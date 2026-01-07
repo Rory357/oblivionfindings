@@ -2,7 +2,6 @@
 
 namespace App\Models;
 
-// use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -22,6 +21,10 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+
+        // Keep this while you migrate off users.role
+        // (You already reference auth.user.role in React)
+        'role',
     ];
 
     /**
@@ -48,5 +51,63 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
         ];
+    }
+
+    // ---------------------------
+    // Existing relationship
+    // ---------------------------
+    public function assignedClients()
+    {
+        return $this->belongsToMany(\App\Models\Client::class)->withTimestamps();
+    }
+
+    // ---------------------------
+    // RBAC: Roles & Permissions
+    // ---------------------------
+
+    public function roles()
+    {
+        return $this->belongsToMany(\App\Models\Role::class, 'role_user');
+    }
+
+    public function permissionOverrides()
+    {
+        return $this->belongsToMany(\App\Models\Permission::class, 'permission_user')
+            ->withPivot('allowed');
+    }
+
+    public function hasRole(string ...$roles): bool
+    {
+        return $this->roles()
+            ->whereIn('name', $roles)
+            ->exists();
+    }
+
+    public function canDo(string $permissionKey): bool
+    {
+        // 1) explicit deny override wins
+        $deny = $this->permissionOverrides()
+            ->where('permissions.key', $permissionKey)
+            ->wherePivot('allowed', false)
+            ->exists();
+
+        if ($deny) {
+            return false;
+        }
+
+        // 2) explicit allow override
+        $allow = $this->permissionOverrides()
+            ->where('permissions.key', $permissionKey)
+            ->wherePivot('allowed', true)
+            ->exists();
+
+        if ($allow) {
+            return true;
+        }
+
+        // 3) role permissions
+        return $this->roles()
+            ->whereHas('permissions', fn($q) => $q->where('key', $permissionKey))
+            ->exists();
     }
 }
