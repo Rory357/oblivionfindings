@@ -34,6 +34,10 @@ class CreateNewUser implements CreatesNewUsers
             'name' => $input['name'],
             'email' => $input['email'],
             'password' => $input['password'],
+            // New registrations must be approved by an admin before they can log in.
+            'role' => 'pending',
+            'approved_at' => null,
+            'approved_by' => null,
         ]);
     }
 }

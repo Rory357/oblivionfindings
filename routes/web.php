@@ -4,7 +4,13 @@ use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 use Laravel\Fortify\Features;
 use App\Http\Controllers\ClientController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ClientAssignmentController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\StaffController;
+use App\Http\Controllers\StaffAssignmentController;
+use App\Http\Controllers\ShiftController;
+use App\Http\Controllers\TimesheetController;
 
 Route::get('/', function () {
     return Inertia::render('home', [
@@ -17,9 +23,7 @@ Route::get('/contact', function () {
 })->name('contact');
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    Route::get('/dashboard', function () {
-        return Inertia::render('dashboard');
-    })->name('dashboard');
+    Route::get('/dashboard', DashboardController::class)->name('dashboard');
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -28,6 +32,7 @@ Route::middleware(['auth'])->group(function () {
     // (now permission-based so it’s consistent)
     Route::middleware('permission:clients.viewAny')->group(function () {
         Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
+        Route::get('/clients/{client}', [ClientController::class, 'show'])->name('clients.show');
     });
 
     // ✅ Manager/Admin modules (permission-based)
@@ -39,9 +44,25 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/reports', fn() => inertia('reports/index'))->name('reports.index');
     });
 
-    Route::middleware('permission:staff.viewAny')->group(function () {
-        Route::get('/staff', fn() => inertia('staff/index'))->name('staff.index');
-    });
+    // Staff
+    Route::get('/staff', [StaffController::class, 'index'])
+        ->middleware('permission:staff.viewAny')
+        ->name('staff.index');
+    // Staff can always view their own profile; managers/admins can view any (enforced in controller)
+    Route::get('/staff/{user}', [StaffController::class, 'show'])->name('staff.show');
+    Route::get('/staff/{user}/edit', [StaffController::class, 'edit'])
+        ->middleware('permission:staff.update')
+        ->name('staff.edit');
+    Route::put('/staff/{user}', [StaffController::class, 'update'])
+        ->middleware('permission:staff.update')
+        ->name('staff.update');
+
+    Route::get('/staff/{user}/assignments', [StaffAssignmentController::class, 'edit'])
+        ->middleware('permission:staff.assignments.update')
+        ->name('staff.assignments.edit');
+    Route::put('/staff/{user}/assignments', [StaffAssignmentController::class, 'update'])
+        ->middleware('permission:staff.assignments.update')
+        ->name('staff.assignments.update');
 
     Route::middleware('permission:rostering.viewAny')->group(function () {
         Route::get('/rostering', fn() => inertia('rostering/index'))->name('rostering.index');
@@ -52,7 +73,16 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::middleware('permission:calendar.viewAny')->group(function () {
-        Route::get('/calendar', fn() => inertia('calendar/index'))->name('calendar.index');
+        Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
+        Route::get('/calendar/events', [CalendarController::class, 'events'])->name('calendar.events');
+
+        // Calendar interactions (create/edit shifts inline)
+        Route::post('/calendar/shifts', [CalendarController::class, 'storeShift'])
+            ->middleware('permission:shifts.create')
+            ->name('calendar.shifts.store');
+        Route::patch('/calendar/shifts/{shift}', [CalendarController::class, 'updateShift'])
+            ->middleware('permission:shifts.update')
+            ->name('calendar.shifts.update');
     });
 
     // ✅ Client create/update (manager/admin permissions)
@@ -75,10 +105,39 @@ Route::middleware(['auth'])->group(function () {
             ->name('clients.assignments.update');
     });
 
-    // ✅ Support worker module (permission-based now)
-    Route::middleware('permission:shifts.viewAny')->group(function () {
-        Route::get('/shifts', fn() => inertia('shifts/index'))->name('shifts.index');
-    });
+    // Shifts
+    Route::get('/shifts', [ShiftController::class, 'index'])
+        ->middleware('permission:shifts.viewAny')
+        ->name('shifts.index');
+    Route::get('/shifts/create', [ShiftController::class, 'create'])
+        ->middleware('permission:shifts.create')
+        ->name('shifts.create');
+    Route::post('/shifts', [ShiftController::class, 'store'])
+        ->middleware('permission:shifts.create')
+        ->name('shifts.store');
+    Route::get('/shifts/{shift}/edit', [ShiftController::class, 'edit'])
+        ->middleware('permission:shifts.update')
+        ->name('shifts.edit');
+    Route::put('/shifts/{shift}', [ShiftController::class, 'update'])
+        ->middleware('permission:shifts.update')
+        ->name('shifts.update');
+
+    // Timesheets
+    Route::get('/timesheets', [TimesheetController::class, 'index'])
+        ->middleware('permission:timesheets.viewAny')
+        ->name('timesheets.index');
+    Route::get('/timesheets/create', [TimesheetController::class, 'create'])
+        ->middleware('permission:timesheets.create')
+        ->name('timesheets.create');
+    Route::post('/timesheets', [TimesheetController::class, 'store'])
+        ->middleware('permission:timesheets.create')
+        ->name('timesheets.store');
+    Route::get('/timesheets/{timesheet}/edit', [TimesheetController::class, 'edit'])
+        ->middleware('permission:timesheets.viewAny')
+        ->name('timesheets.edit');
+    Route::put('/timesheets/{timesheet}', [TimesheetController::class, 'update'])
+        ->middleware('permission:timesheets.update')
+        ->name('timesheets.update');
 });
 
 require __DIR__ . '/settings.php';

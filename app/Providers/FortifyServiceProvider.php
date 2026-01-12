@@ -10,6 +10,12 @@ use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
+use Laravel\Fortify\Actions\AttemptToAuthenticate;
+use Laravel\Fortify\Actions\CanonicalizeUsername;
+use Laravel\Fortify\Actions\EnsureLoginIsNotThrottled;
+use Laravel\Fortify\Actions\PrepareAuthenticatedSession;
+use Laravel\Fortify\Actions\RedirectIfTwoFactorAuthenticatable;
+use Laravel\Fortify\Contracts\RegisterResponse;
 use Laravel\Fortify\Features;
 use Laravel\Fortify\Fortify;
 
@@ -29,8 +35,26 @@ class FortifyServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureActions();
+        $this->configureAuthentication();
         $this->configureViews();
         $this->configureRateLimiting();
+    }
+
+    /**
+     * Configure Fortify authentication behavior.
+     */
+    private function configureAuthentication(): void
+    {
+        Fortify::authenticateThrough(function (Request $request) {
+            return array_filter([
+                config('fortify.limiters.login') ? EnsureLoginIsNotThrottled::class : null,
+                CanonicalizeUsername::class,
+                Features::enabled(Features::twoFactorAuthentication()) ? RedirectIfTwoFactorAuthenticatable::class : null,
+                AttemptToAuthenticate::class,
+                \App\Actions\Fortify\EnsureUserIsApproved::class,
+                PrepareAuthenticatedSession::class,
+            ]);
+        });
     }
 
     /**
@@ -38,6 +62,7 @@ class FortifyServiceProvider extends ServiceProvider
      */
     private function configureActions(): void
     {
+        $this->app->singleton(RegisterResponse::class, \App\Http\Responses\RegisterResponse::class);
         Fortify::resetUserPasswordsUsing(ResetUserPassword::class);
         Fortify::createUsersUsing(CreateNewUser::class);
     }

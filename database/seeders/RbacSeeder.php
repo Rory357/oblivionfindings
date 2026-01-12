@@ -42,6 +42,7 @@ class RbacSeeder extends Seeder
             ['key' => 'staff.create', 'description' => 'Create staff'],
             ['key' => 'staff.update', 'description' => 'Update staff'],
             ['key' => 'staff.invite', 'description' => 'Invite staff'],
+            ['key' => 'staff.assignments.update', 'description' => 'Assign clients to staff'],
 
             // Workers / modules
             ['key' => 'workers.viewAny', 'description' => 'View workers'],
@@ -49,13 +50,29 @@ class RbacSeeder extends Seeder
             ['key' => 'rostering.viewAny', 'description' => 'View rostering'],
             ['key' => 'fleet.viewAny', 'description' => 'View fleet management'],
             ['key' => 'calendar.viewAny', 'description' => 'View calendar'],
+            // Shifts (appointments)
             ['key' => 'shifts.viewAny', 'description' => 'View shifts'],
+            ['key' => 'shifts.create', 'description' => 'Create shifts'],
+            ['key' => 'shifts.update', 'description' => 'Update shifts'],
+            ['key' => 'shifts.manageAny', 'description' => 'Manage any staff shifts'],
+
+            // Timesheets
+            ['key' => 'timesheets.viewAny', 'description' => 'View timesheets'],
+            ['key' => 'timesheets.create', 'description' => 'Create timesheets'],
+            ['key' => 'timesheets.update', 'description' => 'Update timesheets'],
+            ['key' => 'timesheets.approve', 'description' => 'Approve/reject timesheets'],
+            ['key' => 'timesheets.manageAny', 'description' => 'Manage any staff timesheets'],
 
             // Clients
             ['key' => 'clients.viewAny', 'description' => 'View clients'],
             ['key' => 'clients.create', 'description' => 'Create clients'],
             ['key' => 'clients.update', 'description' => 'Update clients'],
             ['key' => 'clients.assignments.update', 'description' => 'Manage client assignments'],
+
+            // Settings
+            ['key' => 'settings.access.manage', 'description' => 'Manage user access (roles & overrides)'],
+            ['key' => 'settings.terminology.manage', 'description' => 'Manage UI terminology (labels)'],
+            ['key' => 'settings.branding.manage', 'description' => 'Manage organisation branding (colors, logo)'],
         ];
 
         foreach ($permissions as $perm) {
@@ -81,6 +98,7 @@ class RbacSeeder extends Seeder
                 'staff.create',
                 'staff.update',
                 'staff.invite',
+                'staff.assignments.update',
 
                 'workers.viewAny',
                 'reports.viewAny',
@@ -88,10 +106,24 @@ class RbacSeeder extends Seeder
                 'fleet.viewAny',
                 'calendar.viewAny',
 
+                'shifts.viewAny',
+                'shifts.create',
+                'shifts.update',
+                'shifts.manageAny',
+
+                'timesheets.viewAny',
+                'timesheets.create',
+                'timesheets.update',
+                'timesheets.approve',
+                'timesheets.manageAny',
+
                 'clients.viewAny',
                 'clients.create',
                 'clients.update',
                 'clients.assignments.update',
+
+                // Settings (adjust to taste)
+                'settings.terminology.manage',
             ])->pluck('id')
         );
 
@@ -100,6 +132,9 @@ class RbacSeeder extends Seeder
             Permission::whereIn('key', [
                 'clients.viewAny',
                 'shifts.viewAny',
+                'timesheets.viewAny',
+                'timesheets.create',
+                'timesheets.update',
             ])->pluck('id')
         );
 

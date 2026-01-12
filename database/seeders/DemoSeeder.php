@@ -13,12 +13,12 @@ class DemoSeeder extends Seeder
     {
         User::updateOrCreate(
             ['email' => 'admin@demo.test'],
-            ['name' => 'Demo Admin', 'password' => Hash::make('password'), 'role' => 'admin']
+            ['name' => 'Demo Admin', 'password' => Hash::make('password'), 'role' => 'admin', 'approved_at' => now()]
         );
 
         User::updateOrCreate(
             ['email' => 'manager@demo.test'],
-            ['name' => 'Demo Manager', 'password' => Hash::make('password'), 'role' => 'provider_manager']
+            ['name' => 'Demo Manager', 'password' => Hash::make('password'), 'role' => 'provider_manager', 'approved_at' => now()]
         );
 
         $workers = User::factory()->count(6)->create([

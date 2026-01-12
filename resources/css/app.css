@@ -141,3 +141,35 @@
         @apply bg-background text-foreground;
     }
 }
+
+/* FullCalendar theming (uses existing CSS variables so Branding settings apply) */
+.of-calendar .fc {
+    --fc-border-color: var(--border);
+    --fc-page-bg-color: transparent;
+    --fc-neutral-bg-color: var(--muted);
+    --fc-neutral-text-color: var(--muted-foreground);
+
+    --fc-button-bg-color: var(--primary);
+    --fc-button-border-color: var(--primary);
+    --fc-button-text-color: var(--primary-foreground);
+
+    --fc-button-hover-bg-color: var(--primary);
+    --fc-button-hover-border-color: var(--primary);
+
+    --fc-button-active-bg-color: var(--primary);
+    --fc-button-active-border-color: var(--primary);
+
+    --fc-today-bg-color: var(--accent);
+}
+
+.of-calendar .fc .fc-toolbar-title {
+    font-size: 1rem;
+}
+
+.of-calendar .fc .fc-button {
+    border-radius: 0.5rem;
+}
+
+.of-calendar .fc .fc-event {
+    border-radius: 0.5rem;
+}

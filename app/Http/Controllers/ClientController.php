@@ -29,6 +29,37 @@ class ClientController extends Controller
         ]);
     }
 
+    public function show(Request $request, Client $client)
+    {
+        $this->authorize('view', $client);
+
+        $client->load([
+            'supportWorkers:id,name,email',
+        ]);
+
+        // For modal / async detail views, return JSON.
+        if ($request->wantsJson() || $request->boolean('modal')) {
+            return response()->json([
+                'client' => [
+                    'id' => $client->id,
+                    'first_name' => $client->first_name,
+                    'last_name' => $client->last_name,
+                    'status' => $client->status,
+                    'support_workers' => $client->supportWorkers->map(fn($u) => [
+                        'id' => $u->id,
+                        'name' => $u->name,
+                        'email' => $u->email,
+                    ])->values(),
+                ],
+            ]);
+        }
+
+        // Fallback (optional future full page)
+        return inertia('clients/show', [
+            'client' => $client,
+        ]);
+    }
+
 
     // public function show(Client $client)
     // {

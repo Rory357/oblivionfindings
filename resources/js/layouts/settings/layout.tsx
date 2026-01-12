@@ -8,6 +8,7 @@ import { show } from '@/routes/two-factor';
 import { edit as editPassword } from '@/routes/user-password';
 import { type NavItem } from '@/types';
 import { Link } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 
 const sidebarNavItems: NavItem[] = [
@@ -40,6 +41,21 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     }
 
     const currentPath = window.location.pathname;
+    const { auth } = usePage().props as any;
+    const can = auth?.can;
+
+    const extraItems: NavItem[] = [];
+    if (can?.settings?.manageTerminology) {
+        extraItems.push({ title: 'Terminology', href: '/settings/terminology', icon: null });
+    }
+    if (can?.settings?.manageBranding) {
+        extraItems.push({ title: 'Branding', href: '/settings/branding', icon: null });
+    }
+    if (can?.settings?.manageAccess) {
+        extraItems.push({ title: 'Access Control', href: '/settings/access', icon: null });
+    }
+
+    const allItems = [...sidebarNavItems, ...extraItems];
 
     return (
         <div className="px-4 py-6">
@@ -51,7 +67,7 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             <div className="flex flex-col lg:flex-row lg:space-x-12">
                 <aside className="w-full max-w-xl lg:w-48">
                     <nav className="flex flex-col space-y-1 space-x-0">
-                        {sidebarNavItems.map((item, index) => (
+                        {allItems.map((item, index) => (
                             <Button
                                 key={`${resolveUrl(item.href)}-${index}`}
                                 size="sm"

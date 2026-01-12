@@ -25,17 +25,17 @@ import {
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
-type Role = 'admin' | 'provider_manager' | 'support_worker';
-
 type PageProps = {
     auth: {
         user: null | {
             name: string;
             email: string;
-            role?: Role | null;
+            role?: string | null;
             organization_id?: number | null;
         };
+        can?: any;
     };
+    labels?: Record<string, string>;
 };
 
 const footerNavItems: NavItem[] = [
@@ -51,7 +51,7 @@ const footerNavItems: NavItem[] = [
     },
 ];
 
-function buildMainNav(role?: Role | null): NavItem[] {
+function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; labels: Record<string, string> }): NavItem[] {
     const items: NavItem[] = [
         {
             title: 'Dashboard',
@@ -60,16 +60,26 @@ function buildMainNav(role?: Role | null): NavItem[] {
         },
     ];
 
-    // Support Worker nav
+    const clientPlural = labels['client.plural'] ?? 'Clients';
+    const staffPlural = labels['staff.plural'] ?? 'Staff';
+    const shiftPlural = labels['shift.plural'] ?? 'Shifts';
+    const timesheetPlural = labels['timesheet.plural'] ?? 'Timesheets';
+
+    // Support Worker nav (kept for now, but also gate via permissions)
     if (role === 'support_worker') {
         items.push(
             {
                 title: 'My Shifts',
-                href: '/my-shifts',
+                href: '/shifts',
                 icon: CalendarDays,
             },
             {
-                title: 'Clients',
+                title: timesheetPlural,
+                href: '/timesheets',
+                icon: ClipboardList,
+            },
+            {
+                title: clientPlural,
                 href: '/clients',
                 icon: Users,
             },
@@ -82,58 +92,43 @@ function buildMainNav(role?: Role | null): NavItem[] {
         return items;
     }
 
-    // Provider Manager / Admin nav (default)
-    items.push(
-        {
-            title: 'Clients',
-            href: '/clients',
-            icon: Users,
-        },
-        {
-            title: 'Shifts',
-            href: '/shifts',
-            icon: CalendarDays,
-        },
-        {
-            title: 'Staff',
-            href: '/staff',
-            icon: ClipboardList,
-        },
-        {
-            title: 'Reports',
-            href: '/reports',
-            icon: FileText,
-        },
-        {
-            title: 'Rostering',
-            href: '/rostering',
-            icon: Settings,
-        },
-        {
-            title: 'Fleet Management',
-            href: '/fleet-management',
-            icon: Settings,
-        },
-        {
-            title: 'Calendar',
-            href: '/calendar',
-            icon: CalendarDays,
-        },
-        {
-            title: 'Settings',
-            href: '/settings',
-            icon: Settings,
-        },
-    );
+    // Provider/Manager/Admin nav (permission gated)
+    if (can?.clients?.viewAny) {
+        items.push({ title: clientPlural, href: '/clients', icon: Users });
+    }
+    if (can?.shifts?.viewAny) {
+        items.push({ title: shiftPlural, href: '/shifts', icon: CalendarDays });
+    }
+    if (can?.timesheets?.viewAny) {
+        items.push({ title: timesheetPlural, href: '/timesheets', icon: ClipboardList });
+    }
+    if (can?.staff?.viewAny) {
+        items.push({ title: staffPlural, href: '/staff', icon: ClipboardList });
+    }
+    if (can?.reports?.viewAny) {
+        items.push({ title: 'Reports', href: '/reports', icon: FileText });
+    }
+    if (can?.rostering?.viewAny) {
+        items.push({ title: 'Rostering', href: '/rostering', icon: Settings });
+    }
+    if (can?.fleet?.viewAny) {
+        items.push({ title: 'Fleet Management', href: '/fleet-management', icon: Settings });
+    }
+    if (can?.calendar?.viewAny) {
+        items.push({ title: 'Calendar', href: '/calendar', icon: CalendarDays });
+    }
+    items.push({ title: 'Settings', href: '/settings', icon: Settings });
 
     return items;
 }
 
 export function AppSidebar() {
     const { auth } = usePage<PageProps>().props;
+    const { labels } = usePage<PageProps>().props;
     const role = auth.user?.role ?? null;
+    const can = auth?.can;
 
-    const mainNavItems = buildMainNav(role);
+    const mainNavItems = buildMainNav({ role, can, labels: labels ?? {} });
 
     return (
         <Sidebar collapsible="icon" variant="inset">

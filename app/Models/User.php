@@ -25,6 +25,10 @@ class User extends Authenticatable
         // Keep this while you migrate off users.role
         // (You already reference auth.user.role in React)
         'role',
+
+        // Admin approval gate
+        'approved_at',
+        'approved_by',
     ];
 
     /**
@@ -50,7 +54,13 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
+            'approved_at' => 'datetime',
         ];
+    }
+
+    public function isApproved(): bool
+    {
+        return !is_null($this->approved_at);
     }
 
     // ---------------------------
@@ -59,6 +69,21 @@ class User extends Authenticatable
     public function assignedClients()
     {
         return $this->belongsToMany(\App\Models\Client::class)->withTimestamps();
+    }
+
+    public function staffProfile()
+    {
+        return $this->hasOne(\App\Models\StaffProfile::class);
+    }
+
+    public function shifts()
+    {
+        return $this->hasMany(\App\Models\Shift::class);
+    }
+
+    public function timesheets()
+    {
+        return $this->hasMany(\App\Models\Timesheet::class);
     }
 
     // ---------------------------
