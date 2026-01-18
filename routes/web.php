@@ -11,6 +11,8 @@ use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StaffAssignmentController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\TimesheetController;
+use App\Http\Controllers\Auth\MicrosoftController;
+use App\Http\Controllers\Auth\GoogleController;
 
 Route::get('/', function () {
     return Inertia::render('home', [
@@ -25,6 +27,12 @@ Route::get('/contact', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
 });
+
+Route::get('/auth/google/redirect', [GoogleController::class, 'redirect'])->name('auth.google.redirect');
+Route::get('/auth/google/callback', [GoogleController::class, 'callback'])->name('auth.google.callback');
+
+Route::get('/auth/microsoft/redirect', [MicrosoftController::class, 'redirect'])->name('auth.microsoft.redirect');
+Route::get('/auth/microsoft/callback', [MicrosoftController::class, 'callback'])->name('auth.microsoft.callback');
 
 Route::middleware(['auth'])->group(function () {
 

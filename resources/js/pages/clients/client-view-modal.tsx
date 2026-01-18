@@ -1,4 +1,9 @@
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useEffect, useMemo, useState } from 'react';
@@ -83,96 +88,101 @@ export default function ClientViewModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-2xl h-[80vh] overflow-hidden p-0">
+            <DialogContent className="h-[80vh] max-w-3xl overflow-hidden p-0">
                 <div className="flex h-full flex-col">
                     <DialogHeader className="px-6 pt-6">
-                    <DialogTitle>
-                        {labels['client.singular']}: {title}
-                    </DialogTitle>
+                        <DialogTitle>
+                            {labels['client.singular']}: {title}
+                        </DialogTitle>
                     </DialogHeader>
 
                     <div className="flex-1 overflow-y-auto px-6 pb-6">
-
-                {loading && (
-                    <div className="space-y-3">
-                        <Skeleton className="h-5 w-56" />
-                        <Skeleton className="h-4 w-full" />
-                        <Skeleton className="h-4 w-2/3" />
-                        <Separator />
-                        <Skeleton className="h-5 w-40" />
-                        <Skeleton className="h-12 w-full" />
-                    </div>
-                )}
-
-                {!loading && error && (
-                    <div className="rounded-md border p-3 text-sm text-red-500">
-                        {error}
-                    </div>
-                )}
-
-                {!loading && !error && detail && (
-                    <div className="space-y-6">
-                        <div className="space-y-2">
-                            <div className="text-sm font-semibold">General</div>
-                            <div className="grid grid-cols-2 gap-4 text-sm">
-                                <div>
-                                    <div className="text-xs text-muted-foreground">
-                                        First name
-                                    </div>
-                                    <div>{detail.first_name}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-muted-foreground">
-                                        Last name
-                                    </div>
-                                    <div>{detail.last_name}</div>
-                                </div>
-                                <div>
-                                    <div className="text-xs text-muted-foreground">
-                                        Status
-                                    </div>
-                                    <div>{detail.status}</div>
-                                </div>
+                        {loading && (
+                            <div className="space-y-3">
+                                <Skeleton className="h-5 w-56" />
+                                <Skeleton className="h-4 w-full" />
+                                <Skeleton className="h-4 w-2/3" />
+                                <Separator />
+                                <Skeleton className="h-5 w-40" />
+                                <Skeleton className="h-12 w-full" />
                             </div>
-                        </div>
+                        )}
 
-                        <Separator />
-
-                        <div className="space-y-2">
-                            <div className="text-sm font-semibold">
-                                Assigned {labels['worker.plural']}
+                        {!loading && error && (
+                            <div className="rounded-md border p-3 text-sm text-red-500">
+                                {error}
                             </div>
+                        )}
 
-                            {detail.support_workers.length === 0 ? (
-                                <div className="text-sm text-muted-foreground">
-                                    No {labels['worker.plural'].toLowerCase()} assigned.
-                                </div>
-                            ) : (
+                        {!loading && !error && detail && (
+                            <div className="space-y-6">
                                 <div className="space-y-2">
-                                    {detail.support_workers.map((w) => (
-                                        <div
-                                            key={w.id}
-                                            className="rounded-md border p-3"
-                                        >
-                                            <div className="text-sm font-medium">
-                                                {w.name}
-                                            </div>
+                                    <div className="text-sm font-semibold">
+                                        General
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4 text-sm">
+                                        <div>
                                             <div className="text-xs text-muted-foreground">
-                                                {w.email}
+                                                First name
                                             </div>
+                                            <div>{detail.first_name}</div>
                                         </div>
-                                    ))}
+                                        <div>
+                                            <div className="text-xs text-muted-foreground">
+                                                Last name
+                                            </div>
+                                            <div>{detail.last_name}</div>
+                                        </div>
+                                        <div>
+                                            <div className="text-xs text-muted-foreground">
+                                                Status
+                                            </div>
+                                            <div>{detail.status}</div>
+                                        </div>
+                                    </div>
                                 </div>
-                            )}
-                        </div>
 
-                        {/* Future sections (permission-gated later)
+                                <Separator />
+
+                                <div className="space-y-2">
+                                    <div className="text-sm font-semibold">
+                                        Assigned {labels['worker.plural']}
+                                    </div>
+
+                                    {detail.support_workers.length === 0 ? (
+                                        <div className="text-sm text-muted-foreground">
+                                            No{' '}
+                                            {labels[
+                                                'worker.plural'
+                                            ].toLowerCase()}{' '}
+                                            assigned.
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {detail.support_workers.map((w) => (
+                                                <div
+                                                    key={w.id}
+                                                    className="rounded-md border p-3"
+                                                >
+                                                    <div className="text-sm font-medium">
+                                                        {w.name}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        {w.email}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Future sections (permission-gated later)
                             - Schedule (upcoming appointments)
                             - Plans / Notes
                             - Sensitive Diary
                         */}
-                    </div>
-                )}
+                            </div>
+                        )}
                     </div>
                 </div>
             </DialogContent>

@@ -75,7 +75,7 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                     </div>
                 )}
 
-                <div className="rounded-xl border p-4">
+                <div className="m-4 rounded-xl border p-4">
                     <div className="text-sm text-slate-500">Client</div>
                     <div className="text-lg font-semibold">
                         {client.first_name} {client.last_name}
@@ -85,7 +85,7 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                     </div>
                 </div>
 
-                <div className="rounded-xl border p-4">
+                <div className="m-4 rounded-xl border p-4">
                     <div className="flex items-center justify-between gap-3">
                         <div>
                             <div className="text-lg font-semibold">
