@@ -2,16 +2,23 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ClientDocument extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'client_id',
         'uploaded_by_user_id',
         'title',
         'category',
+        'version',
+        'effective_date',
+        'expiry_date',
+        'portal_visible',
         'notes',
         'storage_disk',
         'storage_path',
@@ -19,6 +26,12 @@ class ClientDocument extends Model
         'mime_type',
         'size_bytes',
         'openai_file_id',
+    ];
+
+    protected $casts = [
+        'effective_date' => 'date',
+        'expiry_date' => 'date',
+        'portal_visible' => 'boolean',
     ];
 
     public function client(): BelongsTo

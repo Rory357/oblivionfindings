@@ -23,9 +23,10 @@ type Props = {
         assigned_clients?: Client[];
     };
     todayShifts: Shift[];
+    upcomingShifts: Shift[];
 };
 
-export default function StaffShow({ user, todayShifts }: Props) {
+export default function StaffShow({ user, todayShifts, upcomingShifts }: Props) {
     const { auth, labels } = usePage().props as any;
     const can = auth?.can;
 
@@ -47,6 +48,12 @@ export default function StaffShow({ user, todayShifts }: Props) {
                     </div>
 
                     <div className="flex items-center gap-2">
+                        <Link href={`/staff/${user.id}/credentials`}>
+                            <Button variant="outline">Credentials</Button>
+                        </Link>
+                        <Link href={`/staff/${user.id}/availability`}>
+                            <Button variant="outline">Availability</Button>
+                        </Link>
                         {can?.staff?.assignmentsUpdate ? (
                             <Link href={`/staff/${user.id}/assignments`}>
                                 <Button variant="outline">Assignments</Button>
@@ -99,6 +106,41 @@ export default function StaffShow({ user, todayShifts }: Props) {
                                 ))
                             ) : (
                                 <div className="text-sm text-muted-foreground">No shifts today.</div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div className="rounded-md border p-4 md:col-span-2">
+                        <div className="font-medium">Upcoming schedule (next 14 days)</div>
+                        <div className="mt-3 divide-y">
+                            {upcomingShifts?.length ? (
+                                upcomingShifts.map((s) => (
+                                    <div key={s.id} className="flex items-start justify-between gap-3 py-3">
+                                        <div>
+                                            <div className="text-sm font-medium">
+                                                {new Date(s.starts_at).toLocaleString([], {
+                                                    weekday: 'short',
+                                                    month: 'short',
+                                                    day: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                })}
+                                                {' – '}
+                                                {new Date(s.ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {s.client ? `${s.client.first_name} ${s.client.last_name}` : '—'}
+                                                {s.location ? ` • ${s.location}` : ''}
+                                                {s.status ? ` • ${s.status}` : ''}
+                                            </div>
+                                        </div>
+                                        <Link className="text-xs underline" href={`/shifts/${s.id}/edit`}>
+                                            View
+                                        </Link>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="py-3 text-sm text-muted-foreground">No upcoming shifts.</div>
                             )}
                         </div>
                     </div>

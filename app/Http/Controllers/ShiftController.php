@@ -12,7 +12,7 @@ class ShiftController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('shifts.viewAny'), 403);
+        abort_unless($auth && ($auth->canDo('shifts.viewAny') || $auth->canDo('shifts.viewAssigned')), 403);
 
         $date = $request->query('date');
         $day = $date ? now()->parse($date)->startOfDay() : now()->startOfDay();
@@ -24,7 +24,7 @@ class ShiftController extends Controller
             ->orderBy('starts_at');
 
         if (!$auth->canDo('shifts.manageAny')) {
-            // Support staff: only their own shifts
+            // Assigned-only access: only their own shifts
             $query->where('user_id', $auth->id);
         }
 

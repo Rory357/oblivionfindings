@@ -2,19 +2,37 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Client extends Model
 {
     use HasFactory;
+    use AuditableChanges;
 
     protected $fillable = [
         'site_id',
         'first_name',
         'last_name',
+        'date_of_birth',
+        'preferred_name',
+        'gender',
         'status',
+        'phone',
+        'email',
+        'address_line_1',
+        'address_line_2',
+        'suburb',
+        'city',
+        'postcode',
+        'funding_type',
+        'funding_notes',
         'openai_vector_store_id',
+    ];
+
+    protected $casts = [
+        'date_of_birth' => 'date',
     ];
 
     public function site()
@@ -62,5 +80,15 @@ class Client extends Model
     public function documents()
     {
         return $this->hasMany(\App\Models\ClientDocument::class);
+    }
+
+    public function supportPlan()
+    {
+        return $this->hasOne(\App\Models\ClientSupportPlan::class);
+    }
+
+    public function assessments()
+    {
+        return $this->hasMany(\App\Models\ClientAssessment::class);
     }
 }

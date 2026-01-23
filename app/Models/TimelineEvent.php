@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class TimelineEvent extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'source_type',
         'source_id',

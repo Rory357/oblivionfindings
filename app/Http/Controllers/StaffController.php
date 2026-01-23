@@ -58,6 +58,8 @@ class StaffController extends Controller
         $today = now()->startOfDay();
         $tomorrow = now()->addDay()->startOfDay();
 
+        $rangeEnd = now()->addDays(14)->endOfDay();
+
         $todayShifts = \App\Models\Shift::query()
             ->where('user_id', $user->id)
             ->whereBetween('starts_at', [$today, $tomorrow])
@@ -65,9 +67,18 @@ class StaffController extends Controller
             ->with('client:id,first_name,last_name')
             ->get();
 
+        $upcomingShifts = \App\Models\Shift::query()
+            ->where('user_id', $user->id)
+            ->whereBetween('starts_at', [now(), $rangeEnd])
+            ->orderBy('starts_at')
+            ->with('client:id,first_name,last_name')
+            ->limit(200)
+            ->get();
+
         return inertia('staff/show', [
             'user' => $user,
             'todayShifts' => $todayShifts,
+            'upcomingShifts' => $upcomingShifts,
         ]);
     }
 

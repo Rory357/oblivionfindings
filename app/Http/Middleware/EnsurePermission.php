@@ -12,7 +12,15 @@ class EnsurePermission
     {
         $user = $request->user();
 
-        if (!$user || !$user->canDo($permissionKey)) {
+        // Allow simple OR checks: "permission:a|b|c"
+        $keys = array_values(array_filter(array_map('trim', explode('|', $permissionKey))));
+        $allowed = $user && (
+            empty($keys)
+                ? false
+                : collect($keys)->some(fn ($k) => $user->canDo($k))
+        );
+
+        if (!$allowed) {
             abort(403);
         }
 

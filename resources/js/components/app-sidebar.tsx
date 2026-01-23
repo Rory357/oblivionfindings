@@ -23,6 +23,7 @@ import {
     MapPin,
     MessageSquareText,
     Settings,
+    Shield,
     Users,
 } from 'lucide-react';
 import AppLogo from './app-logo';
@@ -134,8 +135,15 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     if (can?.summaries?.viewAny) {
         items.push({ title: 'Summaries', href: '/summaries', icon: FileText });
     }
+    if (can?.audit?.viewAny) {
+        items.push({ title: 'Audit Logs', href: '/audit-logs', icon: Shield });
+    }
     if (can?.unifi?.manage) {
         items.push({ title: 'UniFi', href: '/integrations/unifi', icon: Settings });
+    }
+
+    if (can?.audit?.viewAny) {
+        items.push({ title: 'Audit Logs', href: '/audit-logs', icon: Shield });
     }
     items.push({ title: 'Settings', href: '/settings', icon: Settings });
 

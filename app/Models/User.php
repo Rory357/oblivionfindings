@@ -89,6 +89,16 @@ class User extends Authenticatable
         return $this->hasOne(\App\Models\StaffProfile::class);
     }
 
+    public function staffCredentials()
+    {
+        return $this->hasMany(\App\Models\StaffCredential::class);
+    }
+
+    public function staffAvailabilities()
+    {
+        return $this->hasMany(\App\Models\StaffAvailability::class);
+    }
+
     public function shifts()
     {
         return $this->hasMany(\App\Models\Shift::class);

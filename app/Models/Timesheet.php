@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Timesheet extends Model
 {
     use HasFactory;
+    use AuditableChanges;
 
     protected $fillable = [
         'user_id',

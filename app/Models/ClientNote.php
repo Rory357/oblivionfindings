@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ClientNote extends Model
 {
+    use AuditableChanges;
+
     protected $table = 'client_notes';
 
     protected $fillable = [

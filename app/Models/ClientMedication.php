@@ -2,12 +2,14 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class ClientMedication extends Model
 {
     use HasFactory;
+    use AuditableChanges;
 
     protected $fillable = [
         'client_id',

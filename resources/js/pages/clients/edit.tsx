@@ -10,7 +10,19 @@ export default function EditClient({ client, sites = [] }) {
         site_id: (client.site_id ?? null) as number | null,
         first_name: client.first_name ?? '',
         last_name: client.last_name ?? '',
+        preferred_name: client.preferred_name ?? '',
+        date_of_birth: client.date_of_birth ?? '',
+        gender: client.gender ?? '',
         status: client.status ?? 'active',
+        phone: client.phone ?? '',
+        email: client.email ?? '',
+        address_line_1: client.address_line_1 ?? '',
+        address_line_2: client.address_line_2 ?? '',
+        suburb: client.suburb ?? '',
+        city: client.city ?? '',
+        postcode: client.postcode ?? '',
+        funding_type: client.funding_type ?? '',
+        funding_notes: client.funding_notes ?? '',
     });
 
     function submit(e: React.FormEvent) {
@@ -96,6 +108,44 @@ export default function EditClient({ client, sites = [] }) {
                     </div>
 
                     <div>
+                        <label className="text-sm font-medium">Preferred name</label>
+                        <input
+                            className="mt-1 w-full rounded-md border bg-transparent p-2"
+                            value={data.preferred_name}
+                            onChange={(e) => setData('preferred_name', e.target.value)}
+                        />
+                        {errors.preferred_name && (
+                            <div className="mt-1 text-xs text-red-400">{errors.preferred_name}</div>
+                        )}
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label className="text-sm font-medium">Date of birth</label>
+                            <input
+                                type="date"
+                                className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                value={data.date_of_birth}
+                                onChange={(e) => setData('date_of_birth', e.target.value)}
+                            />
+                            {errors.date_of_birth && (
+                                <div className="mt-1 text-xs text-red-400">{errors.date_of_birth}</div>
+                            )}
+                        </div>
+                        <div>
+                            <label className="text-sm font-medium">Gender</label>
+                            <input
+                                className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                value={data.gender}
+                                onChange={(e) => setData('gender', e.target.value)}
+                            />
+                            {errors.gender && (
+                                <div className="mt-1 text-xs text-red-400">{errors.gender}</div>
+                            )}
+                        </div>
+                    </div>
+
+                    <div>
                         <label className="text-sm font-medium">Status</label>
                         <select
                             className="mt-1 w-full rounded-md border bg-transparent p-2"
@@ -110,6 +160,248 @@ export default function EditClient({ client, sites = [] }) {
                                 {errors.status}
                             </div>
                         )}
+                    </div>
+
+                    <div className="rounded-lg border p-3">
+                        <div className="text-sm font-medium">Contact</div>
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <label className="text-sm font-medium">Phone</label>
+                                <input
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    value={data.phone}
+                                    onChange={(e) => setData('phone', e.target.value)}
+                                />
+                                {errors.phone && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.phone}</div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">Email</label>
+                                <input
+                                    type="email"
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    value={data.email}
+                                    onChange={(e) => setData('email', e.target.value)}
+                                />
+                                {errors.email && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.email}</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border p-3">
+                        <div className="text-sm font-medium">Address</div>
+                        <div className="mt-3 space-y-3">
+                            <div>
+                                <label className="text-sm font-medium">Address line 1</label>
+                                <input
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    value={data.address_line_1}
+                                    onChange={(e) => setData('address_line_1', e.target.value)}
+                                />
+                                {errors.address_line_1 && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.address_line_1}</div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">Address line 2</label>
+                                <input
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    value={data.address_line_2}
+                                    onChange={(e) => setData('address_line_2', e.target.value)}
+                                />
+                                {errors.address_line_2 && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.address_line_2}</div>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <div>
+                                    <label className="text-sm font-medium">Suburb</label>
+                                    <input
+                                        className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                        value={data.suburb}
+                                        onChange={(e) => setData('suburb', e.target.value)}
+                                    />
+                                    {errors.suburb && (
+                                        <div className="mt-1 text-xs text-red-400">{errors.suburb}</div>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">City</label>
+                                    <input
+                                        className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                        value={data.city}
+                                        onChange={(e) => setData('city', e.target.value)}
+                                    />
+                                    {errors.city && (
+                                        <div className="mt-1 text-xs text-red-400">{errors.city}</div>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">Postcode</label>
+                                    <input
+                                        className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                        value={data.postcode}
+                                        onChange={(e) => setData('postcode', e.target.value)}
+                                    />
+                                    {errors.postcode && (
+                                        <div className="mt-1 text-xs text-red-400">{errors.postcode}</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border p-3">
+                        <div className="text-sm font-medium">Funding</div>
+                        <div className="mt-3 space-y-3">
+                            <div>
+                                <label className="text-sm font-medium">Funding type</label>
+                                <input
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    value={data.funding_type}
+                                    onChange={(e) => setData('funding_type', e.target.value)}
+                                />
+                                {errors.funding_type && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.funding_type}</div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">Funding notes</label>
+                                <textarea
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    rows={4}
+                                    value={data.funding_notes}
+                                    onChange={(e) => setData('funding_notes', e.target.value)}
+                                />
+                                {errors.funding_notes && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.funding_notes}</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border p-3">
+                        <div className="text-sm font-medium">Contact</div>
+                        <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <label className="text-sm font-medium">Phone</label>
+                                <input
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    value={data.phone}
+                                    onChange={(e) => setData('phone', e.target.value)}
+                                />
+                                {errors.phone && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.phone}</div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">Email</label>
+                                <input
+                                    type="email"
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    value={data.email}
+                                    onChange={(e) => setData('email', e.target.value)}
+                                />
+                                {errors.email && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.email}</div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border p-3">
+                        <div className="text-sm font-medium">Address</div>
+                        <div className="mt-3 space-y-3">
+                            <div>
+                                <label className="text-sm font-medium">Address line 1</label>
+                                <input
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    value={data.address_line_1}
+                                    onChange={(e) => setData('address_line_1', e.target.value)}
+                                />
+                                {errors.address_line_1 && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.address_line_1}</div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">Address line 2</label>
+                                <input
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    value={data.address_line_2}
+                                    onChange={(e) => setData('address_line_2', e.target.value)}
+                                />
+                                {errors.address_line_2 && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.address_line_2}</div>
+                                )}
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <div>
+                                    <label className="text-sm font-medium">Suburb</label>
+                                    <input
+                                        className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                        value={data.suburb}
+                                        onChange={(e) => setData('suburb', e.target.value)}
+                                    />
+                                    {errors.suburb && (
+                                        <div className="mt-1 text-xs text-red-400">{errors.suburb}</div>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">City</label>
+                                    <input
+                                        className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                        value={data.city}
+                                        onChange={(e) => setData('city', e.target.value)}
+                                    />
+                                    {errors.city && (
+                                        <div className="mt-1 text-xs text-red-400">{errors.city}</div>
+                                    )}
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">Postcode</label>
+                                    <input
+                                        className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                        value={data.postcode}
+                                        onChange={(e) => setData('postcode', e.target.value)}
+                                    />
+                                    {errors.postcode && (
+                                        <div className="mt-1 text-xs text-red-400">{errors.postcode}</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border p-3">
+                        <div className="text-sm font-medium">Funding</div>
+                        <div className="mt-3 space-y-3">
+                            <div>
+                                <label className="text-sm font-medium">Funding type</label>
+                                <input
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    value={data.funding_type}
+                                    onChange={(e) => setData('funding_type', e.target.value)}
+                                />
+                                {errors.funding_type && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.funding_type}</div>
+                                )}
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">Funding notes</label>
+                                <textarea
+                                    className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                    rows={4}
+                                    value={data.funding_notes}
+                                    onChange={(e) => setData('funding_notes', e.target.value)}
+                                />
+                                {errors.funding_notes && (
+                                    <div className="mt-1 text-xs text-red-400">{errors.funding_notes}</div>
+                                )}
+                            </div>
+                        </div>
                     </div>
 
                     <button

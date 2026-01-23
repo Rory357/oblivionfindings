@@ -17,6 +17,7 @@ class PortalClientController extends Controller
 
         $documents = ClientDocument::query()
             ->where('client_id', $client->id)
+            ->where('portal_visible', true)
             ->orderByDesc('created_at')
             ->get(['id', 'title', 'category', 'notes', 'original_name', 'mime_type', 'size_bytes', 'created_at']);
 

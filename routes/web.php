@@ -22,9 +22,14 @@ use App\Http\Controllers\ClientMedicalController;
 use App\Http\Controllers\ClientDocumentController;
 use App\Http\Controllers\ClientPortalUserController;
 use App\Http\Controllers\ClientRagController;
+use App\Http\Controllers\ClientSupportPlanController;
+use App\Http\Controllers\ClientAssessmentController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\PortalClientController;
 use App\Http\Controllers\RagController;
+use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\StaffCredentialController;
+use App\Http\Controllers\StaffAvailabilityController;
 
 Route::get('/', function () {
     return Inertia::render('home', [
@@ -103,7 +108,7 @@ Route::middleware(['auth'])->group(function () {
 
     // ✅ ALL authenticated users (policy decides data)
     // (now permission-based so it’s consistent)
-    Route::middleware('permission:clients.viewAny')->group(function () {
+    Route::middleware('permission:clients.viewAny|clients.viewAssigned')->group(function () {
         Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
         Route::get('/clients/{client}', [ClientController::class, 'show'])->name('clients.show');
         Route::get('/clients/{client}/documents', [ClientDocumentController::class, 'index'])->name('clients.documents.index');
@@ -139,6 +144,16 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:staff.assignments.update')
         ->name('staff.assignments.update');
 
+    // Staff compliance: credentials + availability
+    Route::get('/staff/{user}/credentials', [StaffCredentialController::class, 'index'])->name('staff.credentials.index');
+    Route::post('/staff/{user}/credentials', [StaffCredentialController::class, 'store'])->name('staff.credentials.store');
+    Route::put('/staff/{user}/credentials/{credential}', [StaffCredentialController::class, 'update'])->name('staff.credentials.update');
+    Route::delete('/staff/{user}/credentials/{credential}', [StaffCredentialController::class, 'destroy'])->name('staff.credentials.destroy');
+
+    Route::get('/staff/{user}/availability', [StaffAvailabilityController::class, 'index'])->name('staff.availability.index');
+    Route::post('/staff/{user}/availability', [StaffAvailabilityController::class, 'store'])->name('staff.availability.store');
+    Route::delete('/staff/{user}/availability/{availability}', [StaffAvailabilityController::class, 'destroy'])->name('staff.availability.destroy');
+
     Route::middleware('permission:rostering.viewAny')->group(function () {
         Route::get('/rostering', fn() => inertia('rostering/index'))->name('rostering.index');
     });
@@ -146,6 +161,11 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:fleet.viewAny')->group(function () {
         Route::get('/fleet-management', fn() => inertia('fleet-management/index'))->name('fleet.index');
     });
+
+    // Audit logs
+    Route::get('/audit-logs', [AuditLogController::class, 'index'])
+        ->middleware('permission:audit.viewAny')
+        ->name('audit.index');
 
     Route::middleware('permission:calendar.viewAny')->group(function () {
         Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
@@ -172,6 +192,7 @@ Route::middleware(['auth'])->group(function () {
 
         // Client medical + portal users management
         Route::post('/clients/{client}/documents', [ClientDocumentController::class, 'store'])->name('clients.documents.store');
+        Route::put('/clients/{client}/documents/{document}', [ClientDocumentController::class, 'update'])->name('clients.documents.update');
         Route::delete('/clients/{client}/documents/{document}', [ClientDocumentController::class, 'destroy'])->name('clients.documents.destroy');
 
         Route::get('/clients/{client}/medical', [ClientMedicalController::class, 'show'])->name('clients.medical.show');
@@ -193,6 +214,17 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/clients/{client}/portal-users/{user}', [ClientPortalUserController::class, 'destroy'])->name('clients.portal_users.destroy');
 
         Route::post('/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])->name('clients.rag.ask');
+
+        // Support plan + assessments
+        Route::put('/clients/{client}/support-plan', [ClientSupportPlanController::class, 'update'])
+            ->name('clients.support_plan.update');
+
+        Route::post('/clients/{client}/assessments', [ClientAssessmentController::class, 'store'])
+            ->name('clients.assessments.store');
+        Route::put('/clients/{client}/assessments/{assessment}', [ClientAssessmentController::class, 'update'])
+            ->name('clients.assessments.update');
+        Route::delete('/clients/{client}/assessments/{assessment}', [ClientAssessmentController::class, 'destroy'])
+            ->name('clients.assessments.destroy');
     });
 
     // ✅ Assign support workers to a client
@@ -206,7 +238,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Shifts
     Route::get('/shifts', [ShiftController::class, 'index'])
-        ->middleware('permission:shifts.viewAny')
+        ->middleware('permission:shifts.viewAny|shifts.viewAssigned')
         ->name('shifts.index');
     Route::get('/shifts/create', [ShiftController::class, 'create'])
         ->middleware('permission:shifts.create')
@@ -223,7 +255,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Timesheets
     Route::get('/timesheets', [TimesheetController::class, 'index'])
-        ->middleware('permission:timesheets.viewAny')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
         ->name('timesheets.index');
     Route::get('/timesheets/create', [TimesheetController::class, 'create'])
         ->middleware('permission:timesheets.create')

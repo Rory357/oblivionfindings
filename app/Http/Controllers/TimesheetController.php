@@ -12,7 +12,7 @@ class TimesheetController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('timesheets.viewAny'), 403);
+        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned')), 403);
 
         $status = $request->query('status');
         $from = $request->query('from');
@@ -116,7 +116,7 @@ class TimesheetController extends Controller
     public function edit(Request $request, Timesheet $timesheet)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('timesheets.viewAny'), 403);
+        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned')), 403);
 
         if (!$auth->canDo('timesheets.manageAny') && $timesheet->user_id !== $auth->id) {
             abort(403);

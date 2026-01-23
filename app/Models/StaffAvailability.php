@@ -6,21 +6,20 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class ClientMedicalProfile extends Model
+class StaffAvailability extends Model
 {
     use HasFactory;
     use AuditableChanges;
 
     protected $fillable = [
-        'client_id',
-        'medical_history',
-        'disabilities',
-        'allergies',
-        'notes',
+        'user_id',
+        'day_of_week',
+        'starts_at',
+        'ends_at',
     ];
 
-    public function client()
+    public function user()
     {
-        return $this->belongsTo(Client::class);
+        return $this->belongsTo(User::class);
     }
 }

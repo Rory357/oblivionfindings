@@ -26,9 +26,29 @@ class RbacSeeder extends Seeder
             ['label' => 'Provider Manager']
         );
 
+        $coordinator = Role::firstOrCreate(
+            ['name' => 'coordinator'],
+            ['label' => 'Coordinator']
+        );
+
         $supportWorker = Role::firstOrCreate(
             ['name' => 'support_worker'],
             ['label' => 'Support Worker']
+        );
+
+        $finance = Role::firstOrCreate(
+            ['name' => 'finance'],
+            ['label' => 'Finance']
+        );
+
+        $hr = Role::firstOrCreate(
+            ['name' => 'hr'],
+            ['label' => 'HR']
+        );
+
+        $auditor = Role::firstOrCreate(
+            ['name' => 'auditor'],
+            ['label' => 'Auditor (Read only)']
         );
 
         $clientRole = Role::firstOrCreate(
@@ -38,12 +58,22 @@ class RbacSeeder extends Seeder
 
         $nextOfKinRole = Role::firstOrCreate(
             ['name' => 'next_of_kin'],
-            ['label' => 'Next of Kin (Portal)']
+            ['label' => 'Next of Kin / Guardian (Portal)']
         );
 
         // Remove any roles we are not using right now (but only if they are not assigned).
         // This keeps the Access Control UI role list clean.
-        $activeRoleNames = ['admin', 'provider_manager', 'support_worker', 'client', 'next_of_kin'];
+        $activeRoleNames = [
+            'admin',
+            'provider_manager',
+            'coordinator',
+            'support_worker',
+            'finance',
+            'hr',
+            'next_of_kin',
+            'client',
+            'auditor',
+        ];
         Role::query()
             ->whereNotIn('name', $activeRoleNames)
             ->doesntHave('users')
@@ -66,6 +96,11 @@ class RbacSeeder extends Seeder
             ['key' => 'staff.update', 'description' => 'Update staff'],
             ['key' => 'staff.invite', 'description' => 'Invite staff'],
             ['key' => 'staff.assignments.update', 'description' => 'Assign clients to staff'],
+            ['key' => 'staff.credentials.viewAny', 'description' => 'View staff credentials'],
+            ['key' => 'staff.credentials.updateAny', 'description' => 'Manage staff credentials'],
+            ['key' => 'staff.credentials.updateSelf', 'description' => 'Manage own credentials'],
+            ['key' => 'staff.availability.updateAny', 'description' => 'Manage staff availability'],
+            ['key' => 'staff.availability.updateSelf', 'description' => 'Manage own availability'],
 
             // Workers / modules
             ['key' => 'workers.viewAny', 'description' => 'View workers'],
@@ -75,12 +110,14 @@ class RbacSeeder extends Seeder
             ['key' => 'calendar.viewAny', 'description' => 'View calendar'],
             // Shifts (appointments)
             ['key' => 'shifts.viewAny', 'description' => 'View shifts'],
+            ['key' => 'shifts.viewAssigned', 'description' => 'View assigned shifts only'],
             ['key' => 'shifts.create', 'description' => 'Create shifts'],
             ['key' => 'shifts.update', 'description' => 'Update shifts'],
             ['key' => 'shifts.manageAny', 'description' => 'Manage any staff shifts'],
 
             // Timesheets
             ['key' => 'timesheets.viewAny', 'description' => 'View timesheets'],
+            ['key' => 'timesheets.viewAssigned', 'description' => 'View assigned timesheets only'],
             ['key' => 'timesheets.create', 'description' => 'Create timesheets'],
             ['key' => 'timesheets.update', 'description' => 'Update timesheets'],
             ['key' => 'timesheets.approve', 'description' => 'Approve/reject timesheets'],
@@ -88,9 +125,13 @@ class RbacSeeder extends Seeder
 
             // Clients
             ['key' => 'clients.viewAny', 'description' => 'View clients'],
+            ['key' => 'clients.viewAssigned', 'description' => 'View assigned clients only'],
             ['key' => 'clients.create', 'description' => 'Create clients'],
             ['key' => 'clients.update', 'description' => 'Update clients'],
             ['key' => 'clients.assignments.update', 'description' => 'Manage client assignments'],
+
+            // Audit logs
+            ['key' => 'audit.viewAny', 'description' => 'View audit logs'],
 
             // Timeline / notes
             ['key' => 'timeline.viewAny', 'description' => 'View timelines (staff/client activity)'],
@@ -142,6 +183,9 @@ class RbacSeeder extends Seeder
                 'staff.update',
                 'staff.invite',
                 'staff.assignments.update',
+                'staff.credentials.viewAny',
+                'staff.credentials.updateAny',
+                'staff.availability.updateAny',
 
                 'workers.viewAny',
                 'reports.viewAny',
@@ -174,7 +218,34 @@ class RbacSeeder extends Seeder
                 // Settings (adjust to taste)
                 'settings.terminology.manage',
 
+                // Audit
+                'audit.viewAny',
+
                 // RAG
+                'rag.ask.any',
+            ])->pluck('id')
+        );
+
+        // Coordinator (global view, limited settings)
+        $coordinator->permissions()->sync(
+            Permission::whereIn('key', [
+                'sites.viewAny',
+                'staff.viewAny',
+                'staff.credentials.viewAny',
+                'staff.credentials.updateAny',
+                'staff.availability.updateAny',
+                'clients.viewAny',
+                'clients.assignments.update',
+                'shifts.viewAny',
+                'shifts.create',
+                'shifts.update',
+                'timesheets.viewAny',
+                'timesheets.approve',
+                'timeline.viewAny',
+                'timeline.create',
+                'summaries.viewAny',
+                'summaries.generate',
+                'calendar.viewAny',
                 'rag.ask.any',
             ])->pluck('id')
         );
@@ -182,17 +253,56 @@ class RbacSeeder extends Seeder
         // Support Worker
         $supportWorker->permissions()->sync(
             Permission::whereIn('key', [
-                'clients.viewAny',
+                'clients.viewAssigned',
                 'timeline.create',
-                'shifts.viewAny',
-                'timesheets.viewAny',
+                'shifts.viewAssigned',
+                'timesheets.viewAssigned',
                 'timesheets.create',
                 'timesheets.update',
+
+                'staff.credentials.updateSelf',
+                'staff.availability.updateSelf',
 
                 'timeline.create',
 
                 // RAG
                 'rag.ask.assigned',
+            ])->pluck('id')
+        );
+
+        // Finance (timesheets + reports)
+        $finance->permissions()->sync(
+            Permission::whereIn('key', [
+                'timesheets.viewAny',
+                'timesheets.approve',
+                'reports.viewAny',
+                'audit.viewAny',
+            ])->pluck('id')
+        );
+
+        // HR (staff + compliance)
+        $hr->permissions()->sync(
+            Permission::whereIn('key', [
+                'staff.viewAny',
+                'staff.update',
+                'staff.credentials.viewAny',
+                'staff.credentials.updateAny',
+                'staff.availability.updateAny',
+                'reports.viewAny',
+                'audit.viewAny',
+            ])->pluck('id')
+        );
+
+        // Auditor (read-only, audit + reporting + view)
+        $auditor->permissions()->sync(
+            Permission::whereIn('key', [
+                'clients.viewAny',
+                'shifts.viewAny',
+                'timesheets.viewAny',
+                'reports.viewAny',
+                'timeline.viewAny',
+                'summaries.viewAny',
+                'audit.viewAny',
             ])->pluck('id')
         );
 
@@ -218,13 +328,17 @@ class RbacSeeder extends Seeder
         */
         User::query()
             ->select('id', 'role')
-            ->chunk(200, function ($users) use ($admin, $providerManager, $supportWorker) {
+            ->chunk(200, function ($users) use ($admin, $providerManager, $coordinator, $supportWorker, $finance, $hr, $auditor) {
                 foreach ($users as $user) {
                     $roleName = $user->role ?? 'support_worker';
 
                     $role = match ($roleName) {
                         'admin' => $admin,
                         'provider_manager' => $providerManager,
+                        'coordinator' => $coordinator,
+                        'finance' => $finance,
+                        'hr' => $hr,
+                        'auditor' => $auditor,
                         default => $supportWorker,
                     };
 

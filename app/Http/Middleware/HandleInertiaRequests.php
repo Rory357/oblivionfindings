@@ -41,6 +41,11 @@ class HandleInertiaRequests extends Middleware
                     'update'  => $user->canDo('staff.update'),
                     'invite'  => $user->canDo('staff.invite'),
                     'assignmentsUpdate' => $user->canDo('staff.assignments.update'),
+                    'credentialsViewAny' => $user->canDo('staff.credentials.viewAny'),
+                    'credentialsUpdateAny' => $user->canDo('staff.credentials.updateAny'),
+                    'credentialsUpdateSelf' => $user->canDo('staff.credentials.updateSelf'),
+                    'availabilityUpdateAny' => $user->canDo('staff.availability.updateAny'),
+                    'availabilityUpdateSelf' => $user->canDo('staff.availability.updateSelf'),
                 ],
                 'clients' => [
                     'viewAny' => $user->canDo('clients.viewAny'),
@@ -87,6 +92,10 @@ class HandleInertiaRequests extends Middleware
                 'summaries' => [
                     'viewAny' => $user->canDo('summaries.viewAny'),
                     'generate' => $user->canDo('summaries.generate'),
+                ],
+
+                'audit' => [
+                    'viewAny' => $user->canDo('audit.viewAny'),
                 ],
 
                 'unifi' => [

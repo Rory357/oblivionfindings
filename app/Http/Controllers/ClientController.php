@@ -7,6 +7,7 @@ use App\Models\ClientDocument;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Models\Site;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
@@ -37,6 +38,8 @@ class ClientController extends Controller
     {
         $this->authorize('view', $client);
 
+        AuditLogger::log('clients.view', $client);
+
         $client->load([
             'site:id,name',
             'supportWorkers:id,name,email',
@@ -45,6 +48,8 @@ class ClientController extends Controller
             'conditions',
             'emergencyContacts',
             'portalUsers:id,name,email',
+            'supportPlan',
+            'assessments',
         ]);
 
         // For modal / async detail views, return JSON.
@@ -73,7 +78,7 @@ class ClientController extends Controller
         $documents = ClientDocument::query()
             ->where('client_id', $client->id)
             ->orderByDesc('created_at')
-            ->get(['id','title','category','notes','original_name','mime_type','size_bytes','created_at']);
+            ->get(['id','title','category','version','effective_date','expiry_date','portal_visible','notes','original_name','mime_type','size_bytes','created_at']);
 
         $events = TimelineEvent::query()
             ->where('client_id', $client->id)
@@ -87,7 +92,19 @@ class ClientController extends Controller
                 'id' => $client->id,
                 'first_name' => $client->first_name,
                 'last_name' => $client->last_name,
+                'preferred_name' => $client->preferred_name,
+                'date_of_birth' => optional($client->date_of_birth)->toDateString(),
+                'gender' => $client->gender,
                 'status' => $client->status,
+                'phone' => $client->phone,
+                'email' => $client->email,
+                'address_line_1' => $client->address_line_1,
+                'address_line_2' => $client->address_line_2,
+                'suburb' => $client->suburb,
+                'city' => $client->city,
+                'postcode' => $client->postcode,
+                'funding_type' => $client->funding_type,
+                'funding_notes' => $client->funding_notes,
                 'site' => $client->site ? ['id' => $client->site->id, 'name' => $client->site->name] : null,
                 'support_workers' => $client->supportWorkers->map(fn($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email])->values(),
             ],
@@ -97,6 +114,10 @@ class ClientController extends Controller
                 'conditions' => $client->conditions,
                 'emergency_contacts' => $client->emergencyContacts,
             ],
+            'support_plan' => $client->supportPlan,
+            'assessments' => $client->assessments
+                ->sortByDesc(fn($a) => $a->assessed_at ?? $a->created_at)
+                ->values(),
             'documents' => $documents,
             'portal_users' => $client->portalUsers->map(fn($u) => [
                 'id' => $u->id,
@@ -116,6 +137,7 @@ class ClientController extends Controller
             'can' => [
                 'edit' => $request->user()?->canDo('clients.update') ?? false,
                 'assign_workers' => $request->user()?->canDo('clients.assignments.update') ?? false,
+                'create_note' => $request->user()?->canDo('timeline.create') ?? false,
             ],
         ]);
     }
@@ -170,7 +192,10 @@ class ClientController extends Controller
         $sites = $sitesQuery->get(['id', 'name', 'is_active']);
 
         return inertia('clients/edit', [
-            'client' => $client->only(['id', 'site_id', 'first_name', 'last_name', 'status']),
+            'client' => $client->only([
+                'id','site_id','first_name','last_name','preferred_name','date_of_birth','gender','status',
+                'phone','email','address_line_1','address_line_2','suburb','city','postcode','funding_type','funding_notes',
+            ]),
             'sites' => $sites,
         ]);
     }

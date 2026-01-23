@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\ClientDocument;
 use App\Services\Rag\OpenAiVectorStoreClient;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -13,6 +14,8 @@ class ClientDocumentController extends Controller
     public function index(Request $request, Client $client)
     {
         $this->authorize('view', $client);
+
+        AuditLogger::log('documents.list', $client);
 
         $documents = ClientDocument::query()
             ->where('client_id', $client->id)
@@ -27,6 +30,10 @@ class ClientDocumentController extends Controller
                 'id' => $d->id,
                 'title' => $d->title,
                 'category' => $d->category,
+                'version' => $d->version,
+                'effective_date' => optional($d->effective_date)->toDateString(),
+                'expiry_date' => optional($d->expiry_date)->toDateString(),
+                'portal_visible' => (bool) $d->portal_visible,
                 'notes' => $d->notes,
                 'original_name' => $d->original_name,
                 'mime_type' => $d->mime_type,
@@ -49,6 +56,10 @@ class ClientDocumentController extends Controller
             'file' => ['required', 'file', 'max:51200'],
             'title' => ['nullable', 'string', 'max:200'],
             'category' => ['nullable', 'string', 'max:60'],
+            'version' => ['nullable', 'string', 'max:30'],
+            'effective_date' => ['nullable', 'date'],
+            'expiry_date' => ['nullable', 'date'],
+            'portal_visible' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
@@ -61,6 +72,10 @@ class ClientDocumentController extends Controller
             'uploaded_by_user_id' => $request->user()?->id,
             'title' => $data['title'] ?? null,
             'category' => $data['category'] ?? null,
+            'version' => $data['version'] ?? null,
+            'effective_date' => $data['effective_date'] ?? null,
+            'expiry_date' => $data['expiry_date'] ?? null,
+            'portal_visible' => (bool) ($data['portal_visible'] ?? false),
             'notes' => $data['notes'] ?? null,
             'storage_disk' => 'local',
             'storage_path' => $stored,
@@ -91,10 +106,46 @@ class ClientDocumentController extends Controller
         return back()->with('success', 'Document uploaded.');
     }
 
+    public function update(Request $request, Client $client, ClientDocument $document)
+    {
+        $this->authorize('update', $client);
+        abort_unless($document->client_id === $client->id, 404);
+
+        $data = $request->validate([
+            'title' => ['nullable', 'string', 'max:200'],
+            'category' => ['nullable', 'string', 'max:60'],
+            'version' => ['nullable', 'string', 'max:30'],
+            'effective_date' => ['nullable', 'date'],
+            'expiry_date' => ['nullable', 'date'],
+            'portal_visible' => ['nullable', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        // Only update portal_visible if it was explicitly sent (so older clients don't accidentally flip)
+        if (!array_key_exists('portal_visible', $data)) {
+            $data['portal_visible'] = $document->portal_visible;
+        }
+
+        $document->update($data);
+
+        return back()->with('success', 'Document updated.');
+    }
+
     public function download(Request $request, Client $client, ClientDocument $document)
     {
         $this->authorize('view', $client);
         abort_unless($document->client_id === $client->id, 404);
+
+        // If downloaded from the portal, only allow documents explicitly shared.
+        $routeName = $request->route()?->getName();
+        if ($routeName && str_starts_with($routeName, 'portal.')) {
+            abort_unless($document->portal_visible, 403);
+        }
+
+        AuditLogger::log('documents.download', $document, [
+            'document_id' => $document->id,
+            'original_name' => $document->original_name,
+        ]);
 
         return Storage::disk($document->storage_disk)->download(
             $document->storage_path,

@@ -9,8 +9,9 @@ class ClientPolicy
 {
     public function viewAny(User $user): bool
     {
-        // Anyone with this permission can access the list route
-        return $user->canDo('clients.viewAny');
+        // Anyone with one of these permissions can access the list route.
+        // Row-level filtering is handled in the query/controller.
+        return $user->canDo('clients.viewAny') || $user->canDo('clients.viewAssigned');
     }
 
     public function view(User $user, Client $client): bool
@@ -25,9 +26,13 @@ class ClientPolicy
             return true;
         }
 
-        // Support workers can view only assigned clients
-        return $user->hasRole('support_worker')
-            && $client->supportWorkers()->whereKey($user->id)->exists();
+        // Assigned-only access
+        if ($user->canDo('clients.viewAssigned')) {
+            return $client->supportWorkers()->whereKey($user->id)->exists();
+        }
+
+        // Support workers can view only assigned clients (legacy)
+        return $user->hasRole('support_worker') && $client->supportWorkers()->whereKey($user->id)->exists();
     }
 
     public function create(User $user): bool
