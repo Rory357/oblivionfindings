@@ -31,12 +31,35 @@ class RbacSeeder extends Seeder
             ['label' => 'Support Worker']
         );
 
+        $clientRole = Role::firstOrCreate(
+            ['name' => 'client'],
+            ['label' => 'Client (Portal)']
+        );
+
+        $nextOfKinRole = Role::firstOrCreate(
+            ['name' => 'next_of_kin'],
+            ['label' => 'Next of Kin (Portal)']
+        );
+
+        // Remove any roles we are not using right now (but only if they are not assigned).
+        // This keeps the Access Control UI role list clean.
+        $activeRoleNames = ['admin', 'provider_manager', 'support_worker', 'client', 'next_of_kin'];
+        Role::query()
+            ->whereNotIn('name', $activeRoleNames)
+            ->doesntHave('users')
+            ->delete();
+
         /*
         |--------------------------------------------------------------------------
         | 2. Permissions
         |--------------------------------------------------------------------------
         */
         $permissions = [
+            // Sites
+            ['key' => 'sites.viewAny', 'description' => 'View sites'],
+            ['key' => 'sites.create', 'description' => 'Create sites'],
+            ['key' => 'sites.update', 'description' => 'Update sites'],
+
             // Staff / workers
             ['key' => 'staff.viewAny', 'description' => 'View staff'],
             ['key' => 'staff.create', 'description' => 'Create staff'],
@@ -69,10 +92,26 @@ class RbacSeeder extends Seeder
             ['key' => 'clients.update', 'description' => 'Update clients'],
             ['key' => 'clients.assignments.update', 'description' => 'Manage client assignments'],
 
+            // Timeline / notes
+            ['key' => 'timeline.viewAny', 'description' => 'View timelines (staff/client activity)'],
+            ['key' => 'timeline.create', 'description' => 'Create timeline events (notes/incidents)'],
+
+            // AI summaries
+            ['key' => 'summaries.viewAny', 'description' => 'View AI summaries'],
+            ['key' => 'summaries.generate', 'description' => 'Generate AI summaries'],
+
+            // Integrations
+            ['key' => 'unifi.manage', 'description' => 'Manage UniFi integration settings'],
+
             // Settings
             ['key' => 'settings.access.manage', 'description' => 'Manage user access (roles & overrides)'],
             ['key' => 'settings.terminology.manage', 'description' => 'Manage UI terminology (labels)'],
             ['key' => 'settings.branding.manage', 'description' => 'Manage organisation branding (colors, logo)'],
+
+            // RAG / AI Query
+            ['key' => 'rag.ask.any', 'description' => 'Ask AI about any client (within view permissions)'],
+            ['key' => 'rag.ask.assigned', 'description' => 'Ask AI about assigned clients'],
+            ['key' => 'rag.ask.self', 'description' => 'Ask AI about own / linked client (portal)'],
         ];
 
         foreach ($permissions as $perm) {
@@ -94,6 +133,10 @@ class RbacSeeder extends Seeder
         // Provider Manager
         $providerManager->permissions()->sync(
             Permission::whereIn('key', [
+                'sites.viewAny',
+                'sites.create',
+                'sites.update',
+
                 'staff.viewAny',
                 'staff.create',
                 'staff.update',
@@ -105,6 +148,12 @@ class RbacSeeder extends Seeder
                 'rostering.viewAny',
                 'fleet.viewAny',
                 'calendar.viewAny',
+
+                'timeline.viewAny',
+                'timeline.create',
+                'summaries.viewAny',
+                'summaries.generate',
+                'unifi.manage',
 
                 'shifts.viewAny',
                 'shifts.create',
@@ -124,6 +173,9 @@ class RbacSeeder extends Seeder
 
                 // Settings (adjust to taste)
                 'settings.terminology.manage',
+
+                // RAG
+                'rag.ask.any',
             ])->pluck('id')
         );
 
@@ -131,10 +183,30 @@ class RbacSeeder extends Seeder
         $supportWorker->permissions()->sync(
             Permission::whereIn('key', [
                 'clients.viewAny',
+                'timeline.create',
                 'shifts.viewAny',
                 'timesheets.viewAny',
                 'timesheets.create',
                 'timesheets.update',
+
+                'timeline.create',
+
+                // RAG
+                'rag.ask.assigned',
+            ])->pluck('id')
+        );
+
+        // Client / Next-of-kin portal users
+        // (Most access control is enforced via ClientPolicy + client_portal_users links.)
+        $clientRole->permissions()->sync(
+            Permission::whereIn('key', [
+                'rag.ask.self',
+            ])->pluck('id')
+        );
+
+        $nextOfKinRole->permissions()->sync(
+            Permission::whereIn('key', [
+                'rag.ask.self',
             ])->pluck('id')
         );
 

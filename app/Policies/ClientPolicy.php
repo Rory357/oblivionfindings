@@ -15,6 +15,11 @@ class ClientPolicy
 
     public function view(User $user, Client $client): bool
     {
+        // Client portal users (the client themselves or next of kin) can view their client
+        if ($user->hasRole('client', 'next_of_kin') && $user->canAccessClientPortal($client)) {
+            return true;
+        }
+
         // If they have a global view permission (manager/admin), allow
         if ($user->canDo('clients.viewAny') && !$user->hasRole('support_worker')) {
             return true;

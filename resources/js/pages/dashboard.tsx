@@ -4,6 +4,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { ShiftTimeline, type ShiftLite } from '@/components/dashboard/timeline';
+import { ActivityTimeline, type ActivityEventLite } from '@/components/dashboard/activity-timeline';
 
 const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Dashboard', href: dashboard().url },
@@ -19,6 +20,7 @@ type Props = {
   assignedClients?: ClientLite[];
   todayShifts: ShiftLite[];
   upcomingShifts?: ShiftLite[];
+  upcomingEvents?: ActivityEventLite[];
   todayTimesheets?: TimesheetLite[];
   managerSummary?: {
     staffWorkingTodayCount: number;
@@ -103,12 +105,20 @@ export default function Dashboard(props: Props) {
         ) : (
           <div className="grid gap-4 lg:grid-cols-3">
             <div className="lg:col-span-2">
-              <ShiftTimeline
-                title="To-do timeline"
-                shifts={(props.upcomingShifts ?? props.todayShifts) as ShiftLite[]}
-                mode={props.mode === 'manager' ? 'manager' : 'staff'}
-                emptyText="No shifts scheduled."
-              />
+              {props.mode === 'staff' ? (
+                <ActivityTimeline
+                  title="To-do timeline"
+                  events={(props.upcomingEvents ?? []) as ActivityEventLite[]}
+                  emptyText="No activity scheduled."
+                />
+              ) : (
+                <ShiftTimeline
+                  title="To-do timeline"
+                  shifts={(props.upcomingShifts ?? props.todayShifts) as ShiftLite[]}
+                  mode="manager"
+                  emptyText="No shifts scheduled."
+                />
+              )}
             </div>
 
             <div className="space-y-4 lg:col-span-1">

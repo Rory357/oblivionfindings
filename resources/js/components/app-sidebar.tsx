@@ -20,6 +20,8 @@ import {
     FileText,
     Folder,
     LayoutGrid,
+    MapPin,
+    MessageSquareText,
     Settings,
     Users,
 } from 'lucide-react';
@@ -61,6 +63,7 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     ];
 
     const clientPlural = labels['client.plural'] ?? 'Clients';
+    const sitePlural = labels['site.plural'] ?? 'Sites';
     const staffPlural = labels['staff.plural'] ?? 'Staff';
     const shiftPlural = labels['shift.plural'] ?? 'Shifts';
     const timesheetPlural = labels['timesheet.plural'] ?? 'Timesheets';
@@ -88,11 +91,19 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
                 href: '/notes',
                 icon: FileText,
             },
+            {
+                title: 'Timeline',
+                href: '/timeline',
+                icon: MessageSquareText,
+            },
         );
         return items;
     }
 
     // Provider/Manager/Admin nav (permission gated)
+    if (can?.sites?.viewAny) {
+        items.push({ title: sitePlural, href: '/sites', icon: MapPin });
+    }
     if (can?.clients?.viewAny) {
         items.push({ title: clientPlural, href: '/clients', icon: Users });
     }
@@ -116,6 +127,15 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     }
     if (can?.calendar?.viewAny) {
         items.push({ title: 'Calendar', href: '/calendar', icon: CalendarDays });
+    }
+    if (can?.timeline?.viewAny) {
+        items.push({ title: 'Timeline', href: '/timeline', icon: MessageSquareText });
+    }
+    if (can?.summaries?.viewAny) {
+        items.push({ title: 'Summaries', href: '/summaries', icon: FileText });
+    }
+    if (can?.unifi?.manage) {
+        items.push({ title: 'UniFi', href: '/integrations/unifi', icon: Settings });
     }
     items.push({ title: 'Settings', href: '/settings', icon: Settings });
 

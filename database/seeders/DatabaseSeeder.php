@@ -27,6 +27,9 @@ class DatabaseSeeder extends Seeder
 
         $this->call(DemoSeeder::class);
         $this->call(RbacSeeder::class);
-        $this->call(RoleCatalogSeeder::class);
+        // NOTE: RoleCatalogSeeder created a large catalogue of job-title roles.
+        // We are not using those roles in the system right now, so we no longer seed them.
+        // (Keeps Access Control role list clean and prevents accidental assignment.)
+        // $this->call(RoleCatalogSeeder::class);
     }
 }

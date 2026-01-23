@@ -1,8 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 
-export default function EditClient({ client }) {
+export default function EditClient({ client, sites = [] }) {
+    const { labels } = usePage().props as any;
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
+    const clientPlural = labels?.['client.plural'] ?? 'Clients';
+    const siteSingular = labels?.['site.singular'] ?? 'Site';
     const { data, setData, put, processing, errors } = useForm({
+        site_id: (client.site_id ?? null) as number | null,
         first_name: client.first_name ?? '',
         last_name: client.last_name ?? '',
         status: client.status ?? 'active',
@@ -16,17 +21,46 @@ export default function EditClient({ client }) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Clients', href: '/clients' },
-                { title: 'Edit Client', href: `/clients/${client.id}/edit` },
+                { title: clientPlural, href: '/clients' },
+                { title: `Edit ${clientSingular}`, href: `/clients/${client.id}/edit` },
             ]}
         >
-            <Head title="Edit Client" />
+            <Head title={`Edit ${clientSingular}`} />
 
             <div className="m-4">
                 <form
                     onSubmit={submit}
                     className="max-w-xl space-y-4 rounded-xl border p-4"
                 >
+                    <div>
+                        <label className="text-sm font-medium">{siteSingular}</label>
+                        <select
+                            className="mt-1 w-full rounded-md border bg-transparent p-2"
+                            value={data.site_id ?? ''}
+                            onChange={(e) =>
+                                setData(
+                                    'site_id',
+                                    e.target.value === ''
+                                        ? null
+                                        : Number(e.target.value),
+                                )
+                            }
+                        >
+                            <option value="">—</option>
+                            {sites.map((s) => (
+                                <option key={s.id} value={s.id}>
+                                    {s.name}
+                                    {s.is_active === false ? ' (inactive)' : ''}
+                                </option>
+                            ))}
+                        </select>
+                        {errors.site_id && (
+                            <div className="mt-1 text-xs text-red-400">
+                                {errors.site_id}
+                            </div>
+                        )}
+                    </div>
+
                     <div>
                         <label className="text-sm font-medium">
                             First name

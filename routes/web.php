@@ -11,8 +11,20 @@ use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StaffAssignmentController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\TimesheetController;
+use App\Http\Controllers\SiteController;
 use App\Http\Controllers\Auth\MicrosoftController;
 use App\Http\Controllers\Auth\GoogleController;
+use App\Http\Controllers\TimelineController;
+use App\Http\Controllers\ClientNoteController;
+use App\Http\Controllers\SummaryController;
+use App\Http\Controllers\UnifiController;
+use App\Http\Controllers\ClientMedicalController;
+use App\Http\Controllers\ClientDocumentController;
+use App\Http\Controllers\ClientPortalUserController;
+use App\Http\Controllers\ClientRagController;
+use App\Http\Controllers\PortalController;
+use App\Http\Controllers\PortalClientController;
+use App\Http\Controllers\RagController;
 
 Route::get('/', function () {
     return Inertia::render('home', [
@@ -36,11 +48,66 @@ Route::get('/auth/microsoft/callback', [MicrosoftController::class, 'callback'])
 
 Route::middleware(['auth'])->group(function () {
 
+    // Global RAG endpoints for the header query bar
+    Route::get('/rag/clients', [RagController::class, 'clients'])->name('rag.clients');
+    Route::post('/rag/ask', [RagController::class, 'ask'])->name('rag.ask');
+
+    // Client/Next-of-kin Portal
+    Route::get('/portal', [PortalController::class, 'index'])->name('portal.index');
+    Route::get('/portal/clients/{client}', [PortalClientController::class, 'show'])->name('portal.clients.show');
+    Route::post('/portal/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])->name('portal.clients.rag.ask');
+    Route::get('/portal/clients/{client}/documents/{document}/download', [ClientDocumentController::class, 'download'])->name('portal.clients.documents.download');
+    Route::post('/portal/summaries/generate', [SummaryController::class, 'generate'])->name('portal.summaries.generate');
+
+    // Timelines
+    Route::get('/timeline', [TimelineController::class, 'my'])->name('timeline.my');
+    Route::get('/staff/{user}/timeline', [TimelineController::class, 'staff'])->name('timeline.staff');
+    Route::get('/clients/{client}/timeline', [TimelineController::class, 'client'])->name('timeline.client');
+
+    Route::post('/clients/{client}/notes', [ClientNoteController::class, 'store'])
+        ->middleware('permission:timeline.create')
+        ->name('clients.notes.store');
+
+    // Summaries
+    Route::get('/summaries', fn() => redirect('/summaries/me'))->name('summaries.home');
+    Route::get('/summaries/me', [SummaryController::class, 'my'])->name('summaries.me');
+    Route::get('/summaries/staff/{user}', [SummaryController::class, 'staff'])->name('summaries.staff');
+    Route::get('/summaries/clients/{client}', [SummaryController::class, 'client'])->name('summaries.client');
+    Route::post('/summaries/generate', [SummaryController::class, 'generate'])
+        ->middleware('permission:summaries.generate')
+        ->name('summaries.generate');
+
+    // Integrations: UniFi
+    Route::get('/integrations/unifi', [UnifiController::class, 'index'])
+        ->middleware('permission:unifi.manage')
+        ->name('integrations.unifi.index');
+    Route::post('/integrations/unifi/{site}', [UnifiController::class, 'upsert'])
+        ->middleware('permission:unifi.manage')
+        ->name('integrations.unifi.upsert');
+    Route::post('/integrations/unifi/{site}/sync', [UnifiController::class, 'sync'])
+        ->middleware('permission:unifi.manage')
+        ->name('integrations.unifi.sync');
+
+    // Sites
+    Route::middleware('permission:sites.viewAny')->group(function () {
+        Route::get('/sites', [SiteController::class, 'index'])->name('sites.index');
+    });
+    Route::middleware('permission:sites.create')->group(function () {
+        Route::get('/sites/create', [SiteController::class, 'create'])->name('sites.create');
+        Route::post('/sites', [SiteController::class, 'store'])->name('sites.store');
+    });
+    Route::middleware('permission:sites.update')->group(function () {
+        Route::get('/sites/{site}/edit', [SiteController::class, 'edit'])->name('sites.edit');
+        Route::put('/sites/{site}', [SiteController::class, 'update'])->name('sites.update');
+    });
+
     // ✅ ALL authenticated users (policy decides data)
     // (now permission-based so it’s consistent)
     Route::middleware('permission:clients.viewAny')->group(function () {
         Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
         Route::get('/clients/{client}', [ClientController::class, 'show'])->name('clients.show');
+        Route::get('/clients/{client}/documents', [ClientDocumentController::class, 'index'])->name('clients.documents.index');
+        Route::get('/clients/{client}/documents/{document}/download', [ClientDocumentController::class, 'download'])->name('clients.documents.download');
     });
 
     // ✅ Manager/Admin modules (permission-based)
@@ -102,6 +169,30 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:clients.update')->group(function () {
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('clients.edit');
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
+
+        // Client medical + portal users management
+        Route::post('/clients/{client}/documents', [ClientDocumentController::class, 'store'])->name('clients.documents.store');
+        Route::delete('/clients/{client}/documents/{document}', [ClientDocumentController::class, 'destroy'])->name('clients.documents.destroy');
+
+        Route::get('/clients/{client}/medical', [ClientMedicalController::class, 'show'])->name('clients.medical.show');
+        Route::put('/clients/{client}/medical/profile', [ClientMedicalController::class, 'updateProfile'])->name('clients.medical.profile.update');
+        Route::post('/clients/{client}/medical/medications', [ClientMedicalController::class, 'storeMedication'])->name('clients.medical.medications.store');
+        Route::put('/clients/{client}/medical/medications/{medication}', [ClientMedicalController::class, 'updateMedication'])->name('clients.medical.medications.update');
+        Route::delete('/clients/{client}/medical/medications/{medication}', [ClientMedicalController::class, 'destroyMedication'])->name('clients.medical.medications.destroy');
+
+        Route::post('/clients/{client}/medical/conditions', [ClientMedicalController::class, 'storeCondition'])->name('clients.medical.conditions.store');
+        Route::put('/clients/{client}/medical/conditions/{condition}', [ClientMedicalController::class, 'updateCondition'])->name('clients.medical.conditions.update');
+        Route::delete('/clients/{client}/medical/conditions/{condition}', [ClientMedicalController::class, 'destroyCondition'])->name('clients.medical.conditions.destroy');
+
+        Route::post('/clients/{client}/medical/emergency-contacts', [ClientMedicalController::class, 'storeEmergencyContact'])->name('clients.medical.emergency_contacts.store');
+        Route::put('/clients/{client}/medical/emergency-contacts/{contact}', [ClientMedicalController::class, 'updateEmergencyContact'])->name('clients.medical.emergency_contacts.update');
+        Route::delete('/clients/{client}/medical/emergency-contacts/{contact}', [ClientMedicalController::class, 'destroyEmergencyContact'])->name('clients.medical.emergency_contacts.destroy');
+
+        Route::get('/clients/{client}/portal-users', [ClientPortalUserController::class, 'edit'])->name('clients.portal_users.edit');
+        Route::post('/clients/{client}/portal-users', [ClientPortalUserController::class, 'store'])->name('clients.portal_users.store');
+        Route::delete('/clients/{client}/portal-users/{user}', [ClientPortalUserController::class, 'destroy'])->name('clients.portal_users.destroy');
+
+        Route::post('/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])->name('clients.rag.ask');
     });
 
     // ✅ Assign support workers to a client

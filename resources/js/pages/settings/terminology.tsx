@@ -28,6 +28,8 @@ const LABEL_KEYS = [
     'shift.plural',
     'timesheet.singular',
     'timesheet.plural',
+    'site.singular',
+    'site.plural',
 ];
 
 export default function TerminologyPage(props: Props) {

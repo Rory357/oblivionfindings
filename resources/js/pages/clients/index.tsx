@@ -1,20 +1,19 @@
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import ClientViewModal from '@/pages/clients/client-view-modal';
 import { Head, Link, usePage } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 
 export default function ClientsIndex({ clients }) {
     const { auth } = usePage().props as any;
     const { labels } = usePage().props as any;
+    const siteSingular = labels?.['site.singular'] ?? 'Site';
     const can = auth?.can;
 
     const canCreate = !!can?.clients?.create;
     const canUpdate = !!can?.clients?.update;
     const canManage = canCreate || canUpdate;
 
-    const [viewOpen, setViewOpen] = useState(false);
-    const [selected, setSelected] = useState<any | null>(null);
+
 
     const breadcrumbs = useMemo(
         () => [
@@ -58,18 +57,34 @@ export default function ClientsIndex({ clients }) {
                                 <div className="text-xs text-slate-500">
                                     Status: {client.status}
                                 </div>
+                                <div className="mt-1 text-xs text-slate-500">
+                                    {siteSingular}:{' '}
+                                    {client.site ? (
+                                        can?.sites?.update ? (
+                                            <Link
+                                                href={`/sites/${client.site.id}/edit`}
+                                                className="text-indigo-300 hover:text-indigo-200"
+                                            >
+                                                {client.site.name}
+                                            </Link>
+                                        ) : (
+                                            <span className="text-slate-300">
+                                                {client.site.name}
+                                            </span>
+                                        )
+                                    ) : (
+                                        <span className="text-slate-500">—</span>
+                                    )}
+                                </div>
                             </div>
 
                             <div className="flex items-center gap-2">
                                 <Button
                                     variant="outline"
                                     size="sm"
-                                    onClick={() => {
-                                        setSelected(client);
-                                        setViewOpen(true);
-                                    }}
+                                    asChild
                                 >
-                                    View
+                                    <Link href={`/clients/${client.id}`}>View</Link>
                                 </Button>
 
                                 {canManage && (
@@ -106,12 +121,6 @@ export default function ClientsIndex({ clients }) {
                 </div>
             </div>
 
-            <ClientViewModal
-                open={viewOpen}
-                onOpenChange={setViewOpen}
-                client={selected}
-                labels={labels ?? {}}
-            />
         </AppLayout>
     );
 }

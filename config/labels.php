@@ -5,6 +5,9 @@ return [
     'client.singular' => 'Client',
     'client.plural' => 'Clients',
 
+    'site.singular' => 'Site',
+    'site.plural' => 'Sites',
+
     'staff.singular' => 'Staff',
     'staff.plural' => 'Staff',
 

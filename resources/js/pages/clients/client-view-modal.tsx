@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Link, usePage } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 type ClientListItem = {
@@ -21,6 +22,7 @@ type ClientDetail = {
     last_name: string;
     status: string;
     support_workers: Array<{ id: number; name: string; email: string }>;
+    site: { id: number; name: string } | null;
 };
 
 export default function ClientViewModal({
@@ -34,9 +36,14 @@ export default function ClientViewModal({
     client: ClientListItem | null;
     labels: Record<string, string>;
 }) {
+    const { auth } = usePage().props as any;
+    const canUpdateSite = !!auth?.can?.sites?.update;
+
     const [loading, setLoading] = useState(false);
     const [detail, setDetail] = useState<ClientDetail | null>(null);
     const [error, setError] = useState<string | null>(null);
+
+    const siteSingular = labels?.['site.singular'] ?? 'Site';
 
     const title = useMemo(() => {
         if (!client) return '';
@@ -67,6 +74,7 @@ export default function ClientViewModal({
             })
             .then((json) => {
                 if (isCancelled) return;
+                // Expecting: { client: { ... } }
                 setDetail(json.client as ClientDetail);
             })
             .catch((e) => {
@@ -88,7 +96,7 @@ export default function ClientViewModal({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="h-[80vh] max-w-3xl overflow-hidden p-0">
+            <DialogContent className="h-[80vh] max-w-3xl overflow-hidden overflow-y-auto scroll-smooth p-0">
                 <div className="flex h-full flex-col">
                     <DialogHeader className="px-6 pt-6">
                         <DialogTitle>
@@ -96,7 +104,7 @@ export default function ClientViewModal({
                         </DialogTitle>
                     </DialogHeader>
 
-                    <div className="flex-1 overflow-y-auto px-6 pb-6">
+                    <div className="flex-1 px-6 pb-6 md:scroll-auto">
                         {loading && (
                             <div className="space-y-3">
                                 <Skeleton className="h-5 w-56" />
@@ -120,6 +128,7 @@ export default function ClientViewModal({
                                     <div className="text-sm font-semibold">
                                         General
                                     </div>
+
                                     <div className="grid grid-cols-2 gap-4 text-sm">
                                         <div>
                                             <div className="text-xs text-muted-foreground">
@@ -127,12 +136,40 @@ export default function ClientViewModal({
                                             </div>
                                             <div>{detail.first_name}</div>
                                         </div>
+
                                         <div>
                                             <div className="text-xs text-muted-foreground">
                                                 Last name
                                             </div>
                                             <div>{detail.last_name}</div>
                                         </div>
+
+                                        <div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {siteSingular}
+                                            </div>
+                                            <div className="mt-1 text-xs text-slate-500">
+                                                {detail.site ? (
+                                                    canUpdateSite ? (
+                                                        <Link
+                                                            href={`/sites/${detail.site.id}/edit`}
+                                                            className="text-indigo-300 hover:text-indigo-200"
+                                                        >
+                                                            {detail.site.name}
+                                                        </Link>
+                                                    ) : (
+                                                        <span className="text-slate-300">
+                                                            {detail.site.name}
+                                                        </span>
+                                                    )
+                                                ) : (
+                                                    <span className="text-slate-500">
+                                                        —
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+
                                         <div>
                                             <div className="text-xs text-muted-foreground">
                                                 Status
@@ -176,11 +213,34 @@ export default function ClientViewModal({
                                     )}
                                 </div>
 
+                                <Separator />
+
+                                <div className="space-y-2">
+                                    <div className="text-sm font-semibold">Management</div>
+                                    <div className="flex flex-wrap gap-2 text-xs">
+                                        <Link href={`/clients/${detail.id}`} className="rounded-md border px-3 py-2 hover:bg-muted">
+                                            Open profile
+                                        </Link>
+                                        <Link href={`/clients/${detail.id}/medical`} className="rounded-md border px-3 py-2 hover:bg-muted">
+                                            Medical
+                                        </Link>
+                                        <Link href={`/clients/${detail.id}/documents`} className="rounded-md border px-3 py-2 hover:bg-muted">
+                                            Documents
+                                        </Link>
+                                        <Link href={`/clients/${detail.id}/portal-users`} className="rounded-md border px-3 py-2 hover:bg-muted">
+                                            Portal users
+                                        </Link>
+                                        <Link href={`/clients/${detail.id}/assignments`} className="rounded-md border px-3 py-2 hover:bg-muted">
+                                            Assign workers
+                                        </Link>
+                                    </div>
+                                </div>
+
                                 {/* Future sections (permission-gated later)
-                            - Schedule (upcoming appointments)
-                            - Plans / Notes
-                            - Sensitive Diary
-                        */}
+                                    - Schedule (upcoming appointments)
+                                    - Plans / Notes
+                                    - Sensitive Diary
+                                */}
                             </div>
                         )}
                     </div>

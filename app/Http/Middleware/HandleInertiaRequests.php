@@ -29,6 +29,12 @@ class HandleInertiaRequests extends Middleware
 
         if ($user) {
             $can = [
+                'sites' => [
+                    'viewAny' => $user->canDo('sites.viewAny'),
+                    'create' => $user->canDo('sites.create'),
+                    'update' => $user->canDo('sites.update'),
+                ],
+
                 'staff' => [
                     'viewAny' => $user->canDo('staff.viewAny'),
                     'create'  => $user->canDo('staff.create'),
@@ -71,6 +77,26 @@ class HandleInertiaRequests extends Middleware
 
                 'calendar' => [
                     'viewAny' => $user->canDo('calendar.viewAny'),
+                ],
+
+                'timeline' => [
+                    'viewAny' => $user->canDo('timeline.viewAny'),
+                    'create' => $user->canDo('timeline.create'),
+                ],
+
+                'summaries' => [
+                    'viewAny' => $user->canDo('summaries.viewAny'),
+                    'generate' => $user->canDo('summaries.generate'),
+                ],
+
+                'unifi' => [
+                    'manage' => $user->canDo('unifi.manage'),
+                ],
+
+                'rag' => [
+                    'askAny' => $user->canDo('rag.ask.any'),
+                    'askAssigned' => $user->canDo('rag.ask.assigned'),
+                    'askSelf' => $user->canDo('rag.ask.self'),
                 ],
 
                 'settings' => [

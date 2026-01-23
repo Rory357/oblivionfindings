@@ -3,7 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\ClientDocument;
+use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Models\Site;
 use Illuminate\Http\Request;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
@@ -21,8 +24,9 @@ class ClientController extends Controller
                 $user->hasRole('support_worker'),
                 fn($q) => $q->whereHas('supportWorkers', fn($q) => $q->whereKey($user->id))
             )
+            ->with(['site:id,name,is_active'])
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name', 'status']);
+            ->get(['id', 'site_id', 'first_name', 'last_name', 'status']);
 
         return inertia('clients/index', [
             'clients' => $clients,
@@ -34,7 +38,13 @@ class ClientController extends Controller
         $this->authorize('view', $client);
 
         $client->load([
+            'site:id,name',
             'supportWorkers:id,name,email',
+            'medicalProfile',
+            'medications',
+            'conditions',
+            'emergencyContacts',
+            'portalUsers:id,name,email',
         ]);
 
         // For modal / async detail views, return JSON.
@@ -45,6 +55,12 @@ class ClientController extends Controller
                     'first_name' => $client->first_name,
                     'last_name' => $client->last_name,
                     'status' => $client->status,
+                    'site' => $client->site
+                        ? [
+                            'id' => $client->site->id,
+                            'name' => $client->site->name,
+                        ]
+                        : null,
                     'support_workers' => $client->supportWorkers->map(fn($u) => [
                         'id' => $u->id,
                         'name' => $u->name,
@@ -54,11 +70,56 @@ class ClientController extends Controller
             ]);
         }
 
-        // Fallback (optional future full page)
+        $documents = ClientDocument::query()
+            ->where('client_id', $client->id)
+            ->orderByDesc('created_at')
+            ->get(['id','title','category','notes','original_name','mime_type','size_bytes','created_at']);
+
+        $events = TimelineEvent::query()
+            ->where('client_id', $client->id)
+            ->orderByDesc('occurred_at')
+            ->limit(80)
+            ->with(['actor:id,name', 'site:id,name'])
+            ->get();
+
         return inertia('clients/show', [
-            'client' => $client,
+            'client' => [
+                'id' => $client->id,
+                'first_name' => $client->first_name,
+                'last_name' => $client->last_name,
+                'status' => $client->status,
+                'site' => $client->site ? ['id' => $client->site->id, 'name' => $client->site->name] : null,
+                'support_workers' => $client->supportWorkers->map(fn($u) => ['id' => $u->id, 'name' => $u->name, 'email' => $u->email])->values(),
+            ],
+            'medical' => [
+                'profile' => $client->medicalProfile,
+                'medications' => $client->medications,
+                'conditions' => $client->conditions,
+                'emergency_contacts' => $client->emergencyContacts,
+            ],
+            'documents' => $documents,
+            'portal_users' => $client->portalUsers->map(fn($u) => [
+                'id' => $u->id,
+                'name' => $u->name,
+                'email' => $u->email,
+                'relation' => $u->pivot?->relation,
+            ])->values(),
+            'events' => $events->map(fn($e) => [
+                'id' => $e->id,
+                'type' => $e->type,
+                'occurred_at' => optional($e->occurred_at)->toISOString(),
+                'subject' => $e->subject,
+                'body' => $e->body,
+                'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
+                'site' => $e->site ? ['id' => $e->site->id, 'name' => $e->site->name] : null,
+            ])->values(),
+            'can' => [
+                'edit' => $request->user()?->canDo('clients.update') ?? false,
+                'assign_workers' => $request->user()?->canDo('clients.assignments.update') ?? false,
+            ],
         ]);
     }
+
 
 
     // public function show(Client $client)
@@ -74,7 +135,14 @@ class ClientController extends Controller
     {
         $this->authorize('create', Client::class);
 
-        return inertia('clients/create');
+        $sites = Site::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
+        return inertia('clients/create', [
+            'sites' => $sites,
+        ]);
     }
 
     public function store(StoreClientRequest $request)
@@ -92,8 +160,18 @@ class ClientController extends Controller
     {
         $this->authorize('update', $client);
 
+        $sitesQuery = Site::query()->orderBy('name');
+        // Keep inactive site visible if client currently assigned to it
+        $sitesQuery->where('is_active', true);
+        if ($client->site_id) {
+            $sitesQuery->orWhere('id', $client->site_id);
+        }
+
+        $sites = $sitesQuery->get(['id', 'name', 'is_active']);
+
         return inertia('clients/edit', [
-            'client' => $client->only(['id', 'first_name', 'last_name', 'status']),
+            'client' => $client->only(['id', 'site_id', 'first_name', 'last_name', 'status']),
+            'sites' => $sites,
         ]);
     }
 

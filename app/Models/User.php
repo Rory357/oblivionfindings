@@ -71,6 +71,19 @@ class User extends Authenticatable
         return $this->belongsToMany(\App\Models\Client::class)->withTimestamps();
     }
 
+    // Client portal access (client + next_of_kin)
+    public function portalClients()
+    {
+        return $this->belongsToMany(\App\Models\Client::class, 'client_portal_users')
+            ->withPivot('relation')
+            ->withTimestamps();
+    }
+
+    public function canAccessClientPortal(\App\Models\Client $client): bool
+    {
+        return $this->portalClients()->whereKey($client->id)->exists();
+    }
+
     public function staffProfile()
     {
         return $this->hasOne(\App\Models\StaffProfile::class);
@@ -128,6 +141,21 @@ class User extends Authenticatable
 
         if ($allow) {
             return true;
+        }
+
+        // 2.5) Backwards-compatibility: if the user hasn't been migrated into role_user yet,
+        // fall back to the legacy users.role column.
+        // This prevents "I'm an admin but I can't ..." issues when the pivot table is empty.
+        if (!$this->roles()->exists() && !empty($this->role)) {
+            // Legacy admin was effectively "allow all"
+            if ($this->role === 'admin') {
+                return true;
+            }
+
+            $legacyRole = \App\Models\Role::query()->where('name', $this->role)->first();
+            if ($legacyRole) {
+                return $legacyRole->permissions()->where('key', $permissionKey)->exists();
+            }
         }
 
         // 3) role permissions

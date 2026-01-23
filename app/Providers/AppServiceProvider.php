@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Models\ClientNote;
+use App\Models\Shift;
+use App\Observers\ClientNoteObserver;
+use App\Observers\ShiftObserver;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -19,6 +23,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        //
+        Shift::observe(ShiftObserver::class);
+        ClientNote::observe(ClientNoteObserver::class);
     }
 }
