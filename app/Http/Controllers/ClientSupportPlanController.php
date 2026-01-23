@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientSupportPlan;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class ClientSupportPlanController extends Controller
@@ -23,10 +24,15 @@ class ClientSupportPlanController extends Controller
             'next_review_at' => ['nullable', 'date'],
         ]);
 
-        ClientSupportPlan::updateOrCreate(
+        $plan = ClientSupportPlan::updateOrCreate(
             ['client_id' => $client->id],
             array_merge($data, ['updated_by_user_id' => $request->user()?->id])
         );
+
+        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'support plan', $plan, $client, [
+            'title' => "Support plan updated: {$client->first_name} {$client->last_name}",
+            'url' => url("/clients/{$client->id}/timeline"),
+        ]);
 
         return back()->with('success', 'Support plan updated.');
     }

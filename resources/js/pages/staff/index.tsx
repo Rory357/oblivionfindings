@@ -1,3 +1,5 @@
+import PageHeader from '@/components/page-header';
+import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
@@ -34,14 +36,13 @@ export default function StaffIndex({ users, filters }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Staff', href: '/staff' }]}>
             <Head title="Staff" />
 
-            <div className="space-y-4 p-4">
+            <PageShell>
+                <PageHeader
+                    title="Staff"
+                    description="Manage staff profiles, assignments, availability and access."
+                />
+
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <div className="text-lg font-semibold">Staff</div>
-                        <div className="text-sm text-muted-foreground">
-                            Manage staff profiles, assignments and access.
-                        </div>
-                    </div>
 
                     <div className="flex items-center gap-2">
                         <Input
@@ -162,7 +163,7 @@ export default function StaffIndex({ users, filters }: Props) {
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </PageShell>
         </AppLayout>
     );
 }

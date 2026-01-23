@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class StaffController extends Controller
@@ -141,6 +142,12 @@ class StaffController extends Controller
                 'is_active' => (bool) ($profileData['is_active'] ?? true),
             ]
         );
+
+        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'staff', $user, null, [
+            'title' => "Staff updated: {$user->name}",
+            'url' => url("/staff/{$user->id}"),
+            'target_user_ids' => [$user->id],
+        ]);
 
         return redirect()->route('staff.show', $user)->with('success', 'Staff updated.');
     }

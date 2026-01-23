@@ -14,8 +14,20 @@ class ClientNote extends Model
 
     protected $fillable = [
         'client_id',
+        'shift_id',
         'user_id',
+        'type',
+        'subject',
+        'goal',
         'body',
+        'occurred_at',
+        'visibility',
+        'is_pinned',
+    ];
+
+    protected $casts = [
+        'occurred_at' => 'datetime',
+        'is_pinned' => 'boolean',
     ];
 
     public function client(): BelongsTo

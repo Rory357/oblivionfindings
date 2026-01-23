@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Http\Requests\StoreSiteRequest;
 use App\Http\Requests\UpdateSiteRequest;
 use App\Models\Site;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class SiteController extends Controller
@@ -51,7 +52,12 @@ class SiteController extends Controller
     {
         $this->authorize('create', Site::class);
 
-        Site::create($request->validated());
+        $site = Site::create($request->validated());
+
+        app(NotificationService::class)->notifyCrud($request->user(), "created", "site", $site, null, [
+            "title" => "Site created: {$site->name}",
+            "url" => url("/sites"),
+        ]);
 
         return redirect()
             ->route('sites.index')
@@ -82,6 +88,11 @@ class SiteController extends Controller
         $this->authorize('update', $site);
 
         $site->update($request->validated());
+
+        app(NotificationService::class)->notifyCrud($request->user(), "updated", "site", $site, null, [
+            "title" => "Site updated: {$site->name}",
+            "url" => url("/sites"),
+        ]);
 
         return redirect()
             ->route('sites.index')

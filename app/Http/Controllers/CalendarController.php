@@ -4,9 +4,11 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\Shift;
+use App\Models\ShiftTask;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class CalendarController extends Controller
 {
@@ -110,13 +112,42 @@ class CalendarController extends Controller
             'location' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
             'status' => ['nullable', 'in:scheduled,completed,cancelled'],
+            'tasks' => ['sometimes', 'array'],
+            'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
         ]);
 
-        $shift = Shift::create([
-            ...$data,
-            'status' => $data['status'] ?? 'scheduled',
-            'created_by' => $auth->id,
-        ]);
+        $conflicts = Shift::query()
+            ->where(function ($q) use ($data) {
+                $q->where('user_id', $data['user_id'])->orWhere('client_id', $data['client_id']);
+            })
+            ->where('starts_at', '<', $data['ends_at'])
+            ->where('ends_at', '>', $data['starts_at'])
+            ->exists();
+
+        abort_unless(!$conflicts, 422, 'Conflicting shift detected for this staff member or client during that time.');
+
+        $shift = DB::transaction(function () use ($auth, $data) {
+            $shift = Shift::create([
+                ...\Illuminate\Support\Arr::except($data, ['tasks']),
+                'status' => $data['status'] ?? 'scheduled',
+                'created_by' => $auth->id,
+            ]);
+
+            $tasks = collect($data['tasks'] ?? [])
+                ->map(fn ($t, $i) => ['label' => (string) ($t['label'] ?? ''), 'sort_order' => $i])
+                ->filter(fn ($t) => trim($t['label']) !== '')
+                ->values();
+
+            foreach ($tasks as $t) {
+                ShiftTask::create([
+                    'shift_id' => $shift->id,
+                    'label' => $t['label'],
+                    'sort_order' => $t['sort_order'],
+                ]);
+            }
+
+            return $shift;
+        });
 
         $shift->load(['client:id,first_name,last_name', 'staff:id,name']);
 
@@ -145,6 +176,9 @@ class CalendarController extends Controller
             'location' => ['sometimes', 'nullable', 'string', 'max:255'],
             'notes' => ['sometimes', 'nullable', 'string'],
             'status' => ['sometimes', 'nullable', 'in:scheduled,completed,cancelled'],
+            'tasks' => ['sometimes', 'array'],
+            'tasks.*.id' => ['sometimes', 'integer', 'exists:shift_tasks,id'],
+            'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
         ]);
 
         // If one of starts/ends provided, require both and ensure ends > starts
@@ -158,8 +192,58 @@ class CalendarController extends Controller
             abort_unless($end->greaterThan($start), 422, 'ends_at must be after starts_at.');
         }
 
-        $shift->update($data);
-        $shift->load(['client:id,first_name,last_name', 'staff:id,name']);
+        // Conflict check when we have enough data
+        $resolvedClientId = $data['client_id'] ?? $shift->client_id;
+        $resolvedUserId = $data['user_id'] ?? $shift->user_id;
+        $resolvedStart = Carbon::parse($data['starts_at'] ?? $shift->starts_at);
+        $resolvedEnd = Carbon::parse($data['ends_at'] ?? $shift->ends_at);
+
+        $conflicts = Shift::query()
+            ->where('id', '!=', $shift->id)
+            ->where(function ($q) use ($resolvedUserId, $resolvedClientId) {
+                $q->where('user_id', $resolvedUserId)->orWhere('client_id', $resolvedClientId);
+            })
+            ->where('starts_at', '<', $resolvedEnd)
+            ->where('ends_at', '>', $resolvedStart)
+            ->exists();
+
+        abort_unless(!$conflicts, 422, 'Conflicting shift detected for this staff member or client during that time.');
+
+        DB::transaction(function () use ($shift, $data) {
+            $shift->update(\Illuminate\Support\Arr::except($data, ['tasks']));
+
+            if (array_key_exists('tasks', $data)) {
+                $existing = $shift->tasks()->get()->keyBy('id');
+                $incoming = collect($data['tasks'] ?? [])
+                    ->map(fn ($t, $i) => [
+                        'id' => $t['id'] ?? null,
+                        'label' => (string) ($t['label'] ?? ''),
+                        'sort_order' => $i,
+                    ])
+                    ->filter(fn ($t) => trim($t['label']) !== '')
+                    ->values();
+
+                $keepIds = $incoming->pluck('id')->filter()->all();
+                $shift->tasks()->whereNotIn('id', $keepIds)->delete();
+
+                foreach ($incoming as $t) {
+                    if ($t['id'] && $existing->has($t['id'])) {
+                        $existing[$t['id']]->update([
+                            'label' => $t['label'],
+                            'sort_order' => $t['sort_order'],
+                        ]);
+                    } else {
+                        ShiftTask::create([
+                            'shift_id' => $shift->id,
+                            'label' => $t['label'],
+                            'sort_order' => $t['sort_order'],
+                        ]);
+                    }
+                }
+            }
+        });
+
+        $shift->load(['client:id,first_name,last_name', 'staff:id,name', 'tasks']);
 
         return response()->json([
             'ok' => true,

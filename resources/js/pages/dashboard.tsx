@@ -6,6 +6,60 @@ import { Button } from '@/components/ui/button';
 import { ShiftTimeline, type ShiftLite } from '@/components/dashboard/timeline';
 import { ActivityTimeline, type ActivityEventLite } from '@/components/dashboard/activity-timeline';
 
+function formatShortDate(iso: string) {
+  const d = new Date(iso + 'T00:00:00');
+  if (Number.isNaN(d.getTime())) return iso;
+  return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function clamp(n: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, n));
+}
+
+function SimpleBarChart({
+  data,
+  height = 120,
+}: {
+  data: Array<{ label: string; value: number }>;
+  height?: number;
+}) {
+  const max = Math.max(1, ...data.map((d) => d.value));
+  const barGap = 6;
+  const barWidth = 18;
+  const width = data.length * (barWidth + barGap);
+
+  return (
+    <div className="w-full overflow-x-auto">
+      <svg width={width} height={height} className="text-foreground">
+        {data.map((d, i) => {
+          const h = clamp((d.value / max) * (height - 30), 2, height - 30);
+          const x = i * (barWidth + barGap);
+          const y = height - 20 - h;
+          return (
+            <g key={d.label}>
+              <rect x={x} y={y} width={barWidth} height={h} rx={4} opacity={0.25} />
+              <rect x={x} y={y} width={barWidth} height={h} rx={4} opacity={0.55} />
+              <text x={x + barWidth / 2} y={height - 6} fontSize={10} textAnchor="middle" opacity={0.7}>
+                {d.label}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
+function SmallKpi({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+  return (
+    <div className="rounded-xl border p-4">
+      <div className="text-xs text-muted-foreground">{label}</div>
+      <div className="mt-2 text-2xl font-semibold">{value}</div>
+      {hint ? <div className="mt-1 text-xs text-muted-foreground">{hint}</div> : null}
+    </div>
+  );
+}
+
 const breadcrumbs: BreadcrumbItem[] = [
   { title: 'Dashboard', href: dashboard().url },
 ];
@@ -26,10 +80,39 @@ type Props = {
     staffWorkingTodayCount: number;
     timesheetsPendingCount: number;
   } | null;
+  analytics?: {
+    shiftSeries?: Array<{ date: string; count: number; hours: number }>;
+    incidentSeries?: Array<{ date: string; count: number }>;
+    timesheetByStatus?: Array<{ status: string; count: number }>;
+  } | null;
 };
 
 export default function Dashboard(props: Props) {
   const { labels } = usePage().props as any;
+
+  const shiftSeries = props.analytics?.shiftSeries ?? [];
+  const incidentSeries = props.analytics?.incidentSeries ?? [];
+  const timesheetByStatus = props.analytics?.timesheetByStatus ?? [];
+
+  const shiftHoursData = shiftSeries.map((d) => ({
+    label: formatShortDate(d.date),
+    value: Number(d.hours ?? 0),
+  }));
+
+  const shiftCountData = shiftSeries.map((d) => ({
+    label: formatShortDate(d.date),
+    value: Number(d.count ?? 0),
+  }));
+
+  const incidentData = incidentSeries.map((d) => ({
+    label: formatShortDate(d.date),
+    value: Number(d.count ?? 0),
+  }));
+
+  const timesheetData = timesheetByStatus.map((d) => ({
+    label: String(d.status).slice(0, 3).toUpperCase(),
+    value: Number(d.count ?? 0),
+  }));
 
   const clientLabelPlural = labels?.['client.plural'] ?? 'Clients';
   const clientLabelSingular = labels?.['client.singular'] ?? 'Client';
@@ -40,17 +123,19 @@ export default function Dashboard(props: Props) {
     <AppLayout breadcrumbs={breadcrumbs}>
       <Head title="Dashboard" />
 
-      <div className="space-y-6 p-4">
+      <div className="space-y-6">
         {props.mode === 'manager' && props.managerSummary ? (
           <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-xl border p-4">
-              <div className="text-xs text-muted-foreground">Staff working today</div>
-              <div className="mt-2 text-2xl font-semibold">{props.managerSummary.staffWorkingTodayCount}</div>
-            </div>
-            <div className="rounded-xl border p-4">
-              <div className="text-xs text-muted-foreground">Timesheets pending approval</div>
-              <div className="mt-2 text-2xl font-semibold">{props.managerSummary.timesheetsPendingCount}</div>
-            </div>
+            <SmallKpi
+              label="Staff working today"
+              value={props.managerSummary.staffWorkingTodayCount}
+              hint={`${props.managerSummary.staffWorkingTodayCount} scheduled`}
+            />
+            <SmallKpi
+              label="Timesheets pending approval"
+              value={props.managerSummary.timesheetsPendingCount}
+              hint="Awaiting review"
+            />
             <div className="rounded-xl border p-4">
               <div className="text-xs text-muted-foreground">Quick actions</div>
               <div className="mt-3 flex flex-wrap gap-2">
@@ -63,6 +148,38 @@ export default function Dashboard(props: Props) {
                 <Button asChild size="sm">
                   <Link href="/shifts/create">Create shift</Link>
                 </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
+
+        {props.mode !== 'client' ? (
+          <div className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-xl border p-4 lg:col-span-1">
+              <div className="text-sm font-semibold">Shifts next 7 days</div>
+              <div className="mt-1 text-xs text-muted-foreground">Hours scheduled</div>
+              <div className="mt-4">
+                <SimpleBarChart data={shiftHoursData} />
+              </div>
+            </div>
+
+            <div className="rounded-xl border p-4 lg:col-span-1">
+              <div className="text-sm font-semibold">Timesheets</div>
+              <div className="mt-1 text-xs text-muted-foreground">Dashboard breakdown</div>
+              <div className="mt-4">
+                <SimpleBarChart data={timesheetData} />
+              </div>
+            </div>
+
+            <div className="rounded-xl border p-4 lg:col-span-1">
+              <div className="text-sm font-semibold">Incidents</div>
+              <div className="mt-1 text-xs text-muted-foreground">Last 14 days</div>
+              <div className="mt-4">
+                {incidentData.length ? (
+                  <SimpleBarChart data={incidentData} />
+                ) : (
+                  <div className="text-sm text-muted-foreground">No incident data available.</div>
+                )}
               </div>
             </div>
           </div>

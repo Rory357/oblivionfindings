@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use App\Models\AppSetting;
+use App\Models\Announcement;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -58,6 +59,7 @@ class HandleInertiaRequests extends Middleware
                     'create' => $user->canDo('shifts.create'),
                     'update' => $user->canDo('shifts.update'),
                     'manageAny' => $user->canDo('shifts.manageAny'),
+                    'tasksUpdateSelf' => $user->canDo('shifts.tasks.updateSelf'),
                 ],
 
                 'timesheets' => [
@@ -87,6 +89,7 @@ class HandleInertiaRequests extends Middleware
                 'timeline' => [
                     'viewAny' => $user->canDo('timeline.viewAny'),
                     'create' => $user->canDo('timeline.create'),
+                    'pin' => $user->canDo('timeline.pin'),
                 ],
 
                 'summaries' => [
@@ -96,6 +99,22 @@ class HandleInertiaRequests extends Middleware
 
                 'audit' => [
                     'viewAny' => $user->canDo('audit.viewAny'),
+                ],
+
+                'incidents' => [
+                    'viewAny' => $user->canDo('incidents.viewAny'),
+                    'viewAssigned' => $user->canDo('incidents.viewAssigned'),
+                    'create' => $user->canDo('incidents.create'),
+                    'update' => $user->canDo('incidents.update'),
+                    'approve' => $user->canDo('incidents.approve'),
+                ],
+
+                'risks' => [
+                    'viewAny' => $user->canDo('risks.viewAny'),
+                    'viewAssigned' => $user->canDo('risks.viewAssigned'),
+                    'create' => $user->canDo('risks.create'),
+                    'update' => $user->canDo('risks.update'),
+                    'delete' => $user->canDo('risks.delete'),
                 ],
 
                 'unifi' => [
@@ -168,6 +187,35 @@ class HandleInertiaRequests extends Middleware
             ],
 
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
+
+            // Flash messages for global toasts
+            'flash' => [
+                // Many controllers use 'status' (starter-kit convention). Treat it as success.
+                'success' => session('success') ?? session('status'),
+                'error' => session('error'),
+                'warning' => session('warning'),
+                'info' => session('info'),
+            ],
+
+            // Header inbox (notifications + announcements)
+            'inbox' => $user ? [
+                'notifications' => [
+                    'unread_count' => $user->unreadNotifications()->count(),
+                    'items' => $user->notifications()
+                        ->latest()
+                        ->limit(8)
+                        ->get(['id', 'type', 'data', 'read_at', 'created_at'])
+                        ->map(fn($n) => [
+                            'id' => $n->id,
+                            'type' => $n->type,
+                            'data' => $n->data,
+                            'read_at' => optional($n->read_at)->toISOString(),
+                            'created_at' => optional($n->created_at)->toISOString(),
+                        ])
+                        ->values(),
+                ],
+                'announcements' => Announcement::inboxFor($user),
+            ] : null,
         ];
     }
 }

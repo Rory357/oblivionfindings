@@ -1,28 +1,42 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 
 type Props = {
     client: { id: number; first_name: string; last_name: string };
     can_edit: boolean;
+    can_record: boolean;
+    can_stock: boolean;
     profile: any | null;
     medications: Array<any>;
     conditions: Array<any>;
     emergency_contacts: Array<any>;
+    administrations: Array<any>;
 };
 
 export default function ClientMedical({
     client,
     can_edit,
+    can_record,
+    can_stock,
     profile,
     medications,
     conditions,
     emergency_contacts,
+    administrations,
 }: Props) {
     const name = `${client.first_name} ${client.last_name}`.trim();
 
@@ -37,13 +51,35 @@ export default function ClientMedical({
         name: '',
         dosage: '',
         frequency: '',
+        is_prn: false,
+        prn_reason: '',
+        max_per_day: '',
         route: '',
         prescriber: '',
         start_date: '',
         end_date: '',
         instructions: '',
+        active: true,
     });
 
+    const administrationForm = useForm({
+        medication_id: medications?.[0]?.id ?? '',
+        status: 'given',
+        dose_given: '',
+        administered_at: new Date().toISOString().slice(0, 16),
+        scheduled_for: '',
+        shift_id: '',
+        notes: '',
+    });
+
+    const stockForm = useForm({
+        medication_id: medications?.[0]?.id ?? '',
+        on_hand: '',
+        unit: '',
+        reorder_level: '',
+        last_counted_at: '',
+        notes: '',
+    });
     const conditionForm = useForm({
         label: '',
         severity: '',
@@ -191,6 +227,43 @@ export default function ClientMedical({
                                             }
                                         />
                                     </div>
+                                    <div className="flex items-center gap-2 pt-6">
+                                        <Checkbox
+                                            checked={!!medForm.data.is_prn}
+                                            onCheckedChange={(v) =>
+                                                medForm.setData('is_prn', !!v)
+                                            }
+                                        />
+                                        <Label className="!mt-0">PRN (as needed)</Label>
+                                    </div>
+                                    {medForm.data.is_prn && (
+                                        <>
+                                            <div>
+                                                <Label>PRN reason</Label>
+                                                <Input
+                                                    value={medForm.data.prn_reason}
+                                                    onChange={(e) =>
+                                                        medForm.setData(
+                                                            'prn_reason',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label>Max per day</Label>
+                                                <Input
+                                                    value={medForm.data.max_per_day}
+                                                    onChange={(e) =>
+                                                        medForm.setData(
+                                                            'max_per_day',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        </>
+                                    )}
                                     <div>
                                         <Label>Route</Label>
                                         <Input
@@ -252,6 +325,15 @@ export default function ClientMedical({
                                                 )
                                             }
                                         />
+                                    </div>
+                                    <div className="flex items-center gap-2 pt-6">
+                                        <Checkbox
+                                            checked={!!medForm.data.active}
+                                            onCheckedChange={(v) =>
+                                                medForm.setData('active', !!v)
+                                            }
+                                        />
+                                        <Label className="!mt-0">Active</Label>
                                     </div>
                                 </div>
                                 <div className="mt-3">
@@ -599,6 +681,359 @@ export default function ClientMedical({
                             {!emergency_contacts.length && (
                                 <div className="text-sm text-slate-500">
                                     No emergency contacts listed.
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* MAR + Stock */}
+            <div className="grid gap-4 md:grid-cols-2">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">
+                            Medication administration (MAR)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {can_record && medications.length > 0 && (
+                            <div className="rounded-md border p-3">
+                                <div className="text-sm font-medium">
+                                    Record administration
+                                </div>
+                                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <div className="md:col-span-2">
+                                        <Label>Medication</Label>
+                                        <Select
+                                            value={`${administrationForm.data.medication_id}`}
+                                            onValueChange={(v) =>
+                                                administrationForm.setData(
+                                                    'medication_id',
+                                                    v,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select medication" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {medications.map((m) => (
+                                                    <SelectItem
+                                                        key={m.id}
+                                                        value={`${m.id}`}
+                                                    >
+                                                        {m.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div>
+                                        <Label>Status</Label>
+                                        <Select
+                                            value={administrationForm.data.status}
+                                            onValueChange={(v) =>
+                                                administrationForm.setData(
+                                                    'status',
+                                                    v,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="given">
+                                                    Given
+                                                </SelectItem>
+                                                <SelectItem value="refused">
+                                                    Refused
+                                                </SelectItem>
+                                                <SelectItem value="missed">
+                                                    Missed
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div>
+                                        <Label>Dose given</Label>
+                                        <Input
+                                            value={administrationForm.data.dose_given}
+                                            onChange={(e) =>
+                                                administrationForm.setData(
+                                                    'dose_given',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <Label>Administered at</Label>
+                                        <Input
+                                            type="datetime-local"
+                                            value={administrationForm.data.administered_at}
+                                            onChange={(e) =>
+                                                administrationForm.setData(
+                                                    'administered_at',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <Label>Scheduled for (optional)</Label>
+                                        <Input
+                                            type="datetime-local"
+                                            value={administrationForm.data.scheduled_for}
+                                            onChange={(e) =>
+                                                administrationForm.setData(
+                                                    'scheduled_for',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+
+                                    <div className="md:col-span-2">
+                                        <Label>Notes</Label>
+                                        <Textarea
+                                            value={administrationForm.data.notes}
+                                            onChange={(e) =>
+                                                administrationForm.setData(
+                                                    'notes',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                                <div className="mt-3">
+                                    <Button
+                                        onClick={() =>
+                                            administrationForm.post(
+                                                `/clients/${client.id}/medical/medications/${administrationForm.data.medication_id}/administrations`,
+                                                {
+                                                    preserveScroll: true,
+                                                    onSuccess: () =>
+                                                        administrationForm.reset(
+                                                            'dose_given',
+                                                            'scheduled_for',
+                                                            'notes',
+                                                        ),
+                                                },
+                                            )
+                                        }
+                                        disabled={
+                                            administrationForm.processing ||
+                                            !administrationForm.data
+                                                .medication_id
+                                        }
+                                    >
+                                        Save
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            {administrations.map((a) => (
+                                <div
+                                    key={a.id}
+                                    className="rounded-md border p-3"
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="text-sm font-medium">
+                                            {a.medication?.name || 'Medication'}
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                            {a.status}
+                                        </div>
+                                    </div>
+                                    <div className="mt-1 text-xs text-slate-500">
+                                        {a.administered_at
+                                            ? `Administered: ${new Date(a.administered_at).toLocaleString()}`
+                                            : ''}
+                                        {a.administeredBy?.name
+                                            ? ` • By: ${a.administeredBy.name}`
+                                            : ''}
+                                        {a.dose_given
+                                            ? ` • Dose: ${a.dose_given}`
+                                            : ''}
+                                    </div>
+                                    {a.notes && (
+                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                            {a.notes}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            {!administrations.length && (
+                                <div className="text-sm text-slate-500">
+                                    No administrations recorded yet.
+                                </div>
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Stock</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {can_stock && medications.length > 0 && (
+                            <div className="rounded-md border p-3">
+                                <div className="text-sm font-medium">
+                                    Update stock
+                                </div>
+                                <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <div className="md:col-span-2">
+                                        <Label>Medication</Label>
+                                        <Select
+                                            value={`${stockForm.data.medication_id}`}
+                                            onValueChange={(v) =>
+                                                stockForm.setData(
+                                                    'medication_id',
+                                                    v,
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select medication" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {medications.map((m) => (
+                                                    <SelectItem
+                                                        key={m.id}
+                                                        value={`${m.id}`}
+                                                    >
+                                                        {m.name}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>On hand</Label>
+                                        <Input
+                                            value={stockForm.data.on_hand}
+                                            onChange={(e) =>
+                                                stockForm.setData(
+                                                    'on_hand',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Unit</Label>
+                                        <Input
+                                            value={stockForm.data.unit}
+                                            onChange={(e) =>
+                                                stockForm.setData(
+                                                    'unit',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Reorder level</Label>
+                                        <Input
+                                            value={stockForm.data.reorder_level}
+                                            onChange={(e) =>
+                                                stockForm.setData(
+                                                    'reorder_level',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Last counted (optional)</Label>
+                                        <Input
+                                            type="date"
+                                            value={stockForm.data.last_counted_at}
+                                            onChange={(e) =>
+                                                stockForm.setData(
+                                                    'last_counted_at',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <Label>Notes</Label>
+                                        <Textarea
+                                            value={stockForm.data.notes}
+                                            onChange={(e) =>
+                                                stockForm.setData(
+                                                    'notes',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                                <div className="mt-3">
+                                    <Button
+                                        onClick={() =>
+                                            stockForm.put(
+                                                `/clients/${client.id}/medical/medications/${stockForm.data.medication_id}/stock`,
+                                                {
+                                                    preserveScroll: true,
+                                                },
+                                            )
+                                        }
+                                        disabled={
+                                            stockForm.processing ||
+                                            !stockForm.data.medication_id
+                                        }
+                                    >
+                                        Save
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="space-y-2">
+                            {medications.map((m) => (
+                                <div
+                                    key={m.id}
+                                    className="rounded-md border p-3"
+                                >
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="text-sm font-medium">
+                                            {m.name}
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                            {m.stock?.on_hand !== null &&
+                                            m.stock?.on_hand !== undefined
+                                                ? `${m.stock.on_hand}${m.stock.unit ? ` ${m.stock.unit}` : ''}`
+                                                : '—'}
+                                        </div>
+                                    </div>
+                                    {m.stock?.reorder_level !== null &&
+                                        m.stock?.reorder_level !== undefined && (
+                                            <div className="mt-1 text-xs text-slate-500">
+                                                Reorder at: {m.stock.reorder_level}
+                                            </div>
+                                        )}
+                                    {m.stock?.notes && (
+                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                            {m.stock.notes}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            {!medications.length && (
+                                <div className="text-sm text-slate-500">
+                                    No medications listed.
                                 </div>
                             )}
                         </div>

@@ -23,6 +23,7 @@ class PortalClientController extends Controller
 
         $events = TimelineEvent::query()
             ->where('client_id', $client->id)
+            ->where('visibility', 'portal')
             ->orderByDesc('occurred_at')
             ->limit(60)
             ->with(['actor:id,name', 'site:id,name'])

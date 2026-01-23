@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\Timesheet;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class TimesheetController extends Controller
@@ -110,6 +111,15 @@ class TimesheetController extends Controller
             'created_by' => $auth->id,
         ]);
 
+        $timesheet->load(['shift.client']);
+        $client = $timesheet->shift?->client;
+
+        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'timesheet', $timesheet, $client, [
+            'title' => 'Timesheet created',
+            'url' => url("/timesheets/{$timesheet->id}/edit"),
+            'target_user_ids' => [$timesheet->user_id],
+        ]);
+
         return redirect()->route('timesheets.edit', $timesheet)->with('success', 'Timesheet created.');
     }
 
@@ -185,6 +195,15 @@ class TimesheetController extends Controller
         }
 
         $timesheet->save();
+
+        $timesheet->load(['shift.client']);
+        $client = $timesheet->shift?->client;
+
+        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'timesheet', $timesheet, $client, [
+            'title' => 'Timesheet updated',
+            'url' => url("/timesheets/{$timesheet->id}/edit"),
+            'target_user_ids' => [$timesheet->user_id],
+        ]);
 
         return redirect()->back()->with('success', 'Timesheet updated.');
     }

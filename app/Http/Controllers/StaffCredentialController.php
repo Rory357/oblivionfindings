@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\StaffCredential;
+use App\Services\NotificationService;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -62,6 +63,12 @@ class StaffCredentialController extends Controller
 
         StaffCredential::create(array_merge($data, ['user_id' => $user->id]));
 
+        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'staff credential', $credential, null, [
+            'title' => 'Credential added',
+            'url' => url("/staff/{$user->id}/credentials"),
+            'target_user_ids' => [$user->id],
+        ]);
+
         return back()->with('success', 'Credential added.');
     }
 
@@ -81,6 +88,12 @@ class StaffCredentialController extends Controller
 
         $credential->update($data);
 
+        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'staff credential', $credential, null, [
+            'title' => 'Credential updated',
+            'url' => url("/staff/{$user->id}/credentials"),
+            'target_user_ids' => [$user->id],
+        ]);
+
         return back()->with('success', 'Credential updated.');
     }
 
@@ -90,6 +103,12 @@ class StaffCredentialController extends Controller
         abort_unless($credential->user_id === $user->id, 404);
 
         $credential->delete();
+
+        app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'staff credential', $credential, null, [
+            'title' => 'Credential removed',
+            'url' => url("/staff/{$user->id}/credentials"),
+            'target_user_ids' => [$user->id],
+        ]);
 
         return back()->with('success', 'Credential removed.');
     }

@@ -7,6 +7,7 @@ use App\Models\ClientDocument;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Models\Site;
+use App\Services\NotificationService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use App\Http\Requests\StoreClientRequest;
@@ -87,6 +88,15 @@ class ClientController extends Controller
             ->with(['actor:id,name', 'site:id,name'])
             ->get();
 
+        $handover = TimelineEvent::query()
+            ->where('client_id', $client->id)
+            ->where('type', 'handover')
+            ->where('is_pinned', true)
+            ->orderByDesc('occurred_at')
+            ->limit(5)
+            ->with(['actor:id,name'])
+            ->get();
+
         return inertia('clients/show', [
             'client' => [
                 'id' => $client->id,
@@ -127,17 +137,35 @@ class ClientController extends Controller
             ])->values(),
             'events' => $events->map(fn($e) => [
                 'id' => $e->id,
+                'source_id' => $e->source_id,
+                'source_type' => $e->source_type,
                 'type' => $e->type,
                 'occurred_at' => optional($e->occurred_at)->toISOString(),
                 'subject' => $e->subject,
                 'body' => $e->body,
+                'meta' => $e->meta ?? [],
+                'visibility' => $e->visibility,
+                'is_pinned' => (bool) $e->is_pinned,
+                'shift_id' => $e->shift_id,
                 'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
                 'site' => $e->site ? ['id' => $e->site->id, 'name' => $e->site->name] : null,
+            ])->values(),
+            'handover' => $handover->map(fn($e) => [
+                'id' => $e->id,
+                'source_id' => $e->source_id,
+                'source_type' => $e->source_type,
+                'type' => $e->type,
+                'occurred_at' => optional($e->occurred_at)->toISOString(),
+                'subject' => $e->subject,
+                'body' => $e->body,
+                'is_pinned' => (bool) $e->is_pinned,
+                'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
             ])->values(),
             'can' => [
                 'edit' => $request->user()?->canDo('clients.update') ?? false,
                 'assign_workers' => $request->user()?->canDo('clients.assignments.update') ?? false,
                 'create_note' => $request->user()?->canDo('timeline.create') ?? false,
+                'pin_handover' => $request->user()?->canDo('timeline.pin') ?? false,
             ],
         ]);
     }
@@ -171,11 +199,23 @@ class ClientController extends Controller
     {
         $this->authorize('create', Client::class);
 
-        $client = Client::create($request->validated());
+        try {
+            $client = Client::create($request->validated());
 
-        return redirect()
-            ->route('clients.index')
-            ->with('success', 'Client created.');
+            app(NotificationService::class)->notifyCrud($request->user(), 'created', 'client', $client, $client, [
+                'title' => "Client created: {$client->first_name} {$client->last_name}",
+                'url' => url("/clients/{$client->id}"),
+            ]);
+
+            return redirect()
+                ->route('clients.index')
+                ->with('success', 'Client created successfully.');
+        } catch (\Throwable $e) {
+            report($e);
+            return back()
+                ->withInput()
+                ->with('error', 'Failed to create client: ' . $e->getMessage());
+        }
     }
 
     public function edit(Client $client)
@@ -204,10 +244,22 @@ class ClientController extends Controller
     {
         $this->authorize('update', $client);
 
-        $client->update($request->validated());
+        try {
+            $client->update($request->validated());
 
-        return redirect()
-            ->route('clients.index')
-            ->with('success', 'Client updated.');
+            app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'client', $client, $client, [
+                'title' => "Client updated: {$client->first_name} {$client->last_name}",
+                'url' => url("/clients/{$client->id}"),
+            ]);
+
+            return redirect()
+                ->route('clients.index')
+                ->with('success', 'Client updated successfully.');
+        } catch (\Throwable $e) {
+            report($e);
+            return back()
+                ->withInput()
+                ->with('error', 'Failed to update client: ' . $e->getMessage());
+        }
     }
 }

@@ -3,11 +3,13 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\ClientIncident;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class DashboardController extends Controller
 {
@@ -108,6 +110,57 @@ class DashboardController extends Controller
             ];
         }
 
+        // Dashboard analytics (used for graphs). Only include what the user is allowed to see.
+        $canSeeIncidents = $user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned');
+
+        $shiftScope = Shift::query()
+            ->when(!$user->canDo('shifts.manageAny'), fn ($q) => $q->where('user_id', $user->id));
+
+        $shiftSeries = $shiftScope
+            ->whereBetween('starts_at', [$today, $weekEnd])
+            ->selectRaw('DATE(starts_at) as d')
+            ->selectRaw('COUNT(*) as c')
+            ->selectRaw('SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)) / 60 as h')
+            ->groupBy('d')
+            ->orderBy('d')
+            ->get()
+            ->map(fn ($r) => [
+                'date' => (string) $r->d,
+                'count' => (int) ($r->c ?? 0),
+                'hours' => (float) ($r->h ?? 0),
+            ])
+            ->values();
+
+        $timesheetScope = Timesheet::query()
+            ->when(!$user->canDo('timesheets.manageAny'), fn ($q) => $q->where('user_id', $user->id));
+
+        $timesheetByStatus = $timesheetScope
+            ->select('status', DB::raw('COUNT(*) as c'))
+            ->groupBy('status')
+            ->get()
+            ->map(fn ($r) => ['status' => (string) $r->status, 'count' => (int) $r->c])
+            ->values();
+
+        $incidentSeries = collect();
+        if ($canSeeIncidents) {
+            $incidentStart = (clone $today)->subDays(14);
+
+            $incidentQuery = ClientIncident::query()->whereBetween('occurred_at', [$incidentStart, $tomorrow]);
+            if ($user->canDo('incidents.viewAssigned') && !$user->canDo('incidents.viewAny')) {
+                $assignedIds = $user->assignedClients()->pluck('clients.id')->values();
+                $incidentQuery->whereIn('client_id', $assignedIds);
+            }
+
+            $incidentSeries = $incidentQuery
+                ->selectRaw('DATE(occurred_at) as d')
+                ->selectRaw('COUNT(*) as c')
+                ->groupBy('d')
+                ->orderBy('d')
+                ->get()
+                ->map(fn ($r) => ['date' => (string) $r->d, 'count' => (int) ($r->c ?? 0)])
+                ->values();
+        }
+
         return inertia('dashboard', [
             'mode' => $user->canDo('shifts.manageAny') || $user->canDo('timesheets.manageAny') ? 'manager' : 'staff',
             'assignedClients' => $assignedClients,
@@ -127,6 +180,11 @@ class DashboardController extends Controller
             })->values(),
             'todayTimesheets' => $todayTimesheets,
             'managerSummary' => $managerSummary,
+            'analytics' => [
+                'shiftSeries' => $shiftSeries,
+                'incidentSeries' => $incidentSeries,
+                'timesheetByStatus' => $timesheetByStatus,
+            ],
         ]);
     }
 }

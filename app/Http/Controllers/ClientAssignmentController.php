@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class ClientAssignmentController extends Controller
@@ -41,7 +42,21 @@ class ClientAssignmentController extends Controller
             ->pluck('id')
             ->all();
 
+        $oldAssignedIds = $client->supportWorkers()->pluck('users.id')->map(fn($id) => (int) $id);
+        $newAssignedIds = collect($allowedWorkerIds)->map(fn($id) => (int) $id);
+
         $client->supportWorkers()->sync($allowedWorkerIds);
+
+        $added = $newAssignedIds->diff($oldAssignedIds)->values()->all();
+        $removed = $oldAssignedIds->diff($newAssignedIds)->values()->all();
+
+        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'client assignments', $client, $client, [
+            'title' => "Client assignments updated: {$client->first_name} {$client->last_name}",
+            'body' => 'Added worker IDs: ' . (count($added) ? implode(', ', $added) : 'none') . ' | Removed worker IDs: ' . (count($removed) ? implode(', ', $removed) : 'none'),
+            'url' => url("/clients/{$client->id}/assignments"),
+            // Explicitly notify newly assigned workers in addition to managers.
+            'target_user_ids' => $added,
+        ]);
 
         return redirect()
             ->route('clients.assignments.edit', $client)

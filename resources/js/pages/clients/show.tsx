@@ -1,9 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
+import PageHeader from '@/components/page-header';
+import PageShell from '@/components/page-shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
@@ -40,10 +44,12 @@ type Props = {
     documents: Array<any>;
     portal_users: Array<any>;
     events: Array<any>;
+    handover: Array<any>;
     can: {
         edit: boolean;
         assign_workers: boolean;
         create_note?: boolean;
+        pin_handover?: boolean;
     };
 };
 
@@ -57,7 +63,7 @@ type TabKey =
     | 'portal'
     | 'assignments';
 
-export default function ClientShow({ client, medical, support_plan, assessments, documents, portal_users, events, can }: Props) {
+export default function ClientShow({ client, medical, support_plan, assessments, documents, portal_users, events, handover, can }: Props) {
     const name = `${client.first_name} ${client.last_name}`.trim();
 
     const tabs: Array<{ key: TabKey; label: string; show: boolean }> = useMemo(
@@ -76,9 +82,19 @@ export default function ClientShow({ client, medical, support_plan, assessments,
 
     const [tab, setTab] = useState<TabKey>('profile');
 
-    const noteForm = useForm<{ subject: string; body: string }>({
+    const templates = [
+        { key: 'note', label: 'Note', body: '' },
+        { key: 'progress_note', label: 'Progress note', body: 'Goal/outcome:\n\nWhat happened:\n\nNext steps:' },
+        { key: 'handover', label: 'Handover', body: 'Key points for next shift:\n-\n-\n\nRisks/alerts:\n-\n\nActions needed:\n-' },
+    ];
+
+    const noteForm = useForm<{ type: string; subject: string; goal: string; body: string; visibility: string; pin: boolean }>({
+        type: 'note',
         subject: '',
+        goal: '',
         body: '',
+        visibility: 'internal',
+        pin: false,
     });
 
     return (
@@ -90,42 +106,35 @@ export default function ClientShow({ client, medical, support_plan, assessments,
         >
             <Head title={name} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">{name}</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            Status: <span className="text-slate-700">{client.status}</span>
-                            {client.site ? (
-                                <>
-                                    <span className="mx-2">•</span>
-                                    Site: <span className="text-slate-700">{client.site.name}</span>
-                                </>
+            <PageShell>
+                <PageHeader
+                    title={name}
+                    backHref="/clients"
+                    description={`${client.status}${client.site ? ` • ${client.site.name}` : ''}`}
+                    actions={
+                        <>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={`/clients/${client.id}/incidents`}>Incidents</Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={`/clients/${client.id}/risks`}>Risks</Link>
+                            </Button>
+                            {can.edit ? (
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={`/clients/${client.id}/edit`}>Edit</Link>
+                                </Button>
                             ) : null}
-                        </div>
-                    </div>
+                            {(can.assign_workers || can.edit) ? (
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={`/clients/${client.id}/assignments`}>Assign workers</Link>
+                                </Button>
+                            ) : null}
+                        </>
+                    }
+                />
 
-                    <div className="flex items-center gap-2">
-                        {can.edit && (
-                            <Link
-                                href={`/clients/${client.id}/edit`}
-                                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                            >
-                                Edit
-                            </Link>
-                        )}
-                        {(can.assign_workers || can.edit) && (
-                            <Link
-                                href={`/clients/${client.id}/assignments`}
-                                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                            >
-                                Assign workers
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
-                <div className="flex flex-wrap gap-2">
+                <div className="-mx-4 overflow-x-auto px-4">
+                    <div className="flex w-max items-center gap-2 pb-1">
                     {tabs
                         .filter((t) => t.show)
                         .map((t) => (
@@ -138,6 +147,7 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                 {t.label}
                             </Button>
                         ))}
+                    </div>
                 </div>
 
                 {tab === 'profile' && (
@@ -344,17 +354,85 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                             <CardTitle className="text-base">Timeline</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
+                            {handover.length ? (
+                                <div className="rounded-md border p-3">
+                                    <div className="text-sm font-medium">Pinned handover</div>
+                                    <div className="mt-2 space-y-2">
+                                        {handover.map((h) => (
+                                            <div key={h.id} className="rounded-md border p-3">
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <div className="text-sm font-medium">{h.subject || 'Handover'}</div>
+                                                    <div className="text-xs text-slate-500">{h.occurred_at ? new Date(h.occurred_at).toLocaleString() : ''}</div>
+                                                </div>
+                                                {h.body && <div className="mt-2 whitespace-pre-wrap text-xs text-slate-600">{h.body}</div>}
+                                                <div className="mt-2 flex items-center justify-between gap-2">
+                                                    <div className="text-xs text-slate-500">{h.actor?.name ? `By ${h.actor.name}` : ''}</div>
+                                                    {can.pin_handover && h.source_id ? (
+                                                        <button
+                                                            className="text-xs underline"
+                                                            onClick={async () => {
+                                                                await fetch(`/clients/${client.id}/notes/${h.source_id}/pin`, {
+                                                                    method: 'POST',
+                                                                    headers: {
+                                                                        'X-Requested-With': 'XMLHttpRequest',
+                                                                        'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content,
+                                                                    },
+                                                                });
+                                                                window.location.reload();
+                                                            }}
+                                                        >
+                                                            Unpin
+                                                        </button>
+                                                    ) : null}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : null}
+
                             {can.create_note && (
                                 <div className="rounded-md border p-3">
                                     <div className="text-sm font-medium">Add note</div>
                                     <div className="mt-3 grid grid-cols-1 gap-3">
-                                        <div>
-                                            <Label>Subject (optional)</Label>
-                                            <Input
-                                                value={noteForm.data.subject}
-                                                onChange={(e) => noteForm.setData('subject', e.target.value)}
-                                            />
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <div>
+                                                <Label>Type</Label>
+                                                <Select
+                                                    value={noteForm.data.type}
+                                                    onValueChange={(v) => {
+                                                        noteForm.setData('type', v);
+                                                        const tpl = templates.find((t) => t.key === v);
+                                                        if (tpl && noteForm.data.body.trim() === '') {
+                                                            noteForm.setData('body', tpl.body);
+                                                        }
+                                                        noteForm.setData('pin', v === 'handover');
+                                                    }}
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {templates.map((t) => (
+                                                            <SelectItem key={t.key} value={t.key}>
+                                                                {t.label}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div>
+                                                <Label>Subject (optional)</Label>
+                                                <Input value={noteForm.data.subject} onChange={(e) => noteForm.setData('subject', e.target.value)} />
+                                            </div>
                                         </div>
+
+                                        {noteForm.data.type === 'progress_note' ? (
+                                            <div>
+                                                <Label>Goal/outcome (optional)</Label>
+                                                <Input value={noteForm.data.goal} onChange={(e) => noteForm.setData('goal', e.target.value)} />
+                                            </div>
+                                        ) : null}
                                         <div>
                                             <Label>Note</Label>
                                             <Textarea
@@ -364,12 +442,23 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                             />
                                         </div>
                                     </div>
-                                    <div className="mt-3">
+                                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <Checkbox checked={noteForm.data.visibility === 'portal'} onCheckedChange={(v) => noteForm.setData('visibility', v ? 'portal' : 'internal')} />
+                                            <span>Share in portal</span>
+                                        </div>
+                                        {noteForm.data.type === 'handover' ? (
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <Checkbox checked={noteForm.data.pin} onCheckedChange={(v) => noteForm.setData('pin', Boolean(v))} />
+                                                <span>Pin as handover</span>
+                                            </div>
+                                        ) : null}
+
                                         <Button
                                             onClick={() =>
                                                 noteForm.post(`/clients/${client.id}/notes`, {
                                                     preserveScroll: true,
-                                                    onSuccess: () => noteForm.reset(),
+                                                    onSuccess: () => noteForm.reset({ type: 'note', subject: '', goal: '', body: '', visibility: 'internal', pin: false }),
                                                 })
                                             }
                                             disabled={noteForm.processing || !noteForm.data.body}
@@ -498,7 +587,7 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageShell>
         </AppLayout>
     );
 }

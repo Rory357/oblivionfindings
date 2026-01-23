@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class StaffAssignmentController extends Controller
@@ -36,7 +37,20 @@ class StaffAssignmentController extends Controller
             'client_ids.*' => ['integer', 'exists:clients,id'],
         ]);
 
+        $oldAssignedIds = $user->assignedClients()->pluck('clients.id')->map(fn($id) => (int) $id);
+        $newAssignedIds = collect($data['client_ids'] ?? [])->map(fn($id) => (int) $id);
+
         $user->assignedClients()->sync($data['client_ids'] ?? []);
+
+        $added = $newAssignedIds->diff($oldAssignedIds)->values()->all();
+        $removed = $oldAssignedIds->diff($newAssignedIds)->values()->all();
+
+        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'staff assignments', $user, null, [
+            'title' => "Staff assignments updated: {$user->name}",
+            'body' => 'Added client IDs: ' . (count($added) ? implode(', ', $added) : 'none') . ' | Removed client IDs: ' . (count($removed) ? implode(', ', $removed) : 'none'),
+            'url' => url("/staff/{$user->id}/assignments"),
+            'target_user_ids' => [$user->id],
+        ]);
 
         return redirect()->back()->with('success', 'Assignments updated.');
     }

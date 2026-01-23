@@ -145,6 +145,14 @@ export default function CalendarIndex(props: Props) {
     const [staffId, setStaffId] = useState<string>('all');
     const [clientId, setClientId] = useState<string>('all');
 
+    const [rangeSummary, setRangeSummary] = useState<{
+        total: number;
+        hours: number;
+        scheduled: number;
+        completed: number;
+        cancelled: number;
+    }>({ total: 0, hours: 0, scheduled: 0, completed: 0, cancelled: 0 });
+
     const calendarRef = useRef<FullCalendar | null>(null);
 
     const [modalOpen, setModalOpen] = useState(false);
@@ -356,6 +364,39 @@ export default function CalendarIndex(props: Props) {
                     </CardHeader>
 
                     <CardContent>
+                        <div className="mb-4 grid gap-3 rounded-lg border p-3 text-xs sm:grid-cols-5">
+                            <div>
+                                <div className="text-muted-foreground">Total</div>
+                                <div className="mt-1 text-sm font-semibold">
+                                    {rangeSummary.total}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-muted-foreground">Hours</div>
+                                <div className="mt-1 text-sm font-semibold">
+                                    {rangeSummary.hours.toFixed(1)}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-muted-foreground">Scheduled</div>
+                                <div className="mt-1 text-sm font-semibold">
+                                    {rangeSummary.scheduled}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-muted-foreground">Completed</div>
+                                <div className="mt-1 text-sm font-semibold">
+                                    {rangeSummary.completed}
+                                </div>
+                            </div>
+                            <div>
+                                <div className="text-muted-foreground">Cancelled</div>
+                                <div className="mt-1 text-sm font-semibold">
+                                    {rangeSummary.cancelled}
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="of-calendar">
                             <FullCalendar
                                 ref={(r) => {
@@ -368,7 +409,8 @@ export default function CalendarIndex(props: Props) {
                                     listPlugin,
                                     interactionPlugin,
                                 ]}
-                                initialView="timeGridWeek"
+                                // Default view: month (requested)
+                                initialView="dayGridMonth"
                                 height="auto"
                                 headerToolbar={{
                                     left: 'prev,next today',
@@ -419,10 +461,92 @@ export default function CalendarIndex(props: Props) {
                                             );
                                         }
                                         const data = await res.json();
+
+                                        // Build a light summary for the currently loaded range.
+                                        try {
+                                            const summary = {
+                                                total: 0,
+                                                hours: 0,
+                                                scheduled: 0,
+                                                completed: 0,
+                                                cancelled: 0,
+                                            };
+                                            for (const ev of data ?? []) {
+                                                summary.total += 1;
+                                                const status =
+                                                    ev?.extendedProps?.status ??
+                                                    'scheduled';
+                                                if (
+                                                    status === 'completed' ||
+                                                    status === 'cancelled'
+                                                ) {
+                                                    // @ts-ignore
+                                                    summary[status] += 1;
+                                                } else {
+                                                    summary.scheduled += 1;
+                                                }
+                                                const start =
+                                                    ev?.start &&
+                                                    new Date(ev.start);
+                                                const end =
+                                                    ev?.end && new Date(ev.end);
+                                                if (
+                                                    start instanceof Date &&
+                                                    !isNaN(start.getTime()) &&
+                                                    end instanceof Date &&
+                                                    !isNaN(end.getTime())
+                                                ) {
+                                                    summary.hours +=
+                                                        (end.getTime() -
+                                                            start.getTime()) /
+                                                        36e5;
+                                                }
+                                            }
+                                            summary.hours = Math.round(summary.hours * 10) / 10;
+                                            setRangeSummary(summary);
+                                        } catch {
+                                            // ignore summary failure
+                                        }
+
                                         successCallback(data);
                                     } catch (e) {
                                         console.error(e);
                                         failureCallback(e as any);
+                                    }
+                                }}
+                                eventContent={(arg) => {
+                                    const ext = (arg.event.extendedProps ?? {}) as any;
+                                    const client = ext.client ?? arg.event.title;
+                                    const staff = ext.staff;
+                                    const loc = ext.location;
+                                    return (
+                                        <div className="min-w-0">
+                                            <div className="truncate text-xs font-medium">
+                                                {client}
+                                            </div>
+                                            {(staff || loc) && (
+                                                <div className="truncate text-[11px] opacity-80">
+                                                    {staff ? staff : null}
+                                                    {staff && loc ? ' · ' : null}
+                                                    {loc ? loc : null}
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                }}
+                                eventDidMount={(info) => {
+                                    const ext = (info.event.extendedProps ?? {}) as any;
+                                    const lines = [
+                                        ext.client ? `Client: ${ext.client}` : null,
+                                        ext.staff ? `Staff: ${ext.staff}` : null,
+                                        ext.location ? `Location: ${ext.location}` : null,
+                                        ext.status ? `Status: ${ext.status}` : null,
+                                    ].filter(Boolean);
+                                    if (lines.length) {
+                                        info.el.setAttribute(
+                                            'title',
+                                            lines.join('\n'),
+                                        );
                                     }
                                 }}
                                 select={(arg: DateSelectArg) => {

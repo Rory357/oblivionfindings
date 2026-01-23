@@ -103,6 +103,12 @@ class ClientDocumentController extends Controller
             }
         }
 
+        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'document', $doc, $client, [
+            'title' => 'Document uploaded',
+            'body' => ($doc->title ?: $doc->original_name),
+            'url' => url("/clients/{$client->id}/documents"),
+        ]);
+
         return back()->with('success', 'Document uploaded.');
     }
 
@@ -127,6 +133,12 @@ class ClientDocumentController extends Controller
         }
 
         $document->update($data);
+
+        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'document', $document, $client, [
+            'title' => 'Document updated',
+            'body' => ($document->title ?: $document->original_name),
+            'url' => url("/clients/{$client->id}/documents"),
+        ]);
 
         return back()->with('success', 'Document updated.');
     }
@@ -160,6 +172,12 @@ class ClientDocumentController extends Controller
 
         Storage::disk($document->storage_disk)->delete($document->storage_path);
         $document->delete();
+
+        app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'document', $document, $client, [
+            'title' => 'Document deleted',
+            'body' => ($document->title ?: $document->original_name),
+            'url' => url("/clients/{$client->id}/documents"),
+        ]);
 
         return back()->with('success', 'Document deleted.');
     }

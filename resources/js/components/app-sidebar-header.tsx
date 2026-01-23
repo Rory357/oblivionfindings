@@ -1,5 +1,6 @@
 import { Breadcrumbs } from '@/components/breadcrumbs';
 import GlobalQueryBar from '@/components/global-query-bar';
+import InboxMenus from '@/components/inbox-menus';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { type BreadcrumbItem as BreadcrumbItemType } from '@/types';
 
@@ -18,6 +19,7 @@ export function AppSidebarHeader({
             {/* Global query bar (visible across the app) */}
             <div className="flex items-center">
                 <GlobalQueryBar />
+                <InboxMenus />
             </div>
         </header>
     );

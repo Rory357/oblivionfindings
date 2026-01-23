@@ -114,6 +114,7 @@ class RbacSeeder extends Seeder
             ['key' => 'shifts.create', 'description' => 'Create shifts'],
             ['key' => 'shifts.update', 'description' => 'Update shifts'],
             ['key' => 'shifts.manageAny', 'description' => 'Manage any staff shifts'],
+            ['key' => 'shifts.tasks.updateSelf', 'description' => 'Complete tasks on own shifts'],
 
             // Timesheets
             ['key' => 'timesheets.viewAny', 'description' => 'View timesheets'],
@@ -130,12 +131,33 @@ class RbacSeeder extends Seeder
             ['key' => 'clients.update', 'description' => 'Update clients'],
             ['key' => 'clients.assignments.update', 'description' => 'Manage client assignments'],
 
+            // Medication / MAR
+            ['key' => 'medications.administer.record', 'description' => 'Record medication administrations (MAR)'],
+            ['key' => 'medications.stock.update', 'description' => 'Update medication stock counts'],
+
+            // Incidents
+            ['key' => 'incidents.viewAny', 'description' => 'View all incidents'],
+            ['key' => 'incidents.viewAssigned', 'description' => 'View incidents for assigned clients'],
+            ['key' => 'incidents.create', 'description' => 'Create incident reports'],
+            ['key' => 'incidents.update', 'description' => 'Update incident reports'],
+            ['key' => 'incidents.delete', 'description' => 'Delete incident reports'],
+            ['key' => 'incidents.approve', 'description' => 'Review/close incidents'],
+            ['key' => 'incidents.export', 'description' => 'Export incidents'],
+
+            // Risks
+            ['key' => 'risks.viewAny', 'description' => 'View all client risks'],
+            ['key' => 'risks.viewAssigned', 'description' => 'View client risks for assigned clients'],
+            ['key' => 'risks.create', 'description' => 'Create client risks'],
+            ['key' => 'risks.update', 'description' => 'Update client risks'],
+            ['key' => 'risks.delete', 'description' => 'Delete client risks'],
+
             // Audit logs
             ['key' => 'audit.viewAny', 'description' => 'View audit logs'],
 
             // Timeline / notes
             ['key' => 'timeline.viewAny', 'description' => 'View timelines (staff/client activity)'],
             ['key' => 'timeline.create', 'description' => 'Create timeline events (notes/incidents)'],
+            ['key' => 'timeline.pin', 'description' => 'Pin/unpin handover notes'],
 
             // AI summaries
             ['key' => 'summaries.viewAny', 'description' => 'View AI summaries'],
@@ -195,6 +217,7 @@ class RbacSeeder extends Seeder
 
                 'timeline.viewAny',
                 'timeline.create',
+                'timeline.pin',
                 'summaries.viewAny',
                 'summaries.generate',
                 'unifi.manage',
@@ -214,6 +237,18 @@ class RbacSeeder extends Seeder
                 'clients.create',
                 'clients.update',
                 'clients.assignments.update',
+
+                'incidents.viewAny',
+                'incidents.create',
+                'incidents.update',
+                'incidents.delete',
+                'incidents.approve',
+                'incidents.export',
+
+                'risks.viewAny',
+                'risks.create',
+                'risks.update',
+                'risks.delete',
 
                 // Settings (adjust to taste)
                 'settings.terminology.manage',
@@ -236,6 +271,15 @@ class RbacSeeder extends Seeder
                 'staff.availability.updateAny',
                 'clients.viewAny',
                 'clients.assignments.update',
+
+                'incidents.viewAny',
+                'incidents.create',
+                'incidents.update',
+                'incidents.approve',
+                'risks.viewAny',
+                'risks.create',
+                'risks.update',
+                'risks.delete',
                 'shifts.viewAny',
                 'shifts.create',
                 'shifts.update',
@@ -243,6 +287,7 @@ class RbacSeeder extends Seeder
                 'timesheets.approve',
                 'timeline.viewAny',
                 'timeline.create',
+                'timeline.pin',
                 'summaries.viewAny',
                 'summaries.generate',
                 'calendar.viewAny',
@@ -256,9 +301,22 @@ class RbacSeeder extends Seeder
                 'clients.viewAssigned',
                 'timeline.create',
                 'shifts.viewAssigned',
+                'shifts.tasks.updateSelf',
                 'timesheets.viewAssigned',
                 'timesheets.create',
                 'timesheets.update',
+
+                'incidents.viewAssigned',
+                'incidents.create',
+                'incidents.update',
+                'risks.viewAssigned',
+
+                'medications.administer.record',
+
+                'incidents.viewAssigned',
+                'incidents.create',
+                'incidents.update',
+                'risks.viewAssigned',
 
                 'staff.credentials.updateSelf',
                 'staff.availability.updateSelf',
@@ -277,6 +335,10 @@ class RbacSeeder extends Seeder
                 'timesheets.approve',
                 'reports.viewAny',
                 'audit.viewAny',
+                'medications.stock.update',
+
+                'incidents.viewAny',
+                'incidents.export',
             ])->pluck('id')
         );
 
@@ -303,6 +365,8 @@ class RbacSeeder extends Seeder
                 'timeline.viewAny',
                 'summaries.viewAny',
                 'audit.viewAny',
+                'incidents.viewAny',
+                'risks.viewAny',
             ])->pluck('id')
         );
 

@@ -67,6 +67,11 @@ class Client extends Model
         return $this->hasMany(\App\Models\ClientMedication::class);
     }
 
+    public function medicationAdministrations()
+    {
+        return $this->hasMany(\App\Models\ClientMedicationAdministration::class);
+    }
+
     public function emergencyContacts()
     {
         return $this->hasMany(\App\Models\ClientEmergencyContact::class);
@@ -90,5 +95,15 @@ class Client extends Model
     public function assessments()
     {
         return $this->hasMany(\App\Models\ClientAssessment::class);
+    }
+
+    public function incidents()
+    {
+        return $this->hasMany(\App\Models\ClientIncident::class);
+    }
+
+    public function risks()
+    {
+        return $this->hasMany(\App\Models\ClientRisk::class);
     }
 }

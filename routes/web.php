@@ -30,6 +30,13 @@ use App\Http\Controllers\RagController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\StaffCredentialController;
 use App\Http\Controllers\StaffAvailabilityController;
+use App\Http\Controllers\ShiftSeriesController;
+use App\Http\Controllers\ShiftTaskController;
+use App\Http\Controllers\ClientIncidentController;
+use App\Http\Controllers\IncidentController;
+use App\Http\Controllers\ClientRiskController;
+use App\Http\Controllers\NotificationInboxController;
+use App\Http\Controllers\AnnouncementInboxController;
 
 Route::get('/', function () {
     return Inertia::render('home', [
@@ -53,6 +60,17 @@ Route::get('/auth/microsoft/callback', [MicrosoftController::class, 'callback'])
 
 Route::middleware(['auth'])->group(function () {
 
+    // Header inbox actions (notifications + announcements)
+    Route::post('/inbox/notifications/{notification}/read', [NotificationInboxController::class, 'markRead'])
+        ->name('inbox.notifications.read');
+    Route::post('/inbox/notifications/read-all', [NotificationInboxController::class, 'markAllRead'])
+        ->name('inbox.notifications.readAll');
+
+    Route::post('/inbox/announcements/{announcement}/read', [AnnouncementInboxController::class, 'markRead'])
+        ->name('inbox.announcements.read');
+    Route::post('/inbox/announcements/read-all', [AnnouncementInboxController::class, 'markAllRead'])
+        ->name('inbox.announcements.readAll');
+
     // Global RAG endpoints for the header query bar
     Route::get('/rag/clients', [RagController::class, 'clients'])->name('rag.clients');
     Route::post('/rag/ask', [RagController::class, 'ask'])->name('rag.ask');
@@ -72,6 +90,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/clients/{client}/notes', [ClientNoteController::class, 'store'])
         ->middleware('permission:timeline.create')
         ->name('clients.notes.store');
+
+    Route::post('/clients/{client}/notes/{note}/pin', [ClientNoteController::class, 'togglePin'])
+        ->middleware('permission:timeline.pin|clients.update')
+        ->name('clients.notes.pin');
 
     // Summaries
     Route::get('/summaries', fn() => redirect('/summaries/me'))->name('summaries.home');
@@ -108,11 +130,12 @@ Route::middleware(['auth'])->group(function () {
 
     // ✅ ALL authenticated users (policy decides data)
     // (now permission-based so it’s consistent)
+    // NOTE: constrain route model params to numbers so `/clients/create` doesn't get eaten by `/clients/{client}`
     Route::middleware('permission:clients.viewAny|clients.viewAssigned')->group(function () {
         Route::get('/clients', [ClientController::class, 'index'])->name('clients.index');
-        Route::get('/clients/{client}', [ClientController::class, 'show'])->name('clients.show');
-        Route::get('/clients/{client}/documents', [ClientDocumentController::class, 'index'])->name('clients.documents.index');
-        Route::get('/clients/{client}/documents/{document}/download', [ClientDocumentController::class, 'download'])->name('clients.documents.download');
+        Route::get('/clients/{client}', [ClientController::class, 'show'])->whereNumber('client')->name('clients.show');
+        Route::get('/clients/{client}/documents', [ClientDocumentController::class, 'index'])->whereNumber('client')->name('clients.documents.index');
+        Route::get('/clients/{client}/documents/{document}/download', [ClientDocumentController::class, 'download'])->whereNumber('client')->name('clients.documents.download');
     });
 
     // ✅ Manager/Admin modules (permission-based)
@@ -186,6 +209,66 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/clients', [ClientController::class, 'store'])->name('clients.store');
     });
 
+    // Medical view (assigned staff + managers)
+    Route::middleware('permission:clients.viewAny|clients.viewAssigned')->group(function () {
+        Route::get('/clients/{client}/medical', [ClientMedicalController::class, 'show'])->whereNumber('client')->name('clients.medical.show');
+    });
+
+    // Incidents (assigned staff + managers)
+    Route::middleware('permission:incidents.viewAny|incidents.viewAssigned')->group(function () {
+        Route::get('/clients/{client}/incidents', [ClientIncidentController::class, 'index'])
+            ->whereNumber('client')
+            ->name('clients.incidents.index');
+        Route::get('/incidents', [IncidentController::class, 'index'])->name('incidents.index');
+        Route::get('/incidents/{incident}', [IncidentController::class, 'show'])->name('incidents.show');
+    });
+
+    Route::post('/clients/{client}/incidents', [ClientIncidentController::class, 'store'])
+        ->middleware('permission:incidents.create')
+        ->whereNumber('client')
+        ->name('clients.incidents.store');
+
+    Route::post('/clients/{client}/incidents/{incident}/attachments', [ClientIncidentController::class, 'uploadAttachment'])
+        ->middleware('permission:incidents.update')
+        ->whereNumber('client')
+        ->name('clients.incidents.attachments.store');
+    Route::get('/clients/{client}/incidents/{incident}/attachments/{attachment}/download', [ClientIncidentController::class, 'downloadAttachment'])
+        ->middleware('permission:incidents.viewAny|incidents.viewAssigned')
+        ->whereNumber('client')
+        ->name('clients.incidents.attachments.download');
+
+    Route::put('/incidents/{incident}', [IncidentController::class, 'update'])
+        ->middleware('permission:incidents.update')
+        ->name('incidents.update');
+    Route::post('/incidents/{incident}/submit', [IncidentController::class, 'submit'])
+        ->middleware('permission:incidents.update')
+        ->name('incidents.submit');
+    Route::post('/incidents/{incident}/review', [IncidentController::class, 'review'])
+        ->middleware('permission:incidents.approve')
+        ->name('incidents.review');
+    Route::post('/incidents/{incident}/close', [IncidentController::class, 'close'])
+        ->middleware('permission:incidents.approve')
+        ->name('incidents.close');
+
+    // Risk register (assigned staff + managers)
+    Route::middleware('permission:risks.viewAny|risks.viewAssigned')->group(function () {
+        Route::get('/clients/{client}/risks', [ClientRiskController::class, 'index'])
+            ->whereNumber('client')
+            ->name('clients.risks.index');
+    });
+    Route::post('/clients/{client}/risks', [ClientRiskController::class, 'store'])
+        ->middleware('permission:risks.create')
+        ->whereNumber('client')
+        ->name('clients.risks.store');
+    Route::put('/clients/{client}/risks/{risk}', [ClientRiskController::class, 'update'])
+        ->middleware('permission:risks.update')
+        ->whereNumber('client')
+        ->name('clients.risks.update');
+    Route::delete('/clients/{client}/risks/{risk}', [ClientRiskController::class, 'destroy'])
+        ->middleware('permission:risks.delete')
+        ->whereNumber('client')
+        ->name('clients.risks.destroy');
+
     Route::middleware('permission:clients.update')->group(function () {
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('clients.edit');
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
@@ -195,11 +278,12 @@ Route::middleware(['auth'])->group(function () {
         Route::put('/clients/{client}/documents/{document}', [ClientDocumentController::class, 'update'])->name('clients.documents.update');
         Route::delete('/clients/{client}/documents/{document}', [ClientDocumentController::class, 'destroy'])->name('clients.documents.destroy');
 
-        Route::get('/clients/{client}/medical', [ClientMedicalController::class, 'show'])->name('clients.medical.show');
         Route::put('/clients/{client}/medical/profile', [ClientMedicalController::class, 'updateProfile'])->name('clients.medical.profile.update');
         Route::post('/clients/{client}/medical/medications', [ClientMedicalController::class, 'storeMedication'])->name('clients.medical.medications.store');
         Route::put('/clients/{client}/medical/medications/{medication}', [ClientMedicalController::class, 'updateMedication'])->name('clients.medical.medications.update');
         Route::delete('/clients/{client}/medical/medications/{medication}', [ClientMedicalController::class, 'destroyMedication'])->name('clients.medical.medications.destroy');
+
+        // Stock updates are defined below (so non-admin roles can be granted access without clients.update)
 
         Route::post('/clients/{client}/medical/conditions', [ClientMedicalController::class, 'storeCondition'])->name('clients.medical.conditions.store');
         Route::put('/clients/{client}/medical/conditions/{condition}', [ClientMedicalController::class, 'updateCondition'])->name('clients.medical.conditions.update');
@@ -227,6 +311,16 @@ Route::middleware(['auth'])->group(function () {
             ->name('clients.assessments.destroy');
     });
 
+    // Medication stock updates (managers/finance, etc.)
+    Route::put('/clients/{client}/medical/medications/{medication}/stock', [ClientMedicalController::class, 'updateMedicationStock'])
+        ->middleware('permission:medications.stock.update|clients.update')
+        ->name('clients.medical.medications.stock.update');
+
+    // Medication administration record (support workers + managers)
+    Route::post('/clients/{client}/medical/medications/{medication}/administrations', [ClientMedicalController::class, 'storeAdministration'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->name('clients.medical.medications.administrations.store');
+
     // ✅ Assign support workers to a client
     Route::middleware('permission:clients.assignments.update')->group(function () {
         Route::get('/clients/{client}/assignments', [ClientAssignmentController::class, 'edit'])
@@ -237,6 +331,7 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Shifts
+    // Shifts
     Route::get('/shifts', [ShiftController::class, 'index'])
         ->middleware('permission:shifts.viewAny|shifts.viewAssigned')
         ->name('shifts.index');
@@ -246,12 +341,28 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/shifts', [ShiftController::class, 'store'])
         ->middleware('permission:shifts.create')
         ->name('shifts.store');
+
+    // Recurring shifts (weekly series)
+    Route::post('/shifts/series', [ShiftSeriesController::class, 'store'])
+        ->middleware('permission:shifts.create')
+        ->name('shifts.series.store');
     Route::get('/shifts/{shift}/edit', [ShiftController::class, 'edit'])
         ->middleware('permission:shifts.update')
         ->name('shifts.edit');
     Route::put('/shifts/{shift}', [ShiftController::class, 'update'])
         ->middleware('permission:shifts.update')
         ->name('shifts.update');
+
+    // constrain shift param so `/shifts/create` doesn't get eaten by `/shifts/{shift}`
+    Route::get('/shifts/{shift}', [ShiftController::class, 'show'])
+        ->whereNumber('shift')
+        ->middleware('permission:shifts.viewAny|shifts.viewAssigned')
+        ->name('shifts.show');
+
+    // Shift tasks (complete/uncomplete)
+    Route::patch('/shifts/{shift}/tasks/{task}', [ShiftTaskController::class, 'update'])
+        ->middleware('permission:shifts.update|shifts.tasks.updateSelf|shifts.manageAny')
+        ->name('shifts.tasks.update');
 
     // Timesheets
     Route::get('/timesheets', [TimesheetController::class, 'index'])

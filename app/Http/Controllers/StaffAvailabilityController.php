@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\StaffAvailability;
+use App\Services\NotificationService;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -55,7 +56,13 @@ class StaffAvailabilityController extends Controller
             'ends_at' => ['required', 'date_format:H:i', 'after:starts_at'],
         ]);
 
-        StaffAvailability::create(array_merge($data, ['user_id' => $user->id]));
+        $availability = StaffAvailability::create(array_merge($data, ['user_id' => $user->id]));
+
+        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'staff availability', $availability, null, [
+            'title' => 'Availability added',
+            'url' => url("/staff/{$user->id}/availability"),
+            'target_user_ids' => [$user->id],
+        ]);
 
         return back()->with('success', 'Availability added.');
     }
@@ -66,6 +73,12 @@ class StaffAvailabilityController extends Controller
         abort_unless($availability->user_id === $user->id, 404);
 
         $availability->delete();
+
+        app(NotificationService::class)->notifyCrud($request->user(), 'deleted', 'staff availability', $availability, null, [
+            'title' => 'Availability removed',
+            'url' => url("/staff/{$user->id}/availability"),
+            'target_user_ids' => [$user->id],
+        ]);
 
         return back()->with('success', 'Availability removed.');
     }

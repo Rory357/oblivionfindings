@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientNote;
+use App\Models\TimelineEvent;
 use Illuminate\Http\Request;
 
 class ClientNoteController extends Controller
@@ -18,15 +19,75 @@ class ClientNoteController extends Controller
         abort_unless($user->canDo('timeline.create'), 403);
 
         $data = $request->validate([
+            'type' => ['nullable', 'string', 'in:note,shift_note,progress_note,handover'],
+            'subject' => ['nullable', 'string', 'max:255'],
+            'goal' => ['nullable', 'string', 'max:255'],
             'body' => ['required', 'string', 'min:2'],
+            'occurred_at' => ['nullable', 'date'],
+            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+            'visibility' => ['nullable', 'string', 'in:internal,portal'],
+            'pin' => ['nullable', 'boolean'],
         ]);
 
-        ClientNote::create([
+        $type = $data['type'] ?? 'note';
+        $occurredAt = isset($data['occurred_at']) ? now()->parse($data['occurred_at']) : now();
+        $visibility = $data['visibility'] ?? 'internal';
+
+        $note = ClientNote::create([
             'client_id' => $client->id,
+            'shift_id' => $data['shift_id'] ?? null,
             'user_id' => $user->id,
+            'type' => $type,
+            'subject' => $data['subject'] ?? null,
+            'goal' => $data['goal'] ?? null,
             'body' => $data['body'],
+            'occurred_at' => $occurredAt,
+            'visibility' => $visibility,
+            'is_pinned' => (bool)($data['pin'] ?? false) && $type === 'handover',
+        ]);
+
+        TimelineEvent::create([
+            'source_type' => ClientNote::class,
+            'source_id' => $note->id,
+            'occurred_at' => $occurredAt,
+            'type' => $type,
+            'actor_user_id' => $user->id,
+            'client_id' => $client->id,
+            'shift_id' => $data['shift_id'] ?? null,
+            'site_id' => $client->site_id,
+            'subject' => $data['subject'] ?? null,
+            'body' => $data['body'],
+            'meta' => array_filter([
+                'goal' => $data['goal'] ?? null,
+            ]),
+            'visibility' => $visibility,
+            'is_pinned' => (bool)($data['pin'] ?? false) && $type === 'handover',
+            'created_by' => $user->id,
         ]);
 
         return back()->with('status', 'Note added.');
+    }
+
+    public function togglePin(Request $request, Client $client, ClientNote $note)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $this->authorize('view', $client);
+        abort_unless($user->canDo('timeline.pin') || $user->canDo('clients.update'), 403);
+
+        abort_unless($note->client_id === $client->id, 404);
+
+        $note->update([
+            'is_pinned' => !$note->is_pinned,
+        ]);
+
+        // Keep timeline event in sync
+        TimelineEvent::query()
+            ->where('source_type', ClientNote::class)
+            ->where('source_id', $note->id)
+            ->update(['is_pinned' => $note->is_pinned]);
+
+        return back()->with('status', $note->is_pinned ? 'Pinned to handover.' : 'Unpinned.');
     }
 }

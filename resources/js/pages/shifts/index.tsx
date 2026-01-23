@@ -1,3 +1,5 @@
+import PageHeader from '@/components/page-header';
+import PageShell from '@/components/page-shell';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,30 +23,37 @@ type Props = {
 
 export default function ShiftsIndex({ shifts, filters, canCreate }: Props) {
     const { labels } = usePage().props as any;
+    const { auth } = usePage().props as any;
+    const canEdit = auth?.can?.shifts?.update;
     const shiftPlural = labels?.['shift.plural'] ?? 'Shifts';
 
     return (
         <AppLayout breadcrumbs={[{ title: shiftPlural, href: '/shifts' }]}>
             <Head title={shiftPlural} />
 
-            <div className="p-4 space-y-4">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <div className="text-lg font-semibold">{shiftPlural}</div>
-                        <div className="text-sm text-muted-foreground">Appointments / rostered shifts.</div>
-                    </div>
+            <PageShell>
+                <PageHeader
+                    title={shiftPlural}
+                    description="Appointments / rostered shifts. Filter by day and open each shift to complete tasks and timesheets."
+                    actions={
+                        canCreate ? (
+                            <Button asChild>
+                                <Link href="/shifts/create">Create</Link>
+                            </Button>
+                        ) : null
+                    }
+                />
 
-                    <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="max-w-xs">
                         <Input
                             type="date"
                             value={filters.date}
                             onChange={(e) => router.get('/shifts', { date: e.target.value }, { preserveState: true, replace: true })}
                         />
-                        {canCreate ? (
-                            <Link href="/shifts/create">
-                                <Button>Create</Button>
-                            </Link>
-                        ) : null}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                        Showing {shifts.data.length}
                     </div>
                 </div>
 
@@ -79,7 +88,10 @@ export default function ShiftsIndex({ shifts, filters, canCreate }: Props) {
                                     <td className="p-3">{s.status}</td>
                                     <td className="p-3">
                                         <div className="flex justify-end gap-2">
-                                            <Link className="text-xs underline" href={`/shifts/${s.id}/edit`}>Edit</Link>
+                                            <Link className="text-xs underline" href={`/shifts/${s.id}`}>View</Link>
+                                            {canEdit ? (
+                                                <Link className="text-xs underline" href={`/shifts/${s.id}/edit`}>Edit</Link>
+                                            ) : null}
                                             <Link className="text-xs underline" href={`/timesheets/create?shift_id=${s.id}`}>Timesheet</Link>
                                         </div>
                                     </td>
@@ -94,7 +106,7 @@ export default function ShiftsIndex({ shifts, filters, canCreate }: Props) {
                         </tbody>
                     </table>
                 </div>
-            </div>
+            </PageShell>
         </AppLayout>
     );
 }

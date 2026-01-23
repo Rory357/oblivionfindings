@@ -12,6 +12,7 @@ class Shift extends Model
     use AuditableChanges;
 
     protected $fillable = [
+        'shift_series_id',
         'client_id',
         'user_id',
         'starts_at',
@@ -32,6 +33,11 @@ class Shift extends Model
         return $this->belongsTo(Client::class);
     }
 
+    public function series()
+    {
+        return $this->belongsTo(ShiftSeries::class, 'shift_series_id');
+    }
+
     public function staff()
     {
         return $this->belongsTo(User::class, 'user_id');
@@ -45,5 +51,10 @@ class Shift extends Model
     public function timesheets()
     {
         return $this->hasMany(Timesheet::class);
+    }
+
+    public function tasks()
+    {
+        return $this->hasMany(ShiftTask::class)->orderBy('sort_order');
     }
 }

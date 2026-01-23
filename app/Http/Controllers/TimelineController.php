@@ -103,11 +103,15 @@ class TimelineController extends Controller
     {
         return [
             'id' => $e->id,
+            'source_id' => $e->source_id,
+            'source_type' => $e->source_type,
             'type' => $e->type,
             'occurred_at' => optional($e->occurred_at)->toISOString(),
             'subject' => $e->subject,
             'body' => $e->body,
             'visibility' => $e->visibility,
+            'is_pinned' => (bool) $e->is_pinned,
+            'shift_id' => $e->shift_id,
             'meta' => $e->meta ?? [],
             'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
             'client' => $e->client ? ['id' => $e->client->id, 'first_name' => $e->client->first_name, 'last_name' => $e->client->last_name] : null,
