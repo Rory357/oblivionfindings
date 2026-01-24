@@ -31,11 +31,9 @@ import listPlugin from '@fullcalendar/list';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 
-// import '@fullcalendar/daygrid/index.css';
-// import '@fullcalendar/timegrid/index.css';
-// import '@fullcalendar/list/index.css';
+// FullCalendar styles are loaded via app.blade.php (CDN) to avoid Vite export-map issues.
 
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 
 type Props = {
     canManageAny: boolean;
@@ -77,9 +75,7 @@ function addHours(date: Date, hours: number) {
 
 function getCsrfToken() {
     return (
-        document.querySelector(
-            'meta[name="csrf-token"]',
-        ) as HTMLMetaElement | null
+        document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null
     )?.content;
 }
 
@@ -116,6 +112,7 @@ async function jsonRequest<T>(
 
     return res.json();
 }
+
 
 export default function CalendarIndex(props: Props) {
     const { auth, labels } = usePage().props as any;
@@ -154,6 +151,88 @@ export default function CalendarIndex(props: Props) {
     }>({ total: 0, hours: 0, scheduled: 0, completed: 0, cancelled: 0 });
 
     const calendarRef = useRef<FullCalendar | null>(null);
+    const loadEvents = useCallback(
+        async (info: any, successCallback: any, failureCallback: any) => {
+            try {
+                const params = new URLSearchParams({
+                    start: info.startStr,
+                    end: info.endStr,
+                });
+
+                if (canManageAny && staffId !== 'all') {
+                    params.set('staff_id', staffId);
+                }
+                if (canManageAny && clientId !== 'all') {
+                    params.set('client_id', clientId);
+                }
+
+                const res = await fetch(`/calendar/events?${params.toString()}`, {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                });
+
+                if (!res.ok) {
+                    throw new Error(`Failed to load events: ${res.status}`);
+                }
+
+                const data = await res.json();
+
+                // Summary for current range (avoid causing refetch loops)
+                try {
+                    const summary = {
+                        total: 0,
+                        hours: 0,
+                        scheduled: 0,
+                        completed: 0,
+                        cancelled: 0,
+                    };
+
+                    for (const ev of data ?? []) {
+                        summary.total += 1;
+
+                        const status =
+                            ev?.extendedProps?.status ?? 'scheduled';
+                        if (status === 'completed') summary.completed += 1;
+                        else if (status === 'cancelled') summary.cancelled += 1;
+                        else summary.scheduled += 1;
+
+                        const start = ev?.start ? new Date(ev.start) : null;
+                        const end = ev?.end ? new Date(ev.end) : null;
+                        if (
+                            start instanceof Date &&
+                            !isNaN(start.getTime()) &&
+                            end instanceof Date &&
+                            !isNaN(end.getTime())
+                        ) {
+                            summary.hours +=
+                                (end.getTime() - start.getTime()) / 36e5;
+                        }
+                    }
+
+                    summary.hours = Math.round(summary.hours * 10) / 10;
+
+                    setRangeSummary((prev) => {
+                        const same =
+                            prev.total === summary.total &&
+                            prev.hours === summary.hours &&
+                            prev.scheduled === summary.scheduled &&
+                            prev.completed === summary.completed &&
+                            prev.cancelled === summary.cancelled;
+                        return same ? prev : summary;
+                    });
+                } catch {
+                    // ignore summary failure
+                }
+
+                successCallback(data);
+            } catch (e) {
+                console.error(e);
+                failureCallback(e as any);
+            }
+        },
+        [canManageAny, staffId, clientId],
+    );
+
 
     const [modalOpen, setModalOpen] = useState(false);
     const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
@@ -427,93 +506,7 @@ export default function CalendarIndex(props: Props) {
                                     minute: '2-digit',
                                     meridiem: false,
                                 }}
-                                events={async (
-                                    info,
-                                    successCallback,
-                                    failureCallback,
-                                ) => {
-                                    try {
-                                        const params = new URLSearchParams({
-                                            start: info.startStr,
-                                            end: info.endStr,
-                                        });
-                                        if (canManageAny && staffId !== 'all') {
-                                            params.set('staff_id', staffId);
-                                        }
-                                        if (
-                                            canManageAny &&
-                                            clientId !== 'all'
-                                        ) {
-                                            params.set('client_id', clientId);
-                                        }
-
-                                        const res = await fetch(
-                                            `/calendar/events?${params.toString()}`,
-                                            {
-                                                headers: {
-                                                    Accept: 'application/json',
-                                                },
-                                            },
-                                        );
-                                        if (!res.ok) {
-                                            throw new Error(
-                                                `Failed to load events: ${res.status}`,
-                                            );
-                                        }
-                                        const data = await res.json();
-
-                                        // Build a light summary for the currently loaded range.
-                                        try {
-                                            const summary = {
-                                                total: 0,
-                                                hours: 0,
-                                                scheduled: 0,
-                                                completed: 0,
-                                                cancelled: 0,
-                                            };
-                                            for (const ev of data ?? []) {
-                                                summary.total += 1;
-                                                const status =
-                                                    ev?.extendedProps?.status ??
-                                                    'scheduled';
-                                                if (
-                                                    status === 'completed' ||
-                                                    status === 'cancelled'
-                                                ) {
-                                                    // @ts-ignore
-                                                    summary[status] += 1;
-                                                } else {
-                                                    summary.scheduled += 1;
-                                                }
-                                                const start =
-                                                    ev?.start &&
-                                                    new Date(ev.start);
-                                                const end =
-                                                    ev?.end && new Date(ev.end);
-                                                if (
-                                                    start instanceof Date &&
-                                                    !isNaN(start.getTime()) &&
-                                                    end instanceof Date &&
-                                                    !isNaN(end.getTime())
-                                                ) {
-                                                    summary.hours +=
-                                                        (end.getTime() -
-                                                            start.getTime()) /
-                                                        36e5;
-                                                }
-                                            }
-                                            summary.hours = Math.round(summary.hours * 10) / 10;
-                                            setRangeSummary(summary);
-                                        } catch {
-                                            // ignore summary failure
-                                        }
-
-                                        successCallback(data);
-                                    } catch (e) {
-                                        console.error(e);
-                                        failureCallback(e as any);
-                                    }
-                                }}
+                                events={loadEvents}
                                 eventContent={(arg) => {
                                     const ext = (arg.event.extendedProps ?? {}) as any;
                                     const client = ext.client ?? arg.event.title;

@@ -56,9 +56,13 @@ class CalendarController extends Controller
 
         $canManageAny = $auth->canDo('shifts.manageAny');
 
+        // FullCalendar supplies an inclusive start and an exclusive end.
+        // Use an overlap query so shifts that start before the range but
+        // overlap it are still included.
         $query = Shift::query()
             ->with(['client:id,first_name,last_name', 'staff:id,name'])
-            ->whereBetween('starts_at', [$data['start'], $data['end']]);
+            ->where('starts_at', '<', $data['end'])
+            ->where('ends_at', '>', $data['start']);
 
         if (!$canManageAny) {
             $query->where('user_id', $auth->id);
@@ -83,8 +87,9 @@ class CalendarController extends Controller
                 return [
                     'id' => $shift->id,
                     'title' => $title,
-                    'start' => $shift->starts_at,
-                    'end' => $shift->ends_at,
+                    // Send ISO-8601 strings so FullCalendar parses reliably.
+                    'start' => optional($shift->starts_at)->toIso8601String(),
+                    'end' => optional($shift->ends_at)->toIso8601String(),
                     'extendedProps' => [
                         'client_id' => $shift->client_id,
                         'user_id' => $shift->user_id,

@@ -104,8 +104,20 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=instrument-sans:400,500,600" rel="stylesheet" />
 
+    {{-- FullCalendar v6 CSS (CDN) --}}
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fullcalendar/core@6.1.15/index.global.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fullcalendar/daygrid@6.1.15/index.global.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fullcalendar/timegrid@6.1.15/index.global.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fullcalendar/list@6.1.15/index.global.min.css" />
+
     @viteReactRefresh
-    @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])
+    {{--
+        Only include the main React entrypoint.
+        Inertia pages are resolved via import.meta.glob() in resources/js/app.tsx.
+        Including a dynamic page entry here breaks production builds because the
+        entrypoints must be known at build time.
+    --}}
+    @vite(['resources/js/app.tsx'])
     @inertiaHead
 </head>
 
