@@ -4,10 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\IncidentFollowup;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\WorkstreamService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
@@ -38,6 +40,18 @@ class DashboardController extends Controller
         $today = now()->startOfDay();
         $tomorrow = (clone $today)->addDay();
         $weekEnd = (clone $today)->addDays(7);
+
+        // Dashboard filters (used mainly for staff workflow)
+        $range = (string) ($request->query('range') ?? 'week'); // today|week
+        if (!in_array($range, ['today', 'week'], true)) {
+            $range = 'week';
+        }
+        $status = $request->query('status'); // scheduled|in_progress|completed|cancelled|all
+        if ($status && !in_array($status, ['scheduled', 'in_progress', 'completed', 'cancelled', 'all'], true)) {
+            $status = null;
+        }
+        $clientId = $request->query('client_id');
+        $clientId = $clientId ? (int) $clientId : null;
 
         // Legacy: if there's a Client linked directly to this user (older installs)
         $client = Client::query()->where('user_id', $user->id)->first();
@@ -80,18 +94,25 @@ class DashboardController extends Controller
 
         $todayShifts = Shift::query()
             ->when(!$user->canDo('shifts.manageAny'), fn($q) => $q->where('user_id', $user->id))
+            ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($status && $status !== 'all', fn ($q) => $q->where('status', $status))
             ->whereBetween('starts_at', [$today, $tomorrow])
             ->orderBy('starts_at')
             ->with('client:id,first_name,last_name')
             ->get();
 
-        $upcomingShifts = Shift::query()
-            ->when(!$user->canDo('shifts.manageAny'), fn($q) => $q->where('user_id', $user->id))
-            ->whereBetween('starts_at', [$today, $weekEnd])
-            ->orderBy('starts_at')
-            ->with('client:id,first_name,last_name')
-            ->limit(75)
-            ->get();
+        $upcomingShifts = collect();
+        if ($range === 'week') {
+            $upcomingShifts = Shift::query()
+                ->when(!$user->canDo('shifts.manageAny'), fn($q) => $q->where('user_id', $user->id))
+                ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+                ->when($status && $status !== 'all', fn ($q) => $q->where('status', $status))
+                ->whereBetween('starts_at', [$today, $weekEnd])
+                ->orderBy('starts_at')
+                ->with('client:id,first_name,last_name')
+                ->limit(75)
+                ->get();
+        }
 
         $todayTimesheets = Timesheet::query()
             ->when(!$user->canDo('timesheets.manageAny'), fn($q) => $q->where('user_id', $user->id))
@@ -129,6 +150,7 @@ class DashboardController extends Controller
             ->selectRaw('COUNT(*) as c')
             ->selectRaw('SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)) / 60 as h')
             ->selectRaw("SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) as scheduled")
+            ->selectRaw("SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress")
             ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
             ->selectRaw("SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled")
             ->groupBy('d')
@@ -140,6 +162,7 @@ class DashboardController extends Controller
                 'hours' => (float) ($r->h ?? 0),
                 'status' => [
                     'scheduled' => (int) ($r->scheduled ?? 0),
+                    'in_progress' => (int) ($r->in_progress ?? 0),
                     'completed' => (int) ($r->completed ?? 0),
                     'cancelled' => (int) ($r->cancelled ?? 0),
                 ],
@@ -152,6 +175,7 @@ class DashboardController extends Controller
             ->selectRaw('COUNT(*) as c')
             ->selectRaw('SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)) / 60 as h')
             ->selectRaw("SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) as scheduled")
+            ->selectRaw("SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress")
             ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
             ->selectRaw("SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled")
             ->groupBy('d')
@@ -163,6 +187,7 @@ class DashboardController extends Controller
                 'hours' => (float) ($r->h ?? 0),
                 'status' => [
                     'scheduled' => (int) ($r->scheduled ?? 0),
+                    'in_progress' => (int) ($r->in_progress ?? 0),
                     'completed' => (int) ($r->completed ?? 0),
                     'cancelled' => (int) ($r->cancelled ?? 0),
                 ],
@@ -199,6 +224,7 @@ class DashboardController extends Controller
         $incidentSeries = collect();
         $incidentSeries30 = collect();
         $incidentBySeverity30 = collect();
+        $incidentKpis = null;
         if ($canSeeIncidents) {
             $incidentStart = (clone $today)->subDays(14);
             $incidentStart30 = (clone $today)->subDays(30);
@@ -240,11 +266,47 @@ class DashboardController extends Controller
                 ->get()
                 ->map(fn ($r) => ['severity' => (string) ($r->severity ?? 'unspecified'), 'count' => (int) ($r->c ?? 0)])
                 ->values();
+
+            // KPI-style metrics used for manager/admin cards.
+            // Scoped to the incidents the current user is allowed to see.
+            $incidentKpis = [
+                'incidentsLast30' => (clone $incidentQuery30)->count(),
+                'incidentsHighLast30' => (clone $incidentQuery30)->where('severity', 'high')->count(),
+                'reviewedLast30' => (clone $incidentQuery30)->whereNotNull('reviewed_at')->count(),
+                'unreviewedLast30' => (clone $incidentQuery30)->whereNull('reviewed_at')->count(),
+            ];
+
+            // Follow-up KPIs: open + overdue (also scoped).
+            $followupQuery = IncidentFollowup::query()->whereHas('incident', function ($q) use ($incidentQuery30) {
+                // Mirror the same scope as $incidentQuery30, without re-running the full builder logic.
+                // We do this by constraining to the incident IDs from the scoped query.
+                $q->whereIn('id', (clone $incidentQuery30)->select('id'));
+            });
+
+            $incidentKpis['followupsOpen'] = (clone $followupQuery)->whereNull('completed_at')->count();
+            $incidentKpis['followupsOverdue'] = (clone $followupQuery)
+                ->whereNull('completed_at')
+                ->whereNotNull('due_at')
+                ->where('due_at', '<', now())
+                ->count();
         }
+
+        // Unified workstream (My Day) for staff workflow
+        $workstreamTo = $range === 'today' ? (clone $tomorrow) : (clone $weekEnd);
+        $myDayItems = app(WorkstreamService::class)
+            ->forStaff($user, (clone $today), $workstreamTo)
+            ->take(200)
+            ->values();
 
         return inertia('dashboard', [
             'mode' => $user->canDo('shifts.manageAny') || $user->canDo('timesheets.manageAny') ? 'manager' : 'staff',
+            'filters' => [
+                'range' => $range,
+                'status' => $status ?? 'all',
+                'client_id' => $clientId,
+            ],
             'assignedClients' => $assignedClients,
+            'myDayItems' => $myDayItems,
             'todayShifts' => $todayShifts,
             'upcomingShifts' => $upcomingShifts,
             'upcomingEvents' => $upcomingEvents->map(function ($e) {
@@ -259,8 +321,10 @@ class DashboardController extends Controller
                     'site' => $e->site ? ['id' => $e->site->id, 'name' => $e->site->name] : null,
                 ];
             })->values(),
+            'myDayItems' => $myDayItems,
             'todayTimesheets' => $todayTimesheets,
             'managerSummary' => $managerSummary,
+            'incidentKpis' => $incidentKpis,
             'analytics' => [
                 'shiftSeries' => $shiftSeries,
                 'shiftSeries30' => $shiftSeries30,

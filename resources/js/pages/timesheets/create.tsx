@@ -29,7 +29,6 @@ export default function TimesheetCreate({ clients, shift }: Props) {
         ends_at: end,
         break_minutes: 0,
         notes: '',
-        status: 'draft',
     });
 
     return (
@@ -88,18 +87,6 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                 <Label>End</Label>
                                 <Input type="datetime-local" value={form.data.ends_at} onChange={(e) => form.setData('ends_at', e.target.value)} />
                             </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Status</Label>
-                            <select
-                                className="w-full rounded-md border bg-background p-2 text-sm"
-                                value={form.data.status}
-                                onChange={(e) => form.setData('status', e.target.value)}
-                            >
-                                <option value="draft">draft</option>
-                                <option value="submitted">submitted</option>
-                            </select>
                         </div>
 
                         <div className="space-y-2">

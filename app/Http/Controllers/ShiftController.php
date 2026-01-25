@@ -3,6 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
+use App\Models\ClientIncident;
+use App\Models\IncidentTemplate;
+use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftTask;
 use App\Models\User;
@@ -51,7 +54,12 @@ class ShiftController extends Controller
             abort(403);
         }
 
-        $shift->load(['client:id,first_name,last_name,site_id', 'staff:id,name,email', 'tasks']);
+        $shift->load([
+            'client:id,first_name,last_name,site_id',
+            'staff:id,name,email',
+            'tasks',
+            'serviceContext:id,name,type,is_active',
+        ]);
 
         // Pinned handover notes for this client
         $handover = \App\Models\TimelineEvent::query()
@@ -70,6 +78,19 @@ class ShiftController extends Controller
             ->with(['actor:id,name'])
             ->limit(100)
             ->get();
+
+        $incidents = ClientIncident::query()
+            ->where('shift_id', $shift->id)
+            ->with(['reporter:id,name', 'attachments'])
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->get();
+
+        $incidentTemplates = IncidentTemplate::query()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+
 
         return inertia('shifts/show', [
             'shift' => $shift,
@@ -90,8 +111,11 @@ class ShiftController extends Controller
                 'meta' => $e->meta ?? [],
                 'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
             ])->values(),
+            'incidents' => $incidents,
+            'incidentTemplates' => $incidentTemplates,
             'can' => [
                 'add_note' => $auth->canDo('timeline.create'),
+                'create_incident' => $auth->canDo('incidents.create'),
                 'mark_tasks' => true,
             ],
         ]);
@@ -102,12 +126,21 @@ class ShiftController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.create'), 403);
 
-        $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
+        $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'service_context_id']);
         $staff = User::query()->orderBy('name')->get(['id', 'name', 'email']);
+
+        $serviceContexts = ServiceContext::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'type', 'is_active']);
+
+        $defaultClientId = $request->query('client_id');
 
         return inertia('shifts/create', [
             'clients' => $clients,
             'staff' => $staff,
+            'serviceContexts' => $serviceContexts,
+            'defaultServiceContextId' => ServiceContext::defaultId(),
+            'defaultClientId' => $defaultClientId,
         ]);
     }
 
@@ -118,15 +151,33 @@ class ShiftController extends Controller
 
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:scheduled,completed,cancelled'],
+            'status' => ['nullable', 'in:draft,scheduled,in_progress,completed,cancelled'],
             'tasks' => ['sometimes', 'array'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
         ]);
+
+        // If not explicitly provided, inherit the client's service context.
+        if (empty($data['service_context_id'])) {
+            $data['service_context_id'] = Client::query()
+                ->whereKey($data['client_id'])
+                ->value('service_context_id');
+        }
+
+        // If still not set, apply organisation default service context (if configured).
+        if (empty($data['service_context_id'])) {
+            $data['service_context_id'] = ServiceContext::defaultId();
+        }
+
+        // If still not set, apply organisation default service context (if configured).
+        if (empty($data['service_context_id'])) {
+            $data['service_context_id'] = ServiceContext::defaultId();
+        }
 
         // Conflict check: staff or client overlap
         $conflicts = Shift::query()
@@ -187,14 +238,20 @@ class ShiftController extends Controller
             abort(403);
         }
 
-        $shift->load(['client:id,first_name,last_name', 'staff:id,name,email', 'tasks']);
-        $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
+        $shift->load(['client:id,first_name,last_name,service_context_id', 'staff:id,name,email', 'tasks', 'serviceContext:id,name,type,is_active']);
+        $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'service_context_id']);
         $staff = User::query()->orderBy('name')->get(['id', 'name', 'email']);
+
+        $serviceContexts = ServiceContext::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'type', 'is_active']);
 
         return inertia('shifts/edit', [
             'shift' => $shift,
             'clients' => $clients,
             'staff' => $staff,
+            'serviceContexts' => $serviceContexts,
+            'defaultServiceContextId' => ServiceContext::defaultId(),
         ]);
     }
 
@@ -209,17 +266,30 @@ class ShiftController extends Controller
 
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:scheduled,completed,cancelled'],
+            'status' => ['nullable', 'in:draft,scheduled,in_progress,completed,cancelled'],
             'tasks' => ['sometimes', 'array'],
             'tasks.*.id' => ['sometimes', 'integer', 'exists:shift_tasks,id'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
             'tasks.*.is_completed' => ['sometimes', 'boolean'],
         ]);
+
+        // If not explicitly provided, inherit the client's service context.
+        if (empty($data['service_context_id'])) {
+            $data['service_context_id'] = Client::query()
+                ->whereKey($data['client_id'])
+                ->value('service_context_id');
+        }
+
+        // If still not set, apply organisation default service context (if configured).
+        if (empty($data['service_context_id'])) {
+            $data['service_context_id'] = ServiceContext::defaultId();
+        }
 
         // Conflict check: staff or client overlap (ignore self)
         $conflicts = Shift::query()
@@ -283,5 +353,154 @@ class ShiftController extends Controller
         ]);
 
         return redirect()->route('shifts.index')->with('success', 'Shift updated.');
+    }
+
+
+    public function start(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.update'), 403);
+
+        if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
+            abort(403);
+        }
+
+        if (!in_array($shift->status, ['scheduled', 'draft'], true)) {
+            return back()->withErrors(['status' => 'Only scheduled shifts can be started.']);
+        }
+
+        $shift->update([
+            'status' => 'in_progress',
+            'actual_starts_at' => $shift->actual_starts_at ?? now(),
+            'started_by' => $shift->started_by ?? $auth->id,
+        ]);
+
+        return back()->with('success', 'Shift started.');
+    }
+
+    public function complete(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.update'), 403);
+
+        if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
+            abort(403);
+        }
+
+        if (!in_array($shift->status, ['scheduled', 'in_progress'], true)) {
+            return back()->withErrors(['status' => 'Only scheduled or in-progress shifts can be completed.']);
+        }
+
+        $data = $request->validate([
+            'final_note_subject' => ['nullable', 'string', 'max:255'],
+            // Required only if no other shift notes exist.
+            'final_note_body' => ['nullable', 'string', 'max:20000'],
+            'allow_incomplete_tasks' => ['nullable', 'boolean'],
+            'incomplete_tasks_reason' => ['nullable', 'string', 'max:2000'],
+            'create_timesheet' => ['nullable', 'boolean'],
+        ]);
+
+        $shift->loadMissing(['tasks', 'client']);
+        $incompleteTasks = $shift->tasks->where('is_completed', false)->values();
+
+        // Enforce: a shift must have at least one progress/shift note OR a completion summary.
+        $existingNoteCount = \App\Models\ClientNote::query()
+            ->where('shift_id', $shift->id)
+            ->whereIn('type', ['progress_note', 'shift_note'])
+            ->count();
+
+        $finalBody = trim((string)($data['final_note_body'] ?? ''));
+        if ($finalBody === '' && $existingNoteCount === 0) {
+            return back()->withErrors([
+                'final_note_body' => 'Add at least one progress note during the shift or provide a shift summary note to complete the shift.',
+            ]);
+        }
+
+        $allowIncomplete = (bool)($data['allow_incomplete_tasks'] ?? false);
+        if ($incompleteTasks->count() > 0 && !$allowIncomplete) {
+            return back()->withErrors([
+                'allow_incomplete_tasks' => 'This shift still has incomplete tasks. Complete all tasks or allow completion with a reason.',
+            ]);
+        }
+        if ($incompleteTasks->count() > 0 && $allowIncomplete && empty(trim((string)($data['incomplete_tasks_reason'] ?? '')))) {
+            return back()->withErrors([
+                'incomplete_tasks_reason' => 'Please provide a reason for completing with incomplete tasks.',
+            ]);
+        }
+
+        DB::transaction(function () use ($auth, $shift, $data, $incompleteTasks, $allowIncomplete, $finalBody) {
+            $now = now();
+
+            $shift->update([
+                'status' => 'completed',
+                'actual_starts_at' => $shift->actual_starts_at ?? $now,
+                'actual_ends_at' => $now,
+                'started_by' => $shift->started_by ?? $auth->id,
+                'completed_by' => $auth->id,
+            ]);
+
+            // Create a shift summary note (auditable via ClientNote + TimelineEvent)
+            $subject = trim((string)($data['final_note_subject'] ?? 'Shift summary'));
+            $body = $finalBody !== ''
+                ? $finalBody
+                : 'Shift completed — see shift notes for details.';
+
+            $note = \App\Models\ClientNote::create([
+                'client_id' => $shift->client_id,
+                'shift_id' => $shift->id,
+                'user_id' => $auth->id,
+                'type' => 'shift_note',
+                'subject' => $subject,
+                'body' => $body,
+                'occurred_at' => $now,
+                'visibility' => 'internal',
+                'is_pinned' => false,
+            ]);
+
+            \App\Models\TimelineEvent::create([
+                'source_type' => \App\Models\ClientNote::class,
+                'source_id' => $note->id,
+                'occurred_at' => $now,
+                'type' => 'shift_note',
+                'actor_user_id' => $auth->id,
+                'client_id' => $shift->client_id,
+                'shift_id' => $shift->id,
+                'site_id' => $shift->client?->site_id,
+                'subject' => $subject,
+                'body' => $body,
+                'meta' => array_filter([
+                    'completed_with_incomplete_tasks' => $incompleteTasks->count() > 0 ? true : null,
+                    'incomplete_tasks_reason' => $allowIncomplete ? (string)($data['incomplete_tasks_reason'] ?? null) : null,
+                    'incomplete_task_count' => $incompleteTasks->count() ?: null,
+                ]),
+                'visibility' => 'internal',
+                'is_pinned' => false,
+                'created_by' => $auth->id,
+            ]);
+
+            // Auto-create timesheet (optional)
+            $wantTimesheet = (bool)($data['create_timesheet'] ?? true);
+            if ($wantTimesheet && $auth->canDo('timesheets.create')) {
+                $exists = \App\Models\Timesheet::query()->where('shift_id', $shift->id)->exists();
+                if (!$exists) {
+                    $startsAt = $shift->actual_starts_at ?? $shift->starts_at ?? $now;
+                    $endsAt = $shift->actual_ends_at ?? $shift->ends_at ?? $now;
+                    \App\Models\Timesheet::create([
+                        'user_id' => $shift->user_id,
+                        'client_id' => $shift->client_id,
+                        'shift_id' => $shift->id,
+                        'work_date' => $startsAt->toDateString(),
+                        'starts_at' => $startsAt,
+                        'ends_at' => $endsAt,
+                        'break_minutes' => 0,
+                        'notes' => null,
+                        'status' => 'draft',
+                        'created_by' => $auth->id,
+                    ]);
+                }
+            }
+        });
+
+        return back()->with('success', 'Shift completed.');
     }
 }

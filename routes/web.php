@@ -22,10 +22,12 @@ use App\Http\Controllers\ClientMedicalController;
 use App\Http\Controllers\ClientDocumentController;
 use App\Http\Controllers\ClientPortalUserController;
 use App\Http\Controllers\ClientRagController;
+use App\Http\Controllers\ClientOnboardingController;
 use App\Http\Controllers\ClientSupportPlanController;
 use App\Http\Controllers\ClientAssessmentController;
 use App\Http\Controllers\PortalController;
 use App\Http\Controllers\PortalClientController;
+use App\Http\Controllers\PortalIncidentAttachmentController;
 use App\Http\Controllers\RagController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\StaffCredentialController;
@@ -34,9 +36,17 @@ use App\Http\Controllers\ShiftSeriesController;
 use App\Http\Controllers\ShiftTaskController;
 use App\Http\Controllers\ClientIncidentController;
 use App\Http\Controllers\IncidentController;
+use App\Http\Controllers\IncidentFollowupController;
+use App\Http\Controllers\ShiftIncidentController;
 use App\Http\Controllers\ClientRiskController;
 use App\Http\Controllers\NotificationInboxController;
 use App\Http\Controllers\AnnouncementInboxController;
+use App\Http\Controllers\MedicationsReportController;
+use App\Http\Controllers\MedicationsController;
+use App\Http\Controllers\ClientMarController;
+use App\Http\Controllers\MedicationAdministrationCorrectionController;
+use App\Http\Controllers\MedicationAuditController;
+use App\Http\Controllers\BreakGlassController;
 
 Route::get('/', function () {
     return Inertia::render('home', [
@@ -78,6 +88,8 @@ Route::middleware(['auth'])->group(function () {
     // Client/Next-of-kin Portal
     Route::get('/portal', [PortalController::class, 'index'])->name('portal.index');
     Route::get('/portal/clients/{client}', [PortalClientController::class, 'show'])->name('portal.clients.show');
+    Route::get('/portal/clients/{client}/incidents/{incident}/attachments/{attachment}/download', [PortalIncidentAttachmentController::class, 'download'])
+        ->name('portal.clients.incidents.attachments.download');
     Route::post('/portal/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])->name('portal.clients.rag.ask');
     Route::get('/portal/clients/{client}/documents/{document}/download', [ClientDocumentController::class, 'download'])->name('portal.clients.documents.download');
     Route::post('/portal/summaries/generate', [SummaryController::class, 'generate'])->name('portal.summaries.generate');
@@ -136,6 +148,14 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/clients/{client}', [ClientController::class, 'show'])->whereNumber('client')->name('clients.show');
         Route::get('/clients/{client}/documents', [ClientDocumentController::class, 'index'])->whereNumber('client')->name('clients.documents.index');
         Route::get('/clients/{client}/documents/{document}/download', [ClientDocumentController::class, 'download'])->whereNumber('client')->name('clients.documents.download');
+
+        // Step 8: Daily MAR
+        Route::get('/clients/{client}/mar', [ClientMarController::class, 'show'])
+            ->whereNumber('client')
+            ->name('clients.mar.show');
+        Route::get('/clients/{client}/mar/export.csv', [ClientMarController::class, 'exportCsv'])
+            ->whereNumber('client')
+            ->name('clients.mar.export_csv');
     });
 
     // ✅ Manager/Admin modules (permission-based)
@@ -145,7 +165,26 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware('permission:reports.viewAny')->group(function () {
         Route::get('/reports', fn() => inertia('reports/index'))->name('reports.index');
+
+        Route::get('/reports/medications', [MedicationsReportController::class, 'index'])
+            ->name('reports.medications');
+        Route::get('/reports/medications/export-mar', [MedicationsReportController::class, 'exportMarCsv'])
+            ->name('reports.medications.export_mar');
+        Route::get('/reports/medications/export-controlled-discrepancies', [MedicationsReportController::class, 'exportDiscrepanciesCsv'])
+            ->name('reports.medications.export_discrepancies');
     });
+
+    // Central medications module (permission-gated)
+    Route::get('/medications', [MedicationsController::class, 'index'])
+        ->middleware('permission:medications.view')
+        ->name('medications.index');
+
+    Route::get('/medications/audit', [MedicationAuditController::class, 'index'])
+        ->middleware('permission:medications.audit.view')
+        ->name('medications.audit.index');
+    Route::get('/medications/audit/export', [MedicationAuditController::class, 'exportCsv'])
+        ->middleware('permission:medications.reports.export')
+        ->name('medications.audit.export');
 
     // Staff
     Route::get('/staff', [StaffController::class, 'index'])
@@ -219,15 +258,49 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/clients/{client}/incidents', [ClientIncidentController::class, 'index'])
             ->whereNumber('client')
             ->name('clients.incidents.index');
+
         Route::get('/incidents', [IncidentController::class, 'index'])->name('incidents.index');
+        Route::get('/incidents/create', [IncidentController::class, 'create'])
+            ->middleware('permission:incidents.create')
+            ->name('incidents.create');
+        Route::post('/incidents', [IncidentController::class, 'store'])
+            ->middleware('permission:incidents.create')
+            ->name('incidents.store');
+
         Route::get('/incidents/{incident}', [IncidentController::class, 'show'])->name('incidents.show');
+
+        // Follow-ups
+        Route::post('/incidents/{incident}/followups', [IncidentFollowupController::class, 'store'])
+            ->middleware('permission:incidents.followups.manage')
+            ->name('incidents.followups.store');
+        Route::put('/incidents/{incident}/followups/{followup}', [IncidentFollowupController::class, 'update'])
+            ->middleware('permission:incidents.followups.manage')
+            ->name('incidents.followups.update');
+        Route::post('/incidents/{incident}/followups/{followup}/complete', [IncidentFollowupController::class, 'complete'])
+            ->middleware('permission:incidents.followups.complete|incidents.followups.manage')
+            ->name('incidents.followups.complete');
+
+        // Attachments (global)
+        Route::post('/incidents/{incident}/attachments', [IncidentController::class, 'uploadAttachment'])
+            ->middleware('permission:incidents.update')
+            ->name('incidents.attachments.store');
+        Route::delete('/incidents/{incident}/attachments/{attachment}', [IncidentController::class, 'removeAttachment'])
+            ->middleware('permission:incidents.update')
+            ->name('incidents.attachments.destroy');
+        Route::patch('/incidents/{incident}/attachments/{attachment}', [IncidentController::class, 'updateAttachment'])
+            ->middleware('permission:incidents.portal.manage')
+            ->name('incidents.attachments.update');
+        Route::get('/incidents/{incident}/attachments/{attachment}/download', [IncidentController::class, 'downloadAttachment'])
+            ->name('incidents.attachments.download');
     });
 
+    // Create standalone incident from client profile
     Route::post('/clients/{client}/incidents', [ClientIncidentController::class, 'store'])
         ->middleware('permission:incidents.create')
         ->whereNumber('client')
         ->name('clients.incidents.store');
 
+    // Client-scoped attachment routes (kept for compatibility)
     Route::post('/clients/{client}/incidents/{incident}/attachments', [ClientIncidentController::class, 'uploadAttachment'])
         ->middleware('permission:incidents.update')
         ->whereNumber('client')
@@ -237,18 +310,40 @@ Route::middleware(['auth'])->group(function () {
         ->whereNumber('client')
         ->name('clients.incidents.attachments.download');
 
+    // Update + workflow actions
     Route::put('/incidents/{incident}', [IncidentController::class, 'update'])
         ->middleware('permission:incidents.update')
         ->name('incidents.update');
+
     Route::post('/incidents/{incident}/submit', [IncidentController::class, 'submit'])
-        ->middleware('permission:incidents.update')
+        ->middleware('permission:incidents.submit')
         ->name('incidents.submit');
+
     Route::post('/incidents/{incident}/review', [IncidentController::class, 'review'])
         ->middleware('permission:incidents.approve')
         ->name('incidents.review');
-    Route::post('/incidents/{incident}/close', [IncidentController::class, 'close'])
-        ->middleware('permission:incidents.approve')
-        ->name('incidents.close');
+
+    // Shift-linked incident creation
+    Route::post('/shifts/{shift}/incidents', [ShiftIncidentController::class, 'store'])
+        ->middleware('permission:incidents.create')
+        ->name('shifts.incidents.store');
+
+    // Incident templates (admin/manager)
+    Route::middleware('permission:incidents.templates.manage')->group(function () {
+        Route::get('/incidents/templates', [IncidentTemplateController::class, 'index'])->name('incidents.templates.index');
+        Route::get('/incidents/templates/create', [IncidentTemplateController::class, 'create'])->name('incidents.templates.create');
+        Route::post('/incidents/templates', [IncidentTemplateController::class, 'store'])->name('incidents.templates.store');
+        Route::get('/incidents/templates/{template}', [IncidentTemplateController::class, 'edit'])->name('incidents.templates.edit');
+        Route::put('/incidents/templates/{template}', [IncidentTemplateController::class, 'update'])->name('incidents.templates.update');
+    });
+
+    // Reporting module integration
+    Route::middleware('permission:reports.viewAny|incidents.export')->group(function () {
+        Route::get('/reports/incidents', [IncidentReportController::class, 'index'])->name('reports.incidents.index');
+        Route::get('/reports/incidents/export', [IncidentReportController::class, 'exportCsv'])
+            ->middleware('permission:incidents.export')
+            ->name('reports.incidents.export');
+    });
 
     // Risk register (assigned staff + managers)
     Route::middleware('permission:risks.viewAny|risks.viewAssigned')->group(function () {
@@ -299,6 +394,12 @@ Route::middleware(['auth'])->group(function () {
 
         Route::post('/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])->name('clients.rag.ask');
 
+        // Client onboarding checklist overrides ("doesn't have this")
+        Route::post('/clients/{client}/onboarding/{key}', [ClientOnboardingController::class, 'toggle'])
+            ->whereNumber('client')
+            ->name('clients.onboarding.toggle')
+            ->middleware('permission:clients.onboarding.manage|clients.update');
+
         // Support plan + assessments
         Route::put('/clients/{client}/support-plan', [ClientSupportPlanController::class, 'update'])
             ->name('clients.support_plan.update');
@@ -320,6 +421,29 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/clients/{client}/medical/medications/{medication}/administrations', [ClientMedicalController::class, 'storeAdministration'])
         ->middleware('permission:medications.administer.record|clients.update')
         ->name('clients.medical.medications.administrations.store');
+
+    // Step 10: correction entries
+    Route::post('/clients/{client}/mar/administrations/{administration}/corrections', [MedicationAdministrationCorrectionController::class, 'store'])
+        ->middleware('permission:medications.administer.correct|clients.update')
+        ->name('clients.mar.administrations.corrections.store');
+
+    // Step 16: break-glass access
+    Route::post('/clients/{client}/break-glass', [BreakGlassController::class, 'store'])
+        ->middleware('permission:medications.breakglass')
+        ->name('clients.break_glass.store');
+
+    Route::delete('/clients/{client}/break-glass/{access}', [BreakGlassController::class, 'destroy'])
+        ->middleware('permission:medications.breakglass')
+        ->name('clients.break_glass.destroy');
+
+    // Emergency access entry point (client discovery + break-glass)
+    Route::get('/emergency-access', [\App\Http\Controllers\EmergencyAccessController::class, 'index'])
+        ->middleware('permission:medications.breakglass')
+        ->name('emergency_access.index');
+
+    Route::post('/clients/{client}/medical/controlled-discrepancies/{discrepancy}/close', [ClientMedicalController::class, 'closeControlledDiscrepancy'])
+        ->middleware('permission:medications.controlled.record|clients.update')
+        ->name('clients.medical.controlled_discrepancies.close');
 
     // ✅ Assign support workers to a client
     Route::middleware('permission:clients.assignments.update')->group(function () {
@@ -353,6 +477,14 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:shifts.update')
         ->name('shifts.update');
 
+    // Shift lifecycle actions
+    Route::patch('/shifts/{shift}/start', [ShiftController::class, 'start'])
+        ->middleware('permission:shifts.update|shifts.manageAny')
+        ->name('shifts.start');
+    Route::patch('/shifts/{shift}/complete', [ShiftController::class, 'complete'])
+        ->middleware('permission:shifts.update|shifts.manageAny')
+        ->name('shifts.complete');
+
     // constrain shift param so `/shifts/create` doesn't get eaten by `/shifts/{shift}`
     Route::get('/shifts/{shift}', [ShiftController::class, 'show'])
         ->whereNumber('shift')
@@ -368,6 +500,20 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/timesheets', [TimesheetController::class, 'index'])
         ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
         ->name('timesheets.index');
+
+    // Manager/Admin approval queue
+    Route::get('/timesheets/approvals', [TimesheetController::class, 'approvals'])
+        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->name('timesheets.approvals');
+    Route::post('/timesheets/bulk-approve', [TimesheetController::class, 'bulkApprove'])
+        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->name('timesheets.bulkApprove');
+    Route::post('/timesheets/bulk-return', [TimesheetController::class, 'bulkReturnForChanges'])
+        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->name('timesheets.bulkReturn');
+    Route::post('/timesheets/bulk-reject', [TimesheetController::class, 'bulkReject'])
+        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->name('timesheets.bulkReject');
     Route::get('/timesheets/create', [TimesheetController::class, 'create'])
         ->middleware('permission:timesheets.create')
         ->name('timesheets.create');
@@ -375,11 +521,25 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:timesheets.create')
         ->name('timesheets.store');
     Route::get('/timesheets/{timesheet}/edit', [TimesheetController::class, 'edit'])
-        ->middleware('permission:timesheets.viewAny')
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
         ->name('timesheets.edit');
     Route::put('/timesheets/{timesheet}', [TimesheetController::class, 'update'])
         ->middleware('permission:timesheets.update')
         ->name('timesheets.update');
+
+    // Timesheet workflow
+    Route::post('/timesheets/{timesheet}/submit', [TimesheetController::class, 'submit'])
+        ->middleware('permission:timesheets.submit|timesheets.manageAny')
+        ->name('timesheets.submit');
+    Route::post('/timesheets/{timesheet}/approve', [TimesheetController::class, 'approve'])
+        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->name('timesheets.approve');
+    Route::post('/timesheets/{timesheet}/reject', [TimesheetController::class, 'reject'])
+        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->name('timesheets.reject');
+    Route::post('/timesheets/{timesheet}/return', [TimesheetController::class, 'returnForChanges'])
+        ->middleware('permission:timesheets.approve|timesheets.manageAny')
+        ->name('timesheets.return');
 });
 
 require __DIR__ . '/settings.php';

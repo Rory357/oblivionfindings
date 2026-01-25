@@ -13,6 +13,7 @@ class Client extends Model
 
     protected $fillable = [
         'site_id',
+        'service_context_id',
         'first_name',
         'last_name',
         'date_of_birth',
@@ -38,6 +39,11 @@ class Client extends Model
     public function site()
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function serviceContext()
+    {
+        return $this->belongsTo(ServiceContext::class);
     }
 
     public function supportWorkers()
@@ -72,6 +78,11 @@ class Client extends Model
         return $this->hasMany(\App\Models\ClientMedicationAdministration::class);
     }
 
+    public function breakGlassAccesses()
+    {
+        return $this->hasMany(\App\Models\ClientBreakGlassAccess::class);
+    }
+
     public function emergencyContacts()
     {
         return $this->hasMany(\App\Models\ClientEmergencyContact::class);
@@ -80,6 +91,11 @@ class Client extends Model
     public function conditions()
     {
         return $this->hasMany(\App\Models\ClientCondition::class);
+    }
+
+    public function controlledDrugDiscrepancies()
+    {
+        return $this->hasMany(\App\Models\ClientControlledDrugDiscrepancy::class);
     }
 
     public function documents()
@@ -105,5 +121,10 @@ class Client extends Model
     public function risks()
     {
         return $this->hasMany(\App\Models\ClientRisk::class);
+    }
+
+    public function onboardingOverrides()
+    {
+        return $this->hasMany(\App\Models\ClientOnboardingOverride::class);
     }
 }

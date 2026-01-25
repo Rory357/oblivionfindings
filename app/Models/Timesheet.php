@@ -21,16 +21,24 @@ class Timesheet extends Model
         'break_minutes',
         'notes',
         'status',
+        'submitted_at',
+        'submitted_by',
         'created_by',
         'approved_by',
         'approved_at',
+        'decision_notes',
+        'returned_at',
+        'returned_by',
+        'returned_notes',
     ];
 
     protected $casts = [
         'work_date' => 'date',
         'starts_at' => 'datetime',
         'ends_at' => 'datetime',
+        'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
+        'returned_at' => 'datetime',
     ];
 
     public function client()
@@ -51,6 +59,16 @@ class Timesheet extends Model
     public function approver()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function submitter()
+    {
+        return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    public function returner()
+    {
+        return $this->belongsTo(User::class, 'returned_by');
     }
 
     public function creator()

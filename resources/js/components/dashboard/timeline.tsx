@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Link } from '@inertiajs/react';
+import { Link, router, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 
 type ClientLite = { id: number; first_name: string; last_name: string };
@@ -11,6 +11,8 @@ export type ShiftLite = {
   ends_at: string;
   location?: string | null;
   status?: string | null;
+  actual_starts_at?: string | null;
+  actual_ends_at?: string | null;
   client?: ClientLite | null;
   staff?: StaffLite | null;
 };
@@ -43,6 +45,10 @@ export function ShiftTimeline({
   emptyText?: string;
 }) {
   const [range, setRange] = React.useState<'today' | 'week'>('today');
+
+  const { auth } = usePage().props as any;
+  const canActShift = auth?.can?.shifts?.update || auth?.can?.shifts?.manageAny;
+
 
   const todayIso = React.useMemo(() => new Date().toISOString(), []);
 
@@ -133,8 +139,28 @@ export function ShiftTimeline({
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
+                      {mode !== 'client' && canActShift && isSameDay(s.starts_at, todayIso) ? (
+                        <>
+                          {s.status === 'scheduled' ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => router.patch(`/shifts/${s.id}/start`, {}, { preserveScroll: true })}
+                            >
+                              Start
+                            </Button>
+                          ) : null}
+                          {s.status === 'scheduled' || s.status === 'in_progress' ? (
+                            <Button asChild type="button" size="sm">
+                              <Link href={`/shifts/${s.id}?complete=1`}>Complete</Link>
+                            </Button>
+                          ) : null}
+                        </>
+                      ) : null}
+
                       <Button asChild size="sm" variant="outline">
-                        <Link href={`/shifts/${s.id}/edit`}>View</Link>
+                        <Link href={`/shifts/${s.id}`}>Open</Link>
                       </Button>
 
                       {(mode === 'staff' || mode === 'manager') && (

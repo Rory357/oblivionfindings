@@ -1,9 +1,10 @@
 import { Button } from '@/components/ui/button';
 import { Tabs } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 
 import {
     ActivityTimeline,
@@ -11,6 +12,7 @@ import {
 } from '@/components/dashboard/activity-timeline';
 import { DashboardAnalytics } from '@/components/dashboard/analytics';
 import { ShiftTimeline, type ShiftLite } from '@/components/dashboard/timeline';
+import { MyDayList, type MyDayItem } from '@/components/workstream/my-day-list';
 
 function SmallKpi({
     label,
@@ -53,6 +55,11 @@ type TimesheetLite = {
 
 type Props = {
     mode: 'staff' | 'manager' | 'client';
+    filters?: {
+        range?: 'today' | 'week';
+        status?: string;
+        client_id?: number | null;
+    };
     client?: {
         id: number;
         first_name: string;
@@ -61,6 +68,7 @@ type Props = {
     } | null;
     assignedStaff?: { id: number; name: string; email?: string }[];
     assignedClients?: ClientLite[];
+    myDayItems?: MyDayItem[];
     todayShifts: ShiftLite[];
     upcomingShifts?: ShiftLite[];
     upcomingEvents?: ActivityEventLite[];
@@ -68,6 +76,14 @@ type Props = {
     managerSummary?: {
         staffWorkingTodayCount: number;
         timesheetsPendingCount: number;
+    } | null;
+    incidentKpis?: {
+        incidentsLast30: number;
+        incidentsHighLast30: number;
+        followupsOpen: number;
+        followupsOverdue: number;
+        reviewedLast30: number;
+        unreviewedLast30: number;
     } | null;
     analytics?: {
         shiftSeries?: Array<{
@@ -112,13 +128,97 @@ export default function Dashboard(props: Props) {
     const clientLabelSingular = labels?.['client.singular'] ?? 'Client';
     const staffLabelPlural = labels?.['staff.plural'] ?? 'Staff';
 
+    const myDayItems = props.myDayItems ?? [];
+
     const shiftsForWorkTab = [
         ...(props.todayShifts ?? []),
         ...(props.upcomingShifts ?? []),
     ];
 
+    const filters = props.filters ?? { range: 'week', status: 'all', client_id: null };
+
+    function updateFilters(next: Partial<typeof filters>) {
+        router.get(
+            '/dashboard',
+            {
+                range: next.range ?? filters.range,
+                status: next.status ?? filters.status,
+                client_id: Object.prototype.hasOwnProperty.call(next, 'client_id')
+                    ? (next as any).client_id
+                    : filters.client_id,
+            },
+            { preserveScroll: true, preserveState: true, replace: true },
+        );
+    }
+
     const workTab = (
         <div className="space-y-4">
+            {props.mode !== 'client' ? (
+                <div className="flex flex-wrap items-end gap-3 rounded-xl border p-4">
+                    <div>
+                        <div className="text-xs text-muted-foreground">Range</div>
+                        <Select
+                            value={filters.range ?? 'week'}
+                            onValueChange={(v) => updateFilters({ range: v as any })}
+                        >
+                            <SelectTrigger className="mt-1 w-[160px]">
+                                <SelectValue placeholder="Range" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="today">Today</SelectItem>
+                                <SelectItem value="week">Next 7 days</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div>
+                        <div className="text-xs text-muted-foreground">Status</div>
+                        <Select
+                            value={filters.status ?? 'all'}
+                            onValueChange={(v) => updateFilters({ status: v })}
+                        >
+                            <SelectTrigger className="mt-1 w-[180px]">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All</SelectItem>
+                                <SelectItem value="scheduled">Scheduled</SelectItem>
+                                <SelectItem value="in_progress">In progress</SelectItem>
+                                <SelectItem value="completed">Completed</SelectItem>
+                                <SelectItem value="cancelled">Cancelled</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div>
+                        <div className="text-xs text-muted-foreground">Client</div>
+                        <Select
+                            value={filters.client_id ? String(filters.client_id) : 'all'}
+                            onValueChange={(v) =>
+                                updateFilters({ client_id: v === 'all' ? null : Number(v) })
+                            }
+                        >
+                            <SelectTrigger className="mt-1 w-[260px]">
+                                <SelectValue placeholder="Client" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All clients</SelectItem>
+                                {(props.assignedClients ?? []).map((c) => (
+                                    <SelectItem key={c.id} value={String(c.id)}>
+                                        {fullName(c)}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="ml-auto text-xs text-muted-foreground">
+                        Showing {shiftsForWorkTab.length} shift
+                        {shiftsForWorkTab.length === 1 ? '' : 's'}
+                    </div>
+                </div>
+            ) : null}
+
             <div className="grid gap-4 lg:grid-cols-3">
                 <div className="lg:col-span-2">
                     <ShiftTimeline
@@ -129,7 +229,15 @@ export default function Dashboard(props: Props) {
                     />
                 </div>
 
-                <div className="lg:col-span-1">
+                <div className="lg:col-span-1 space-y-4">
+                    {props.mode !== 'client' ? (
+                        <MyDayList
+                            title="My day"
+                            items={props.myDayItems ?? []}
+                            emptyLabel="No tasks or follow-ups due."
+                        />
+                    ) : null}
+
                     <ActivityTimeline
                         title="Activity"
                         events={props.upcomingEvents ?? []}
@@ -277,6 +385,52 @@ export default function Dashboard(props: Props) {
                                     <Link href="/shifts/create">
                                         Create shift
                                     </Link>
+                                </Button>
+                            </div>
+                        </div>
+                    </div>
+                ) : null}
+
+                {props.mode === 'manager' && props.incidentKpis ? (
+                    <div className="grid gap-4 md:grid-cols-5">
+                        <SmallKpi
+                            label="Incidents (last 30 days)"
+                            value={props.incidentKpis.incidentsLast30}
+                            hint="All severities"
+                        />
+                        <SmallKpi
+                            label="High severity (last 30 days)"
+                            value={props.incidentKpis.incidentsHighLast30}
+                            hint="Requires attention"
+                        />
+                        <SmallKpi
+                            label="Open follow-ups"
+                            value={props.incidentKpis.followupsOpen}
+                            hint="Not completed"
+                        />
+                        <SmallKpi
+                            label="Overdue follow-ups"
+                            value={props.incidentKpis.followupsOverdue}
+                            hint="Past due"
+                        />
+                        <div className="rounded-xl border p-4">
+                            <div className="text-xs text-muted-foreground">
+                                Incident review
+                            </div>
+                            <div className="mt-2 text-2xl font-semibold">
+                                {props.incidentKpis.reviewedLast30}/
+                                {props.incidentKpis.reviewedLast30 +
+                                    props.incidentKpis.unreviewedLast30}
+                            </div>
+                            <div className="mt-1 text-xs text-muted-foreground">
+                                Reviewed vs unreviewed (30 days)
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                <Button asChild size="sm" variant="outline">
+                                    <Link href="/incidents">View incidents</Link>
+                                </Button>
+                                <Button asChild size="sm" variant="outline">
+                                    <Link href="/reports/incidents">Reports</Link>
                                 </Button>
                             </div>
                         </div>

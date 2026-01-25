@@ -68,27 +68,32 @@ class NotificationService
     {
         $ids = collect();
 
-        // 1) Always include managers (roles)
-        $managerIds = User::query()
-            ->whereHas('roles', fn($q) => $q->whereIn('name', self::MANAGER_ROLES))
-            ->pluck('id');
-        $ids = $ids->merge($managerIds);
+        $includeManagers = array_key_exists('include_managers', $extra) ? (bool) $extra['include_managers'] : true;
+        $includeAssignedWorkers = array_key_exists('include_assigned_workers', $extra) ? (bool) $extra['include_assigned_workers'] : true;
+        $includeEntityUser = array_key_exists('include_entity_user', $extra) ? (bool) $extra['include_entity_user'] : true;
 
-        // 2) If event is client-related, include assigned support workers
+        // 1) Managers (roles)
+        if ($includeManagers) {
+            $managerIds = User::query()
+                ->whereHas('roles', fn($q) => $q->whereIn('name', self::MANAGER_ROLES))
+                ->pluck('id');
+            $ids = $ids->merge($managerIds);
+        }
+
+        // 2) If event is client-related, include assigned support workers (optional)
         $clientModel = $client;
         if (!$clientModel && $entity && property_exists($entity, 'client_id')) {
-            // fallback - if model has client_id column
             if (!empty($entity->client_id)) {
                 $clientModel = Client::query()->find($entity->client_id);
             }
         }
 
-        if ($clientModel) {
+        if ($includeAssignedWorkers && $clientModel) {
             $ids = $ids->merge($clientModel->supportWorkers()->pluck('users.id'));
         }
 
-        // 3) If entity has a user_id (staff-specific), notify that staff member
-        if ($entity && isset($entity->user_id) && !empty($entity->user_id)) {
+        // 3) If entity has a user_id (staff-specific), notify that staff member (optional)
+        if ($includeEntityUser && $entity && isset($entity->user_id) && !empty($entity->user_id)) {
             $ids = $ids->merge([$entity->user_id]);
         }
 
@@ -110,6 +115,7 @@ class NotificationService
 
         return User::query()->whereIn('id', $ids)->get();
     }
+
 
     protected function defaultTitle(string $action, string $entityLabel, ?Model $entity, ?Client $client): string
     {

@@ -6,12 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
-type Client = { id: number; first_name: string; last_name: string };
+type Client = { id: number; first_name: string; last_name: string; service_context_id?: number | null };
 type Staff = { id: number; name: string; email: string };
+type ServiceContext = { id: number; name: string; type: string; is_active: boolean };
 
-type Props = { shift: any; clients: Client[]; staff: Staff[] };
+type Props = { shift: any; clients: Client[]; staff: Staff[]; serviceContexts: ServiceContext[]; defaultServiceContextId?: number | null };
 
-export default function ShiftEdit({ shift, clients, staff }: Props) {
+export default function ShiftEdit({ shift, clients, staff, serviceContexts, defaultServiceContextId = null }: Props) {
     const { labels } = usePage().props as any;
     const shiftLabel = labels?.['shift.singular'] ?? 'Shift';
 
@@ -20,6 +21,7 @@ export default function ShiftEdit({ shift, clients, staff }: Props) {
 
     const form = useForm({
         client_id: shift.client_id,
+        service_context_id: shift.service_context_id ?? shift?.service_context?.id ?? '',
         user_id: shift.user_id,
         starts_at: shift.starts_at?.slice(0, 16) ?? '',
         ends_at: shift.ends_at?.slice(0, 16) ?? '',
@@ -88,7 +90,17 @@ export default function ShiftEdit({ shift, clients, staff }: Props) {
                             <select
                                 className="w-full rounded-md border bg-background p-2 text-sm"
                                 value={form.data.client_id}
-                                onChange={(e) => form.setData('client_id', e.target.value)}
+                                onChange={(e) => {
+                                    const nextId = e.target.value;
+                                    form.setData('client_id', nextId);
+                                    if (!form.data.service_context_id) {
+                                        const client = clients.find((c) => String(c.id) === String(nextId));
+                                        const inherited = client?.service_context_id ?? defaultServiceContextId;
+                                        if (inherited) {
+                                            form.setData('service_context_id', inherited as any);
+                                        }
+                                    }
+                                }}
                             >
                                 {clients.map((c) => (
                                     <option key={c.id} value={c.id}>
@@ -96,6 +108,28 @@ export default function ShiftEdit({ shift, clients, staff }: Props) {
                                     </option>
                                 ))}
                             </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Service context</Label>
+                            <select
+                                className="w-full rounded-md border bg-background p-2 text-sm"
+                                value={String(form.data.service_context_id ?? '')}
+                                onChange={(e) => form.setData('service_context_id', e.target.value)}
+                            >
+                                <option value="">Inherit from client (recommended)</option>
+                                {serviceContexts
+                                    .filter((sc) => sc.is_active || String(sc.id) === String(form.data.service_context_id))
+                                    .map((sc) => (
+                                        <option key={sc.id} value={sc.id}>
+                                            {sc.name}
+                                            {!sc.is_active ? ' (inactive)' : ''}
+                                        </option>
+                                    ))}
+                            </select>
+                            <div className="text-xs text-slate-500">
+                                If left blank, the shift will inherit the selected client’s service context (if set).
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -132,7 +166,9 @@ export default function ShiftEdit({ shift, clients, staff }: Props) {
                         <div className="space-y-2">
                             <Label>Status</Label>
                             <select className="w-full rounded-md border bg-background p-2 text-sm" value={form.data.status} onChange={(e) => form.setData('status', e.target.value)}>
+                                <option value="draft">draft</option>
                                 <option value="scheduled">scheduled</option>
+                                <option value="in_progress">in_progress</option>
                                 <option value="completed">completed</option>
                                 <option value="cancelled">cancelled</option>
                             </select>

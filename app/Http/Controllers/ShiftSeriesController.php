@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Shift;
 use App\Models\ShiftSeries;
+use App\Models\Client;
+use App\Models\ServiceContext;
 use App\Services\NotificationService;
 use App\Models\ShiftTask;
 use Carbon\CarbonImmutable;
@@ -20,6 +22,7 @@ class ShiftSeriesController extends Controller
 
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'start_date' => ['required', 'date'],
             'end_date' => ['required', 'date', 'after_or_equal:start_date'],
@@ -34,6 +37,19 @@ class ShiftSeriesController extends Controller
             'tasks' => ['sometimes', 'array'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
         ]);
+
+        // If not explicitly provided, inherit the client's service context
+        // so that each generated shift is correctly classified for audit.
+        if (empty($data['service_context_id'])) {
+            $data['service_context_id'] = Client::query()
+                ->whereKey($data['client_id'])
+                ->value('service_context_id');
+        }
+
+        // If still not set, apply organisation default service context (if configured).
+        if (empty($data['service_context_id'])) {
+            $data['service_context_id'] = ServiceContext::defaultId();
+        }
 
         // Validate time window
         $tz = $data['timezone'] ?? 'Pacific/Auckland';
@@ -83,7 +99,7 @@ class ShiftSeriesController extends Controller
 
         $result = DB::transaction(function () use ($auth, $data, $tz, $occurrences) {
             $series = ShiftSeries::create([
-                ...Arr::except($data, ['tasks']),
+                ...Arr::except($data, ['tasks', 'service_context_id']),
                 'timezone' => $tz,
                 'status' => $data['status'] ?? 'scheduled',
                 'created_by' => $auth->id,
@@ -100,6 +116,7 @@ class ShiftSeriesController extends Controller
                 $shift = Shift::create([
                     'shift_series_id' => $series->id,
                     'client_id' => $data['client_id'],
+                    'service_context_id' => $data['service_context_id'] ?? null,
                     'user_id' => $data['user_id'],
                     'starts_at' => $startsAt,
                     'ends_at' => $endsAt,

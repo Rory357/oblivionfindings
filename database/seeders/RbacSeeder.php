@@ -121,6 +121,7 @@ class RbacSeeder extends Seeder
             ['key' => 'timesheets.viewAssigned', 'description' => 'View assigned timesheets only'],
             ['key' => 'timesheets.create', 'description' => 'Create timesheets'],
             ['key' => 'timesheets.update', 'description' => 'Update timesheets'],
+            ['key' => 'timesheets.submit', 'description' => 'Submit timesheets for approval'],
             ['key' => 'timesheets.approve', 'description' => 'Approve/reject timesheets'],
             ['key' => 'timesheets.manageAny', 'description' => 'Manage any staff timesheets'],
 
@@ -130,19 +131,38 @@ class RbacSeeder extends Seeder
             ['key' => 'clients.create', 'description' => 'Create clients'],
             ['key' => 'clients.update', 'description' => 'Update clients'],
             ['key' => 'clients.assignments.update', 'description' => 'Manage client assignments'],
+            ['key' => 'clients.onboarding.manage', 'description' => 'Manage client onboarding checklist (mark sections as not applicable)'],
 
             // Medication / MAR
+            ['key' => 'medications.view', 'description' => 'View medications module (central + per-client MAR)'],
+            ['key' => 'medications.orders.manage', 'description' => 'Create/update medication orders'],
             ['key' => 'medications.administer.record', 'description' => 'Record medication administrations (MAR)'],
+            ['key' => 'medications.administer.correct', 'description' => 'Correct medication administrations (audit safe)'],
             ['key' => 'medications.stock.update', 'description' => 'Update medication stock counts'],
+            ['key' => 'medications.controlled.view', 'description' => 'View controlled drug register entries'],
+            ['key' => 'medications.controlled.record', 'description' => 'Record controlled drug register entries (double-sign)'],
+            ['key' => 'medications.controlled.witness', 'description' => 'Witness controlled drug administrations/stock counts'],
+            ['key' => 'medications.controlled.override', 'description' => 'Override controlled drug discrepancy blocks'],
+            ['key' => 'medications.audit.view', 'description' => 'View medication-focused audit log'],
+            ['key' => 'medications.reports.export', 'description' => 'Export MAR/audit/medications reports'],
+            ['key' => 'medications.breakglass', 'description' => 'Use break-glass emergency access for medications'],
 
             // Incidents
             ['key' => 'incidents.viewAny', 'description' => 'View all incidents'],
             ['key' => 'incidents.viewAssigned', 'description' => 'View incidents for assigned clients'],
             ['key' => 'incidents.create', 'description' => 'Create incident reports'],
             ['key' => 'incidents.update', 'description' => 'Update incident reports'],
-            ['key' => 'incidents.delete', 'description' => 'Delete incident reports'],
+            ['key' => 'incidents.submit', 'description' => 'Submit standalone incident reports'],
             ['key' => 'incidents.approve', 'description' => 'Review/close incidents'],
             ['key' => 'incidents.export', 'description' => 'Export incidents'],
+            ['key' => 'incidents.templates.manage', 'description' => 'Manage incident templates'],
+
+            ['key' => 'incidents.portal.manage', 'description' => 'Control portal visibility for incidents and attachments'],
+            ['key' => 'incidents.view.portal', 'description' => 'View incidents in the client/next-of-kin portal'],
+            ['key' => 'incidents.attachments.view.portal', 'description' => 'Download incident attachments in the portal'],
+
+            ['key' => 'incidents.followups.manage', 'description' => 'Create/assign incident follow-ups'],
+            ['key' => 'incidents.followups.complete', 'description' => 'Complete assigned incident follow-ups'],
 
             // Risks
             ['key' => 'risks.viewAny', 'description' => 'View all client risks'],
@@ -170,6 +190,7 @@ class RbacSeeder extends Seeder
             ['key' => 'settings.access.manage', 'description' => 'Manage user access (roles & overrides)'],
             ['key' => 'settings.terminology.manage', 'description' => 'Manage UI terminology (labels)'],
             ['key' => 'settings.branding.manage', 'description' => 'Manage organisation branding (colors, logo)'],
+            ['key' => 'settings.service_contexts.manage', 'description' => 'Manage service contexts (residential/home support/respite)'],
 
             // RAG / AI Query
             ['key' => 'rag.ask.any', 'description' => 'Ask AI about any client (within view permissions)'],
@@ -237,13 +258,32 @@ class RbacSeeder extends Seeder
                 'clients.create',
                 'clients.update',
                 'clients.assignments.update',
+                'clients.onboarding.manage',
+                'clients.onboarding.manage',
+
+                'medications.view',
+                'medications.orders.manage',
+                'medications.administer.record',
+                'medications.administer.correct',
+                'medications.stock.update',
+                'medications.controlled.view',
+                'medications.controlled.record',
+                'medications.controlled.witness',
+                'medications.controlled.override',
+                'medications.audit.view',
+                'medications.reports.export',
+                'medications.breakglass',
 
                 'incidents.viewAny',
                 'incidents.create',
                 'incidents.update',
-                'incidents.delete',
-                'incidents.approve',
+                'incidents.submit',
+                                'incidents.approve',
+                                'incidents.followups.manage',
                 'incidents.export',
+                'incidents.portal.manage',
+                'incidents.view.portal',
+                'incidents.attachments.view.portal',
 
                 'risks.viewAny',
                 'risks.create',
@@ -252,6 +292,7 @@ class RbacSeeder extends Seeder
 
                 // Settings (adjust to taste)
                 'settings.terminology.manage',
+                'settings.service_contexts.manage',
 
                 // Audit
                 'audit.viewAny',
@@ -271,11 +312,25 @@ class RbacSeeder extends Seeder
                 'staff.availability.updateAny',
                 'clients.viewAny',
                 'clients.assignments.update',
+                'clients.onboarding.manage',
+                'clients.onboarding.manage',
+
+                'medications.view',
+                'medications.orders.manage',
+                'medications.administer.record',
+                'medications.administer.correct',
+                'medications.stock.update',
+                'medications.controlled.view',
+                'medications.controlled.record',
+                'medications.controlled.witness',
+                'medications.audit.view',
+                'medications.reports.export',
 
                 'incidents.viewAny',
                 'incidents.create',
                 'incidents.update',
                 'incidents.approve',
+                'incidents.followups.manage',
                 'risks.viewAny',
                 'risks.create',
                 'risks.update',
@@ -299,19 +354,27 @@ class RbacSeeder extends Seeder
         $supportWorker->permissions()->sync(
             Permission::whereIn('key', [
                 'clients.viewAssigned',
+                'medications.view',
                 'timeline.create',
                 'shifts.viewAssigned',
                 'shifts.tasks.updateSelf',
                 'timesheets.viewAssigned',
                 'timesheets.create',
                 'timesheets.update',
+                'timesheets.submit',
 
                 'incidents.viewAssigned',
                 'incidents.create',
                 'incidents.update',
+                'incidents.submit',
+                'incidents.followups.complete',
                 'risks.viewAssigned',
 
                 'medications.administer.record',
+                'medications.administer.correct',
+                'medications.controlled.view',
+                'medications.controlled.record',
+                'medications.controlled.witness',
 
                 'incidents.viewAssigned',
                 'incidents.create',
@@ -335,7 +398,11 @@ class RbacSeeder extends Seeder
                 'timesheets.approve',
                 'reports.viewAny',
                 'audit.viewAny',
+                'medications.view',
+                'medications.reports.export',
                 'medications.stock.update',
+                'medications.view',
+                'medications.reports.export',
 
                 'incidents.viewAny',
                 'incidents.export',
@@ -359,12 +426,16 @@ class RbacSeeder extends Seeder
         $auditor->permissions()->sync(
             Permission::whereIn('key', [
                 'clients.viewAny',
+                'medications.view',
+                'medications.audit.view',
                 'shifts.viewAny',
                 'timesheets.viewAny',
                 'reports.viewAny',
                 'timeline.viewAny',
                 'summaries.viewAny',
                 'audit.viewAny',
+                'medications.view',
+                'medications.audit.view',
                 'incidents.viewAny',
                 'risks.viewAny',
             ])->pluck('id')
@@ -375,12 +446,16 @@ class RbacSeeder extends Seeder
         $clientRole->permissions()->sync(
             Permission::whereIn('key', [
                 'rag.ask.self',
+                'incidents.view.portal',
+                'incidents.attachments.view.portal',
             ])->pluck('id')
         );
 
         $nextOfKinRole->permissions()->sync(
             Permission::whereIn('key', [
                 'rag.ask.self',
+                'incidents.view.portal',
+                'incidents.attachments.view.portal',
             ])->pluck('id')
         );
 

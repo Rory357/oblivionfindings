@@ -1,5 +1,12 @@
 import { Button } from '@/components/ui/button';
 import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
@@ -9,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { usePage, router } from '@inertiajs/react';
 import { Bell, Megaphone } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type InboxPayload = {
     notifications: {
@@ -62,6 +70,31 @@ export default function InboxMenus() {
     const inbox = (usePage().props as any).inbox as InboxPayload | null;
     if (!inbox) return null;
 
+    const [openNotifId, setOpenNotifId] = useState<string | null>(null);
+    const [openAnnouncementId, setOpenAnnouncementId] = useState<number | null>(null);
+
+    const openNotification = useMemo(
+        () => inbox.notifications.items.find((n) => n.id === openNotifId) ?? null,
+        [inbox.notifications.items, openNotifId],
+    );
+    const openAnnouncement = useMemo(
+        () => inbox.announcements.items.find((a) => a.id === openAnnouncementId) ?? null,
+        [inbox.announcements.items, openAnnouncementId],
+    );
+
+    const reloadInbox = () => {
+        // Refresh just the inbox payload so counts / read state update immediately.
+        router.reload({ only: ['inbox'], preserveScroll: true });
+    };
+
+    const markNotificationRead = (id: string) => {
+        router.post(`/inbox/notifications/${id}/read`, {}, { preserveScroll: true, onSuccess: reloadInbox });
+    };
+
+    const markAnnouncementRead = (id: number) => {
+        router.post(`/inbox/announcements/${id}/read`, {}, { preserveScroll: true, onSuccess: reloadInbox });
+    };
+
     const unreadNotifications = inbox.notifications?.unread_count ?? 0;
     const unreadAnnouncements = inbox.announcements?.unread_count ?? 0;
 
@@ -89,7 +122,11 @@ export default function InboxMenus() {
                             className="h-8 px-2 text-xs"
                             disabled={!unreadNotifications}
                             onClick={() =>
-                                router.post('/inbox/notifications/read-all', {}, { preserveScroll: true })
+                                router.post(
+                                    '/inbox/notifications/read-all',
+                                    {},
+                                    { preserveScroll: true, onSuccess: reloadInbox },
+                                )
                             }
                         >
                             Mark all read
@@ -113,12 +150,6 @@ export default function InboxMenus() {
                                 className="flex cursor-pointer flex-col items-start gap-1 whitespace-normal"
                                 onSelect={(e) => {
                                     e.preventDefault();
-                                    if (!isUnread) return;
-                                    router.post(
-                                        `/inbox/notifications/${n.id}/read`,
-                                        {},
-                                        { preserveScroll: true },
-                                    );
                                 }}
                             >
                                 <div className="flex w-full items-center justify-between gap-2">
@@ -136,6 +167,22 @@ export default function InboxMenus() {
                                         {body}
                                     </span>
                                 )}
+
+                                <div className="mt-1 flex w-full justify-end">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={() => {
+                                            setOpenAnnouncementId(null);
+                                            setOpenNotifId(n.id);
+                                            if (isUnread) markNotificationRead(n.id);
+                                        }}
+                                    >
+                                        View
+                                    </Button>
+                                </div>
                             </DropdownMenuItem>
                         );
                     })}
@@ -164,7 +211,11 @@ export default function InboxMenus() {
                             className="h-8 px-2 text-xs"
                             disabled={!unreadAnnouncements}
                             onClick={() =>
-                                router.post('/inbox/announcements/read-all', {}, { preserveScroll: true })
+                                router.post(
+                                    '/inbox/announcements/read-all',
+                                    {},
+                                    { preserveScroll: true, onSuccess: reloadInbox },
+                                )
                             }
                         >
                             Mark all read
@@ -186,12 +237,6 @@ export default function InboxMenus() {
                                 className="flex cursor-pointer flex-col items-start gap-1 whitespace-normal"
                                 onSelect={(e) => {
                                     e.preventDefault();
-                                    if (!isUnread) return;
-                                    router.post(
-                                        `/inbox/announcements/${a.id}/read`,
-                                        {},
-                                        { preserveScroll: true },
-                                    );
                                 }}
                             >
                                 <div className="flex w-full items-center justify-between gap-2">
@@ -214,11 +259,103 @@ export default function InboxMenus() {
                                         From {a.author.name}
                                     </span>
                                 )}
+
+                                <div className="mt-1 flex w-full justify-end">
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-7 px-2 text-xs"
+                                        onClick={() => {
+                                            setOpenNotifId(null);
+                                            setOpenAnnouncementId(a.id);
+                                            if (isUnread) markAnnouncementRead(a.id);
+                                        }}
+                                    >
+                                        View
+                                    </Button>
+                                </div>
                             </DropdownMenuItem>
                         );
                     })}
                 </DropdownMenuContent>
             </DropdownMenu>
+
+            {/* Notification modal */}
+            <Dialog open={!!openNotification} onOpenChange={(v) => !v && setOpenNotifId(null)}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>
+                            {openNotification ? notificationTitle(openNotification) : 'Notification'}
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    {openNotification && (
+                        <div className="space-y-3">
+                            {openNotification.created_at && (
+                                <div className="text-xs text-muted-foreground">
+                                    {new Date(openNotification.created_at).toLocaleString()}
+                                </div>
+                            )}
+                            {notificationBody(openNotification) ? (
+                                <div className="whitespace-pre-wrap text-sm">
+                                    {notificationBody(openNotification)}
+                                </div>
+                            ) : (
+                                <div className="text-sm text-muted-foreground">
+                                    No message content.
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setOpenNotifId(null)}>
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Announcement modal */}
+            <Dialog open={!!openAnnouncement} onOpenChange={(v) => !v && setOpenAnnouncementId(null)}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>{openAnnouncement ? openAnnouncement.title : 'Announcement'}</DialogTitle>
+                    </DialogHeader>
+
+                    {openAnnouncement && (
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between gap-2">
+                                {openAnnouncement.author ? (
+                                    <div className="text-xs text-muted-foreground">
+                                        From {openAnnouncement.author.name}
+                                    </div>
+                                ) : (
+                                    <div />
+                                )}
+                                {openAnnouncement.created_at && (
+                                    <div className="text-xs text-muted-foreground">
+                                        {new Date(openAnnouncement.created_at).toLocaleString()}
+                                    </div>
+                                )}
+                            </div>
+
+                            {openAnnouncement.body ? (
+                                <div className="whitespace-pre-wrap text-sm">{openAnnouncement.body}</div>
+                            ) : (
+                                <div className="text-sm text-muted-foreground">No content.</div>
+                            )}
+                        </div>
+                    )}
+
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setOpenAnnouncementId(null)}>
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\ShiftTask;
+use App\Models\ServiceContext;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -19,6 +20,12 @@ class CalendarController extends Controller
 
         $canManageAny = $auth->canDo('shifts.manageAny');
 
+        // Provide service contexts to allow shift creation/editing to capture
+        // the service setting (residential / home support / respite) for audit.
+        $serviceContexts = ServiceContext::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'type', 'is_active']);
+
         $staff = [];
         $clients = [];
 
@@ -29,13 +36,15 @@ class CalendarController extends Controller
 
             $clients = Client::query()
                 ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name']);
+                ->get(['id', 'first_name', 'last_name', 'service_context_id']);
         }
 
         return inertia('calendar/index', [
             'canManageAny' => $canManageAny,
             'staff' => $staff,
             'clients' => $clients,
+            'serviceContexts' => $serviceContexts,
+            'defaultServiceContextId' => ServiceContext::defaultId(),
         ]);
     }
 
@@ -60,7 +69,11 @@ class CalendarController extends Controller
         // Use an overlap query so shifts that start before the range but
         // overlap it are still included.
         $query = Shift::query()
-            ->with(['client:id,first_name,last_name', 'staff:id,name'])
+            ->with([
+                'client:id,first_name,last_name',
+                'staff:id,name',
+                'serviceContext:id,name,type,is_active',
+            ])
             ->where('starts_at', '<', $data['end'])
             ->where('ends_at', '>', $data['start']);
 
@@ -92,6 +105,8 @@ class CalendarController extends Controller
                     'end' => optional($shift->ends_at)->toIso8601String(),
                     'extendedProps' => [
                         'client_id' => $shift->client_id,
+                        'service_context_id' => $shift->service_context_id,
+                        'service_context' => $shift->serviceContext ? $shift->serviceContext->name : null,
                         'user_id' => $shift->user_id,
                         'location' => $shift->location,
                         'notes' => $shift->notes,
@@ -111,6 +126,7 @@ class CalendarController extends Controller
 
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
             'user_id' => ['required', 'integer', 'exists:users,id'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
@@ -120,6 +136,19 @@ class CalendarController extends Controller
             'tasks' => ['sometimes', 'array'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
         ]);
+
+        // If not explicitly provided, inherit the client's service context.
+        // This keeps service setting consistent for audit trails.
+        if (empty($data['service_context_id'])) {
+            $data['service_context_id'] = Client::query()
+                ->whereKey($data['client_id'])
+                ->value('service_context_id');
+        }
+
+        // If still not set, apply organisation default service context (if configured).
+        if (empty($data['service_context_id'])) {
+            $data['service_context_id'] = ServiceContext::defaultId();
+        }
 
         $conflicts = Shift::query()
             ->where(function ($q) use ($data) {
@@ -175,6 +204,7 @@ class CalendarController extends Controller
         // Support partial updates (drag/drop resize sends only times)
         $data = $request->validate([
             'client_id' => ['sometimes', 'required', 'integer', 'exists:clients,id'],
+            'service_context_id' => ['sometimes', 'nullable', 'integer', 'exists:service_contexts,id'],
             'user_id' => ['sometimes', 'required', 'integer', 'exists:users,id'],
             'starts_at' => ['sometimes', 'required', 'date'],
             'ends_at' => ['sometimes', 'required', 'date'],
@@ -185,6 +215,14 @@ class CalendarController extends Controller
             'tasks.*.id' => ['sometimes', 'integer', 'exists:shift_tasks,id'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
         ]);
+
+        // If the client is changed but service_context_id isn't explicitly set,
+        // inherit the new client's service context.
+        if (array_key_exists('client_id', $data) && !array_key_exists('service_context_id', $data)) {
+            $data['service_context_id'] = Client::query()
+                ->whereKey($data['client_id'])
+                ->value('service_context_id');
+        }
 
         // If one of starts/ends provided, require both and ensure ends > starts
         $hasStart = array_key_exists('starts_at', $data);
@@ -213,6 +251,14 @@ class CalendarController extends Controller
             ->exists();
 
         abort_unless(!$conflicts, 422, 'Conflicting shift detected for this staff member or client during that time.');
+
+        // If the client changes and service context is not explicitly set,
+        // inherit from the client to keep classification consistent.
+        if (array_key_exists('client_id', $data) && !array_key_exists('service_context_id', $data)) {
+            $data['service_context_id'] = Client::query()
+                ->whereKey($resolvedClientId)
+                ->value('service_context_id');
+        }
 
         DB::transaction(function () use ($shift, $data) {
             $shift->update(\Illuminate\Support\Arr::except($data, ['tasks']));

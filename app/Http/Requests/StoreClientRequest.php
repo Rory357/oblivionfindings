@@ -15,6 +15,7 @@ class StoreClientRequest extends FormRequest
     {
         return [
             'site_id'    => ['nullable', 'integer', 'exists:sites,id'],
+            'service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name'  => ['required', 'string', 'max:255'],
             'date_of_birth' => ['nullable', 'date'],

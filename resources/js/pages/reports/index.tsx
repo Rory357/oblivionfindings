@@ -1,11 +1,45 @@
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 
 export default function ReportsIndex() {
+    const { auth } = usePage().props as any;
+    const can = auth?.can ?? {};
+    const canIncidents = can?.incidents ?? {};
+
     return (
         <AppLayout breadcrumbs={[{ title: 'Reports', href: '/reports' }]}>
             <Head title="Reports" />
-            <div className="p-4">Reports (coming next)</div>
+            <div className="space-y-4 p-4">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Available reports</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <Link href="/reports/medications" className="rounded-md border p-3 hover:bg-slate-50">
+                            <div className="text-sm font-medium">Medication report (MAR + controlled discrepancies)</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                                Filter by date, client, service context. Export CSV.
+                            </div>
+                        </Link>
+                        {(canIncidents.export || canIncidents.viewAny) ? (
+                            <Link href="/reports/incidents" className="rounded-md border p-3 hover:bg-slate-50">
+                                <div className="text-sm font-medium">Incident reports</div>
+                                <div className="mt-1 text-xs text-slate-500">
+                                    Filter by date, client, severity, review status. Export CSV.
+                                </div>
+                            </Link>
+                        ) : (
+                            <div className="rounded-md border p-3 text-sm text-slate-500">
+                                Incident reports (no access)
+                            </div>
+                        )}
+                        <div className="rounded-md border p-3 text-sm text-slate-500">
+                            More reports coming next.
+                        </div>
+                    </CardContent>
+                </Card>
+            </div>
         </AppLayout>
     );
 }

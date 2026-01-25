@@ -35,6 +35,45 @@ class ClientPolicy
         return $user->hasRole('support_worker') && $client->supportWorkers()->whereKey($user->id)->exists();
     }
 
+    /**
+     * Medications access is intentionally scoped and may be granted temporarily
+     * via break-glass. This should NOT automatically grant full client profile
+     * access.
+     */
+    public function viewMedications(User $user, Client $client): bool
+    {
+        // Portal roles can view meds only via the portal rules.
+        if ($user->hasRole('client', 'next_of_kin') && $user->canAccessClientPortal($client)) {
+            return $user->canDo('medications.view');
+        }
+
+        // Managers/admins: global.
+        if ($user->canDo('clients.viewAny') && !$user->hasRole('support_worker')) {
+            return $user->canDo('medications.view');
+        }
+
+        // Assigned-only access.
+        $assigned = $client->supportWorkers()->whereKey($user->id)->exists();
+        if ($assigned) {
+            return $user->canDo('medications.view');
+        }
+
+        // Break-glass (temporary) for meds-only access.
+        if ($user->canDo('medications.breakglass')) {
+            $has = $client->breakGlassAccesses()
+                ->where('user_id', $user->id)
+                ->where(function ($q) {
+                    $q->whereNull('expires_at')->orWhere('expires_at', '>', now());
+                })
+                ->exists();
+            if ($has) {
+                return $user->canDo('medications.view');
+            }
+        }
+
+        return false;
+    }
+
     public function create(User $user): bool
     {
         return $user->canDo('clients.create');

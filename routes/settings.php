@@ -6,6 +6,7 @@ use App\Http\Controllers\Settings\TwoFactorAuthenticationController;
 use App\Http\Controllers\Settings\TerminologyController;
 use App\Http\Controllers\Settings\AccessController;
 use App\Http\Controllers\Settings\BrandingController;
+use App\Http\Controllers\Settings\ServiceContextController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -56,4 +57,21 @@ Route::middleware('auth')->group(function () {
     Route::post('settings/branding', [BrandingController::class, 'update'])
         ->middleware('permission:settings.branding.manage')
         ->name('settings.branding.update');
+
+    // Service contexts (Residential / Home Support / Respite)
+    Route::get('settings/service-contexts', [ServiceContextController::class, 'index'])
+        ->middleware('permission:settings.service_contexts.manage')
+        ->name('settings.service_contexts');
+    Route::post('settings/service-contexts', [ServiceContextController::class, 'store'])
+        ->middleware('permission:settings.service_contexts.manage')
+        ->name('settings.service_contexts.store');
+
+
+    Route::post('settings/service-contexts/default', [ServiceContextController::class, 'setDefault'])
+        ->middleware('permission:settings.service_contexts.manage')
+        ->name('settings.service_contexts.default');
+
+    Route::put('settings/service-contexts/{serviceContext}', [ServiceContextController::class, 'update'])
+        ->middleware('permission:settings.service_contexts.manage')
+        ->name('settings.service_contexts.update');
 });

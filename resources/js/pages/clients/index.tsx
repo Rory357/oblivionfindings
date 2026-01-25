@@ -2,6 +2,7 @@ import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Checkbox } from '@/components/ui/checkbox';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
@@ -18,11 +19,16 @@ export default function ClientsIndex({ clients }) {
     const canManage = canCreate || canUpdate;
 
     const [query, setQuery] = useState('');
+    const [onlyIncomplete, setOnlyIncomplete] = useState(false);
 
     const filteredClients = useMemo(() => {
         const q = query.trim().toLowerCase();
-        if (!q) return clients;
-        return clients.filter((c) => {
+        let rows = clients as any[];
+        if (onlyIncomplete) {
+            rows = rows.filter((c) => c.onboarding?.status !== 'complete');
+        }
+        if (!q) return rows;
+        return rows.filter((c) => {
             const name = `${c.first_name ?? ''} ${c.last_name ?? ''}`
                 .trim()
                 .toLowerCase();
@@ -34,7 +40,7 @@ export default function ClientsIndex({ clients }) {
                 status.includes(q)
             );
         });
-    }, [clients, query]);
+    }, [clients, query, onlyIncomplete]);
 
     const breadcrumbs = useMemo(
         () => [
@@ -74,8 +80,14 @@ export default function ClientsIndex({ clients }) {
                             onChange={(e) => setQuery(e.target.value)}
                         />
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                        Showing {filteredClients.length} of {clients.length}
+                    <div className="flex items-center gap-3">
+                        <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                            <Checkbox checked={onlyIncomplete} onCheckedChange={(v) => setOnlyIncomplete(!!v)} />
+                            Onboarding incomplete only
+                        </label>
+                        <div className="text-sm text-muted-foreground">
+                            Showing {filteredClients.length} of {clients.length}
+                        </div>
                     </div>
                 </div>
 
@@ -90,8 +102,20 @@ export default function ClientsIndex({ clients }) {
                                 <div className="text-sm font-medium">
                                     {client.first_name} {client.last_name}
                                 </div>
-                                <div className="text-xs text-slate-500">
-                                    Status: {client.status}
+                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                                    <div className="text-xs text-slate-500">Status: {client.status}</div>
+                                    {client.onboarding ? (
+                                        <div
+                                            className={`rounded-full px-2 py-0.5 text-xs ${
+                                                client.onboarding.status === 'complete'
+                                                    ? 'bg-emerald-50 text-emerald-700'
+                                                    : 'bg-amber-50 text-amber-700'
+                                            }`}
+                                        >
+                                            Onboarding: {client.onboarding.status === 'complete' ? 'Complete' : 'Incomplete'}
+                                            {typeof client.onboarding.percent === 'number' ? ` • ${client.onboarding.percent}%` : ''}
+                                        </div>
+                                    ) : null}
                                 </div>
                                 <div className="mt-1 text-xs text-slate-500">
                                     {siteSingular}:{' '}

@@ -12,13 +12,18 @@ class ClientMedicationAdministration extends Model
     use AuditableChanges;
 
     protected $fillable = [
+        'corrected_of_id',
+        'is_correction',
         'client_id',
         'client_medication_id',
         'shift_id',
+        'service_context_id',
         'administered_by',
         'scheduled_for',
         'administered_at',
         'status',
+        'reason',
+        'correction_reason',
         'dose_given',
         'notes',
     ];
@@ -26,6 +31,7 @@ class ClientMedicationAdministration extends Model
     protected $casts = [
         'scheduled_for' => 'datetime',
         'administered_at' => 'datetime',
+        'is_correction' => 'boolean',
     ];
 
     public function client()
@@ -41,6 +47,11 @@ class ClientMedicationAdministration extends Model
     public function shift()
     {
         return $this->belongsTo(Shift::class);
+    }
+
+    public function serviceContext()
+    {
+        return $this->belongsTo(ServiceContext::class);
     }
 
     public function administeredBy()

@@ -97,6 +97,12 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
                 href: '/timeline',
                 icon: MessageSquareText,
             },
+            ...(can?.medications?.view
+                ? [{ title: 'Medications', href: '/medications', icon: ClipboardList }]
+                : []),
+            ...(can?.medications?.breakGlass
+                ? [{ title: 'Emergency Access', href: '/emergency-access', icon: Shield }]
+                : []),
             ...(can?.incidents?.viewAssigned
                 ? [{ title: 'Incidents', href: '/incidents', icon: FileText }]
                 : []),
@@ -111,17 +117,29 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     if (can?.clients?.viewAny) {
         items.push({ title: clientPlural, href: '/clients', icon: Users });
     }
+    if (can?.medications?.view) {
+        items.push({ title: 'Medications', href: '/medications', icon: ClipboardList });
+    }
+    if (can?.medications?.breakGlass) {
+        items.push({ title: 'Emergency Access', href: '/emergency-access', icon: Shield });
+    }
     if (can?.shifts?.viewAny) {
         items.push({ title: shiftPlural, href: '/shifts', icon: CalendarDays });
     }
-    if (can?.timesheets?.viewAny) {
+    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned) {
         items.push({ title: timesheetPlural, href: '/timesheets', icon: ClipboardList });
+    }
+    if (can?.timesheets?.approve || can?.timesheets?.manageAny) {
+        items.push({ title: 'Timesheet Approvals', href: '/timesheets/approvals', icon: ClipboardList });
     }
     if (can?.staff?.viewAny) {
         items.push({ title: staffPlural, href: '/staff', icon: ClipboardList });
     }
     if (can?.reports?.viewAny) {
         items.push({ title: 'Reports', href: '/reports', icon: FileText });
+    }
+    if (can?.medications?.view) {
+        items.push({ title: 'Medications', href: '/medications', icon: ClipboardList });
     }
     if (can?.rostering?.viewAny) {
         items.push({ title: 'Rostering', href: '/rostering', icon: Settings });

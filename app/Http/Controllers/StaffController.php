@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\Role;
 use App\Models\User;
 use App\Services\NotificationService;
+use App\Services\WorkstreamService;
 use Illuminate\Http\Request;
 
 class StaffController extends Controller
@@ -76,8 +77,14 @@ class StaffController extends Controller
             ->limit(200)
             ->get();
 
+        $myDayItems = app(WorkstreamService::class)
+            ->forStaff($user, (clone $today), (clone $rangeEnd))
+            ->take(250)
+            ->values();
+
         return inertia('staff/show', [
             'user' => $user,
+            'myDayItems' => $myDayItems,
             'todayShifts' => $todayShifts,
             'upcomingShifts' => $upcomingShifts,
         ]);

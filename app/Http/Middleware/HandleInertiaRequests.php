@@ -64,14 +64,30 @@ class HandleInertiaRequests extends Middleware
 
                 'timesheets' => [
                     'viewAny' => $user->canDo('timesheets.viewAny'),
+                    'viewAssigned' => $user->canDo('timesheets.viewAssigned'),
                     'create' => $user->canDo('timesheets.create'),
                     'update' => $user->canDo('timesheets.update'),
+                    'submit' => $user->canDo('timesheets.submit'),
                     'approve' => $user->canDo('timesheets.approve'),
                     'manageAny' => $user->canDo('timesheets.manageAny'),
                 ],
 
                 'reports' => [
                     'viewAny' => $user->canDo('reports.viewAny'),
+                ],
+
+                'medications' => [
+                    'view' => $user->canDo('medications.view'),
+                    'ordersManage' => $user->canDo('medications.orders.manage'),
+                    'administerRecord' => $user->canDo('medications.administer.record'),
+                    'administerCorrect' => $user->canDo('medications.administer.correct'),
+                    'auditView' => $user->canDo('medications.audit.view'),
+                    'reportsExport' => $user->canDo('medications.reports.export'),
+                    'controlledView' => $user->canDo('medications.controlled.view'),
+                    'controlledRecord' => $user->canDo('medications.controlled.record'),
+                    'controlledWitness' => $user->canDo('medications.controlled.witness'),
+                    'controlledOverride' => $user->canDo('medications.controlled.override'),
+                    'breakGlass' => $user->canDo('medications.breakglass'),
                 ],
 
                 'rostering' => [
@@ -106,7 +122,14 @@ class HandleInertiaRequests extends Middleware
                     'viewAssigned' => $user->canDo('incidents.viewAssigned'),
                     'create' => $user->canDo('incidents.create'),
                     'update' => $user->canDo('incidents.update'),
+                    'submit' => $user->canDo('incidents.submit'),
                     'approve' => $user->canDo('incidents.approve'),
+                    'export' => $user->canDo('incidents.export'),
+                    'templatesManage' => $user->canDo('incidents.templates.manage'),
+                    'followupsManage' => $user->canDo('incidents.followups.manage'),
+                    'followupsComplete' => $user->canDo('incidents.followups.complete'),
+                    'portalManage' => $user->canDo('incidents.portal.manage'),
+                    'portalView' => $user->canDo('incidents.view.portal'),
                 ],
 
                 'risks' => [
@@ -131,6 +154,7 @@ class HandleInertiaRequests extends Middleware
                     'manageAccess' => $user->canDo('settings.access.manage'),
                     'manageTerminology' => $user->canDo('settings.terminology.manage'),
                     'manageBranding' => $user->canDo('settings.branding.manage'),
+                    'manageServiceContexts' => $user->canDo('settings.service_contexts.manage'),
                 ],
             ];
         }

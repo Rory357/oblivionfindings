@@ -38,12 +38,15 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 type Props = {
     canManageAny: boolean;
     staff: Array<{ id: number; name: string; email: string }>;
-    clients: Array<{ id: number; first_name: string; last_name: string }>;
+    clients: Array<{ id: number; first_name: string; last_name: string; service_context_id?: number | null }>;
+    serviceContexts: Array<{ id: number; name: string; type: string; is_active: boolean }>;
+    defaultServiceContextId?: number | null;
 };
 
 type ShiftForm = {
     id?: number;
     client_id: number | '';
+    service_context_id: number | '';
     user_id: number | '';
     starts_at: string;
     ends_at: string;
@@ -115,6 +118,7 @@ async function jsonRequest<T>(
 
 
 export default function CalendarIndex(props: Props) {
+    const defaultServiceContextId = props.defaultServiceContextId ?? null;
     const { auth, labels } = usePage().props as any;
 
     const canManageAny = !!(props.canManageAny && auth?.can?.shifts?.manageAny);
@@ -135,9 +139,26 @@ export default function CalendarIndex(props: Props) {
             (props.clients ?? []).map((c) => ({
                 id: c.id,
                 label: `${c.first_name} ${c.last_name}`,
+                service_context_id: c.service_context_id ?? null,
             })),
         [props.clients],
     );
+
+    const clientServiceContextById = useMemo(() => {
+        const m = new Map<number, number | null>();
+        for (const c of props.clients ?? []) {
+            m.set(c.id, c.service_context_id ?? null);
+        }
+        return m;
+    }, [props.clients]);
+
+    const serviceContextOptions = useMemo(() => {
+        return (props.serviceContexts ?? []).map((sc) => ({
+            id: sc.id,
+            label: sc.name,
+            is_active: !!sc.is_active,
+        }));
+    }, [props.serviceContexts]);
 
     const [staffId, setStaffId] = useState<string>('all');
     const [clientId, setClientId] = useState<string>('all');
@@ -241,6 +262,7 @@ export default function CalendarIndex(props: Props) {
     const [viewInfo, setViewInfo] = useState<ShiftViewInfo | null>(null);
     const [form, setForm] = useState<ShiftForm>({
         client_id: '',
+        service_context_id: (defaultServiceContextId ?? '') as any,
         user_id: '',
         starts_at: '',
         ends_at: '',
@@ -257,12 +279,16 @@ export default function CalendarIndex(props: Props) {
         const prefillClient =
             canManageAny && clientId !== 'all' ? Number(clientId) : '';
 
+        const prefillServiceContext =
+            prefillClient !== '' ? (clientServiceContextById.get(Number(prefillClient)) ?? '') : '';
+
         setModalMode('create');
         setError(null);
         setViewInfo(null);
         setForm({
             id: undefined,
             client_id: prefillClient,
+            service_context_id: (prefillServiceContext === null ? (defaultServiceContextId ?? '') : prefillServiceContext) as any,
             user_id: prefillStaff,
             starts_at: toDatetimeLocalValue(start),
             ends_at: toDatetimeLocalValue(end),
@@ -286,6 +312,7 @@ export default function CalendarIndex(props: Props) {
         setForm({
             id: Number(arg.event.id),
             client_id: ext.client_id ?? '',
+            service_context_id: ext.service_context_id ?? '',
             user_id: ext.user_id ?? '',
             starts_at: toDatetimeLocalValue(start),
             ends_at: toDatetimeLocalValue(end),
@@ -304,6 +331,10 @@ export default function CalendarIndex(props: Props) {
             const payload = {
                 client_id:
                     form.client_id === '' ? null : Number(form.client_id),
+                service_context_id:
+                    form.service_context_id === ''
+                        ? null
+                        : Number(form.service_context_id),
                 user_id: form.user_id === '' ? null : Number(form.user_id),
                 starts_at: form.starts_at,
                 ends_at: form.ends_at,
@@ -531,6 +562,7 @@ export default function CalendarIndex(props: Props) {
                                     const ext = (info.event.extendedProps ?? {}) as any;
                                     const lines = [
                                         ext.client ? `Client: ${ext.client}` : null,
+                                        ext.service_context ? `Service context: ${ext.service_context}` : null,
                                         ext.staff ? `Staff: ${ext.staff}` : null,
                                         ext.location ? `Location: ${ext.location}` : null,
                                         ext.status ? `Status: ${ext.status}` : null,
@@ -636,15 +668,26 @@ export default function CalendarIndex(props: Props) {
                                             !canUpdate && modalMode === 'edit'
                                         }
                                         onChange={(e) =>
-                                            setForm((s) => ({
-                                                ...s,
-                                                client_id:
+                                            setForm((s) => {
+                                                const nextClientId =
                                                     e.target.value === ''
                                                         ? ''
-                                                        : Number(
-                                                              e.target.value,
-                                                          ),
-                                            }))
+                                                        : Number(e.target.value);
+                                                const inherited =
+                                                    nextClientId === ''
+                                                        ? ''
+                                                        : (clientServiceContextById.get(nextClientId) ?? '');
+
+                                                return {
+                                                    ...s,
+                                                    client_id: nextClientId,
+                                                    // If service context not manually chosen yet, inherit from client
+                                                    service_context_id:
+                                                        s.service_context_id === ''
+                                                            ? (inherited === null ? '' : inherited)
+                                                            : s.service_context_id,
+                                                };
+                                            })
                                         }
                                     >
                                         <option value="">
@@ -685,6 +728,44 @@ export default function CalendarIndex(props: Props) {
                                             </option>
                                         ))}
                                     </select>
+                                </div>
+                            </div>
+                        )}
+
+                        {(canUpdate || modalMode === 'create') && (
+                            <div className="grid gap-1">
+                                <Label>Service context</Label>
+                                <select
+                                    className="w-full rounded-md border bg-background p-2 text-sm"
+                                    value={String(form.service_context_id)}
+                                    disabled={!canUpdate && modalMode === 'edit'}
+                                    onChange={(e) =>
+                                        setForm((s) => ({
+                                            ...s,
+                                            service_context_id:
+                                                e.target.value === ''
+                                                    ? ''
+                                                    : Number(e.target.value),
+                                        }))
+                                    }
+                                >
+                                    <option value="">
+                                        Inherit from client (recommended)
+                                    </option>
+                                    {serviceContextOptions
+                                        .filter((sc) =>
+                                            sc.is_active ||
+                                            sc.id === Number(form.service_context_id),
+                                        )
+                                        .map((sc) => (
+                                            <option key={sc.id} value={sc.id}>
+                                                {sc.label}
+                                                {!sc.is_active ? ' (inactive)' : ''}
+                                            </option>
+                                        ))}
+                                </select>
+                                <div className="text-xs text-muted-foreground">
+                                    If left blank, the shift will inherit the selected client’s service context (if set).
                                 </div>
                             </div>
                         )}

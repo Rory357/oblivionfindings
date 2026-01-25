@@ -51,6 +51,9 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     if (can?.settings?.manageBranding) {
         extraItems.push({ title: 'Branding', href: '/settings/branding', icon: null });
     }
+    if (can?.settings?.manageServiceContexts) {
+        extraItems.push({ title: 'Service contexts', href: '/settings/service-contexts', icon: null });
+    }
     if (can?.settings?.manageAccess) {
         extraItems.push({ title: 'Access Control', href: '/settings/access', icon: null });
     }

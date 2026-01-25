@@ -10,6 +10,157 @@ use Illuminate\Http\Request;
 
 class TimesheetController extends Controller
 {
+    public function approvals(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+
+        $from = $request->query('from');
+        $to = $request->query('to');
+        $clientId = $request->query('client_id');
+        $staffId = $request->query('staff_id');
+
+        $q = Timesheet::query()
+            ->with(['client:id,first_name,last_name', 'staff:id,name,email'])
+            ->where('status', 'submitted')
+            ->orderByDesc('submitted_at');
+
+        if ($from) {
+            $q->whereDate('work_date', '>=', $from);
+        }
+        if ($to) {
+            $q->whereDate('work_date', '<=', $to);
+        }
+        if ($clientId) {
+            $q->where('client_id', $clientId);
+        }
+        if ($staffId) {
+            $q->where('user_id', $staffId);
+        }
+
+        $timesheets = $q->paginate(25)->withQueryString();
+
+        $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
+        $staff = \App\Models\User::query()->orderBy('name')->get(['id', 'name', 'email']);
+
+        return inertia('timesheets/approvals', [
+            'timesheets' => $timesheets,
+            'filters' => [
+                'from' => $from,
+                'to' => $to,
+                'client_id' => $clientId,
+                'staff_id' => $staffId,
+            ],
+            'clients' => $clients,
+            'staff' => $staff,
+        ]);
+    }
+
+    public function bulkApprove(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:timesheets,id'],
+            'decision_notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $timesheets = Timesheet::query()->whereIn('id', $data['ids'])->get();
+
+        foreach ($timesheets as $t) {
+            if ($t->status !== 'submitted') {
+                continue;
+            }
+            $t->status = 'approved';
+            $t->approved_by = $auth->id;
+            $t->approved_at = now();
+            $t->decision_notes = $data['decision_notes'] ?? null;
+            $t->save();
+
+            $t->load(['shift.client']);
+            $client = $t->shift?->client;
+            app(NotificationService::class)->notifyCrud($auth, 'approved', 'timesheet', $t, $client, [
+                'title' => 'Timesheet approved',
+                'url' => url("/timesheets/{$t->id}/edit"),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Selected timesheets approved.');
+    }
+
+    public function bulkReturnForChanges(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:timesheets,id'],
+            'returned_notes' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $timesheets = Timesheet::query()->whereIn('id', $data['ids'])->get();
+
+        foreach ($timesheets as $t) {
+            if ($t->status !== 'submitted') {
+                continue;
+            }
+            $t->status = 'returned';
+            $t->returned_by = $auth->id;
+            $t->returned_at = now();
+            $t->returned_notes = $data['returned_notes'];
+            $t->approved_by = null;
+            $t->approved_at = null;
+            $t->decision_notes = null;
+            $t->save();
+
+            $t->load(['shift.client']);
+            $client = $t->shift?->client;
+            app(NotificationService::class)->notifyCrud($auth, 'returned', 'timesheet', $t, $client, [
+                'title' => 'Timesheet returned for changes',
+                'url' => url("/timesheets/{$t->id}/edit"),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Selected timesheets returned for changes.');
+    }
+
+    public function bulkReject(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+
+        $data = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer', 'exists:timesheets,id'],
+            'decision_notes' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $timesheets = Timesheet::query()->whereIn('id', $data['ids'])->get();
+
+        foreach ($timesheets as $t) {
+            if ($t->status !== 'submitted') {
+                continue;
+            }
+            $t->status = 'rejected';
+            $t->approved_by = $auth->id;
+            $t->approved_at = now();
+            $t->decision_notes = $data['decision_notes'];
+            $t->save();
+
+            $t->load(['shift.client']);
+            $client = $t->shift?->client;
+            app(NotificationService::class)->notifyCrud($auth, 'rejected', 'timesheet', $t, $client, [
+                'title' => 'Timesheet rejected',
+                'url' => url("/timesheets/{$t->id}/edit"),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Selected timesheets rejected.');
+    }
+
     public function index(Request $request)
     {
         $auth = $request->user();
@@ -84,7 +235,7 @@ class TimesheetController extends Controller
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:600'],
             'notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:draft,submitted'],
+            // timesheets start as draft; submission is a separate action
         ]);
 
         $userId = $auth->id;
@@ -107,7 +258,7 @@ class TimesheetController extends Controller
             'ends_at' => $data['ends_at'],
             'break_minutes' => (int) ($data['break_minutes'] ?? 0),
             'notes' => $data['notes'] ?? null,
-            'status' => $data['status'] ?? 'draft',
+            'status' => 'draft',
             'created_by' => $auth->id,
         ]);
 
@@ -139,6 +290,10 @@ class TimesheetController extends Controller
             'timesheet' => $timesheet,
             'clients' => $clients,
             'canApprove' => $auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny'),
+            'canSubmit' => $auth->canDo('timesheets.submit') && ($auth->canDo('timesheets.manageAny') || $timesheet->user_id === $auth->id),
+            'canEdit' => $auth->canDo('timesheets.update')
+                && ($auth->canDo('timesheets.manageAny') || $timesheet->user_id === $auth->id)
+                && in_array($timesheet->status, ['draft', 'returned'], true),
         ]);
     }
 
@@ -152,8 +307,8 @@ class TimesheetController extends Controller
             abort(403);
         }
 
-        // If already approved, only managers can change
-        if ($timesheet->status === 'approved' && !$auth->canDo('timesheets.manageAny')) {
+        // Only editable while draft/returned (audit safety)
+        if (!in_array($timesheet->status, ['draft', 'returned'], true)) {
             abort(403);
         }
 
@@ -164,35 +319,16 @@ class TimesheetController extends Controller
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:600'],
             'notes' => ['nullable', 'string'],
-            'status' => ['nullable', 'in:draft,submitted,approved,rejected'],
-            'approve' => ['nullable', 'boolean'],
-            'reject' => ['nullable', 'boolean'],
         ]);
 
-        // Approve/reject controls
-        if (($data['approve'] ?? false) || ($data['reject'] ?? false)) {
-            abort_unless($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny'), 403);
-            if (($data['approve'] ?? false)) {
-                $timesheet->status = 'approved';
-                $timesheet->approved_by = $auth->id;
-                $timesheet->approved_at = now();
-            } else {
-                $timesheet->status = 'rejected';
-                $timesheet->approved_by = $auth->id;
-                $timesheet->approved_at = now();
-            }
-        } else {
-            // Normal update
-            $timesheet->fill([
-                'client_id' => $data['client_id'],
-                'work_date' => $data['work_date'],
-                'starts_at' => $data['starts_at'],
-                'ends_at' => $data['ends_at'],
-                'break_minutes' => (int) ($data['break_minutes'] ?? 0),
-                'notes' => $data['notes'] ?? null,
-                'status' => $data['status'] ?? $timesheet->status,
-            ]);
-        }
+        $timesheet->fill([
+            'client_id' => $data['client_id'],
+            'work_date' => $data['work_date'],
+            'starts_at' => $data['starts_at'],
+            'ends_at' => $data['ends_at'],
+            'break_minutes' => (int) ($data['break_minutes'] ?? 0),
+            'notes' => $data['notes'] ?? null,
+        ]);
 
         $timesheet->save();
 
@@ -206,5 +342,126 @@ class TimesheetController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Timesheet updated.');
+    }
+
+    public function submit(Request $request, Timesheet $timesheet)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('timesheets.submit'), 403);
+
+        // Ownership check
+        if (!$auth->canDo('timesheets.manageAny') && $timesheet->user_id !== $auth->id) {
+            abort(403);
+        }
+
+        abort_unless(in_array($timesheet->status, ['draft', 'returned'], true), 403);
+
+        $timesheet->status = 'submitted';
+        $timesheet->submitted_at = now();
+        $timesheet->submitted_by = $auth->id;
+        // clear any prior decision
+        $timesheet->approved_by = null;
+        $timesheet->approved_at = null;
+        $timesheet->decision_notes = null;
+        $timesheet->returned_at = null;
+        $timesheet->returned_by = null;
+        $timesheet->returned_notes = null;
+        $timesheet->save();
+
+        $timesheet->load(['shift.client']);
+        $client = $timesheet->shift?->client;
+
+        app(NotificationService::class)->notifyCrud($auth, 'submitted', 'timesheet', $timesheet, $client, [
+            'title' => 'Timesheet submitted for approval',
+            'url' => url("/timesheets/{$timesheet->id}/edit"),
+            'include_entity_user' => false,
+        ]);
+
+        return redirect()->back()->with('success', 'Timesheet submitted.');
+    }
+
+    public function approve(Request $request, Timesheet $timesheet)
+    {
+        $auth = $request->user();
+        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+        abort_unless($timesheet->status === 'submitted', 403);
+
+        $data = $request->validate([
+            'decision_notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $timesheet->status = 'approved';
+        $timesheet->approved_by = $auth->id;
+        $timesheet->approved_at = now();
+        $timesheet->decision_notes = $data['decision_notes'] ?? null;
+        $timesheet->save();
+
+        $timesheet->load(['shift.client']);
+        $client = $timesheet->shift?->client;
+
+        app(NotificationService::class)->notifyCrud($auth, 'approved', 'timesheet', $timesheet, $client, [
+            'title' => 'Timesheet approved',
+            'url' => url("/timesheets/{$timesheet->id}/edit"),
+        ]);
+
+        return redirect()->back()->with('success', 'Timesheet approved.');
+    }
+
+    public function reject(Request $request, Timesheet $timesheet)
+    {
+        $auth = $request->user();
+        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+        abort_unless($timesheet->status === 'submitted', 403);
+
+        $data = $request->validate([
+            'decision_notes' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $timesheet->status = 'rejected';
+        $timesheet->approved_by = $auth->id;
+        $timesheet->approved_at = now();
+        $timesheet->decision_notes = $data['decision_notes'];
+        $timesheet->save();
+
+        $timesheet->load(['shift.client']);
+        $client = $timesheet->shift?->client;
+
+        app(NotificationService::class)->notifyCrud($auth, 'rejected', 'timesheet', $timesheet, $client, [
+            'title' => 'Timesheet rejected',
+            'url' => url("/timesheets/{$timesheet->id}/edit"),
+        ]);
+
+        return redirect()->back()->with('success', 'Timesheet rejected.');
+    }
+
+    public function returnForChanges(Request $request, Timesheet $timesheet)
+    {
+        $auth = $request->user();
+        abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
+        abort_unless($timesheet->status === 'submitted', 403);
+
+        $data = $request->validate([
+            'returned_notes' => ['required', 'string', 'max:5000'],
+        ]);
+
+        $timesheet->status = 'returned';
+        $timesheet->returned_by = $auth->id;
+        $timesheet->returned_at = now();
+        $timesheet->returned_notes = $data['returned_notes'];
+        // clear decision
+        $timesheet->approved_by = null;
+        $timesheet->approved_at = null;
+        $timesheet->decision_notes = null;
+        $timesheet->save();
+
+        $timesheet->load(['shift.client']);
+        $client = $timesheet->shift?->client;
+
+        app(NotificationService::class)->notifyCrud($auth, 'returned', 'timesheet', $timesheet, $client, [
+            'title' => 'Timesheet returned for changes',
+            'url' => url("/timesheets/{$timesheet->id}/edit"),
+        ]);
+
+        return redirect()->back()->with('success', 'Timesheet returned for changes.');
     }
 }

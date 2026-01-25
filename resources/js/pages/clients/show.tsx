@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Tabs } from '@/components/ui/tabs';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 type Props = {
@@ -31,6 +32,7 @@ type Props = {
         funding_type?: string | null;
         funding_notes?: string | null;
         site: { id: number; name: string } | null;
+        service_context?: { id: number; type: string | null; name: string } | null;
         support_workers: Array<{ id: number; name: string; email: string }>;
     };
     medical: {
@@ -45,17 +47,31 @@ type Props = {
     portal_users: Array<any>;
     events: Array<any>;
     handover: Array<any>;
+    shifts_summary?: {
+        next: any | null;
+        last: any | null;
+    };
+    onboarding: {
+        items: Array<{ key: string; label: string; has_data: boolean; override: boolean; complete: boolean }>;
+        completed: number;
+        total: number;
+        percent: number;
+        status: 'complete' | 'incomplete';
+    };
     can: {
         edit: boolean;
         assign_workers: boolean;
         create_note?: boolean;
         pin_handover?: boolean;
+        manage_onboarding?: boolean;
+        create_shift?: boolean;
     };
 };
 
 type TabKey =
     | 'profile'
     | 'medical'
+    | 'mar'
     | 'support_plan'
     | 'assessments'
     | 'timeline'
@@ -63,13 +79,14 @@ type TabKey =
     | 'portal'
     | 'assignments';
 
-export default function ClientShow({ client, medical, support_plan, assessments, documents, portal_users, events, handover, can }: Props) {
+export default function ClientShow({ client, medical, support_plan, assessments, documents, portal_users, events, handover, onboarding, shifts_summary, can }: Props) {
     const name = `${client.first_name} ${client.last_name}`.trim();
 
     const tabs: Array<{ key: TabKey; label: string; show: boolean }> = useMemo(
         () => [
             { key: 'profile', label: 'Profile', show: true },
             { key: 'medical', label: 'Medical', show: true },
+            { key: 'mar', label: 'MAR', show: true },
             { key: 'support_plan', label: 'Support plan', show: true },
             { key: 'assessments', label: 'Assessments', show: true },
             { key: 'timeline', label: 'Timeline', show: true },
@@ -110,7 +127,7 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                 <PageHeader
                     title={name}
                     backHref="/clients"
-                    description={`${client.status}${client.site ? ` • ${client.site.name}` : ''}`}
+                    description={`${client.status}${client.service_context ? ` • ${client.service_context.name}` : ''}${client.site ? ` • ${client.site.name}` : ''}`}
                     actions={
                         <>
                             <Button variant="outline" size="sm" asChild>
@@ -142,7 +159,13 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                 key={t.key}
                                 variant={tab === t.key ? 'default' : 'outline'}
                                 size="sm"
-                                onClick={() => setTab(t.key)}
+                                onClick={() => {
+                                    if (t.key === 'mar') {
+                                        window.location.href = `/clients/${client.id}/mar`;
+                                        return;
+                                    }
+                                    setTab(t.key);
+                                }}
                             >
                                 {t.label}
                             </Button>
@@ -156,6 +179,94 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                             <CardTitle className="text-base">Profile</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
+                            <div className="rounded-md border p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div className="text-sm font-medium">Onboarding checklist</div>
+                                        <div className="text-xs text-slate-500">{onboarding.completed}/{onboarding.total} complete • {onboarding.percent}%</div>
+                                    </div>
+                                    <div className={`rounded-full px-2 py-1 text-xs ${onboarding.status === 'complete' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                                        {onboarding.status === 'complete' ? 'Complete' : 'In progress'}
+                                    </div>
+                                </div>
+
+                                <Separator className="my-3" />
+
+                                <div className="space-y-2">
+                                    {onboarding.items.map((item) => (
+                                        <div key={item.key} className="flex flex-col gap-2 rounded-md border p-2 sm:flex-row sm:items-center sm:justify-between">
+                                            <div className="flex items-start gap-2">
+                                                <div className={`mt-0.5 h-2 w-2 rounded-full ${item.complete ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                                                <div>
+                                                    <div className="text-sm font-medium">{item.label}</div>
+                                                    <div className="text-xs text-slate-500">
+                                                        {item.complete ? (item.has_data ? 'Added' : 'Marked as not applicable') : 'Not completed'}
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-3">
+                                                {!item.has_data && (can.manage_onboarding || can.edit) ? (
+                                                    <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                                                        <Checkbox
+                                                            checked={item.override}
+                                                            onCheckedChange={(v) => {
+                                                                router.post(
+                                                                    `/clients/${client.id}/onboarding/${item.key}`,
+                                                                    { checked: !!v },
+                                                                    { preserveScroll: true },
+                                                                );
+                                                            }}
+                                                        />
+                                                        Doesn't have this
+                                                    </label>
+                                                ) : null}
+
+                                                {item.key === 'profile' ? (
+                                                    can.edit ? (
+                                                        <Button size="sm" variant="outline" asChild>
+                                                            <Link href={`/clients/${client.id}/edit`}>Open</Link>
+                                                        </Button>
+                                                    ) : (
+                                                        <Button size="sm" variant="outline" disabled>
+                                                            Review
+                                                        </Button>
+                                                    )
+                                                ) : item.key === 'medications' ? (
+                                                    <Button size="sm" variant="outline" asChild>
+                                                        <Link href={`/clients/${client.id}/medical`}>Open</Link>
+                                                    </Button>
+                                                ) : item.key === 'conditions' ? (
+                                                    <Button size="sm" variant="outline" asChild>
+                                                        <Link href={`/clients/${client.id}/medical`}>Open</Link>
+                                                    </Button>
+                                                ) : item.key === 'emergency_contacts' ? (
+                                                    <Button size="sm" variant="outline" asChild>
+                                                        <Link href={`/clients/${client.id}/medical`}>Open</Link>
+                                                    </Button>
+                                                ) : item.key === 'next_of_kin' ? (
+                                                    can.edit ? (
+                                                        <Button size="sm" variant="outline" asChild>
+                                                            <Link href={`/clients/${client.id}/portal-users`}>Open</Link>
+                                                        </Button>
+                                                    ) : null
+                                                ) : item.key === 'documents' ? (
+                                                    <Button size="sm" variant="outline" asChild>
+                                                        <Link href={`/clients/${client.id}/documents`}>Open</Link>
+                                                    </Button>
+                                                ) : item.key === 'history' ? (
+                                                    <Button size="sm" variant="outline" onClick={() => setTab('support_plan')}>Open</Button>
+                                                ) : (
+                                                    <Button size="sm" variant="outline" disabled>
+                                                        Review
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
                             <div className="rounded-md border p-3">
                                 <div className="text-sm font-medium">Details</div>
                                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -217,6 +328,68 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                 </div>
                             </div>
 
+                            <div className="rounded-md border p-3">
+                                <div className="flex items-center justify-between gap-3">
+                                    <div>
+                                        <div className="text-sm font-medium">Shifts</div>
+                                        <div className="text-xs text-slate-500">Next and recent rostered shifts for this client.</div>
+                                    </div>
+                                    {can.create_shift ? (
+                                        <Button size="sm" asChild>
+                                            <Link href={`/shifts/create?client_id=${client.id}`}>Create shift</Link>
+                                        </Button>
+                                    ) : null}
+                                </div>
+
+                                <Separator className="my-3" />
+
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <div className="rounded-md border p-3">
+                                        <div className="text-xs text-slate-500">Next shift</div>
+                                        {shifts_summary?.next ? (
+                                            <div className="mt-1 space-y-1">
+                                                <div className="text-sm font-medium">
+                                                    {new Date(shifts_summary.next.starts_at).toLocaleString()} – {new Date(shifts_summary.next.ends_at).toLocaleTimeString()}
+                                                </div>
+                                                <div className="text-xs text-slate-500">
+                                                    {shifts_summary.next.staff?.name ? `Staff: ${shifts_summary.next.staff.name}` : 'Staff: —'}
+                                                    {shifts_summary.next.location ? ` • ${shifts_summary.next.location}` : ''}
+                                                </div>
+                                                <div className="mt-2">
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link href={`/shifts/${shifts_summary.next.id}`}>Open</Link>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-1 text-sm text-slate-500">No upcoming shifts.</div>
+                                        )}
+                                    </div>
+
+                                    <div className="rounded-md border p-3">
+                                        <div className="text-xs text-slate-500">Most recent shift</div>
+                                        {shifts_summary?.last ? (
+                                            <div className="mt-1 space-y-1">
+                                                <div className="text-sm font-medium">
+                                                    {new Date(shifts_summary.last.starts_at).toLocaleString()} – {new Date(shifts_summary.last.ends_at).toLocaleTimeString()}
+                                                </div>
+                                                <div className="text-xs text-slate-500">
+                                                    {shifts_summary.last.staff?.name ? `Staff: ${shifts_summary.last.staff.name}` : 'Staff: —'}
+                                                    {shifts_summary.last.location ? ` • ${shifts_summary.last.location}` : ''}
+                                                </div>
+                                                <div className="mt-2">
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link href={`/shifts/${shifts_summary.last.id}`}>Open</Link>
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="mt-1 text-sm text-slate-500">No previous shifts yet.</div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+
                             <Separator />
 
                             <div className="flex flex-wrap gap-2">
@@ -245,98 +418,140 @@ export default function ClientShow({ client, medical, support_plan, assessments,
 
                 {tab === 'medical' && (
                     <div className="space-y-4">
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">Medical profile</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3 text-sm">
-                                <div>
-                                    <div className="font-medium">Medical history</div>
-                                    <div className="text-slate-600 whitespace-pre-wrap">{medical.profile?.medical_history || '-'}</div>
-                                </div>
-                                <div>
-                                    <div className="font-medium">Disabilities</div>
-                                    <div className="text-slate-600 whitespace-pre-wrap">{medical.profile?.disabilities || '-'}</div>
-                                </div>
-                                <div>
-                                    <div className="font-medium">Allergies</div>
-                                    <div className="text-slate-600 whitespace-pre-wrap">{medical.profile?.allergies || '-'}</div>
-                                </div>
-                                <div>
-                                    <div className="font-medium">Notes</div>
-                                    <div className="text-slate-600 whitespace-pre-wrap">{medical.profile?.notes || '-'}</div>
-                                </div>
-
-                                {can.edit && (
-                                    <div>
-                                        <Link
-                                            href={`/clients/${client.id}/medical`}
-                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                        >
-                                            Edit medical
-                                        </Link>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">Medications</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {medical.medications.map((m) => (
-                                    <div key={m.id} className="rounded-md border p-3">
-                                        <div className="text-sm font-medium">{m.name}</div>
-                                        <div className="mt-1 text-xs text-slate-500">
-                                            {[m.dosage && `Dosage: ${m.dosage}`, m.frequency && `Frequency: ${m.frequency}`, m.route && `Route: ${m.route}`]
-                                                .filter(Boolean)
-                                                .join(' - ') || '-'}
-                                        </div>
-                                        {m.instructions && <div className="mt-2 text-xs text-slate-600 whitespace-pre-wrap">{m.instructions}</div>}
-                                    </div>
-                                ))}
-                                {!medical.medications.length && <div className="text-sm text-slate-500">No medications listed.</div>}
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">Conditions</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {medical.conditions.map((c) => (
-                                    <div key={c.id} className="rounded-md border p-3">
-                                        <div className="text-sm font-medium">
-                                            {c.label}
-                                            {c.severity ? <span className="ml-2 text-xs text-slate-500">({c.severity})</span> : null}
-                                        </div>
-                                        {c.notes && <div className="mt-2 text-xs text-slate-600 whitespace-pre-wrap">{c.notes}</div>}
-                                    </div>
-                                ))}
-                                {!medical.conditions.length && <div className="text-sm text-slate-500">No conditions listed.</div>}
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="text-base">Emergency contacts</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {medical.emergency_contacts.map((e) => (
-                                    <div key={e.id} className="rounded-md border p-3">
-                                        <div className="text-sm font-medium">{e.name}</div>
-                                        <div className="mt-1 text-xs text-slate-500">
-                                            {[e.relationship && `Relationship: ${e.relationship}`, e.phone && `Phone: ${e.phone}`, e.email && `Email: ${e.email}`]
-                                                .filter(Boolean)
-                                                .join(' - ') || '-'}
-                                        </div>
-                                        {e.notes && <div className="mt-2 text-xs text-slate-600 whitespace-pre-wrap">{e.notes}</div>}
-                                    </div>
-                                ))}
-                                {!medical.emergency_contacts.length && <div className="text-sm text-slate-500">No emergency contacts listed.</div>}
-                            </CardContent>
-                        </Card>
+                        <Tabs
+                            tabs={[
+                                {
+                                    key: 'medical_profile',
+                                    label: 'Medical profile',
+                                    content: (
+                                        <Card>
+                                            <CardHeader>
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <CardTitle className="text-base">Medical profile</CardTitle>
+                                                    {can.edit ? (
+                                                        <Button variant="outline" size="sm" asChild>
+                                                            <Link href={`/clients/${client.id}/medical`}>Edit</Link>
+                                                        </Button>
+                                                    ) : null}
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent className="space-y-3 text-sm">
+                                                <div>
+                                                    <div className="font-medium">Medical history</div>
+                                                    <div className="whitespace-pre-wrap text-slate-600">{medical.profile?.medical_history || '-'}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium">Disabilities</div>
+                                                    <div className="whitespace-pre-wrap text-slate-600">{medical.profile?.disabilities || '-'}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium">Allergies</div>
+                                                    <div className="whitespace-pre-wrap text-slate-600">{medical.profile?.allergies || '-'}</div>
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium">Notes</div>
+                                                    <div className="whitespace-pre-wrap text-slate-600">{medical.profile?.notes || '-'}</div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ),
+                                },
+                                {
+                                    key: 'medications',
+                                    label: `Medications${medical.medications.length ? ` (${medical.medications.length})` : ''}`,
+                                    content: (
+                                        <Card>
+                                            <CardHeader>
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <CardTitle className="text-base">Medications</CardTitle>
+                                                    {can.edit ? (
+                                                        <Button variant="outline" size="sm" asChild>
+                                                            <Link href={`/clients/${client.id}/medical`}>Manage</Link>
+                                                        </Button>
+                                                    ) : null}
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent className="space-y-2">
+                                                {medical.medications.map((m) => (
+                                                    <div key={m.id} className="rounded-md border p-3">
+                                                        <div className="text-sm font-medium">{m.name}</div>
+                                                        <div className="mt-1 text-xs text-slate-500">
+                                                            {[m.dosage && `Dosage: ${m.dosage}`, m.frequency && `Frequency: ${m.frequency}`, m.route && `Route: ${m.route}`]
+                                                                .filter(Boolean)
+                                                                .join(' - ') || '-'}
+                                                        </div>
+                                                        {m.instructions ? <div className="mt-2 whitespace-pre-wrap text-xs text-slate-600">{m.instructions}</div> : null}
+                                                    </div>
+                                                ))}
+                                                {!medical.medications.length ? <div className="text-sm text-slate-500">No medications listed.</div> : null}
+                                            </CardContent>
+                                        </Card>
+                                    ),
+                                },
+                                {
+                                    key: 'conditions',
+                                    label: `Conditions${medical.conditions.length ? ` (${medical.conditions.length})` : ''}`,
+                                    content: (
+                                        <Card>
+                                            <CardHeader>
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <CardTitle className="text-base">Conditions</CardTitle>
+                                                    {can.edit ? (
+                                                        <Button variant="outline" size="sm" asChild>
+                                                            <Link href={`/clients/${client.id}/medical`}>Manage</Link>
+                                                        </Button>
+                                                    ) : null}
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent className="space-y-2">
+                                                {medical.conditions.map((c) => (
+                                                    <div key={c.id} className="rounded-md border p-3">
+                                                        <div className="text-sm font-medium">
+                                                            {c.label}
+                                                            {c.severity ? <span className="ml-2 text-xs text-slate-500">({c.severity})</span> : null}
+                                                        </div>
+                                                        {c.notes ? <div className="mt-2 whitespace-pre-wrap text-xs text-slate-600">{c.notes}</div> : null}
+                                                    </div>
+                                                ))}
+                                                {!medical.conditions.length ? <div className="text-sm text-slate-500">No conditions listed.</div> : null}
+                                            </CardContent>
+                                        </Card>
+                                    ),
+                                },
+                                {
+                                    key: 'emergency_contacts',
+                                    label: `Emergency contacts${medical.emergency_contacts.length ? ` (${medical.emergency_contacts.length})` : ''}`,
+                                    content: (
+                                        <Card>
+                                            <CardHeader>
+                                                <div className="flex items-center justify-between gap-3">
+                                                    <CardTitle className="text-base">Emergency contacts</CardTitle>
+                                                    {can.edit ? (
+                                                        <Button variant="outline" size="sm" asChild>
+                                                            <Link href={`/clients/${client.id}/medical`}>Manage</Link>
+                                                        </Button>
+                                                    ) : null}
+                                                </div>
+                                            </CardHeader>
+                                            <CardContent className="space-y-2">
+                                                {medical.emergency_contacts.map((e) => (
+                                                    <div key={e.id} className="rounded-md border p-3">
+                                                        <div className="text-sm font-medium">{e.name}</div>
+                                                        <div className="mt-1 text-xs text-slate-500">
+                                                            {[e.relationship && `Relationship: ${e.relationship}`, e.phone && `Phone: ${e.phone}`, e.email && `Email: ${e.email}`]
+                                                                .filter(Boolean)
+                                                                .join(' - ') || '-'}
+                                                        </div>
+                                                        {e.notes ? <div className="mt-2 whitespace-pre-wrap text-xs text-slate-600">{e.notes}</div> : null}
+                                                    </div>
+                                                ))}
+                                                {!medical.emergency_contacts.length ? <div className="text-sm text-slate-500">No emergency contacts listed.</div> : null}
+                                            </CardContent>
+                                        </Card>
+                                    ),
+                                },
+                            ]}
+                        />
                     </div>
                 )}
 

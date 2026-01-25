@@ -6,7 +6,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { useMemo, useState } from 'react';
 
 type Task = {
@@ -29,20 +36,27 @@ type Props = {
   shift: {
     id: number;
     client_id: number;
+    service_context_id?: number | null;
     user_id: number;
     starts_at: string;
     ends_at: string;
+    actual_starts_at?: string | null;
+    actual_ends_at?: string | null;
     status: string;
     location?: string | null;
     notes?: string | null;
     client: { id: number; first_name: string; last_name: string };
     staff: { id: number; name: string; email?: string };
+    service_context?: { id: number; name: string; type: string; is_active: boolean } | null;
     tasks: Task[];
   };
   handover: Note[];
   notes: Note[];
+  incidents: any[];
+  incidentTemplates: any[];
   can: {
     add_note: boolean;
+    create_incident: boolean;
   };
 };
 
@@ -52,12 +66,63 @@ const templates = [
   { key: 'handover', label: 'Handover', body: 'Key points for next shift:\n-\n-\n\nRisks/alerts:\n-\n\nActions needed:\n-' },
 ];
 
-export default function ShiftShow({ shift, handover, notes, can }: Props) {
+export default function ShiftShow({ shift, handover, notes, incidents, incidentTemplates, can }: Props) {
   const { auth } = usePage().props as any;
   const canMarkTasks = auth?.can?.shifts?.update || auth?.can?.shifts?.tasksUpdateSelf || auth?.can?.shifts?.manageAny;
-
+  const canActShift = auth?.can?.shifts?.update || auth?.can?.shifts?.manageAny;
+  const canCreateTimesheet = auth?.can?.timesheets?.create || auth?.can?.timesheets?.manageAny;
+  const canStartShift = canActShift && shift.status === 'scheduled';
+  const canCompleteShift = canActShift && (shift.status === 'scheduled' || shift.status === 'in_progress');
   const [tasks, setTasks] = useState<Task[]>(shift.tasks ?? []);
+  const [completeOpen, setCompleteOpen] = useState(() => {
+    try {
+      return new URLSearchParams(window.location.search).get('complete') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const [incidentOpen, setIncidentOpen] = useState(false);
+  const incidentForm = useForm({
+    template_id: '',
+    type: 'injury',
+    severity: 'low',
+    occurred_at: '',
+    description: '',
+    requires_followup: false,
+    immediate_action_taken: '',
+    witnesses: '',
+  });
+
+  const applyIncidentTemplate = (id: string) => {
+    incidentForm.setData('template_id', id);
+    const t = (incidentTemplates || []).find((x: any) => String(x.id) === String(id));
+    if (!t) return;
+    if (t.type) incidentForm.setData('type', t.type);
+    if (t.severity) incidentForm.setData('severity', t.severity);
+    if (t.default_description && !incidentForm.data.description) incidentForm.setData('description', t.default_description);
+  };
+
   const name = `${shift.client.first_name} ${shift.client.last_name}`.trim();
+
+  const incompleteCount = useMemo(() => tasks.filter((t) => !t.is_completed).length, [tasks]);
+  const hasProgressOrShiftNotes = useMemo(
+    () => (notes ?? []).some((n) => n.type === 'progress_note' || n.type === 'shift_note'),
+    [notes],
+  );
+
+  const completeForm = useForm<{
+    final_note_subject: string;
+    final_note_body: string;
+    allow_incomplete_tasks: boolean;
+    incomplete_tasks_reason: string;
+    create_timesheet: boolean;
+  }>({
+    final_note_subject: 'Shift summary',
+    final_note_body: '',
+    allow_incomplete_tasks: false,
+    incomplete_tasks_reason: '',
+    create_timesheet: true,
+  });
 
   const noteForm = useForm<{ type: string; subject: string; goal: string; body: string; visibility: string; pin: boolean; shift_id: number }>(
     {
@@ -141,13 +206,55 @@ export default function ShiftShow({ shift, handover, notes, can }: Props) {
               Staff: <span className="font-medium">{shift.staff?.name ?? '—'}</span>
               <span className="mx-2">•</span>
               Status: <span className="font-medium">{shift.status}</span>
+              {shift.actual_starts_at ? (
+                <>
+                  <span className="mx-2">•</span>
+                  Actual: <span className="font-medium">{new Date(shift.actual_starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                  {shift.actual_ends_at ? (
+                    <>–<span className="font-medium">{new Date(shift.actual_ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></>
+                  ) : null}
+                </>
+              ) : null}
+              {shift.service_context ? (
+                <>
+                  <span className="mx-2">•</span>
+                  Service context: <span className="font-medium">{shift.service_context.name}</span>
+                </>
+              ) : null}
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            <Link className="rounded-md border px-3 py-2 text-xs hover:bg-muted" href={`/timesheets/create?shift_id=${shift.id}`}>
-              Timesheet
-            </Link>
+            {canStartShift ? (
+              <Button
+                size="sm"
+                onClick={() => router.patch(`/shifts/${shift.id}/start`, {}, { preserveScroll: true })}
+              >
+                Start
+              </Button>
+            ) : null}
+
+            {canCompleteShift ? (
+              <Button size="sm" variant="outline" onClick={() => setCompleteOpen(true)}>
+                Complete
+              </Button>
+            ) : null}
+
+            {can.create_incident ? (
+              <Button size="sm" variant="outline" onClick={() => setIncidentOpen(true)}>
+                Report incident
+              </Button>
+            ) : null}
+
+            {(auth?.can?.timesheets?.create || auth?.can?.timesheets?.manageAny) ? (
+              <Link
+                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                href={`/timesheets/create?shift_id=${shift.id}`}
+              >
+                Timesheet
+              </Link>
+            ) : null}
+
             {auth?.can?.shifts?.update ? (
               <Link className="rounded-md border px-3 py-2 text-xs hover:bg-muted" href={`/shifts/${shift.id}/edit`}>
                 Edit
@@ -155,6 +262,228 @@ export default function ShiftShow({ shift, handover, notes, can }: Props) {
             ) : null}
           </div>
         </div>
+
+        <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Complete shift</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-4">
+              <div className="rounded-lg border p-3">
+                <div className="text-sm font-medium">Checklist</div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {incompleteCount === 0 ? (
+                    <>All shift tasks are completed.</>
+                  ) : (
+                    <>
+                      {incompleteCount} task{incompleteCount === 1 ? '' : 's'} still incomplete.
+                    </>
+                  )}
+                </div>
+
+                {incompleteCount > 0 ? (
+                  <div className="mt-3 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Checkbox
+                        checked={completeForm.data.allow_incomplete_tasks}
+                        onCheckedChange={(v) => completeForm.setData('allow_incomplete_tasks', Boolean(v))}
+                      />
+                      <div className="text-sm">Allow completion with incomplete tasks</div>
+                    </div>
+
+                    {completeForm.data.allow_incomplete_tasks ? (
+                      <div>
+                        <Label>Reason (required)</Label>
+                        <Textarea
+                          className="mt-1"
+                          value={completeForm.data.incomplete_tasks_reason}
+                          onChange={(e) => completeForm.setData('incomplete_tasks_reason', e.target.value)}
+                          placeholder="Why are tasks incomplete?"
+                        />
+                        {completeForm.errors.incomplete_tasks_reason ? (
+                          <div className="mt-1 text-xs text-red-600">{completeForm.errors.incomplete_tasks_reason}</div>
+                        ) : null}
+                      </div>
+                    ) : null}
+
+                    {completeForm.errors.allow_incomplete_tasks ? (
+                      <div className="text-xs text-red-600">{completeForm.errors.allow_incomplete_tasks}</div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="rounded-lg border p-3">
+                <div className="text-sm font-medium">Shift summary note</div>
+                <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label>Subject</Label>
+                    <Input
+                      className="mt-1"
+                      value={completeForm.data.final_note_subject}
+                      onChange={(e) => completeForm.setData('final_note_subject', e.target.value)}
+                    />
+                    {completeForm.errors.final_note_subject ? (
+                      <div className="mt-1 text-xs text-red-600">{completeForm.errors.final_note_subject}</div>
+                    ) : null}
+                  </div>
+                </div>
+
+                <div className="mt-3">
+                  <Label>Note {hasProgressOrShiftNotes ? '(optional if notes already added)' : '(required)'}</Label>
+                  {hasProgressOrShiftNotes ? (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      You already have notes recorded for this shift. You can leave this blank to auto-generate a short completion summary.
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      Provide a short summary to complete the shift, or add a progress note first.
+                    </div>
+                  )}
+                  <Textarea
+                    className="mt-1"
+                    value={completeForm.data.final_note_body}
+                    onChange={(e) => completeForm.setData('final_note_body', e.target.value)}
+                    placeholder="Summarise what happened during the shift, outcomes, any concerns, and handover items."
+                  />
+                  {completeForm.errors.final_note_body ? (
+                    <div className="mt-1 text-xs text-red-600">{completeForm.errors.final_note_body}</div>
+                  ) : null}
+                </div>
+              </div>
+
+              {canCreateTimesheet ? (
+                <div className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <div className="text-sm font-medium">Create timesheet</div>
+                    <div className="text-xs text-muted-foreground">
+                      Creates a draft timesheet for this shift automatically.
+                    </div>
+                  </div>
+                  <Checkbox
+                    checked={completeForm.data.create_timesheet}
+                    onCheckedChange={(v) => completeForm.setData('create_timesheet', Boolean(v))}
+                  />
+                </div>
+              ) : null}
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setCompleteOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                disabled={completeForm.processing}
+                onClick={() =>
+                  completeForm.patch(`/shifts/${shift.id}/complete`, {
+                    preserveScroll: true,
+                    onSuccess: () => {
+                      setCompleteOpen(false);
+                      // clean query param if present
+                      try {
+                        const url = new URL(window.location.href);
+                        url.searchParams.delete('complete');
+                        window.history.replaceState({}, '', url.toString());
+                      } catch {}
+                    },
+                  })
+                }
+              >
+                Complete shift
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={incidentOpen} onOpenChange={setIncidentOpen}>
+          <DialogContent className="sm:max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Report incident</DialogTitle>
+            </DialogHeader>
+
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                <div className="space-y-1">
+                  <Label>Template (optional)</Label>
+                  <Select
+                    value={incidentForm.data.template_id || '__none__'}
+                    onValueChange={(v) => applyIncidentTemplate(v === '__none__' ? '' : v)}
+                  >
+                    <SelectTrigger><SelectValue placeholder="Pick a template" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none__">None</SelectItem>
+                      {(incidentTemplates || []).map((t: any) => (
+                        <SelectItem key={t.id} value={String(t.id)}>{t.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Type</Label>
+                  <Input value={incidentForm.data.type} onChange={(e) => incidentForm.setData('type', e.target.value)} />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Severity</Label>
+                  <Select value={incidentForm.data.severity} onValueChange={(v) => incidentForm.setData('severity', v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {['low','medium','high'].map((s) => (
+                        <SelectItem key={s} value={s}>{s}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Occurred at</Label>
+                  <Input type="datetime-local" value={incidentForm.data.occurred_at} onChange={(e) => incidentForm.setData('occurred_at', e.target.value)} />
+                </div>
+
+                <div className="flex items-center gap-2 pt-6">
+                  <Checkbox checked={!!incidentForm.data.requires_followup} onCheckedChange={(v) => incidentForm.setData('requires_followup', !!v)} />
+                  <Label>Requires follow-up</Label>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label>Description</Label>
+                <Textarea value={incidentForm.data.description} onChange={(e) => incidentForm.setData('description', e.target.value)} />
+              </div>
+
+              <div className="space-y-1">
+                <Label>Immediate action taken</Label>
+                <Textarea value={incidentForm.data.immediate_action_taken} onChange={(e) => incidentForm.setData('immediate_action_taken', e.target.value)} />
+              </div>
+
+              <div className="space-y-1">
+                <Label>Witnesses</Label>
+                <Textarea value={incidentForm.data.witnesses} onChange={(e) => incidentForm.setData('witnesses', e.target.value)} />
+              </div>
+            </div>
+
+            <DialogFooter>
+              <Button
+                disabled={incidentForm.processing}
+                onClick={() =>
+                  incidentForm.post(`/shifts/${shift.id}/incidents`, {
+                    onSuccess: () => {
+                      incidentForm.reset();
+                      setIncidentOpen(false);
+                    },
+                  })
+                }
+              >
+                Submit (shift-linked)
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {handover.length ? (
           <Card>
@@ -290,6 +619,23 @@ export default function ShiftShow({ shift, handover, notes, can }: Props) {
               </div>
             ))}
             {!notes.length ? <div className="text-sm text-muted-foreground">No notes for this shift yet.</div> : null}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Shift incidents</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {(incidents || []).map((i: any) => (
+              <div key={i.id} className="flex items-center justify-between rounded-md border p-3">
+                <div>
+                  <div className="text-sm font-medium">{i.type} • {i.severity}</div>
+                  <div className="mt-1 text-xs text-muted-foreground">{i.status} • {i.occurred_at}</div>
+                </div>
+                <Link href={`/incidents/${i.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">Open</Link>
+              </div>
+            ))}
+            {!(incidents || []).length && <div className="text-sm text-muted-foreground">No incidents for this shift.</div>}
           </CardContent>
         </Card>
       </div>

@@ -56,6 +56,7 @@ export default function TimesheetsIndex({ timesheets, filters, canApprove, canCr
                             <option value="">All</option>
                             <option value="draft">draft</option>
                             <option value="submitted">submitted</option>
+                            <option value="returned">returned</option>
                             <option value="approved">approved</option>
                             <option value="rejected">rejected</option>
                         </select>

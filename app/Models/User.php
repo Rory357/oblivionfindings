@@ -124,6 +124,11 @@ class User extends Authenticatable
             ->withPivot('allowed');
     }
 
+    public function breakGlassAccesses()
+    {
+        return $this->hasMany(\App\Models\ClientBreakGlassAccess::class);
+    }
+
     public function hasRole(string ...$roles): bool
     {
         return $this->roles()

@@ -6,6 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
     Select,
     SelectContent,
     SelectItem,
@@ -14,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
+import { useState } from 'react';
 
 type Props = {
     client: { id: number; first_name: string; last_name: string };
@@ -25,6 +33,14 @@ type Props = {
     conditions: Array<any>;
     emergency_contacts: Array<any>;
     administrations: Array<any>;
+    can_controlled_view: boolean;
+    can_controlled_record: boolean;
+    can_controlled_witness: boolean;
+    witnesses: Array<any>;
+    controlled_entries: Array<any>;
+    controlled_discrepancies: Array<any>;
+    med_charts?: Array<any>;
+    has_open_controlled_discrepancy?: boolean;
 };
 
 export default function ClientMedical({
@@ -37,8 +53,17 @@ export default function ClientMedical({
     conditions,
     emergency_contacts,
     administrations,
+    can_controlled_view,
+    can_controlled_record,
+    can_controlled_witness,
+    witnesses,
+    controlled_entries,
+    controlled_discrepancies,
+    med_charts = [],
+    has_open_controlled_discrepancy = false,
 }: Props) {
     const name = `${client.first_name} ${client.last_name}`.trim();
+    const [confirmAdminOpen, setConfirmAdminOpen] = useState(false);
 
     const profileForm = useForm({
         medical_history: profile?.medical_history || '',
@@ -51,11 +76,18 @@ export default function ClientMedical({
         name: '',
         dosage: '',
         frequency: '',
+        dose_times: '' as any,
         is_prn: false,
+        controlled_drug: false,
         prn_reason: '',
         max_per_day: '',
         route: '',
+        form: '',
         prescriber: '',
+        pharmacy: '',
+        state: 'active',
+        ceased_at: '',
+        ceased_reason: '',
         start_date: '',
         end_date: '',
         instructions: '',
@@ -65,12 +97,20 @@ export default function ClientMedical({
     const administrationForm = useForm({
         medication_id: medications?.[0]?.id ?? '',
         status: 'given',
+        reason: '',
         dose_given: '',
         administered_at: new Date().toISOString().slice(0, 16),
         scheduled_for: '',
         shift_id: '',
+        witnessed_by: '',
         notes: '',
     });
+
+    const selectedMedication = medications.find(
+        (m) => `${m.id}` === `${administrationForm.data.medication_id}`,
+    );
+    const administrationNeedsReason =
+        administrationForm.data.status !== 'given' || !!selectedMedication?.is_prn;
 
     const stockForm = useForm({
         medication_id: medications?.[0]?.id ?? '',
@@ -79,7 +119,19 @@ export default function ClientMedical({
         reorder_level: '',
         last_counted_at: '',
         notes: '',
+        reason: '',
+        witnessed_by: '',
     });
+
+    const [closeDiscOpen, setCloseDiscOpen] = useState(false);
+    const [selectedDiscId, setSelectedDiscId] = useState<number | null>(null);
+    const closeDiscForm = useForm({
+        resolution_notes: '',
+    });
+
+    const selectedStockMedication = medications.find(
+        (m) => `${m.id}` === `${stockForm.data.medication_id}`,
+    );
     const conditionForm = useForm({
         label: '',
         severity: '',
@@ -94,6 +146,20 @@ export default function ClientMedical({
         notes: '',
     });
 
+    const submitAdministration = () => {
+        administrationForm.post(
+            `/clients/${client.id}/medical/medications/${administrationForm.data.medication_id}/administrations`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    administrationForm.reset('dose_given', 'scheduled_for', 'notes', 'reason');
+                    administrationForm.reset('witnessed_by');
+                    setConfirmAdminOpen(false);
+                },
+            },
+        );
+    };
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -103,6 +169,51 @@ export default function ClientMedical({
             ]}
         >
             <Head title={`Medical - ${name}`} />
+
+            <div className="mb-4 space-y-3">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <div className="text-lg font-semibold">{name}</div>
+                        <div className="text-xs text-slate-500">Medication orders & medical profile</div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={() => (window.location.href = `/clients/${client.id}/mar`)}>
+                            Open Daily MAR
+                        </Button>
+                    </div>
+                </div>
+
+                {has_open_controlled_discrepancy && (
+                    <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                        There is an open controlled-drug discrepancy for this client. Review and resolve before further controlled stock edits (unless override is granted).
+                    </div>
+                )}
+
+                {med_charts.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Medication chart (source of truth)</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {med_charts.map((d: any) => (
+                                <div key={d.id} className="flex items-center justify-between rounded-md border p-3">
+                                    <div>
+                                        <div className="text-sm font-medium">{d.title}</div>
+                                        <div className="text-xs text-slate-500">
+                                            {d.version ? `v${d.version} • ` : ''}
+                                            {d.effective_date ? `Effective: ${new Date(d.effective_date).toLocaleDateString()}` : ''}
+                                        </div>
+                                    </div>
+                                    <Button variant="outline" onClick={() => (window.location.href = `/clients/${client.id}/documents/${d.id}/download`)}>
+                                        Download
+                                    </Button>
+                                </div>
+                            ))}
+                            <div className="text-xs text-slate-500">To upload/update charts, use the Documents tab (category: Medication chart).</div>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
 
             <div className="grid auto-rows-fr grid-cols-2 gap-4 md:grid-cols-2">
                 <Card>
@@ -236,6 +347,20 @@ export default function ClientMedical({
                                         />
                                         <Label className="!mt-0">PRN (as needed)</Label>
                                     </div>
+                                    <div className="flex items-center gap-2 pt-6">
+                                        <Checkbox
+                                            checked={!!medForm.data.controlled_drug}
+                                            onCheckedChange={(v) =>
+                                                medForm.setData(
+                                                    'controlled_drug',
+                                                    !!v,
+                                                )
+                                            }
+                                        />
+                                        <Label className="!mt-0">
+                                            Controlled drug (double-sign required)
+                                        </Label>
+                                    </div>
                                     {medForm.data.is_prn && (
                                         <>
                                             <div>
@@ -289,6 +414,90 @@ export default function ClientMedical({
                                         />
                                     </div>
                                     <div>
+                                        <Label>Pharmacy</Label>
+                                        <Input
+                                            value={medForm.data.pharmacy}
+                                            onChange={(e) =>
+                                                medForm.setData(
+                                                    'pharmacy',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Form (tablet/liquid/patch)</Label>
+                                        <Input
+                                            value={medForm.data.form}
+                                            onChange={(e) =>
+                                                medForm.setData(
+                                                    'form',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Dose times (HH:MM, comma separated)</Label>
+                                        <Input
+                                            value={medForm.data.dose_times as any}
+                                            onChange={(e) =>
+                                                medForm.setData(
+                                                    'dose_times',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder="e.g. 08:00, 12:00, 18:00"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>State</Label>
+                                        <Select
+                                            value={medForm.data.state}
+                                            onValueChange={(v) =>
+                                                medForm.setData('state', v)
+                                            }
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select state" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="active">Active</SelectItem>
+                                                <SelectItem value="paused">Paused</SelectItem>
+                                                <SelectItem value="ceased">Ceased</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    {medForm.data.state === 'ceased' && (
+                                        <>
+                                            <div>
+                                                <Label>Ceased date</Label>
+                                                <Input
+                                                    type="date"
+                                                    value={medForm.data.ceased_at}
+                                                    onChange={(e) =>
+                                                        medForm.setData(
+                                                            'ceased_at',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                            <div>
+                                                <Label>Ceased reason</Label>
+                                                <Input
+                                                    value={medForm.data.ceased_reason}
+                                                    onChange={(e) =>
+                                                        medForm.setData(
+                                                            'ceased_reason',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
+                                            </div>
+                                        </>
+                                    )}
+                                    <div>
                                         <Label>Start date</Label>
                                         <Input
                                             type="date"
@@ -338,16 +547,22 @@ export default function ClientMedical({
                                 </div>
                                 <div className="mt-3">
                                     <Button
-                                        onClick={() =>
-                                            medForm.post(
-                                                `/clients/${client.id}/medical/medications`,
-                                                {
-                                                    preserveScroll: true,
-                                                    onSuccess: () =>
-                                                        medForm.reset(),
-                                                },
-                                            )
-                                        }
+                                        onClick={() => {
+                                            // Inertia's useForm().transform() does not always support chaining in all versions.
+                                            // Normalize dose_times without relying on chained calls.
+                                            const dt =
+                                                typeof (medForm.data as any).dose_times === 'string'
+                                                    ? (medForm.data as any).dose_times
+                                                          .split(',')
+                                                          .map((s: string) => s.trim())
+                                                          .filter(Boolean)
+                                                    : (medForm.data as any).dose_times;
+                                            medForm.setData('dose_times', dt as any);
+                                            medForm.post(`/clients/${client.id}/medical/medications`, {
+                                                preserveScroll: true,
+                                                onSuccess: () => medForm.reset(),
+                                            });
+                                        }}
                                         disabled={
                                             medForm.processing ||
                                             !medForm.data.name.trim()
@@ -754,9 +969,76 @@ export default function ClientMedical({
                                                 <SelectItem value="missed">
                                                     Missed
                                                 </SelectItem>
+                                                <SelectItem value="withheld">
+                                                    Withheld
+                                                </SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
+
+                                    {administrationNeedsReason && (
+                                        <div className="md:col-span-2">
+                                            <Label>
+                                                {selectedMedication?.is_prn
+                                                    ? 'Indication (required for PRN)'
+                                                    : 'Reason (required)'}
+                                            </Label>
+                                            <Input
+                                                value={administrationForm.data.reason}
+                                                onChange={(e) =>
+                                                    administrationForm.setData(
+                                                        'reason',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder={
+                                                    selectedMedication?.is_prn
+                                                        ? 'e.g. headache, anxiety, pain'
+                                                        : 'e.g. client refused, clinical hold, unavailable'
+                                                }
+                                            />
+                                            {administrationForm.errors.reason && (
+                                                <div className="mt-1 text-xs text-red-600">
+                                                    {administrationForm.errors.reason}
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    {selectedMedication?.controlled_drug &&
+                                        administrationForm.data.status === 'given' && (
+                                            <div className="md:col-span-2">
+                                                <Label>Witness (required)</Label>
+                                                <Select
+                                                    value={`${administrationForm.data.witnessed_by}`}
+                                                    onValueChange={(v) =>
+                                                        administrationForm.setData(
+                                                            'witnessed_by',
+                                                            v,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select witness" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {witnesses.map((w: any) => (
+                                                            <SelectItem
+                                                                key={w.id}
+                                                                value={`${w.id}`}
+                                                            >
+                                                                {w.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                {administrationForm.errors.witnessed_by && (
+                                                    <div className="mt-1 text-xs text-red-600">
+                                                        {administrationForm.errors.witnessed_by}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
 
                                     <div>
                                         <Label>Dose given</Label>
@@ -814,20 +1096,32 @@ export default function ClientMedical({
                                 </div>
                                 <div className="mt-3">
                                     <Button
-                                        onClick={() =>
-                                            administrationForm.post(
-                                                `/clients/${client.id}/medical/medications/${administrationForm.data.medication_id}/administrations`,
-                                                {
-                                                    preserveScroll: true,
-                                                    onSuccess: () =>
-                                                        administrationForm.reset(
-                                                            'dose_given',
-                                                            'scheduled_for',
-                                                            'notes',
-                                                        ),
-                                                },
-                                            )
-                                        }
+                                        onClick={() => {
+                                            administrationForm.clearErrors();
+                                            if (!administrationForm.data.medication_id) return;
+                                            if (
+                                                administrationNeedsReason &&
+                                                !administrationForm.data.reason
+                                            ) {
+                                                administrationForm.setError(
+                                                    'reason',
+                                                    'A reason/indication is required.',
+                                                );
+                                                return;
+                                            }
+                                            if (
+                                                selectedMedication?.controlled_drug &&
+                                                administrationForm.data.status === 'given' &&
+                                                !administrationForm.data.witnessed_by
+                                            ) {
+                                                administrationForm.setError(
+                                                    'witnessed_by',
+                                                    'A witness is required for controlled drug administration.',
+                                                );
+                                                return;
+                                            }
+                                            setConfirmAdminOpen(true);
+                                        }}
                                         disabled={
                                             administrationForm.processing ||
                                             !administrationForm.data
@@ -836,6 +1130,65 @@ export default function ClientMedical({
                                     >
                                         Save
                                     </Button>
+
+                                    <Dialog
+                                        open={confirmAdminOpen}
+                                        onOpenChange={setConfirmAdminOpen}
+                                    >
+                                        <DialogContent>
+                                            <DialogHeader>
+                                                <DialogTitle>
+                                                    Confirm medication administration
+                                                </DialogTitle>
+                                            </DialogHeader>
+
+                                            <div className="space-y-2 text-sm">
+                                                <div>
+                                                    <span className="font-medium">
+                                                        Medication:
+                                                    </span>{' '}
+                                                    {selectedMedication?.name || 'Medication'}
+                                                </div>
+                                                <div>
+                                                    <span className="font-medium">
+                                                        Outcome:
+                                                    </span>{' '}
+                                                    {administrationForm.data.status}
+                                                </div>
+                                                {administrationForm.data.reason && (
+                                                    <div>
+                                                        <span className="font-medium">
+                                                            Reason:
+                                                        </span>{' '}
+                                                        {administrationForm.data.reason}
+                                                    </div>
+                                                )}
+                                                <div>
+                                                    <span className="font-medium">
+                                                        Administered at:
+                                                    </span>{' '}
+                                                    {administrationForm.data.administered_at}
+                                                </div>
+                                            </div>
+
+                                            <DialogFooter>
+                                                <Button
+                                                    variant="outline"
+                                                    onClick={() =>
+                                                        setConfirmAdminOpen(false)
+                                                    }
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button
+                                                    onClick={submitAdministration}
+                                                    disabled={administrationForm.processing}
+                                                >
+                                                    Confirm
+                                                </Button>
+                                            </DialogFooter>
+                                        </DialogContent>
+                                    </Dialog>
                                 </div>
                             </div>
                         )}
@@ -864,7 +1217,18 @@ export default function ClientMedical({
                                         {a.dose_given
                                             ? ` • Dose: ${a.dose_given}`
                                             : ''}
+                                        {a.late_minutes && a.late_minutes > 0
+                                            ? ` • Late: ${a.late_minutes} min`
+                                            : ''}
+                                        {a.serviceContext?.name
+                                            ? ` • Context: ${a.serviceContext.name}`
+                                            : ''}
                                     </div>
+                                    {a.reason && a.status !== 'given' && (
+                                        <div className="mt-2 text-xs text-slate-600">
+                                            Reason: {a.reason}
+                                        </div>
+                                    )}
                                     {a.notes && (
                                         <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
                                             {a.notes}
@@ -918,6 +1282,60 @@ export default function ClientMedical({
                                             </SelectContent>
                                         </Select>
                                     </div>
+
+                                    {selectedStockMedication?.controlled_drug && (
+                                        <>
+                                            <div className="md:col-span-2">
+                                                <Label>Reason (required for controlled drug stock)</Label>
+                                                <Input
+                                                    value={stockForm.data.reason}
+                                                    onChange={(e) =>
+                                                        stockForm.setData(
+                                                            'reason',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="e.g. stock count, discrepancy investigation"
+                                                />
+                                                {stockForm.errors.reason && (
+                                                    <div className="mt-1 text-xs text-red-600">
+                                                        {stockForm.errors.reason}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            <div className="md:col-span-2">
+                                                <Label>Witness (required)</Label>
+                                                <Select
+                                                    value={`${stockForm.data.witnessed_by}`}
+                                                    onValueChange={(v) =>
+                                                        stockForm.setData(
+                                                            'witnessed_by',
+                                                            v,
+                                                        )
+                                                    }
+                                                >
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select witness" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {witnesses.map((w: any) => (
+                                                            <SelectItem
+                                                                key={w.id}
+                                                                value={`${w.id}`}
+                                                            >
+                                                                {w.name}
+                                                            </SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                                {stockForm.errors.witnessed_by && (
+                                                    <div className="mt-1 text-xs text-red-600">
+                                                        {stockForm.errors.witnessed_by}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </>
+                                    )}
                                     <div>
                                         <Label>On hand</Label>
                                         <Input
@@ -982,14 +1400,24 @@ export default function ClientMedical({
                                 </div>
                                 <div className="mt-3">
                                     <Button
-                                        onClick={() =>
+                                        onClick={() => {
+                                            stockForm.clearErrors();
+                                            if (!stockForm.data.medication_id) return;
+                                            if (selectedStockMedication?.controlled_drug) {
+                                                if (!stockForm.data.reason) {
+                                                    stockForm.setError('reason', 'Reason is required for controlled drug stock updates.');
+                                                    return;
+                                                }
+                                                if (!stockForm.data.witnessed_by) {
+                                                    stockForm.setError('witnessed_by', 'Witness is required for controlled drug stock updates.');
+                                                    return;
+                                                }
+                                            }
                                             stockForm.put(
                                                 `/clients/${client.id}/medical/medications/${stockForm.data.medication_id}/stock`,
-                                                {
-                                                    preserveScroll: true,
-                                                },
-                                            )
-                                        }
+                                                { preserveScroll: true },
+                                            );
+                                        }}
                                         disabled={
                                             stockForm.processing ||
                                             !stockForm.data.medication_id
@@ -1040,6 +1468,174 @@ export default function ClientMedical({
                     </CardContent>
                 </Card>
             </div>
+
+            {can_controlled_view && (
+                <div className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">
+                                Controlled drug register
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {controlled_entries.map((e: any) => (
+                                <div key={e.id} className="rounded-md border p-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="text-sm font-medium">
+                                            {e.medication?.name || 'Medication'}
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                            {e.entry_type}
+                                            {e.recorded_at
+                                                ? ` • ${new Date(e.recorded_at).toLocaleString()}`
+                                                : ''}
+                                        </div>
+                                    </div>
+                                    <div className="mt-1 text-xs text-slate-500">
+                                        {e.recordedBy?.name ? `By: ${e.recordedBy.name}` : ''}
+                                        {e.witnessedBy?.name ? ` • Witness: ${e.witnessedBy.name}` : ''}
+                                        {e.serviceContext?.name ? ` • Context: ${e.serviceContext.name}` : ''}
+                                    </div>
+                                    {(e.on_hand_before !== null || e.on_hand_after !== null) && (
+                                        <div className="mt-1 text-xs text-slate-500">
+                                            Stock: {e.on_hand_before ?? '—'} → {e.on_hand_after ?? '—'}
+                                            {e.unit ? ` ${e.unit}` : ''}
+                                        </div>
+                                    )}
+                                    {e.reason && (
+                                        <div className="mt-2 text-xs text-slate-600">
+                                            Reason: {e.reason}
+                                        </div>
+                                    )}
+                                    {e.notes && (
+                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                            {e.notes}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            {!controlled_entries.length && (
+                                <div className="text-sm text-slate-500">
+                                    No controlled drug entries recorded yet.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            {can_controlled_view && (
+                <div className="mt-4">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">
+                                Controlled drug discrepancies
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {controlled_discrepancies.map((d: any) => (
+                                <div key={d.id} className="rounded-md border p-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="text-sm font-medium">
+                                            {d.medication?.name || 'Medication'}
+                                        </div>
+                                        <div className={`text-xs ${d.status === 'open' ? 'text-amber-600' : 'text-slate-500'}`}>
+                                            {d.status}
+                                            {d.reported_at
+                                                ? ` • ${new Date(d.reported_at).toLocaleString()}`
+                                                : ''}
+                                        </div>
+                                    </div>
+                                    <div className="mt-1 text-xs text-slate-500">
+                                        {d.reportedBy?.name ? `Reported by: ${d.reportedBy.name}` : ''}
+                                        {d.witnessedBy?.name ? ` • Witness: ${d.witnessedBy.name}` : ''}
+                                        {d.serviceContext?.name ? ` • Context: ${d.serviceContext.name}` : ''}
+                                    </div>
+                                    <div className="mt-2 text-xs text-slate-500">
+                                        Stock: {d.on_hand_before ?? '—'} → {d.on_hand_after ?? '—'}
+                                        {d.difference !== null && d.difference !== undefined
+                                            ? ` • Difference: ${d.difference}`
+                                            : ''}
+                                    </div>
+                                    {d.reason && (
+                                        <div className="mt-2 text-xs text-slate-600">
+                                            Reason: {d.reason}
+                                        </div>
+                                    )}
+                                    {d.status === 'closed' && (d.resolution_notes || d.resolvedBy?.name) && (
+                                        <div className="mt-2 text-xs text-slate-600">
+                                            Closed{d.resolvedBy?.name ? ` by ${d.resolvedBy.name}` : ''}
+                                            {d.resolution_notes ? ` • ${d.resolution_notes}` : ''}
+                                        </div>
+                                    )}
+
+                                    {d.status === 'open' && can_controlled_record && (
+                                        <div className="mt-3 flex justify-end">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() => {
+                                                    setSelectedDiscId(d.id);
+                                                    closeDiscForm.reset('resolution_notes');
+                                                    setCloseDiscOpen(true);
+                                                }}
+                                            >
+                                                Close discrepancy
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+
+                            {!controlled_discrepancies.length && (
+                                <div className="text-sm text-slate-500">
+                                    No controlled drug discrepancies.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
+
+            <Dialog open={closeDiscOpen} onOpenChange={setCloseDiscOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Close discrepancy</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                        <Label>Resolution notes (optional)</Label>
+                        <Textarea
+                            value={closeDiscForm.data.resolution_notes}
+                            onChange={(e) => closeDiscForm.setData('resolution_notes', e.target.value)}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setCloseDiscOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={() => {
+                                if (!selectedDiscId) return;
+                                closeDiscForm.post(
+                                    `/clients/${client.id}/medical/controlled-discrepancies/${selectedDiscId}/close`,
+                                    {
+                                        preserveScroll: true,
+                                        onSuccess: () => {
+                                            setCloseDiscOpen(false);
+                                            setSelectedDiscId(null);
+                                        },
+                                    },
+                                );
+                            }}
+                            disabled={closeDiscForm.processing}
+                        >
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

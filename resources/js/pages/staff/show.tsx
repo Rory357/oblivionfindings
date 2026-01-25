@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
+import { MyDayList, type MyDayItem } from '@/components/workstream/my-day-list';
 
 type Client = { id: number; first_name: string; last_name: string; status: string };
 type Shift = {
@@ -22,11 +23,12 @@ type Props = {
         staff_profile?: any;
         assigned_clients?: Client[];
     };
+    myDayItems?: MyDayItem[];
     todayShifts: Shift[];
     upcomingShifts: Shift[];
 };
 
-export default function StaffShow({ user, todayShifts, upcomingShifts }: Props) {
+export default function StaffShow({ user, myDayItems, todayShifts, upcomingShifts }: Props) {
     const { auth, labels } = usePage().props as any;
     const can = auth?.can;
 
@@ -68,6 +70,14 @@ export default function StaffShow({ user, todayShifts, upcomingShifts }: Props) 
                 </div>
 
                 <div className="grid gap-6 md:grid-cols-2">
+                    <div className="md:col-span-2">
+                        <MyDayList
+                            title="Workstream"
+                            items={myDayItems ?? []}
+                            emptyLabel="No tasks or follow-ups due."
+                        />
+                    </div>
+
                     <div className="rounded-md border p-4">
                         <div className="font-medium">Assigned {clientPlural}</div>
                         <div className="mt-3 space-y-2">

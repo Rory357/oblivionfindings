@@ -54,6 +54,8 @@ class ShiftObserver
                     'shift_id' => $shift->id,
                     'starts_at' => $shift->starts_at?->toISOString(),
                     'ends_at' => $shift->ends_at?->toISOString(),
+                    'actual_starts_at' => $shift->actual_starts_at?->toISOString(),
+                    'actual_ends_at' => $shift->actual_ends_at?->toISOString(),
                     'location' => $shift->location,
                     'status' => $shift->status,
                 ], fn($v) => $v !== null && $v !== ''),

@@ -14,8 +14,10 @@ type Props = {
     conditions: Array<any>;
     emergency_contacts: Array<any>;
     documents: Array<any>;
+    incidents: Array<any>;
     events: Array<any>;
     rag_answer?: { text: string | null; sources?: Array<any> } | null;
+    can?: { viewIncidents: boolean; downloadIncidentAttachments: boolean };
 };
 
 export default function PortalClient({
@@ -25,8 +27,10 @@ export default function PortalClient({
     conditions,
     emergency_contacts,
     documents,
+    incidents,
     events,
     rag_answer,
+    can,
 }: Props) {
     const form = useForm({ question: '' });
 
@@ -255,6 +259,92 @@ export default function PortalClient({
                                     )}
                                 </div>
                             </div>
+
+                            {can?.viewIncidents ? (
+                                <>
+                                    <Separator />
+
+                                    <div>
+                                        <div className="font-medium">
+                                            Incident reports
+                                        </div>
+                                        <div className="mt-2 space-y-2">
+                                            {incidents.map((i) => (
+                                                <div
+                                                    key={i.id}
+                                                    className="rounded-md border p-2"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div>
+                                                            <div className="text-sm font-medium">
+                                                                {i.type}{' '}
+                                                                <span className="ml-2 text-xs text-slate-500">
+                                                                    ({i.severity})
+                                                                </span>
+                                                            </div>
+                                                            <div className="text-xs text-slate-500">
+                                                                {i.occurred_at
+                                                                    ? new Date(
+                                                                          i.occurred_at,
+                                                                      ).toLocaleString()
+                                                                    : ''}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+
+                                                    {i.description && (
+                                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                                            {i.description}
+                                                        </div>
+                                                    )}
+
+                                                    {i.immediate_action_taken && (
+                                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                                            <span className="font-medium text-slate-700">
+                                                                Immediate action:
+                                                            </span>{' '}
+                                                            {i.immediate_action_taken}
+                                                        </div>
+                                                    )}
+
+                                                    {!!(i.attachments || []).length && (
+                                                        <div className="mt-3 space-y-2">
+                                                            <div className="text-xs font-medium text-slate-600">
+                                                                Attachments
+                                                            </div>
+                                                            {(i.attachments || []).map((a: any) => (
+                                                                <div
+                                                                    key={a.id}
+                                                                    className="flex items-center justify-between gap-3 rounded-md border p-2"
+                                                                >
+                                                                    <div className="min-w-0">
+                                                                        <div className="truncate text-xs font-medium">
+                                                                            {a.original_name}
+                                                                        </div>
+                                                                    </div>
+                                                                    {a.download_url ? (
+                                                                        <a
+                                                                            href={a.download_url}
+                                                                            className="rounded-md border px-3 py-1 text-xs hover:bg-muted"
+                                                                        >
+                                                                            Download
+                                                                        </a>
+                                                                    ) : null}
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            ))}
+                                            {!incidents.length && (
+                                                <div className="text-xs text-slate-500">
+                                                    No shared incidents.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </>
+                            ) : null}
                         </CardContent>
                     </Card>
 

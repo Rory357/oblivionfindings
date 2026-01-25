@@ -16,22 +16,34 @@ class ClientMedication extends Model
         'name',
         'dosage',
         'frequency',
+        'dose_times',
         'is_prn',
+        'controlled_drug',
         'prn_reason',
         'max_per_day',
         'route',
+        'form',
         'prescriber',
+        'pharmacy',
         'start_date',
         'end_date',
+        'ceased_at',
+        'ceased_reason',
         'instructions',
         'active',
+        'state',
+        'paused_at',
     ];
 
     protected $casts = [
         'start_date' => 'date',
         'end_date' => 'date',
+        'ceased_at' => 'date',
+        'paused_at' => 'datetime',
         'is_prn' => 'boolean',
+        'controlled_drug' => 'boolean',
         'active' => 'boolean',
+        'dose_times' => 'array',
     ];
 
     public function client()

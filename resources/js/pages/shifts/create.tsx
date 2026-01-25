@@ -6,17 +6,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 
-type Client = { id: number; first_name: string; last_name: string };
+type Client = { id: number; first_name: string; last_name: string; service_context_id?: number | null };
 type Staff = { id: number; name: string; email: string };
 
-type Props = { clients: Client[]; staff: Staff[] };
+type ServiceContext = { id: number; name: string; type: string; is_active: boolean };
 
-export default function ShiftCreate({ clients, staff }: Props) {
+type Props = { clients: Client[]; staff: Staff[]; serviceContexts: ServiceContext[]; defaultServiceContextId?: number | null; defaultClientId?: number | string | null };
+
+export default function ShiftCreate({ clients, staff, serviceContexts, defaultServiceContextId = null, defaultClientId = null }: Props) {
     const { labels } = usePage().props as any;
     const shiftLabel = labels?.['shift.singular'] ?? 'Shift';
 
+    const initialClient = (() => {
+        if (defaultClientId) {
+            const found = clients.find((c) => String(c.id) === String(defaultClientId));
+            if (found) return found;
+        }
+        return clients?.[0] ?? null;
+    })();
+
     const form = useForm({
-        client_id: clients?.[0]?.id ?? '',
+        client_id: initialClient?.id ?? '',
+        service_context_id: (initialClient?.service_context_id ?? defaultServiceContextId ?? '') as any,
         user_id: staff?.[0]?.id ?? '',
         starts_at: '',
         ends_at: '',
@@ -73,6 +84,7 @@ export default function ShiftCreate({ clients, staff }: Props) {
 
                         router.post('/shifts/series', {
                             client_id: form.data.client_id,
+                            service_context_id: form.data.service_context_id,
                             user_id: form.data.user_id,
                             start_date: startDate,
                             end_date: form.data.repeat_end_date || startDate,
@@ -93,7 +105,18 @@ export default function ShiftCreate({ clients, staff }: Props) {
                             <select
                                 className="w-full rounded-md border bg-background p-2 text-sm"
                                 value={form.data.client_id}
-                                onChange={(e) => form.setData('client_id', e.target.value)}
+                                onChange={(e) => {
+                                    const nextId = e.target.value;
+                                    form.setData('client_id', nextId);
+
+                                    // If service context not manually selected yet, inherit from client
+                                    if (!form.data.service_context_id) {
+                                        const client = clients.find((c) => String(c.id) === String(nextId));
+                                        if (client?.service_context_id) {
+                                            form.setData('service_context_id', client.service_context_id as any);
+                                        }
+                                    }
+                                }}
                             >
                                 {clients.map((c) => (
                                     <option key={c.id} value={c.id}>
@@ -101,6 +124,28 @@ export default function ShiftCreate({ clients, staff }: Props) {
                                     </option>
                                 ))}
                             </select>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Service context</Label>
+                            <select
+                                className="w-full rounded-md border bg-background p-2 text-sm"
+                                value={String(form.data.service_context_id ?? '')}
+                                onChange={(e) => form.setData('service_context_id', e.target.value)}
+                            >
+                                <option value="">Inherit from client (recommended)</option>
+                                {serviceContexts
+                                    .filter((sc) => sc.is_active || String(sc.id) === String(form.data.service_context_id))
+                                    .map((sc) => (
+                                        <option key={sc.id} value={sc.id}>
+                                            {sc.name}
+                                            {!sc.is_active ? ' (inactive)' : ''}
+                                        </option>
+                                    ))}
+                            </select>
+                            <div className="text-xs text-slate-500">
+                                If left blank, the shift will inherit the selected client’s service context (if set).
+                            </div>
                         </div>
 
                         <div className="space-y-2">
@@ -137,7 +182,9 @@ export default function ShiftCreate({ clients, staff }: Props) {
                         <div className="space-y-2">
                             <Label>Status</Label>
                             <select className="w-full rounded-md border bg-background p-2 text-sm" value={form.data.status} onChange={(e) => form.setData('status', e.target.value)}>
+                                <option value="draft">draft</option>
                                 <option value="scheduled">scheduled</option>
+                                <option value="in_progress">in_progress</option>
                                 <option value="completed">completed</option>
                                 <option value="cancelled">cancelled</option>
                             </select>
