@@ -7,11 +7,14 @@ use App\Http\Controllers\ClientController;
 use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\ClientAssignmentController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\TodayDashboardController;
 use App\Http\Controllers\StaffController;
 use App\Http\Controllers\StaffAssignmentController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\TimesheetController;
 use App\Http\Controllers\SiteController;
+use App\Http\Controllers\SiteContactController;
+use App\Http\Controllers\SiteDocumentController;
 use App\Http\Controllers\Auth\MicrosoftController;
 use App\Http\Controllers\Auth\GoogleController;
 use App\Http\Controllers\TimelineController;
@@ -30,6 +33,7 @@ use App\Http\Controllers\PortalClientController;
 use App\Http\Controllers\PortalIncidentAttachmentController;
 use App\Http\Controllers\RagController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\AuditExportController;
 use App\Http\Controllers\StaffCredentialController;
 use App\Http\Controllers\StaffAvailabilityController;
 use App\Http\Controllers\ShiftSeriesController;
@@ -43,10 +47,16 @@ use App\Http\Controllers\NotificationInboxController;
 use App\Http\Controllers\AnnouncementInboxController;
 use App\Http\Controllers\MedicationsReportController;
 use App\Http\Controllers\MedicationsController;
+use App\Http\Controllers\IncidentReportController;
 use App\Http\Controllers\ClientMarController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\BreakGlassController;
+use App\Http\Controllers\Compliance\ComplianceDashboardController;
+use App\Http\Controllers\IncidentTemplateController;
+use App\Http\Controllers\ReportsController;
+use App\Http\Controllers\ShiftReportsController;
+use App\Http\Controllers\QualityChecklistController;
 
 Route::get('/', function () {
     return Inertia::render('home', [
@@ -60,6 +70,8 @@ Route::get('/contact', function () {
 
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/today', TodayDashboardController::class)->name('today');
+    Route::get('/quality/checklist', QualityChecklistController::class)->name('quality.checklist');
 });
 
 Route::get('/auth/google/redirect', [GoogleController::class, 'redirect'])->name('auth.google.redirect');
@@ -73,6 +85,8 @@ Route::middleware(['auth'])->group(function () {
     // Header inbox actions (notifications + announcements)
     Route::post('/inbox/notifications/{notification}/read', [NotificationInboxController::class, 'markRead'])
         ->name('inbox.notifications.read');
+    Route::post('/inbox/notifications/{notification}/acknowledge', [NotificationInboxController::class, 'acknowledge'])
+        ->name('inbox.notifications.ack');
     Route::post('/inbox/notifications/read-all', [NotificationInboxController::class, 'markAllRead'])
         ->name('inbox.notifications.readAll');
 
@@ -130,14 +144,26 @@ Route::middleware(['auth'])->group(function () {
     // Sites
     Route::middleware('permission:sites.viewAny')->group(function () {
         Route::get('/sites', [SiteController::class, 'index'])->name('sites.index');
+        Route::get('/sites/{site}', [SiteController::class, 'show'])->whereNumber('site')->name('sites.show');
+        Route::get('/sites/{site}/documents/{document}/download', [SiteDocumentController::class, 'download'])->whereNumber('site')->name('sites.documents.download');
     });
     Route::middleware('permission:sites.create')->group(function () {
         Route::get('/sites/create', [SiteController::class, 'create'])->name('sites.create');
         Route::post('/sites', [SiteController::class, 'store'])->name('sites.store');
     });
     Route::middleware('permission:sites.update')->group(function () {
-        Route::get('/sites/{site}/edit', [SiteController::class, 'edit'])->name('sites.edit');
-        Route::put('/sites/{site}', [SiteController::class, 'update'])->name('sites.update');
+        Route::get('/sites/{site}/edit', [SiteController::class, 'edit'])->whereNumber('site')->name('sites.edit');
+        Route::put('/sites/{site}', [SiteController::class, 'update'])->whereNumber('site')->name('sites.update');
+
+        // Site contacts
+        Route::post('/sites/{site}/contacts', [SiteContactController::class, 'store'])->whereNumber('site')->name('sites.contacts.store');
+        Route::put('/sites/{site}/contacts/{contact}', [SiteContactController::class, 'update'])->whereNumber('site')->name('sites.contacts.update');
+        Route::delete('/sites/{site}/contacts/{contact}', [SiteContactController::class, 'destroy'])->whereNumber('site')->name('sites.contacts.destroy');
+
+        // Site documents
+        Route::post('/sites/{site}/documents', [SiteDocumentController::class, 'store'])->whereNumber('site')->name('sites.documents.store');
+        Route::put('/sites/{site}/documents/{document}', [SiteDocumentController::class, 'update'])->whereNumber('site')->name('sites.documents.update');
+        Route::delete('/sites/{site}/documents/{document}', [SiteDocumentController::class, 'destroy'])->whereNumber('site')->name('sites.documents.destroy');
     });
 
     // ✅ ALL authenticated users (policy decides data)
@@ -164,7 +190,8 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::middleware('permission:reports.viewAny')->group(function () {
-        Route::get('/reports', fn() => inertia('reports/index'))->name('reports.index');
+        Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
+        Route::get('/reports/shifts', [ShiftReportsController::class, 'index'])->name('reports.shifts');
 
         Route::get('/reports/medications', [MedicationsReportController::class, 'index'])
             ->name('reports.medications');
@@ -173,6 +200,11 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/reports/medications/export-controlled-discrepancies', [MedicationsReportController::class, 'exportDiscrepanciesCsv'])
             ->name('reports.medications.export_discrepancies');
     });
+
+    // Compliance dashboard
+    Route::get('/compliance', [ComplianceDashboardController::class, 'index'])
+        ->middleware('permission:compliance.view')
+        ->name('compliance.index');
 
     // Central medications module (permission-gated)
     Route::get('/medications', [MedicationsController::class, 'index'])
@@ -217,7 +249,14 @@ Route::middleware(['auth'])->group(function () {
     Route::delete('/staff/{user}/availability/{availability}', [StaffAvailabilityController::class, 'destroy'])->name('staff.availability.destroy');
 
     Route::middleware('permission:rostering.viewAny')->group(function () {
-        Route::get('/rostering', fn() => inertia('rostering/index'))->name('rostering.index');
+        Route::get('/rostering', [\App\Http\Controllers\RosteringController::class, 'index'])->name('rostering.index');
+        // One-off leave/unavailability blocks shown in roster planning
+        Route::post('/rostering/time-off', [\App\Http\Controllers\StaffTimeOffController::class, 'store'])
+            ->middleware('permission:staff.availability.updateAny|staff.availability.updateSelf')
+            ->name('rostering.time_off.store');
+        Route::delete('/rostering/time-off/{staffTimeOff}', [\App\Http\Controllers\StaffTimeOffController::class, 'destroy'])
+            ->middleware('permission:staff.availability.updateAny|staff.availability.updateSelf')
+            ->name('rostering.time_off.destroy');
     });
 
     Route::middleware('permission:fleet.viewAny')->group(function () {
@@ -228,6 +267,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/audit-logs', [AuditLogController::class, 'index'])
         ->middleware('permission:audit.viewAny')
         ->name('audit.index');
+
+    // Audit exports (zip bundles)
+    Route::get('/audit-exports/incidents/{incident}', [AuditExportController::class, 'exportIncident'])
+        ->middleware('permission:audit.viewAny')
+        ->name('audit.exports.incident');
+    Route::get('/audit-exports/clients/{client}', [AuditExportController::class, 'exportClient'])
+        ->middleware('permission:audit.viewAny')
+        ->name('audit.exports.client');
 
     Route::middleware('permission:calendar.viewAny')->group(function () {
         Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
@@ -323,6 +370,14 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:incidents.approve')
         ->name('incidents.review');
 
+    Route::post('/incidents/{incident}/close', [IncidentController::class, 'close'])
+        ->middleware('permission:incidents.approve')
+        ->name('incidents.close');
+
+    Route::post('/incidents/{incident}/reopen', [IncidentController::class, 'reopen'])
+        ->middleware('permission:incidents.reopen')
+        ->name('incidents.reopen');
+
     // Shift-linked incident creation
     Route::post('/shifts/{shift}/incidents', [ShiftIncidentController::class, 'store'])
         ->middleware('permission:incidents.create')
@@ -367,6 +422,8 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:clients.update')->group(function () {
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('clients.edit');
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('clients.update');
+        Route::post('/clients/{client}/photo', [ClientController::class, 'updatePhoto'])->name('clients.photo.update');
+        Route::delete('/clients/{client}/photo', [ClientController::class, 'destroyPhoto'])->name('clients.photo.destroy');
 
         // Client medical + portal users management
         Route::post('/clients/{client}/documents', [ClientDocumentController::class, 'store'])->name('clients.documents.store');
@@ -476,6 +533,14 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/shifts/{shift}', [ShiftController::class, 'update'])
         ->middleware('permission:shifts.update')
         ->name('shifts.update');
+
+    // Roster planning: assign/unassign open shifts
+    Route::post('/shifts/{shift}/assign', [ShiftController::class, 'assign'])
+        ->middleware('permission:shifts.manageAny')
+        ->name('shifts.assign');
+    Route::post('/shifts/{shift}/unassign', [ShiftController::class, 'unassign'])
+        ->middleware('permission:shifts.manageAny')
+        ->name('shifts.unassign');
 
     // Shift lifecycle actions
     Route::patch('/shifts/{shift}/start', [ShiftController::class, 'start'])

@@ -41,7 +41,7 @@ class TimesheetController extends Controller
         $timesheets = $q->paginate(25)->withQueryString();
 
         $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
-        $staff = \App\Models\User::query()->orderBy('name')->get(['id', 'name', 'email']);
+        $staff = \App\Models\User::staff()->orderBy('name')->get(['id', 'name', 'email']);
 
         return inertia('timesheets/approvals', [
             'timesheets' => $timesheets,
@@ -82,6 +82,7 @@ class TimesheetController extends Controller
             $t->load(['shift.client']);
             $client = $t->shift?->client;
             app(NotificationService::class)->notifyCrud($auth, 'approved', 'timesheet', $t, $client, [
+                'event_key' => 'timesheets.approved',
                 'title' => 'Timesheet approved',
                 'url' => url("/timesheets/{$t->id}/edit"),
             ]);
@@ -119,6 +120,7 @@ class TimesheetController extends Controller
             $t->load(['shift.client']);
             $client = $t->shift?->client;
             app(NotificationService::class)->notifyCrud($auth, 'returned', 'timesheet', $t, $client, [
+                'event_key' => 'timesheets.returned',
                 'title' => 'Timesheet returned for changes',
                 'url' => url("/timesheets/{$t->id}/edit"),
             ]);
@@ -153,6 +155,7 @@ class TimesheetController extends Controller
             $t->load(['shift.client']);
             $client = $t->shift?->client;
             app(NotificationService::class)->notifyCrud($auth, 'rejected', 'timesheet', $t, $client, [
+                'event_key' => 'timesheets.rejected',
                 'title' => 'Timesheet rejected',
                 'url' => url("/timesheets/{$t->id}/edit"),
             ]);
@@ -266,6 +269,7 @@ class TimesheetController extends Controller
         $client = $timesheet->shift?->client;
 
         app(NotificationService::class)->notifyCrud($request->user(), 'created', 'timesheet', $timesheet, $client, [
+            'event_key' => 'timesheets.created',
             'title' => 'Timesheet created',
             'url' => url("/timesheets/{$timesheet->id}/edit"),
             'target_user_ids' => [$timesheet->user_id],
@@ -336,6 +340,7 @@ class TimesheetController extends Controller
         $client = $timesheet->shift?->client;
 
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'timesheet', $timesheet, $client, [
+            'event_key' => 'timesheets.updated',
             'title' => 'Timesheet updated',
             'url' => url("/timesheets/{$timesheet->id}/edit"),
             'target_user_ids' => [$timesheet->user_id],
@@ -372,6 +377,7 @@ class TimesheetController extends Controller
         $client = $timesheet->shift?->client;
 
         app(NotificationService::class)->notifyCrud($auth, 'submitted', 'timesheet', $timesheet, $client, [
+            'event_key' => 'timesheets.submitted',
             'title' => 'Timesheet submitted for approval',
             'url' => url("/timesheets/{$timesheet->id}/edit"),
             'include_entity_user' => false,
@@ -400,6 +406,7 @@ class TimesheetController extends Controller
         $client = $timesheet->shift?->client;
 
         app(NotificationService::class)->notifyCrud($auth, 'approved', 'timesheet', $timesheet, $client, [
+            'event_key' => 'timesheets.approved',
             'title' => 'Timesheet approved',
             'url' => url("/timesheets/{$timesheet->id}/edit"),
         ]);
@@ -427,6 +434,7 @@ class TimesheetController extends Controller
         $client = $timesheet->shift?->client;
 
         app(NotificationService::class)->notifyCrud($auth, 'rejected', 'timesheet', $timesheet, $client, [
+            'event_key' => 'timesheets.rejected',
             'title' => 'Timesheet rejected',
             'url' => url("/timesheets/{$timesheet->id}/edit"),
         ]);
@@ -458,6 +466,7 @@ class TimesheetController extends Controller
         $client = $timesheet->shift?->client;
 
         app(NotificationService::class)->notifyCrud($auth, 'returned', 'timesheet', $timesheet, $client, [
+            'event_key' => 'timesheets.returned',
             'title' => 'Timesheet returned for changes',
             'url' => url("/timesheets/{$timesheet->id}/edit"),
         ]);

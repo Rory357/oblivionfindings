@@ -139,6 +139,7 @@ export default function ShiftEdit({ shift, clients, staff, serviceContexts, defa
                                 value={form.data.user_id}
                                 onChange={(e) => form.setData('user_id', e.target.value)}
                             >
+                                <option value="">Unassigned (open shift)</option>
                                 {staff.map((s) => (
                                     <option key={s.id} value={s.id}>
                                         {s.name} ({s.email})

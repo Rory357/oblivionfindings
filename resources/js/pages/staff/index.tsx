@@ -1,6 +1,8 @@
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useInitials } from '@/hooks/use-initials';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -9,6 +11,8 @@ type StaffUser = {
     id: number;
     name: string;
     email: string;
+    avatar?: string;
+    profile_photo_url?: string | null;
     role?: string | null;
     roles?: { id: number; name: string; label: string }[];
     staff_profile?: {
@@ -31,6 +35,7 @@ type Props = {
 export default function StaffIndex({ users, filters }: Props) {
     const { auth } = usePage().props as any;
     const can = auth?.can;
+    const getInitials = useInitials();
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Staff', href: '/staff' }]}>
@@ -101,8 +106,12 @@ export default function StaffIndex({ users, filters }: Props) {
                             {users.data.map((u) => (
                                 <tr key={u.id} className="border-t">
                                     <td className="p-3">
-                                        <div className="font-medium">
-                                            {u.name}
+                                        <div className="flex items-center gap-2">
+                                            <Avatar className="h-8 w-8">
+                                                <AvatarImage src={u.avatar ?? u.profile_photo_url ?? undefined} alt={u.name} />
+                                                <AvatarFallback>{getInitials(u.name)}</AvatarFallback>
+                                            </Avatar>
+                                            <div className="font-medium">{u.name}</div>
                                         </div>
                                         {u.staff_profile?.job_title ? (
                                             <div className="text-xs text-muted-foreground">

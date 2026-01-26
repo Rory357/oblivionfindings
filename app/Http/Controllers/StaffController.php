@@ -20,7 +20,7 @@ class StaffController extends Controller
 
         $search = trim((string) $request->query('q', ''));
 
-        $users = User::query()
+        $users = User::staff()
             ->when($search !== '', fn($q) => $q
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")
@@ -44,6 +44,9 @@ class StaffController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth, 403);
+
+        // Portal users should never appear in the staff module.
+        abort_if($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true), 404);
 
         // Staff can view themselves; managers/admins can view any staff.
         if ($auth->id !== $user->id) {
@@ -95,6 +98,9 @@ class StaffController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('staff.update'), 403);
 
+        // Portal users should never appear in the staff module.
+        abort_if($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true), 404);
+
         $user->load(['roles:id,name,label', 'staffProfile']);
 
         $roles = Role::query()->orderBy('label')->get(['id', 'name', 'label']);
@@ -109,6 +115,9 @@ class StaffController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('staff.update'), 403);
+
+        // Portal users should never be editable from the staff module.
+        abort_if($user->hasRole('client', 'next_of_kin') || in_array($user->role, ['client', 'next_of_kin'], true), 404);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],

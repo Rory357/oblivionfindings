@@ -26,6 +26,8 @@ type InboxPayload = {
             type: string;
             data: any;
             read_at: string | null;
+            acknowledged_at: string | null;
+            escalation_count: number | null;
             created_at: string | null;
         }>;
     };
@@ -66,6 +68,14 @@ function notificationBody(n: { data: any }) {
     return typeof msg === 'string' ? msg : null;
 }
 
+function notificationContext(n: { data: any }): Array<{ label: string; value: string }> {
+    const ctx = n?.data?.context;
+    if (!ctx || typeof ctx !== 'object') return [];
+    return Object.entries(ctx)
+        .filter(([, v]) => v !== null && v !== undefined && String(v).trim() !== '')
+        .map(([k, v]) => ({ label: k, value: String(v) }));
+}
+
 export default function InboxMenus() {
     const inbox = (usePage().props as any).inbox as InboxPayload | null;
     if (!inbox) return null;
@@ -82,6 +92,8 @@ export default function InboxMenus() {
         [inbox.announcements.items, openAnnouncementId],
     );
 
+    const mustAckBeforeClose = !!openNotification?.data?.must_ack_before_close && !!openNotification?.data?.ack_required && !openNotification?.acknowledged_at;
+
     const reloadInbox = () => {
         // Refresh just the inbox payload so counts / read state update immediately.
         router.reload({ only: ['inbox'], preserveScroll: true });
@@ -89,6 +101,10 @@ export default function InboxMenus() {
 
     const markNotificationRead = (id: string) => {
         router.post(`/inbox/notifications/${id}/read`, {}, { preserveScroll: true, onSuccess: reloadInbox });
+    };
+
+    const acknowledgeNotification = (id: string) => {
+        router.post(`/inbox/notifications/${id}/acknowledge`, {}, { preserveScroll: true, onSuccess: reloadInbox });
     };
 
     const markAnnouncementRead = (id: number) => {
@@ -282,8 +298,21 @@ export default function InboxMenus() {
             </DropdownMenu>
 
             {/* Notification modal */}
-            <Dialog open={!!openNotification} onOpenChange={(v) => !v && setOpenNotifId(null)}>
-                <DialogContent className="sm:max-w-lg">
+            <Dialog open={!!openNotification} onOpenChange={(v) => {
+                if (!v) {
+                    if (mustAckBeforeClose) return;
+                    setOpenNotifId(null);
+                }
+            }}>
+                <DialogContent
+                    className="sm:max-w-lg"
+                    onEscapeKeyDown={(e) => {
+                        if (mustAckBeforeClose) e.preventDefault();
+                    }}
+                    onPointerDownOutside={(e) => {
+                        if (mustAckBeforeClose) e.preventDefault();
+                    }}
+                >
                     <DialogHeader>
                         <DialogTitle>
                             {openNotification ? notificationTitle(openNotification) : 'Notification'}
@@ -306,13 +335,70 @@ export default function InboxMenus() {
                                     No message content.
                                 </div>
                             )}
+
+                            {notificationContext(openNotification).length > 0 && (
+                                <div className="rounded-md border bg-muted/20 p-3">
+                                    <div className="mb-2 text-xs font-semibold text-muted-foreground">
+                                        Details
+                                    </div>
+                                    <div className="space-y-1">
+                                        {notificationContext(openNotification).map((row) => (
+                                            <div
+                                                key={row.label}
+                                                className="grid grid-cols-3 gap-2 text-sm"
+                                            >
+                                                <div className="text-xs font-medium text-muted-foreground">
+                                                    {row.label}
+                                                </div>
+                                                <div className="col-span-2 text-xs">
+                                                    {row.value}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
                         </div>
                     )}
 
                     <DialogFooter>
-                        <Button type="button" variant="outline" onClick={() => setOpenNotifId(null)}>
+                        {openNotification?.data?.ack_required && !openNotification?.acknowledged_at && (
+                            <Button
+                                type="button"
+                                variant="default"
+                                onClick={() => {
+                                    if (openNotification?.id) {
+                                        acknowledgeNotification(openNotification.id);
+                                    }
+                                }}
+                            >
+                                Acknowledge
+                            </Button>
+                        )}
+                        {openNotification?.data?.url && (
+                            <Button
+                                type="button"
+                                onClick={() => {
+                                    const url = openNotification?.data?.url;
+                                    if (typeof url === 'string' && url) {
+                                        window.location.href = url;
+                                    }
+                                }}
+                            >
+                                Open
+                            </Button>
+                        )}
+                        <Button type="button" variant="outline" disabled={mustAckBeforeClose} onClick={() => {
+                                if (mustAckBeforeClose) return;
+                                setOpenNotifId(null);
+                            }}>
                             Close
                         </Button>
+                        {mustAckBeforeClose && (
+                            <div className="w-full text-xs text-muted-foreground">
+                                This notification requires acknowledgement before you can close it.
+                            </div>
+                        )}
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

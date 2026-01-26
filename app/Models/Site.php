@@ -11,6 +11,14 @@ class Site extends Model
 
     protected $fillable = [
         'name',
+        'phone',
+        'email',
+        'manager_name',
+        'manager_phone',
+        'after_hours_phone',
+        'emergency_plan_location',
+        'medication_storage_location',
+        'notes',
         'address_line_1',
         'address_line_2',
         'suburb',
@@ -27,6 +35,16 @@ class Site extends Model
     public function clients()
     {
         return $this->hasMany(Client::class);
+    }
+
+    public function contacts()
+    {
+        return $this->hasMany(SiteContact::class);
+    }
+
+    public function documents()
+    {
+        return $this->hasMany(SiteDocument::class);
     }
 
     public function getAddressAttribute(): string

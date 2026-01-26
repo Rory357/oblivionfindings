@@ -127,7 +127,7 @@ class ShiftController extends Controller
         abort_unless($auth && $auth->canDo('shifts.create'), 403);
 
         $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'service_context_id']);
-        $staff = User::query()->orderBy('name')->get(['id', 'name', 'email']);
+        $staff = User::staff()->orderBy('name')->get(['id', 'name', 'email']);
 
         $serviceContexts = ServiceContext::query()
             ->orderBy('name')
@@ -152,7 +152,8 @@ class ShiftController extends Controller
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
             'service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
-            'user_id' => ['required', 'integer', 'exists:users,id'],
+            // user_id may be null to create an "open" / unassigned shift for rostering.
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:255'],
@@ -182,8 +183,10 @@ class ShiftController extends Controller
         // Conflict check: staff or client overlap
         $conflicts = Shift::query()
             ->where(function ($q) use ($data) {
-                $q->where('user_id', $data['user_id'])
-                  ->orWhere('client_id', $data['client_id']);
+                if (!empty($data['user_id'])) {
+                    $q->where('user_id', $data['user_id']);
+                }
+                $q->orWhere('client_id', $data['client_id']);
             })
             ->where('starts_at', '<', $data['ends_at'])
             ->where('ends_at', '>', $data['starts_at'])
@@ -217,13 +220,17 @@ class ShiftController extends Controller
             return $shift;
         });
 
-        $client = Client::query()->find($shift->client_id);
+        // Notify assigned staff only (open shifts have no assignee).
+        if (!empty($shift->user_id)) {
+            $client = Client::query()->find($shift->client_id);
+        $targetUserIds = $shift->user_id ? [$shift->user_id] : [];
         app(NotificationService::class)->notifyCrud($request->user(), 'created', 'shift', $shift, $client, [
-            'title' => 'Shift created',
-            'body' => $client ? ("Client: {$client->first_name} {$client->last_name}") : null,
-            'url' => url("/shifts/{$shift->id}"),
-            'target_user_ids' => [$shift->user_id],
-        ]);
+                'title' => 'Shift created',
+                'body' => $client ? ("Client: {$client->first_name} {$client->last_name}") : null,
+                'url' => url("/shifts/{$shift->id}"),
+            'target_user_ids' => $targetUserIds,
+            ]);
+        }
 
         return redirect()->route('shifts.index')->with('success', 'Shift created.');
     }
@@ -240,7 +247,7 @@ class ShiftController extends Controller
 
         $shift->load(['client:id,first_name,last_name,service_context_id', 'staff:id,name,email', 'tasks', 'serviceContext:id,name,type,is_active']);
         $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name', 'service_context_id']);
-        $staff = User::query()->orderBy('name')->get(['id', 'name', 'email']);
+        $staff = User::staff()->orderBy('name')->get(['id', 'name', 'email']);
 
         $serviceContexts = ServiceContext::query()
             ->orderBy('name')
@@ -264,10 +271,16 @@ class ShiftController extends Controller
             abort(403);
         }
 
+        // Lock: once a shift is completed, treat it as immutable (auditable record).
+        if ($shift->status === 'completed') {
+            return back()->with('error', 'This shift has been completed and is now locked.');
+        }
+
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
             'service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
-            'user_id' => ['required', 'integer', 'exists:users,id'],
+            // user_id may be null to keep this as an "open" / unassigned shift.
+            'user_id' => ['nullable', 'integer', 'exists:users,id'],
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:255'],
@@ -295,8 +308,10 @@ class ShiftController extends Controller
         $conflicts = Shift::query()
             ->where('id', '!=', $shift->id)
             ->where(function ($q) use ($data) {
-                $q->where('user_id', $data['user_id'])
-                  ->orWhere('client_id', $data['client_id']);
+                if (!empty($data['user_id'])) {
+                    $q->where('user_id', $data['user_id']);
+                }
+                $q->orWhere('client_id', $data['client_id']);
             })
             ->where('starts_at', '<', $data['ends_at'])
             ->where('ends_at', '>', $data['starts_at'])
@@ -345,11 +360,12 @@ class ShiftController extends Controller
         });
 
         $client = Client::query()->find($shift->client_id);
+        $targetUserIds = $shift->user_id ? [$shift->user_id] : [];
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'shift', $shift, $client, [
             'title' => 'Shift updated',
             'body' => $client ? ("Client: {$client->first_name} {$client->last_name}") : null,
             'url' => url("/shifts/{$shift->id}"),
-            'target_user_ids' => [$shift->user_id],
+            'target_user_ids' => $targetUserIds,
         ]);
 
         return redirect()->route('shifts.index')->with('success', 'Shift updated.');
@@ -502,5 +518,57 @@ class ShiftController extends Controller
         });
 
         return back()->with('success', 'Shift completed.');
+    }
+
+    public function assign(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+
+        // Lock: once completed, immutable.
+        if ($shift->status === 'completed') {
+            return back()->with('error', 'This shift has been completed and is now locked.');
+        }
+
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'return_to' => ['nullable', 'string'],
+        ]);
+
+        // Only allow assigning staff users
+        abort_unless(User::staff()->whereKey($data['user_id'])->exists(), 404);
+
+        // Check staff overlap conflicts
+        $conflicts = Shift::query()
+            ->where('id', '!=', $shift->id)
+            ->where('user_id', $data['user_id'])
+            ->where('starts_at', '<', $shift->ends_at)
+            ->where('ends_at', '>', $shift->starts_at)
+            ->exists();
+
+        if ($conflicts) {
+            return back()->withErrors([
+                'user_id' => 'Conflicting shift detected for this staff member during that time.',
+            ]);
+        }
+
+        $shift->update(['user_id' => $data['user_id']]);
+
+        return redirect($data['return_to'] ?? url('/rostering'))->with('success', 'Shift assigned.');
+    }
+
+    public function unassign(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+
+        if ($shift->status === 'completed') {
+            return back()->with('error', 'This shift has been completed and is now locked.');
+        }
+
+        $returnTo = $request->input('return_to') ?: url('/rostering');
+        $shift->update(['user_id' => null]);
+
+        return redirect($returnTo)->with('success', 'Shift unassigned.');
     }
 }

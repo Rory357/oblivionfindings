@@ -35,6 +35,11 @@ class ClientIncidentPolicy
 
     public function update(User $user, ClientIncident $incident): bool
     {
+        // Locked once closed (immutability for audit).
+        if ($incident->status === 'closed') {
+            return false;
+        }
+
         if ($user->canDo('incidents.viewAny') && $user->canDo('incidents.update')) {
             return true;
         }
@@ -56,7 +61,18 @@ class ClientIncidentPolicy
 
     public function review(User $user, ClientIncident $incident): bool
     {
-        return $user->canDo('incidents.approve');
+        return $user->canDo('incidents.approve') && $incident->status === 'submitted';
+    }
+
+    public function close(User $user, ClientIncident $incident): bool
+    {
+        return $user->canDo('incidents.approve') && $incident->status === 'reviewed';
+    }
+
+    public function reopen(User $user, ClientIncident $incident): bool
+    {
+        // Reopening is an elevated action (audit-sensitive).
+        return $user->canDo('incidents.reopen') && $incident->status === 'closed';
     }
 
     public function export(User $user): bool

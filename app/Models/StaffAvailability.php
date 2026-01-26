@@ -18,6 +18,10 @@ class StaffAvailability extends Model
         'ends_at',
     ];
 
+    protected $casts = [
+        'day_of_week' => 'integer',
+    ];
+
     public function user()
     {
         return $this->belongsTo(User::class);

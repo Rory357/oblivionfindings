@@ -1,6 +1,8 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useInitials } from '@/hooks/use-initials';
 import { MyDayList, type MyDayItem } from '@/components/workstream/my-day-list';
 
 type Client = { id: number; first_name: string; last_name: string; status: string };
@@ -31,6 +33,7 @@ type Props = {
 export default function StaffShow({ user, myDayItems, todayShifts, upcomingShifts }: Props) {
     const { auth, labels } = usePage().props as any;
     const can = auth?.can;
+    const getInitials = useInitials();
 
     const staffLabel = labels?.['staff.singular'] ?? 'Staff';
     const clientPlural = labels?.['client.plural'] ?? 'Clients';
@@ -38,6 +41,19 @@ export default function StaffShow({ user, myDayItems, todayShifts, upcomingShift
     return (
         <AppLayout breadcrumbs={[{ title: staffLabel, href: '/staff' }, { title: user.name, href: `/staff/${user.id}` }]}>
             <Head title={`${staffLabel}: ${user.name}`} />
+
+            <div className="mb-6 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                        <AvatarImage src={(user as any).avatar ?? (user as any).profile_photo_url ?? undefined} alt={user.name} />
+                        <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <div className="text-lg font-semibold">{user.name}</div>
+                        <div className="text-sm text-muted-foreground">{user.email}</div>
+                    </div>
+                </div>
+            </div>
 
             <div className="p-4 space-y-6">
                 <div className="flex items-start justify-between gap-4">

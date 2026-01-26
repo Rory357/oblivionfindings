@@ -10,6 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Tabs } from '@/components/ui/tabs';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useInitials } from '@/hooks/use-initials';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
@@ -18,6 +20,8 @@ type Props = {
         id: number;
         first_name: string;
         last_name: string;
+        avatar?: string | null;
+        profile_photo_url?: string | null;
         preferred_name?: string | null;
         date_of_birth?: string | null;
         gender?: string | null;
@@ -81,6 +85,9 @@ type TabKey =
 
 export default function ClientShow({ client, medical, support_plan, assessments, documents, portal_users, events, handover, onboarding, shifts_summary, can }: Props) {
     const name = `${client.first_name} ${client.last_name}`.trim();
+    const getInitials = useInitials();
+    const photoForm = useForm<{ photo: File | null }>({ photo: null });
+    const removePhotoForm = useForm({});
 
     const tabs: Array<{ key: TabKey; label: string; show: boolean }> = useMemo(
         () => [
@@ -125,11 +132,85 @@ export default function ClientShow({ client, medical, support_plan, assessments,
 
             <PageShell>
                 <PageHeader
-                    title={name}
+                    title={
+                        <div className="flex items-center gap-3">
+                            <Avatar className="h-10 w-10">
+                                <AvatarImage src={client.avatar ?? client.profile_photo_url ?? undefined} alt={name} />
+                                <AvatarFallback>{getInitials(name)}</AvatarFallback>
+                            </Avatar>
+                            <span>{name}</span>
+                        </div>
+                    }
                     backHref="/clients"
                     description={`${client.status}${client.service_context ? ` • ${client.service_context.name}` : ''}${client.site ? ` • ${client.site.name}` : ''}`}
                     actions={
                         <>
+                            {can.edit ? (
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        if (!photoForm.data.photo) return;
+                                        photoForm.post(`/clients/${client.id}/photo`, {
+                                            forceFormData: true,
+                                            preserveScroll: true,
+                                        });
+                                    }}
+                                    className="flex items-center gap-2"
+                                >
+                                    <Input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        id="client-photo"
+                                        onChange={(e) =>
+                                            photoForm.setData(
+                                                'photo',
+                                                e.target.files?.[0] ?? null,
+                                            )
+                                        }
+                                    />
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                            (document.getElementById(
+                                                'client-photo',
+                                            ) as HTMLInputElement | null)?.click()
+                                        }
+                                    >
+                                        Change photo
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        size="sm"
+                                        disabled={
+                                            photoForm.processing ||
+                                            !photoForm.data.photo
+                                        }
+                                    >
+                                        Upload
+                                    </Button>
+
+                                    {(client as any).profile_photo_path ? (
+                                        <Button
+                                            type="button"
+                                            size="sm"
+                                            variant="outline"
+                                            disabled={removePhotoForm.processing}
+                                            onClick={() =>
+                                                removePhotoForm.delete(
+                                                    `/clients/${client.id}/photo`,
+                                                    { preserveScroll: true },
+                                                )
+                                            }
+                                        >
+                                            Remove
+                                        </Button>
+                                    ) : null}
+                                </form>
+                            ) : null}
+
                             <Button variant="outline" size="sm" asChild>
                                 <Link href={`/clients/${client.id}/incidents`}>Incidents</Link>
                             </Button>
@@ -234,15 +315,15 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                                     )
                                                 ) : item.key === 'medications' ? (
                                                     <Button size="sm" variant="outline" asChild>
-                                                        <Link href={`/clients/${client.id}/medical`}>Open</Link>
+                                                        <Link href={`/clients/${client.id}/medical?section=medications`}>Open</Link>
                                                     </Button>
                                                 ) : item.key === 'conditions' ? (
                                                     <Button size="sm" variant="outline" asChild>
-                                                        <Link href={`/clients/${client.id}/medical`}>Open</Link>
+                                                        <Link href={`/clients/${client.id}/medical?section=conditions`}>Open</Link>
                                                     </Button>
                                                 ) : item.key === 'emergency_contacts' ? (
                                                     <Button size="sm" variant="outline" asChild>
-                                                        <Link href={`/clients/${client.id}/medical`}>Open</Link>
+                                                        <Link href={`/clients/${client.id}/medical?section=emergency_contacts`}>Open</Link>
                                                     </Button>
                                                 ) : item.key === 'next_of_kin' ? (
                                                     can.edit ? (
@@ -466,7 +547,7 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                                     <CardTitle className="text-base">Medications</CardTitle>
                                                     {can.edit ? (
                                                         <Button variant="outline" size="sm" asChild>
-                                                            <Link href={`/clients/${client.id}/medical`}>Manage</Link>
+                                                            <Link href={`/clients/${client.id}/medical?section=medications`}>Manage</Link>
                                                         </Button>
                                                     ) : null}
                                                 </div>
@@ -498,7 +579,7 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                                     <CardTitle className="text-base">Conditions</CardTitle>
                                                     {can.edit ? (
                                                         <Button variant="outline" size="sm" asChild>
-                                                            <Link href={`/clients/${client.id}/medical`}>Manage</Link>
+                                                            <Link href={`/clients/${client.id}/medical?section=conditions`}>Manage</Link>
                                                         </Button>
                                                     ) : null}
                                                 </div>
@@ -528,7 +609,7 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                                     <CardTitle className="text-base">Emergency contacts</CardTitle>
                                                     {can.edit ? (
                                                         <Button variant="outline" size="sm" asChild>
-                                                            <Link href={`/clients/${client.id}/medical`}>Manage</Link>
+                                                            <Link href={`/clients/${client.id}/medical?section=emergency_contacts`}>Manage</Link>
                                                         </Button>
                                                     ) : null}
                                                 </div>

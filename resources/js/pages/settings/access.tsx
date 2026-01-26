@@ -50,11 +50,20 @@ function modeFromOverride(
     return val ? 'allow' : 'deny';
 }
 
+function formatGroupName(group: string) {
+    return group
+        .split('_')
+        .filter(Boolean)
+        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+        .join(' ');
+}
+
 export default function AccessControlPage(props: Props) {
     const { auth } = usePage().props as any;
     const can = auth?.can;
 
     const [query, setQuery] = useState('');
+    const [permQuery, setPermQuery] = useState('');
     const [selectedId, setSelectedId] = useState<number | null>(
         props.users?.[0]?.id ?? null,
     );
@@ -68,6 +77,33 @@ export default function AccessControlPage(props: Props) {
                 u.email.toLowerCase().includes(q),
         );
     }, [query, props.users]);
+
+    const filteredPermissions = useMemo(() => {
+        const q = permQuery.trim().toLowerCase();
+        if (!q) return props.permissions;
+        return props.permissions.filter(
+            (perm) =>
+                perm.key.toLowerCase().includes(q) ||
+                (perm.description ?? '').toLowerCase().includes(q),
+        );
+    }, [permQuery, props.permissions]);
+
+    const permissionGroups = useMemo(() => {
+        const map: Record<string, Permission[]> = {};
+        for (const perm of filteredPermissions) {
+            const prefix = perm.key.split('.')[0] ?? 'other';
+            (map[prefix] ||= []).push(perm);
+        }
+        return Object.entries(map)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(
+                ([group, perms]) =>
+                    [
+                        group,
+                        perms.sort((a, b) => a.key.localeCompare(b.key)),
+                    ] as const,
+            );
+    }, [filteredPermissions]);
 
     const selected = useMemo(
         () => props.users.find((u) => u.id === selectedId) ?? null,
@@ -112,6 +148,15 @@ export default function AccessControlPage(props: Props) {
         form.clearErrors();
     };
 
+    const setGroupOverride = (
+        permIds: number[],
+        value: 'inherit' | 'allow' | 'deny',
+    ) => {
+        const next = { ...form.data.overrides };
+        for (const id of permIds) next[String(id)] = value;
+        form.setData('overrides', next);
+    };
+
     if (!can?.settings?.manageAccess) {
         return (
             <SettingsLayout>
@@ -133,7 +178,7 @@ export default function AccessControlPage(props: Props) {
                         description="Assign roles and set per-user permission overrides. Overrides take precedence over role permissions."
                     />
 
-                    <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
+                    <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
                         {/* User list */}
                         <div className="space-y-3">
                             <Input
@@ -216,7 +261,8 @@ export default function AccessControlPage(props: Props) {
 
                                         {selectedIsPending && (
                                             <div className="mt-3 rounded-md border bg-muted/30 p-3 text-sm">
-                                                This user cannot log in yet. Assign roles, then approve.
+                                                This user cannot log in yet.
+                                                Assign roles, then approve.
                                             </div>
                                         )}
                                     </div>
@@ -225,7 +271,11 @@ export default function AccessControlPage(props: Props) {
                                         <div className="text-sm font-semibold">
                                             Roles
                                         </div>
-                                        <InputError message={(form.errors as any).role_ids} />
+                                        <InputError
+                                            message={
+                                                (form.errors as any).role_ids
+                                            }
+                                        />
                                         <div className="space-y-2">
                                             {props.roles.map((r) => {
                                                 const checked =
@@ -285,69 +335,206 @@ export default function AccessControlPage(props: Props) {
                                             Allow/Deny will override roles.
                                         </div>
 
-                                        <div className="space-y-2">
-                                            {props.permissions.map((p) => (
-                                                <div
-                                                    key={p.id}
-                                                    className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_220px]"
-                                                >
-                                                    <div>
-                                                        <div className="text-sm font-medium">
-                                                            {p.key}
-                                                        </div>
-                                                        {p.description && (
-                                                            <div className="text-xs text-muted-foreground">
-                                                                {p.description}
-                                                            </div>
-                                                        )}
-                                                    </div>
+                                        <div className="space-y-3">
+                                            <Input
+                                                placeholder="Filter permissions…"
+                                                value={permQuery}
+                                                onChange={(e) =>
+                                                    setPermQuery(e.target.value)
+                                                }
+                                            />
 
-                                                    <div>
-                                                        <Label className="sr-only">
-                                                            Override
-                                                        </Label>
-                                                        <Select
-                                                            value={
-                                                                form.data
-                                                                    .overrides[
-                                                                    String(p.id)
-                                                                ]
-                                                            }
-                                                            onValueChange={(
-                                                                value: any,
-                                                            ) =>
-                                                                form.setData(
-                                                                    'overrides',
-                                                                    {
-                                                                        ...form
-                                                                            .data
-                                                                            .overrides,
-                                                                        [String(
-                                                                            p.id,
-                                                                        )]:
-                                                                            value,
-                                                                    },
-                                                                )
-                                                            }
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Inherit" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="inherit">
-                                                                    Inherit
-                                                                </SelectItem>
-                                                                <SelectItem value="allow">
-                                                                    Allow
-                                                                </SelectItem>
-                                                                <SelectItem value="deny">
-                                                                    Deny
-                                                                </SelectItem>
-                                                            </SelectContent>
-                                                        </Select>
+                                            <div className="space-y-3">
+                                                {permissionGroups.map(
+                                                    ([group, perms]) => {
+                                                        const ids = perms.map(
+                                                            (x) => x.id,
+                                                        );
+                                                        return (
+                                                            <details
+                                                                key={group}
+                                                                className="rounded-md border"
+                                                                open={Boolean(
+                                                                    permQuery,
+                                                                )}
+                                                            >
+                                                                <summary className="grid cursor-pointer list-none items-start gap-3 px-4 py-3 hover:bg-muted md:grid-cols-[1fr_auto] md:items-center">
+                                                                    <div className="min-w-0">
+                                                                        <div className="text-sm font-semibold">
+                                                                            {formatGroupName(
+                                                                                group,
+                                                                            )}
+                                                                        </div>
+                                                                        <div className="text-xs text-muted-foreground">
+                                                                            {
+                                                                                perms.length
+                                                                            }{' '}
+                                                                            permission
+                                                                            {perms.length ===
+                                                                            1
+                                                                                ? ''
+                                                                                : 's'}
+                                                                        </div>
+                                                                    </div>
+
+                                                                    <div className="flex flex-wrap items-center justify-start gap-2 md:justify-end">
+                                                                        <Button
+                                                                            type="button"
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={(
+                                                                                e,
+                                                                            ) => {
+                                                                                e.preventDefault();
+                                                                                setGroupOverride(
+                                                                                    ids,
+                                                                                    'inherit',
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            All
+                                                                            inherit
+                                                                        </Button>
+                                                                        <Button
+                                                                            type="button"
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={(
+                                                                                e,
+                                                                            ) => {
+                                                                                e.preventDefault();
+                                                                                setGroupOverride(
+                                                                                    ids,
+                                                                                    'allow',
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            All
+                                                                            allow
+                                                                        </Button>
+                                                                        <Button
+                                                                            type="button"
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={(
+                                                                                e,
+                                                                            ) => {
+                                                                                e.preventDefault();
+                                                                                setGroupOverride(
+                                                                                    ids,
+                                                                                    'deny',
+                                                                                );
+                                                                            }}
+                                                                        >
+                                                                            All
+                                                                            deny
+                                                                        </Button>
+                                                                    </div>
+                                                                </summary>
+
+                                                                <div className="px-4 pb-4">
+                                                                    <div className="mt-2 space-y-2">
+                                                                        {perms.map(
+                                                                            (
+                                                                                p,
+                                                                            ) => (
+                                                                                <div
+                                                                                    key={
+                                                                                        p.id
+                                                                                    }
+                                                                                    className="grid gap-2 rounded-md border p-3 md:grid-cols-[1fr_220px]"
+                                                                                >
+                                                                                    <div>
+                                                                                        <div className="font-mono text-sm font-medium">
+                                                                                            {
+                                                                                                p.key
+                                                                                            }
+                                                                                        </div>
+                                                                                        {p.description && (
+                                                                                            <div className="text-xs text-muted-foreground">
+                                                                                                {
+                                                                                                    p.description
+                                                                                                }
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </div>
+
+                                                                                    <div>
+                                                                                        <Label className="sr-only">
+                                                                                            Override
+                                                                                        </Label>
+                                                                                        <Select
+                                                                                            value={
+                                                                                                form
+                                                                                                    .data
+                                                                                                    .overrides[
+                                                                                                    String(
+                                                                                                        p.id,
+                                                                                                    )
+                                                                                                ]
+                                                                                            }
+                                                                                            onValueChange={(
+                                                                                                value: any,
+                                                                                            ) =>
+                                                                                                form.setData(
+                                                                                                    'overrides',
+                                                                                                    {
+                                                                                                        ...form
+                                                                                                            .data
+                                                                                                            .overrides,
+                                                                                                        [String(
+                                                                                                            p.id,
+                                                                                                        )]:
+                                                                                                            value,
+                                                                                                    },
+                                                                                                )
+                                                                                            }
+                                                                                        >
+                                                                                            <SelectTrigger>
+                                                                                                <SelectValue placeholder="Inherit" />
+                                                                                            </SelectTrigger>
+                                                                                            <SelectContent>
+                                                                                                <SelectItem value="inherit">
+                                                                                                    Inherit
+                                                                                                </SelectItem>
+                                                                                                <SelectItem value="allow">
+                                                                                                    Allow
+                                                                                                </SelectItem>
+                                                                                                <SelectItem value="deny">
+                                                                                                    Deny
+                                                                                                </SelectItem>
+                                                                                            </SelectContent>
+                                                                                        </Select>
+                                                                                    </div>
+                                                                                </div>
+                                                                            ),
+                                                                        )}
+
+                                                                        {perms.length ===
+                                                                            0 && (
+                                                                            <div className="rounded-md border p-3 text-sm text-muted-foreground">
+                                                                                No
+                                                                                permissions
+                                                                                in
+                                                                                this
+                                                                                group.
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </details>
+                                                        );
+                                                    },
+                                                )}
+
+                                                {filteredPermissions.length ===
+                                                    0 && (
+                                                    <div className="rounded-md border p-3 text-sm text-muted-foreground">
+                                                        No permissions match
+                                                        your filter.
                                                     </div>
-                                                </div>
-                                            ))}
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
 

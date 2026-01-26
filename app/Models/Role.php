@@ -9,6 +9,11 @@ class Role extends Model
 {
     protected $fillable = ['name', 'label'];
 
+    public function notificationPreferences()
+    {
+        return $this->hasMany(RoleNotificationPreference::class);
+    }
+
     public function permissions()
     {
         return $this->belongsToMany(Permission::class, 'role_permission');

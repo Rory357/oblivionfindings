@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Support\Facades\Storage;
 
 class Client extends Model
 {
@@ -30,11 +31,27 @@ class Client extends Model
         'funding_type',
         'funding_notes',
         'openai_vector_store_id',
+        'profile_photo_path',
     ];
 
     protected $casts = [
         'date_of_birth' => 'date',
     ];
+
+    protected $appends = ['profile_photo_url', 'avatar'];
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        return $this->profile_photo_path
+            ? Storage::disk('public')->url($this->profile_photo_path)
+            : url('/images/avatar-placeholder.svg');
+    }
+
+    public function getAvatarAttribute(): ?string
+    {
+        return $this->profile_photo_url;
+    }
+
 
     public function site()
     {

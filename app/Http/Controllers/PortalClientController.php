@@ -45,7 +45,13 @@ class PortalClientController extends Controller
         }
 
         return inertia('portal/client', [
-            'client' => $client->only(['id', 'first_name', 'last_name']),
+            'client' => [
+                'id' => $client->id,
+                'first_name' => $client->first_name,
+                'last_name' => $client->last_name,
+                'profile_photo_url' => $client->profile_photo_url,
+                'avatar' => $client->avatar,
+            ],
             'profile' => $client->medicalProfile,
             'medications' => $client->medications,
             'conditions' => $client->conditions,

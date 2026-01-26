@@ -2,12 +2,14 @@ import ProfileController from '@/actions/App/Http/Controllers/Settings/ProfileCo
 import { send } from '@/routes/verification';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Transition } from '@headlessui/react';
-import { Form, Head, Link, usePage } from '@inertiajs/react';
+import { Form, Head, Link, useForm, usePage } from '@inertiajs/react';
 
 import DeleteUser from '@/components/delete-user';
 import HeadingSmall from '@/components/heading-small';
 import InputError from '@/components/input-error';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useInitials } from '@/hooks/use-initials';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
@@ -29,6 +31,10 @@ export default function Profile({
     status?: string;
 }) {
     const { auth } = usePage<SharedData>().props;
+    const getInitials = useInitials();
+    const photoForm = useForm<{ photo: File | null }>({ photo: null });
+    const removePhotoForm = useForm({});
+
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -36,6 +42,65 @@ export default function Profile({
 
             <SettingsLayout>
                 <div className="space-y-6">
+                    <HeadingSmall
+                        title="Profile photo"
+                        description="Upload a photo to display across the app."
+                    />
+
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            photoForm.post('/settings/profile/photo', {
+                                forceFormData: true,
+                                preserveScroll: true,
+                            });
+                        }}
+                        className="flex flex-col gap-4 sm:flex-row sm:items-center"
+                    >
+                        <Avatar className="h-16 w-16">
+                            <AvatarImage src={(auth.user as any).avatar ?? (auth.user as any).profile_photo_url} alt={auth.user.name} />
+                            <AvatarFallback>{getInitials(auth.user.name)}</AvatarFallback>
+                        </Avatar>
+
+                        <div className="flex-1">
+                            <Label htmlFor="photo">Upload photo</Label>
+                            <Input
+                                id="photo"
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) =>
+                                    photoForm.setData('photo', e.target.files?.[0] ?? null)
+                                }
+                                className="mt-2"
+                            />
+                            <InputError
+                                className="mt-2"
+                                message={(photoForm.errors as any).photo}
+                            />
+                        </div>
+
+                        <Button type="submit" disabled={photoForm.processing || !photoForm.data.photo}>
+                            Save photo
+                        </Button>
+
+                        {(auth.user as any).profile_photo_path ? (
+                            <Button
+                                type="button"
+                                variant="outline"
+                                disabled={removePhotoForm.processing}
+                                onClick={() =>
+                                    removePhotoForm.delete('/settings/profile/photo', {
+                                        preserveScroll: true,
+                                    })
+                                }
+                            >
+                                Remove
+                            </Button>
+                        ) : null}
+                    </form>
+
+                    <div className="h-px bg-border" />
+
                     <HeadingSmall
                         title="Profile information"
                         description="Update your name and email address"

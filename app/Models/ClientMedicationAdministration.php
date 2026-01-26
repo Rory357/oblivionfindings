@@ -19,6 +19,7 @@ class ClientMedicationAdministration extends Model
         'shift_id',
         'service_context_id',
         'administered_by',
+        'witnessed_by',
         'scheduled_for',
         'administered_at',
         'status',
@@ -57,5 +58,10 @@ class ClientMedicationAdministration extends Model
     public function administeredBy()
     {
         return $this->belongsTo(User::class, 'administered_by');
+    }
+
+    public function witnessedBy()
+    {
+        return $this->belongsTo(User::class, 'witnessed_by');
     }
 }

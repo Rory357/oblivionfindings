@@ -18,8 +18,22 @@ type Props = {
   history: any[];
   break_glass?: { id: number; reason: string; expires_at?: string | null } | null;
   has_open_controlled_discrepancy: boolean;
+  witnesses?: Array<{ id: number; name: string }>;
   can: { record: boolean; correct: boolean; export: boolean; break_glass: boolean };
 };
+
+function toLocalDateTimeInput(iso?: string | null) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function fromLocalDateTimeInput(v: string) {
+  if (!v) return null;
+  const d = new Date(v);
+  return d.toISOString();
+}
 
 function pillForScheduleState(state: string) {
   switch (state) {
@@ -59,7 +73,10 @@ function pillForStatus(status?: string | null) {
 
 export default function ClientMar() {
   const { props } = usePage<Props>();
-  const { client, date, rows, history, can, has_open_controlled_discrepancy, break_glass } = props;
+  const { client, date, rows, history, can, has_open_controlled_discrepancy, break_glass, witnesses = [] } = props;
+
+  const auth: any = (usePage().props as any).auth;
+  const myUserId = auth?.user?.id;
 
   const clientName = `${client.first_name} ${client.last_name}`.trim();
 
@@ -103,6 +120,46 @@ export default function ClientMar() {
     correction_reason: '',
   });
 
+  const corrNeedsReason = useMemo(() => {
+    if (!corrRecord) return false;
+    const createdAt = corrRecord.created_at || corrRecord.record?.created_at;
+    if (!createdAt) return true;
+    const diffMinutes = (Date.now() - new Date(createdAt).getTime()) / 60000;
+    return diffMinutes > 30;
+  }, [corrRecord]);
+
+  const canSubmitCorrection =
+    !!corrRecord && (!corrNeedsReason || !!corrForm.data.correction_reason?.trim());
+
+  const adminNeedsReason = useMemo(() => {
+    if (!adminRow) return false;
+    // Non-given outcomes always need a reason
+    if (adminForm.data.status !== 'given') return true;
+    // PRN "given" needs indication
+    if (adminRow?.medication?.is_prn) return true;
+    // Scheduled given outside time window needs a reason
+    if (adminForm.data.scheduled_for && adminForm.data.administered_at) {
+      try {
+        const scheduled = new Date(adminForm.data.scheduled_for as any);
+        const adminAt = new Date(fromLocalDateTimeInput(adminForm.data.administered_at as any) || new Date().toISOString());
+        const diffMinutes = (adminAt.getTime() - scheduled.getTime()) / 60000;
+        const earlyBefore = 60;
+        const lateAfter = 30;
+        if (diffMinutes < -earlyBefore || diffMinutes > lateAfter) return true;
+      } catch {
+        // ignore
+      }
+    }
+    return false;
+  }, [adminRow, adminForm.data.status, adminForm.data.scheduled_for, adminForm.data.administered_at]);
+
+  const adminNeedsWitness = !!adminRow?.medication?.controlled_drug && adminForm.data.status === 'given';
+
+  const canSubmitAdmin =
+    !!adminRow &&
+    (!adminNeedsReason || !!adminForm.data.reason?.trim()) &&
+    (!adminNeedsWitness || (adminForm.data.witnessed_by && adminForm.data.witnessed_by !== '__none__'));
+
   function goToDate(d: string) {
     router.get(`/clients/${client.id}/mar`, { date: d }, { preserveScroll: true, preserveState: true });
   }
@@ -112,14 +169,20 @@ export default function ClientMar() {
     adminForm.reset();
     adminForm.setData('scheduled_for', row.scheduled_for);
     adminForm.setData('status', 'given');
-    adminForm.setData('administered_at', new Date().toISOString());
+    adminForm.setData('administered_at', toLocalDateTimeInput(new Date().toISOString()));
+    adminForm.setData('witnessed_by', '__none__');
     setAdminOpen(true);
   }
 
   function submitAdmin() {
     if (!adminRow) return;
     const mId = adminRow.medication.id;
-    adminForm.post(`/clients/${client.id}/medical/medications/${mId}/administrations`, {
+    const payload: any = {
+      ...adminForm.data,
+      administered_at: fromLocalDateTimeInput(adminForm.data.administered_at as any),
+      witnessed_by: adminForm.data.witnessed_by === '__none__' ? null : adminForm.data.witnessed_by,
+    };
+    adminForm.transform(() => payload).post(`/clients/${client.id}/medical/medications/${mId}/administrations`, {
       preserveScroll: true,
       onSuccess: () => {
         setAdminOpen(false);
@@ -135,13 +198,17 @@ export default function ClientMar() {
     corrForm.setData('reason', record.reason ?? '');
     corrForm.setData('dose_given', record.dose_given ?? '');
     corrForm.setData('notes', record.notes ?? '');
-    corrForm.setData('administered_at', record.administered_at ?? new Date().toISOString());
+    corrForm.setData('administered_at', toLocalDateTimeInput(record.administered_at ?? new Date().toISOString()));
     setCorrOpen(true);
   }
 
   function submitCorrection() {
     if (!corrRecord) return;
-    corrForm.post(`/clients/${client.id}/mar/administrations/${corrRecord.id}/corrections`, {
+    const payload: any = {
+      ...corrForm.data,
+      administered_at: fromLocalDateTimeInput(corrForm.data.administered_at as any),
+    };
+    corrForm.transform(() => payload).post(`/clients/${client.id}/mar/administrations/${corrRecord.id}/corrections`, {
       preserveScroll: true,
       onSuccess: () => {
         setCorrOpen(false);
@@ -344,7 +411,36 @@ export default function ClientMar() {
               </Select>
             </div>
             <div className="grid gap-2">
-              <Label>Reason / PRN indication (required for non-given, or PRN, or outside window)</Label>
+              <Label>Administered at</Label>
+              <Input
+                type="datetime-local"
+                value={adminForm.data.administered_at as any}
+                onChange={(e) => adminForm.setData('administered_at', e.target.value)}
+              />
+            </div>
+
+            {adminRow?.medication?.controlled_drug && adminForm.data.status === 'given' && (
+              <div className="grid gap-2">
+                <Label>Witness (required for controlled drugs)</Label>
+                <Select
+                  value={(adminForm.data.witnessed_by as any) || '__none__'}
+                  onValueChange={(v) => adminForm.setData('witnessed_by', v)}
+                >
+                  <SelectTrigger><SelectValue placeholder="Select witness" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Select…</SelectItem>
+                    {witnesses.filter((w) => w.id !== myUserId).map((w) => (
+                      <SelectItem key={w.id} value={String(w.id)}>{w.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-slate-500">Witness must be a different authorised user.</div>
+              </div>
+            )}
+            <div className="grid gap-2">
+              <Label>
+                Reason / indication{adminNeedsReason ? ' (required)' : ' (optional)'}
+              </Label>
               <Input value={adminForm.data.reason} onChange={(e) => adminForm.setData('reason', e.target.value)} />
             </div>
             <div className="grid gap-2">
@@ -358,7 +454,7 @@ export default function ClientMar() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setAdminOpen(false)}>Cancel</Button>
-            <Button onClick={submitAdmin} disabled={adminForm.processing}>Save</Button>
+            <Button onClick={submitAdmin} disabled={adminForm.processing || !canSubmitAdmin}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -394,13 +490,21 @@ export default function ClientMar() {
               <Input value={corrForm.data.notes} onChange={(e) => corrForm.setData('notes', e.target.value)} />
             </div>
             <div className="grid gap-2">
-              <Label>Correction reason (required outside 30 minutes)</Label>
+              <Label>Administered at</Label>
+              <Input
+                type="datetime-local"
+                value={corrForm.data.administered_at as any}
+                onChange={(e) => corrForm.setData('administered_at', e.target.value)}
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label>Correction reason{corrNeedsReason ? ' (required)' : ' (optional)'}</Label>
               <Input value={corrForm.data.correction_reason} onChange={(e) => corrForm.setData('correction_reason', e.target.value)} />
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCorrOpen(false)}>Cancel</Button>
-            <Button onClick={submitCorrection} disabled={corrForm.processing}>Save correction</Button>
+            <Button onClick={submitCorrection} disabled={corrForm.processing || !canSubmitCorrection}>Save correction</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

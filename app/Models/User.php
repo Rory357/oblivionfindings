@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Fortify\TwoFactorAuthenticatable;
+use Illuminate\Support\Facades\Storage;
 
 class User extends Authenticatable
 {
@@ -29,6 +30,8 @@ class User extends Authenticatable
         // Admin approval gate
         'approved_at',
         'approved_by',
+
+        'profile_photo_path',
     ];
 
     /**
@@ -42,6 +45,9 @@ class User extends Authenticatable
         'two_factor_recovery_codes',
         'remember_token',
     ];
+
+    protected $appends = ['profile_photo_url', 'avatar'];
+
 
     /**
      * Get the attributes that should be cast.
@@ -61,6 +67,33 @@ class User extends Authenticatable
     public function isApproved(): bool
     {
         return !is_null($this->approved_at);
+    }
+
+    /**
+     * Scope: staff users (excludes client portal roles).
+     *
+     * We exclude users who have the RBAC roles `client` or `next_of_kin`.
+     * For backwards compatibility during the users.role -> role_user migration,
+     * we also exclude legacy users.role values.
+     */
+    public function scopeStaff($query)
+    {
+        return $query
+            ->whereDoesntHave('roles', fn ($q) => $q->whereIn('name', ['client', 'next_of_kin']))
+            ->whereNotIn('role', ['client', 'next_of_kin']);
+    }
+
+
+    public function getProfilePhotoUrlAttribute(): ?string
+    {
+        return $this->profile_photo_path
+            ? Storage::disk('public')->url($this->profile_photo_path)
+            : url('/images/avatar-placeholder.svg');
+    }
+
+    public function getAvatarAttribute(): ?string
+    {
+        return $this->profile_photo_url;
     }
 
     // ---------------------------
@@ -122,6 +155,11 @@ class User extends Authenticatable
     {
         return $this->belongsToMany(\App\Models\Permission::class, 'permission_user')
             ->withPivot('allowed');
+    }
+
+    public function notificationPreferences()
+    {
+        return $this->hasMany(\App\Models\UserNotificationPreference::class);
     }
 
     public function breakGlassAccesses()

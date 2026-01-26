@@ -133,6 +133,8 @@ class IncidentController extends Controller
                 $incident,
                 $client,
                 [
+                    'event_key' => 'incidents.high_severity_alert',
+                    'severity' => $incident->severity,
                     'title' => 'High severity incident drafted',
                     'body' => "Client: {$client->first_name} {$client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}",
                     'url' => url("/incidents/{$incident->id}"),
@@ -162,8 +164,8 @@ class IncidentController extends Controller
 
         $staff = null;
         if ($user && ($user->canDo('incidents.followups.manage') || $user->canDo('incidents.viewAny'))) {
-            $staff = User::query()
-                ->whereIn('role', ['support_worker', 'provider_manager', 'admin'])
+            // Assignable staff (exclude portal users)
+            $staff = User::staff()
                 ->orderBy('name')
                 ->get(['id', 'name', 'email', 'role']);
         }
@@ -174,6 +176,7 @@ class IncidentController extends Controller
                 'update' => $user ? $user->can('update', $incident) : false,
                 'submit' => $user ? $user->can('submit', $incident) : false,
                 'review' => $user ? $user->can('review', $incident) : false,
+                'close' => $user ? $user->can('close', $incident) : false,
                 'templatesManage' => $user?->canDo('incidents.templates.manage') ?? false,
                 'followupsManage' => $user?->canDo('incidents.followups.manage') ?? false,
                 'followupsComplete' => $user?->canDo('incidents.followups.complete') ?? false,
@@ -187,6 +190,12 @@ class IncidentController extends Controller
     public function update(Request $request, ClientIncident $incident)
     {
         $this->authorize('update', $incident);
+
+        $user = $request->user();
+
+        // Audit guardrail: once submitted/reviewed, lock core incident fields.
+        // Managers can still add review notes and manage portal visibility.
+        $coreLocked = in_array($incident->status, ['submitted', 'reviewed'], true);
 
         $data = $request->validate([
             'type' => ['required', 'string', 'max:120'],
@@ -205,7 +214,6 @@ class IncidentController extends Controller
         ]);
 
         // If reporter is editing, do not allow review fields / portal visibility to be overwritten
-        $user = $request->user();
         if ($user && $incident->isEditableByReporter($user) && !$user->canDo('incidents.viewAny')) {
             unset($data['review_notes']);
             unset($data['portal_visible']);
@@ -215,9 +223,16 @@ class IncidentController extends Controller
             unset($data['portal_visible']);
         }
 
+        if ($coreLocked) {
+            // Only allow manager/admin-only fields after submission.
+            foreach (['type', 'severity', 'occurred_at', 'description', 'requires_followup', 'immediate_action_taken', 'witnesses'] as $field) {
+                unset($data[$field]);
+            }
+        }
+
         $incident->update([
             ...$data,
-            'title' => $data['type'] . ' incident',
+            'title' => ($data['type'] ?? $incident->type) . ' incident',
         ]);
 
         return back()->with('success', 'Incident updated.');
@@ -250,12 +265,56 @@ class IncidentController extends Controller
             'submitted_at' => now(),
         ]);
 
+        $incident->load(['client:id,first_name,last_name']);
+        $client = $incident->client;
+
+        app(NotificationService::class)->notifyCrud(
+            $request->user(),
+            'submitted',
+            'incident',
+            $incident,
+            $client,
+            [
+                'event_key' => 'incidents.submitted',
+                'severity' => $incident->severity,
+                'title' => 'Incident submitted for review',
+                'body' => "Client: {$client->first_name} {$client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}",
+                'url' => url("/incidents/{$incident->id}"),
+                // Submission is for managers to action; avoid pinging the submitter again.
+                'include_entity_user' => false,
+            ]
+        );
+
+        // High severity: extra managers-only alert on submission.
+        if ($incident->severity === 'high') {
+            app(NotificationService::class)->notifyCrud(
+                $request->user(),
+                'submitted',
+                'incident',
+                $incident,
+                $client,
+                [
+                    'event_key' => 'incidents.high_severity_alert',
+                    'severity' => $incident->severity,
+                    'title' => 'High severity incident submitted',
+                    'body' => "Client: {$client->first_name} {$client->last_name}\nType: {$incident->type}\nSeverity: {$incident->severity}",
+                    'url' => url("/incidents/{$incident->id}"),
+                    'include_assigned_workers' => false,
+                    'include_entity_user' => false,
+                    'include_managers' => false,
+                ]
+            );
+        }
+
         return back()->with('success', 'Incident submitted.');
     }
 
     public function review(Request $request, ClientIncident $incident)
     {
         $this->authorize('review', $incident);
+
+        // Guardrail: review is only valid for submitted incidents.
+        abort_unless($incident->status === 'submitted', 403);
 
         $data = $request->validate([
             'review_notes' => ['nullable', 'string'],
@@ -268,12 +327,147 @@ class IncidentController extends Controller
             'review_notes' => $data['review_notes'] ?? $incident->review_notes,
         ]);
 
+        $incident->load(['client:id,first_name,last_name']);
+        $client = $incident->client;
+
+        // Notify reporter + assigned workers that the incident has been reviewed.
+        $targets = [];
+        if (!empty($incident->reported_by)) {
+            $targets[] = (int) $incident->reported_by;
+        }
+
+        app(NotificationService::class)->notifyCrud(
+            $request->user(),
+            'reviewed',
+            'incident',
+            $incident,
+            $client,
+            [
+                'event_key' => 'incidents.reviewed',
+                'severity' => $incident->severity,
+                'title' => 'Incident reviewed',
+                'url' => url("/incidents/{$incident->id}"),
+                'target_user_ids' => $targets,
+                'include_entity_user' => false,
+            ]
+        );
+
         return back()->with('success', 'Incident reviewed.');
+    }
+
+    public function close(Request $request, ClientIncident $incident)
+    {
+        $this->authorize('close', $incident);
+
+        // Guardrail: closing is only valid for reviewed incidents.
+        abort_unless($incident->status === 'reviewed', 403);
+
+        // Guardrail: incidents cannot be closed while there are any open follow-ups.
+        // This applies if follow-ups were explicitly flagged *or* any follow-up records exist.
+        $hasOpenFollowups = $incident->followups()->whereNull('completed_at')->exists();
+        if ($hasOpenFollowups) {
+            return back()->with('error', 'There are open follow-ups. Please complete them before closing the incident.');
+        }
+
+        $data = $request->validate([
+            'closed_outcome' => ['required', 'string', 'max:120'],
+            'closed_notes' => ['nullable', 'string'],
+        ]);
+
+        $incident->update([
+            'status' => 'closed',
+            'closed_by' => $request->user()?->id,
+            'closed_at' => now(),
+            'closed_outcome' => $data['closed_outcome'],
+            'closed_notes' => $data['closed_notes'] ?? null,
+        ]);
+
+        $incident->load(['client:id,first_name,last_name']);
+        $client = $incident->client;
+
+        // Notify reporter + assigned workers that the incident has been closed.
+        $targets = [];
+        if (!empty($incident->reported_by)) {
+            $targets[] = (int) $incident->reported_by;
+        }
+
+        app(NotificationService::class)->notifyCrud(
+            $request->user(),
+            'closed',
+            'incident',
+            $incident,
+            $client,
+            [
+                'event_key' => 'incidents.closed',
+                'severity' => $incident->severity,
+                'title' => 'Incident closed',
+                'url' => url("/incidents/{$incident->id}"),
+                'target_user_ids' => $targets,
+                'include_entity_user' => false,
+            ]
+        );
+
+        return back()->with('success', 'Incident closed.');
+    }
+
+    public function reopen(Request $request, ClientIncident $incident)
+    {
+        $this->authorize('reopen', $incident);
+
+        // Only closed incidents may be reopened.
+        abort_unless($incident->status === 'closed', 403);
+
+        $data = $request->validate([
+            'reopened_reason' => ['required', 'string', 'max:2000'],
+        ]);
+
+        $incident->update([
+            'status' => 'reviewed',
+            'reopened_by' => $request->user()?->id,
+            'reopened_at' => now(),
+            'reopened_reason' => $data['reopened_reason'],
+
+            // clear closure fields so the incident becomes "open" again
+            'closed_by' => null,
+            'closed_at' => null,
+            'closed_outcome' => null,
+            'closed_notes' => null,
+        ]);
+
+        $incident->load(['client:id,first_name,last_name']);
+        $client = $incident->client;
+
+        // Notify reporter that the incident has been reopened.
+        $targets = [];
+        if (!empty($incident->reported_by)) {
+            $targets[] = (int) $incident->reported_by;
+        }
+
+        app(\App\Services\NotificationService::class)->notifyCrud(
+            $request->user(),
+            'reopened',
+            'incident',
+            $incident,
+            $client,
+            [
+                'event_key' => 'incidents.reopened',
+                'severity' => $incident->severity,
+                'title' => 'Incident reopened',
+                'url' => url("/incidents/{$incident->id}"),
+                'target_user_ids' => $targets,
+                'include_entity_user' => false,
+            ]
+        );
+
+        return back()->with('success', 'Incident reopened.');
     }
 
     public function uploadAttachment(Request $request, ClientIncident $incident)
     {
         $this->authorize('update', $incident);
+
+        // Audit guardrail: attachments are only mutable while the incident is in draft.
+        abort_unless($incident->status === 'draft', 403);
 
         $data = $request->validate([
             'file' => ['required', 'file', 'max:10240'],
@@ -300,6 +494,9 @@ class IncidentController extends Controller
     public function removeAttachment(Request $request, ClientIncident $incident, ClientIncidentAttachment $attachment)
     {
         $this->authorize('update', $incident);
+
+        // Audit guardrail: attachments are only mutable while the incident is in draft.
+        abort_unless($incident->status === 'draft', 403);
 
         abort_unless((int)$attachment->incident_id === (int)$incident->id, 404);
 

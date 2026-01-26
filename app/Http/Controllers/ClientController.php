@@ -12,6 +12,9 @@ use App\Models\ServiceContext;
 use App\Services\NotificationService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 
@@ -51,6 +54,7 @@ class ClientController extends Controller
                 'address_line_1',
                 'city',
                 'postcode',
+                'profile_photo_path',
             ]);
 
         $clients = $clients->map(function (Client $c) {
@@ -59,6 +63,8 @@ class ClientController extends Controller
                 'id' => $c->id,
                 'first_name' => $c->first_name,
                 'last_name' => $c->last_name,
+                'profile_photo_url' => $c->profile_photo_url,
+                'avatar' => $c->avatar,
                 'status' => $c->status,
                 'site' => $c->site ? ['id' => $c->site->id, 'name' => $c->site->name] : null,
                 'onboarding' => $summary,
@@ -137,6 +143,8 @@ class ClientController extends Controller
                     'id' => $client->id,
                     'first_name' => $client->first_name,
                     'last_name' => $client->last_name,
+                'profile_photo_url' => $client->profile_photo_url,
+                'avatar' => $client->avatar,
                     'status' => $client->status,
                     'site' => $client->site
                         ? [
@@ -195,6 +203,8 @@ class ClientController extends Controller
                 'id' => $client->id,
                 'first_name' => $client->first_name,
                 'last_name' => $client->last_name,
+                'profile_photo_url' => $client->profile_photo_url,
+                'avatar' => $client->avatar,
                 'preferred_name' => $client->preferred_name,
                 'date_of_birth' => optional($client->date_of_birth)->toDateString(),
                 'gender' => $client->gender,
@@ -449,7 +459,8 @@ class ClientController extends Controller
         return inertia('clients/edit', [
             'client' => $client->only([
                 'id','site_id','service_context_id','first_name','last_name','preferred_name','date_of_birth','gender','status',
-                'phone','email','address_line_1','address_line_2','suburb','city','postcode','funding_type','funding_notes',
+                'phone','email','address_line_1','address_line_2','suburb','city','postcode',
+                'profile_photo_path','funding_type','funding_notes',
             ]),
             'sites' => $sites,
             'serviceContexts' => $serviceContexts,
@@ -479,4 +490,87 @@ class ClientController extends Controller
                 ->with('error', 'Failed to update client: ' . $e->getMessage());
         }
     }
+
+
+    public function updatePhoto(Request $request, Client $client)
+    {
+        $this->authorize('update', $client);
+
+        $request->validate([
+            'photo' => ['required', 'image', 'max:5120'], // 5MB
+        ]);
+
+        $path = $this->storeAvatar($request->file('photo'), 'profile-photos/clients');
+
+        if ($client->profile_photo_path) {
+            Storage::disk('public')->delete($client->profile_photo_path);
+        }
+
+        $client->forceFill(['profile_photo_path' => $path])->save();
+
+        return back()->with('success', 'Client photo updated.');
+    }
+
+    /**
+     * Remove the client's profile photo.
+     */
+    public function destroyPhoto(Request $request, Client $client)
+    {
+        $this->authorize('update', $client);
+
+        if ($client->profile_photo_path) {
+            Storage::disk('public')->delete($client->profile_photo_path);
+        }
+
+        $client->forceFill(['profile_photo_path' => null])->save();
+
+        return back()->with('success', 'Client photo removed.');
+    }
+
+    /**
+     * Store a square-cropped avatar (center crop) and resize to 512x512.
+     */
+    private function storeAvatar(UploadedFile $file, string $dir): string
+    {
+        try {
+            $data = file_get_contents($file->getRealPath());
+            $src = @imagecreatefromstring($data);
+            if (!$src) {
+                throw new \RuntimeException('Unable to read image');
+            }
+
+            $w = imagesx($src);
+            $h = imagesy($src);
+            $size = min($w, $h);
+            $x = (int) floor(($w - $size) / 2);
+            $y = (int) floor(($h - $size) / 2);
+
+            $crop = imagecrop($src, ['x' => $x, 'y' => $y, 'width' => $size, 'height' => $size]);
+            if (!$crop) {
+                $crop = $src;
+            }
+
+            $dst = imagecreatetruecolor(512, 512);
+            $white = imagecolorallocate($dst, 255, 255, 255);
+            imagefill($dst, 0, 0, $white);
+            imagecopyresampled($dst, $crop, 0, 0, 0, 0, 512, 512, imagesx($crop), imagesy($crop));
+
+            ob_start();
+            imagejpeg($dst, null, 85);
+            $jpg = ob_get_clean();
+
+            imagedestroy($dst);
+            if ($crop !== $src) {
+                imagedestroy($crop);
+            }
+            imagedestroy($src);
+
+            $filename = trim($dir, '/') . '/' . Str::uuid()->toString() . '.jpg';
+            Storage::disk('public')->put($filename, $jpg);
+            return $filename;
+        } catch (\Throwable $e) {
+            return $file->storePublicly($dir, 'public');
+        }
+    }
+
 }

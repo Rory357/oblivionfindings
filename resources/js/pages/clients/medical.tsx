@@ -19,6 +19,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { useState } from 'react';
@@ -64,6 +65,14 @@ export default function ClientMedical({
 }: Props) {
     const name = `${client.first_name} ${client.last_name}`.trim();
     const [confirmAdminOpen, setConfirmAdminOpen] = useState(false);
+
+    // When navigating from the client profile "Manage" buttons, we pass a section.
+    // This keeps the medical workflow focused instead of showing every create form at once.
+    const sectionParam =
+        typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search).get('section')
+            : null;
+    const [focusSection, setFocusSection] = useState<string>(sectionParam ?? 'all');
 
     const profileForm = useForm({
         medical_history: profile?.medical_history || '',
@@ -215,8 +224,51 @@ export default function ClientMedical({
                 )}
             </div>
 
+            <div className="mb-4 flex flex-wrap items-center gap-2">
+                <Button
+                    size="sm"
+                    variant={focusSection === 'all' ? 'default' : 'outline'}
+                    onClick={() => setFocusSection('all')}
+                >
+                    All
+                </Button>
+                <Button
+                    size="sm"
+                    variant={focusSection === 'profile' ? 'default' : 'outline'}
+                    onClick={() => setFocusSection('profile')}
+                >
+                    Profile
+                </Button>
+                <Button
+                    size="sm"
+                    variant={focusSection === 'medications' ? 'default' : 'outline'}
+                    onClick={() => setFocusSection('medications')}
+                >
+                    Medications
+                </Button>
+                <Button
+                    size="sm"
+                    variant={focusSection === 'conditions' ? 'default' : 'outline'}
+                    onClick={() => setFocusSection('conditions')}
+                >
+                    Conditions
+                </Button>
+                <Button
+                    size="sm"
+                    variant={focusSection === 'emergency_contacts' ? 'default' : 'outline'}
+                    onClick={() => setFocusSection('emergency_contacts')}
+                >
+                    Emergency contacts
+                </Button>
+                {focusSection !== 'all' && (
+                    <div className="text-xs text-slate-500">
+                        Tip: use “All” to see the full medical dashboard.
+                    </div>
+                )}
+            </div>
+
             <div className="grid auto-rows-fr grid-cols-2 gap-4 md:grid-cols-2">
-                <Card>
+                <Card className={cn(focusSection !== 'all' && focusSection !== 'profile' && 'hidden')}>
                     <CardHeader>
                         <CardTitle className="text-base">
                             Medical profile
@@ -291,7 +343,7 @@ export default function ClientMedical({
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className={cn(focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
                     <CardHeader>
                         <CardTitle className="text-base">Medications</CardTitle>
                     </CardHeader>
@@ -628,7 +680,7 @@ export default function ClientMedical({
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className={cn(focusSection !== 'all' && focusSection !== 'conditions' && 'hidden')}>
                     <CardHeader>
                         <CardTitle className="text-base">Conditions</CardTitle>
                     </CardHeader>
@@ -749,7 +801,7 @@ export default function ClientMedical({
                     </CardContent>
                 </Card>
 
-                <Card>
+                <Card className={cn(focusSection !== 'all' && focusSection !== 'emergency_contacts' && 'hidden')}>
                     <CardHeader>
                         <CardTitle className="text-base">
                             Emergency contacts
@@ -904,7 +956,7 @@ export default function ClientMedical({
             </div>
 
             {/* MAR + Stock */}
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className={cn('grid gap-4 md:grid-cols-2', focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">

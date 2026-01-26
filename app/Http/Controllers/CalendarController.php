@@ -30,7 +30,7 @@ class CalendarController extends Controller
         $clients = [];
 
         if ($canManageAny) {
-            $staff = User::query()
+            $staff = User::staff()
                 ->orderBy('name')
                 ->get(['id', 'name', 'email']);
 

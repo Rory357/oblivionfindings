@@ -117,6 +117,10 @@ class HandleInertiaRequests extends Middleware
                     'viewAny' => $user->canDo('audit.viewAny'),
                 ],
 
+                'compliance' => [
+                    'view' => $user->canDo('compliance.view'),
+                ],
+
                 'incidents' => [
                     'viewAny' => $user->canDo('incidents.viewAny'),
                     'viewAssigned' => $user->canDo('incidents.viewAssigned'),
@@ -188,6 +192,10 @@ class HandleInertiaRequests extends Middleware
                     'name' => $user->name,
                     'email' => $user->email,
 
+                    'profile_photo_url' => $user->profile_photo_url,
+
+                    'avatar' => $user->avatar,
+
                     // Keep during migration (existing UI uses it)
                     'role' => $user->role ?? null,
 
@@ -228,12 +236,14 @@ class HandleInertiaRequests extends Middleware
                     'items' => $user->notifications()
                         ->latest()
                         ->limit(8)
-                        ->get(['id', 'type', 'data', 'read_at', 'created_at'])
+                        ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])
                         ->map(fn($n) => [
                             'id' => $n->id,
                             'type' => $n->type,
                             'data' => $n->data,
                             'read_at' => optional($n->read_at)->toISOString(),
+                            'acknowledged_at' => optional($n->acknowledged_at)->toISOString(),
+                            'escalation_count' => (int) ($n->escalation_count ?? 0),
                             'created_at' => optional($n->created_at)->toISOString(),
                         ])
                         ->values(),

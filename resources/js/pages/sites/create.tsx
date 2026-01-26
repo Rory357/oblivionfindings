@@ -8,6 +8,14 @@ export default function CreateSite() {
 
     const { data, setData, post, processing, errors } = useForm({
         name: '',
+        phone: '',
+        email: '',
+        manager_name: '',
+        manager_phone: '',
+        after_hours_phone: '',
+        emergency_plan_location: '',
+        medication_storage_location: '',
+        notes: '',
         address_line_1: '',
         address_line_2: '',
         suburb: '',
@@ -49,6 +57,90 @@ export default function CreateSite() {
                     </div>
 
                     <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                            <label className="text-sm font-medium">Phone</label>
+                            <input
+                                className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                value={data.phone}
+                                onChange={(e) => setData('phone', e.target.value)}
+                            />
+                            {errors.phone && (
+                                <div className="mt-1 text-xs text-red-400">{errors.phone}</div>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="text-sm font-medium">Email</label>
+                            <input
+                                className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                value={data.email}
+                                onChange={(e) => setData('email', e.target.value)}
+                            />
+                            {errors.email && (
+                                <div className="mt-1 text-xs text-red-400">{errors.email}</div>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="text-sm font-medium">Manager name</label>
+                            <input
+                                className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                value={data.manager_name}
+                                onChange={(e) => setData('manager_name', e.target.value)}
+                            />
+                            {errors.manager_name && (
+                                <div className="mt-1 text-xs text-red-400">{errors.manager_name}</div>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="text-sm font-medium">Manager phone</label>
+                            <input
+                                className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                value={data.manager_phone}
+                                onChange={(e) => setData('manager_phone', e.target.value)}
+                            />
+                            {errors.manager_phone && (
+                                <div className="mt-1 text-xs text-red-400">{errors.manager_phone}</div>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="text-sm font-medium">After-hours phone</label>
+                            <input
+                                className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                value={data.after_hours_phone}
+                                onChange={(e) => setData('after_hours_phone', e.target.value)}
+                            />
+                            {errors.after_hours_phone && (
+                                <div className="mt-1 text-xs text-red-400">{errors.after_hours_phone}</div>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="text-sm font-medium">Emergency plan location</label>
+                            <input
+                                className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                value={data.emergency_plan_location}
+                                onChange={(e) => setData('emergency_plan_location', e.target.value)}
+                            />
+                            {errors.emergency_plan_location && (
+                                <div className="mt-1 text-xs text-red-400">{errors.emergency_plan_location}</div>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="text-sm font-medium">Medication storage location</label>
+                            <input
+                                className="mt-1 w-full rounded-md border bg-transparent p-2"
+                                value={data.medication_storage_location}
+                                onChange={(e) => setData('medication_storage_location', e.target.value)}
+                            />
+                            {errors.medication_storage_location && (
+                                <div className="mt-1 text-xs text-red-400">{errors.medication_storage_location}</div>
+                            )}
+                        </div>
+
                         <div>
                             <label className="text-sm font-medium">Address line 1</label>
                             <input
@@ -120,6 +212,19 @@ export default function CreateSite() {
                                 <div className="mt-1 text-xs text-red-400">{errors.country}</div>
                             )}
                         </div>
+                    </div>
+
+                    <div>
+                        <label className="text-sm font-medium">Notes</label>
+                        <textarea
+                            className="mt-1 w-full rounded-md border bg-transparent p-2"
+                            value={data.notes}
+                            onChange={(e) => setData('notes', e.target.value)}
+                            rows={4}
+                        />
+                        {errors.notes && (
+                            <div className="mt-1 text-xs text-red-400">{errors.notes}</div>
+                        )}
                     </div>
 
                     <div>

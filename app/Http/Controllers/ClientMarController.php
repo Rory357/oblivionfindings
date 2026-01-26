@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Services\MedicationMarService;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -52,6 +53,14 @@ class ClientMarController extends Controller
             ->whereIn('status', ['open', 'under_review'])
             ->exists();
 
+        // Witness pick-list (for controlled drug administrations)
+        $witnesses = User::staff()
+            ->orderBy('name')
+            ->get(['id', 'name', 'email', 'role'])
+            ->filter(fn (User $u) => $u->canDo('medications.controlled.witness'))
+            ->values()
+            ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name]);
+
         return inertia('clients/mar', [
             'client' => $client->only(['id', 'first_name', 'last_name']),
             'date' => $date->toDateString(),
@@ -59,12 +68,14 @@ class ClientMarController extends Controller
             'history' => $payload['history'],
             'break_glass' => $activeBreakGlass,
             'has_open_controlled_discrepancy' => $openControlledDiscrepancies,
+            'witnesses' => $witnesses,
             'can' => [
                 'record' => (bool) ($user->canDo('medications.administer.record') || $user->canDo('clients.update')),
                 'correct' => (bool) ($user->canDo('medications.administer.correct') || $user->canDo('clients.update')),
                 'export' => (bool) ($user->canDo('medications.reports.export') || $user->canDo('reports.viewAny') || $user->canDo('clients.update')),
                 'break_glass' => (bool) $user->canDo('medications.breakglass'),
             ],
+            'witnesses' => $witnesses,
         ]);
     }
 

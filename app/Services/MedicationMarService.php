@@ -102,6 +102,7 @@ class MedicationMarService
                     'schedule_state' => $scheduleState,
                     'record' => $existing ? [
                         'id' => $existing->id,
+                        'created_at' => optional($existing->created_at)->toIso8601String(),
                         'status' => $existing->status,
                         'reason' => $existing->reason,
                         'notes' => $existing->notes,
@@ -161,6 +162,7 @@ class MedicationMarService
             ->get()
             ->map(fn ($a) => [
                 'id' => $a->id,
+                'created_at' => optional($a->created_at)->toIso8601String(),
                 'medication' => $a->medication,
                 'status' => $a->status,
                 'reason' => $a->reason,

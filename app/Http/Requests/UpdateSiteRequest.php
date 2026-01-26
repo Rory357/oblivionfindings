@@ -15,6 +15,14 @@ class UpdateSiteRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:60'],
+            'email' => ['nullable', 'string', 'email', 'max:255'],
+            'manager_name' => ['nullable', 'string', 'max:255'],
+            'manager_phone' => ['nullable', 'string', 'max:60'],
+            'after_hours_phone' => ['nullable', 'string', 'max:60'],
+            'emergency_plan_location' => ['nullable', 'string', 'max:255'],
+            'medication_storage_location' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:5000'],
             'address_line_1' => ['nullable', 'string', 'max:255'],
             'address_line_2' => ['nullable', 'string', 'max:255'],
             'suburb' => ['nullable', 'string', 'max:255'],

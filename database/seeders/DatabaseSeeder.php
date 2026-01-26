@@ -13,20 +13,16 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        User::firstOrCreate(
-            ['email' => 'test@example.com'],
-            [
-                'name' => 'Test User',
-                'password' => 'password',
-                'email_verified_at' => now(),
-                'approved_at' => now(),
-            ]
-        );
-
-        $this->call(DemoSeeder::class);
+        // RBAC + full demo dataset for realistic end-to-end testing.
+        // Run with: php artisan migrate:fresh --seed
         $this->call(RbacSeeder::class);
+        $this->call(SystemCatalogSeeder::class);
+        $this->call(SystemUsersSeeder::class);
+        $this->call(SystemClientsSeeder::class);
+        $this->call(SystemShiftsSeeder::class);
+        $this->call(SystemMedicationsSeeder::class);
+        $this->call(SystemIncidentsSeeder::class);
+        $this->call(SystemDocumentsAndNotesSeeder::class);
         // NOTE: RoleCatalogSeeder created a large catalogue of job-title roles.
         // We are not using those roles in the system right now, so we no longer seed them.
         // (Keeps Access Control role list clean and prevents accidental assignment.)

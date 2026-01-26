@@ -3,7 +3,7 @@ import { ArrowLeft } from 'lucide-react';
 import { ReactNode } from 'react';
 
 type Props = {
-    title: string;
+    title: ReactNode;
     description?: string;
     backHref?: string;
     backLabel?: string;

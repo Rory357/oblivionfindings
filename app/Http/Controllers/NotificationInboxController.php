@@ -27,4 +27,24 @@ class NotificationInboxController extends Controller
 
         return back()->with('success', 'All notifications marked as read.');
     }
+
+    public function acknowledge(Request $request, string $notification)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $n = $user->notifications()->where('id', $notification)->firstOrFail();
+
+        // Only acknowledge if this notification requests acknowledgement.
+        $ackRequired = (bool) data_get($n->data, 'ack_required', false);
+        if (!$ackRequired) {
+            return back()->with('info', 'No acknowledgement required for this notification.');
+        }
+
+        if (is_null($n->acknowledged_at)) {
+            $n->forceFill(['acknowledged_at' => now()])->save();
+        }
+
+        return back()->with('success', 'Notification acknowledged.');
+    }
 }

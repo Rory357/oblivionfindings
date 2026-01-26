@@ -61,6 +61,11 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
             href: dashboard(),
             icon: LayoutGrid,
         },
+        {
+            title: 'Today',
+            href: '/today',
+            icon: ClipboardList,
+        },
     ];
 
     const clientPlural = labels['client.plural'] ?? 'Clients';
@@ -138,9 +143,6 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     if (can?.reports?.viewAny) {
         items.push({ title: 'Reports', href: '/reports', icon: FileText });
     }
-    if (can?.medications?.view) {
-        items.push({ title: 'Medications', href: '/medications', icon: ClipboardList });
-    }
     if (can?.rostering?.viewAny) {
         items.push({ title: 'Rostering', href: '/rostering', icon: Settings });
     }
@@ -159,8 +161,12 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     if (can?.incidents?.viewAny) {
         items.push({ title: 'Incidents', href: '/incidents', icon: FileText });
     }
+    if (can?.compliance?.view) {
+        items.push({ title: 'Compliance', href: '/compliance', icon: Shield });
+    }
     if (can?.audit?.viewAny) {
         items.push({ title: 'Audit Logs', href: '/audit-logs', icon: Shield });
+        items.push({ title: 'QA Checklist', href: '/quality/checklist', icon: Shield });
     }
     if (can?.unifi?.manage) {
         items.push({ title: 'UniFi', href: '/integrations/unifi', icon: Settings });

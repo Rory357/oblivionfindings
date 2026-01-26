@@ -154,6 +154,7 @@ class RbacSeeder extends Seeder
             ['key' => 'incidents.update', 'description' => 'Update incident reports'],
             ['key' => 'incidents.submit', 'description' => 'Submit standalone incident reports'],
             ['key' => 'incidents.approve', 'description' => 'Review/close incidents'],
+            ['key' => 'incidents.reopen', 'description' => 'Reopen closed incidents (requires reason)'],
             ['key' => 'incidents.export', 'description' => 'Export incidents'],
             ['key' => 'incidents.templates.manage', 'description' => 'Manage incident templates'],
 
@@ -173,6 +174,9 @@ class RbacSeeder extends Seeder
 
             // Audit logs
             ['key' => 'audit.viewAny', 'description' => 'View audit logs'],
+
+            // Compliance dashboard
+            ['key' => 'compliance.view', 'description' => 'View compliance dashboard'],
 
             // Timeline / notes
             ['key' => 'timeline.viewAny', 'description' => 'View timelines (staff/client activity)'],
@@ -236,6 +240,8 @@ class RbacSeeder extends Seeder
                 'fleet.viewAny',
                 'calendar.viewAny',
 
+                'compliance.view',
+
                 'timeline.viewAny',
                 'timeline.create',
                 'timeline.pin',
@@ -279,6 +285,7 @@ class RbacSeeder extends Seeder
                 'incidents.update',
                 'incidents.submit',
                                 'incidents.approve',
+                                'incidents.reopen',
                                 'incidents.followups.manage',
                 'incidents.export',
                 'incidents.portal.manage',
@@ -330,6 +337,7 @@ class RbacSeeder extends Seeder
                 'incidents.create',
                 'incidents.update',
                 'incidents.approve',
+                                'incidents.reopen',
                 'incidents.followups.manage',
                 'risks.viewAny',
                 'risks.create',
@@ -419,6 +427,8 @@ class RbacSeeder extends Seeder
                 'staff.availability.updateAny',
                 'reports.viewAny',
                 'audit.viewAny',
+
+                'compliance.view',
             ])->pluck('id')
         );
 
@@ -434,6 +444,7 @@ class RbacSeeder extends Seeder
                 'timeline.viewAny',
                 'summaries.viewAny',
                 'audit.viewAny',
+                'compliance.view',
                 'medications.view',
                 'medications.audit.view',
                 'incidents.viewAny',

@@ -1,4 +1,6 @@
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useInitials } from '@/hooks/use-initials';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +10,7 @@ import { Head, useForm } from '@inertiajs/react';
 import { toast } from 'sonner';
 
 type Props = {
-    client: { id: number; first_name: string; last_name: string };
+    client: { id: number; first_name: string; last_name: string; avatar?: string | null; profile_photo_url?: string | null };
     profile: any | null;
     medications: Array<any>;
     conditions: Array<any>;
@@ -33,6 +35,7 @@ export default function PortalClient({
     can,
 }: Props) {
     const form = useForm({ question: '' });
+    const getInitials = useInitials();
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
@@ -58,6 +61,17 @@ export default function PortalClient({
             ]}
         >
             <Head title={`Portal - ${name}`} />
+
+            <div className="flex items-center gap-3 rounded-md border p-4" data-test="portal-client-header">
+                <Avatar className="h-10 w-10">
+                    <AvatarImage src={(client as any).avatar ?? (client as any).profile_photo_url ?? undefined} alt={name} />
+                    <AvatarFallback>{getInitials(name)}</AvatarFallback>
+                </Avatar>
+                <div>
+                    <div className="text-lg font-semibold">{name}</div>
+                    <div className="text-sm text-muted-foreground">Client portal</div>
+                </div>
+            </div>
 
             <div className="space-y-4">
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">

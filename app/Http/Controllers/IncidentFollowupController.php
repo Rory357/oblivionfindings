@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\ClientIncident;
 use App\Models\IncidentFollowup;
 use App\Models\User;
+use App\Services\NotificationService;
 use Illuminate\Http\Request;
 
 class IncidentFollowupController extends Controller
@@ -28,6 +29,35 @@ class IncidentFollowupController extends Controller
             'created_by' => $request->user()?->id,
         ]);
 
+        $incident->loadMissing(['client:id,first_name,last_name']);
+        $client = $incident->client;
+
+        $targets = [];
+        if (!empty($followup->assigned_to_user_id)) {
+            $targets[] = (int) $followup->assigned_to_user_id;
+        }
+
+        app(NotificationService::class)->notifyCrud(
+            $request->user(),
+            'created',
+            'incident follow-up',
+            $followup,
+            $client,
+            [
+                'event_key' => 'followups.created',
+                'title' => 'Incident follow-up created',
+                'url' => url("/incidents/{$incident->id}"),
+                'target_user_ids' => $targets,
+                'include_entity_user' => false,
+                'context' => [
+                    'Client' => trim($client->first_name . ' ' . $client->last_name),
+                    'Incident' => 'ClientIncident #' . $incident->id,
+                    'Due' => $followup->due_at?->format('Y-m-d H:i'),
+                    'Assigned to' => $followup->assigned_to_user_id ? User::query()->find($followup->assigned_to_user_id)?->name : null,
+                ],
+            ]
+        );
+
         return back()->with('success', 'Follow-up created.');
     }
 
@@ -37,6 +67,9 @@ class IncidentFollowupController extends Controller
         abort_unless((int)$followup->client_incident_id === (int)$incident->id, 404);
         $this->authorize('update', $followup);
 
+        // Audit guardrail: completed follow-ups cannot be modified.
+        abort_unless(empty($followup->completed_at), 403);
+
         $data = $request->validate([
             'assigned_to_user_id' => ['nullable', 'integer', 'exists:users,id'],
             'due_at' => ['nullable', 'date'],
@@ -44,6 +77,35 @@ class IncidentFollowupController extends Controller
         ]);
 
         $followup->update($data);
+
+        $incident->loadMissing(['client:id,first_name,last_name']);
+        $client = $incident->client;
+
+        $targets = [];
+        if (!empty($followup->assigned_to_user_id)) {
+            $targets[] = (int) $followup->assigned_to_user_id;
+        }
+
+        app(NotificationService::class)->notifyCrud(
+            $request->user(),
+            'updated',
+            'incident follow-up',
+            $followup,
+            $client,
+            [
+                'event_key' => 'followups.updated',
+                'title' => 'Incident follow-up updated',
+                'url' => url("/incidents/{$incident->id}"),
+                'target_user_ids' => $targets,
+                'include_entity_user' => false,
+                'context' => [
+                    'Client' => trim($client->first_name . ' ' . $client->last_name),
+                    'Incident' => 'ClientIncident #' . $incident->id,
+                    'Due' => $followup->due_at?->format('Y-m-d H:i'),
+                    'Assigned to' => $followup->assigned_to_user_id ? User::query()->find($followup->assigned_to_user_id)?->name : null,
+                ],
+            ]
+        );
 
         return back()->with('success', 'Follow-up updated.');
     }
@@ -62,6 +124,36 @@ class IncidentFollowupController extends Controller
             'completed_at' => now(),
             'notes' => $data['notes'] ?? $followup->notes,
         ]);
+
+        $incident->loadMissing(['client:id,first_name,last_name']);
+        $client = $incident->client;
+
+        // Notify managers + incident team; also ping the follow-up assignee.
+        $targets = [];
+        if (!empty($followup->assigned_to_user_id)) {
+            $targets[] = (int) $followup->assigned_to_user_id;
+        }
+
+        app(NotificationService::class)->notifyCrud(
+            $request->user(),
+            'completed',
+            'incident follow-up',
+            $followup,
+            $client,
+            [
+                'event_key' => 'followups.completed',
+                'title' => 'Incident follow-up completed',
+                'url' => url("/incidents/{$incident->id}"),
+                'target_user_ids' => $targets,
+                'include_entity_user' => false,
+                'context' => [
+                    'Client' => trim($client->first_name . ' ' . $client->last_name),
+                    'Incident' => 'ClientIncident #' . $incident->id,
+                    'Completed' => $followup->completed_at?->format('Y-m-d H:i'),
+                    'Assigned to' => $followup->assigned_to_user_id ? User::query()->find($followup->assigned_to_user_id)?->name : null,
+                ],
+            ]
+        );
 
         return back()->with('success', 'Follow-up completed.');
     }

@@ -43,6 +43,7 @@ class DailyMarController extends Controller
             ->with([
                 'medication:id,client_id,name,dosage,frequency,is_prn,controlled_drug',
                 'administeredBy:id,name,email',
+                'witnessedBy:id,name,email',
                 'serviceContext:id,name,type',
             ])
             ->get();
@@ -74,8 +75,10 @@ class DailyMarController extends Controller
                         'scheduled_for' => $existing->scheduled_for,
                         'administered_at' => $existing->administered_at,
                         'notes' => $existing->notes,
+                        'created_at' => $existing->created_at,
                         'late_minutes' => $lateMinutes,
                         'administeredBy' => $existing->administeredBy ? $existing->administeredBy->only(['id', 'name', 'email']) : null,
+                        'witnessedBy' => $existing->witnessedBy ? $existing->witnessedBy->only(['id', 'name', 'email']) : null,
                         'serviceContext' => $existing->serviceContext ? [
                             'id' => $existing->serviceContext->id,
                             'name' => $existing->serviceContext->name,
@@ -131,6 +134,7 @@ class DailyMarController extends Controller
             ->with([
                 'medication:id,client_id,name,dosage,frequency,is_prn,controlled_drug',
                 'administeredBy:id,name,email',
+                'witnessedBy:id,name,email',
                 'serviceContext:id,name,type',
             ])
             ->orderByDesc('administered_at')
@@ -151,9 +155,11 @@ class DailyMarController extends Controller
                     'scheduled_for' => $a->scheduled_for,
                     'administered_at' => $a->administered_at,
                     'notes' => $a->notes,
+                    'created_at' => $a->created_at,
                     'late_minutes' => $lateMinutes,
                     'medication' => $a->medication,
                     'administeredBy' => $a->administeredBy,
+                    'witnessedBy' => $a->witnessedBy,
                     'serviceContext' => $a->serviceContext ? [
                         'id' => $a->serviceContext->id,
                         'name' => $a->serviceContext->name,
@@ -163,7 +169,7 @@ class DailyMarController extends Controller
             })
             ->values();
 
-        $witnesses = User::query()
+        $witnesses = User::staff()
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'role'])
             ->filter(fn (User $u) => $u->canDo('medications.controlled.witness'))
@@ -261,6 +267,7 @@ class DailyMarController extends Controller
         $a->client_id = $client->id;
         $a->client_medication_id = $medication->id;
         $a->administered_by = $user->id;
+        $a->witnessed_by = $data['witnessed_by'] ?? null;
         $a->shift_id = $data['shift_id'] ?? null;
         $a->service_context_id = null;
         if ($a->shift_id) {

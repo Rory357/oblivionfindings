@@ -45,6 +45,13 @@ class ClientIncident extends Model
 
         'closed_by',
         'closed_at',
+
+        'closed_outcome',
+        'closed_notes',
+
+        'reopened_by',
+        'reopened_at',
+        'reopened_reason',
     ];
 
     protected $casts = [
@@ -54,6 +61,7 @@ class ClientIncident extends Model
         'portal_visible' => 'boolean',
         'reviewed_at' => 'datetime',
         'closed_at' => 'datetime',
+        'reopened_at' => 'datetime',
     ];
 
     public function client(): BelongsTo

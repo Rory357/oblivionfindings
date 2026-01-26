@@ -28,7 +28,8 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
     const form = useForm({
         client_id: initialClient?.id ?? '',
         service_context_id: (initialClient?.service_context_id ?? defaultServiceContextId ?? '') as any,
-        user_id: staff?.[0]?.id ?? '',
+        // Allow creating an open/unassigned shift for roster planning
+        user_id: '',
         starts_at: '',
         ends_at: '',
         location: '',
@@ -155,12 +156,16 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
                                 value={form.data.user_id}
                                 onChange={(e) => form.setData('user_id', e.target.value)}
                             >
+                                <option value="">Unassigned (open shift)</option>
                                 {staff.map((s) => (
                                     <option key={s.id} value={s.id}>
                                         {s.name} ({s.email})
                                     </option>
                                 ))}
                             </select>
+                            <div className="text-xs text-slate-500">
+                                Leave blank to create an open shift that can be assigned later from the Rostering module.
+                            </div>
                         </div>
 
                         <div className="grid gap-4 md:grid-cols-2">

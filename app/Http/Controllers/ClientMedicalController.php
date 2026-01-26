@@ -47,7 +47,7 @@ class ClientMedicalController extends Controller
         $canControlledRecord = $canEdit || ($user?->canDo('medications.controlled.record') ?? false);
         $canControlledWitness = $canEdit || ($user?->canDo('medications.controlled.witness') ?? false);
 
-        $witnesses = User::query()
+        $witnesses = User::staff()
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'role'])
             ->filter(fn (User $u) => $u->canDo('medications.controlled.witness'))
@@ -379,7 +379,7 @@ class ClientMedicalController extends Controller
             }
 
             $witness = User::query()->find($data['witnessed_by']);
-            if (!$witness || !$witness->canDo('medications.controlled.witness')) {
+            if (!$witness || $witness->hasRole('client', 'next_of_kin') || in_array($witness->role, ['client', 'next_of_kin'], true) || !$witness->canDo('medications.controlled.witness')) {
                 return back()->withInput()->with('error', 'Selected witness is not authorised to witness controlled drug actions.');
             }
         }
@@ -492,7 +492,7 @@ class ClientMedicalController extends Controller
             }
 
             $witness = User::query()->find($data['witnessed_by']);
-            if (!$witness || !$witness->canDo('medications.controlled.witness')) {
+            if (!$witness || $witness->hasRole('client', 'next_of_kin') || in_array($witness->role, ['client', 'next_of_kin'], true) || !$witness->canDo('medications.controlled.witness')) {
                 return back()->withInput()->with('error', 'Selected witness is not authorised to witness controlled drug actions.');
             }
         }

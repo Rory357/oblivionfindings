@@ -18,6 +18,11 @@ class ShiftTaskController extends Controller
             abort(403);
         }
 
+        // Lock tasks once shift is completed (audit integrity).
+        if ($shift->status === 'completed') {
+            return response()->json(['ok' => false, 'message' => 'This shift has been completed and is now locked.'], 422);
+        }
+
         abort_unless($task->shift_id === $shift->id, 404);
 
         $data = $request->validate([

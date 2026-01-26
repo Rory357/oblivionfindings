@@ -3,6 +3,8 @@ import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
@@ -17,6 +19,8 @@ export default function ClientsIndex({ clients }) {
     const canCreate = !!can?.clients?.create;
     const canUpdate = !!can?.clients?.update;
     const canManage = canCreate || canUpdate;
+
+    const getInitials = useInitials();
 
     const [query, setQuery] = useState('');
     const [onlyIncomplete, setOnlyIncomplete] = useState(false);
@@ -98,10 +102,15 @@ export default function ClientsIndex({ clients }) {
                             key={client.id}
                             className="flex flex-col gap-3 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between"
                         >
-                            <div>
-                                <div className="text-sm font-medium">
-                                    {client.first_name} {client.last_name}
-                                </div>
+                            <div className="flex items-start gap-3">
+                                <Avatar className="h-10 w-10">
+                                    <AvatarImage src={client.avatar ?? client.profile_photo_url} alt={`${client.first_name} ${client.last_name}`} />
+                                    <AvatarFallback>{getInitials(`${client.first_name} ${client.last_name}`)}</AvatarFallback>
+                                </Avatar>
+                                <div>
+                                    <div className="text-sm font-medium">
+                                        {client.first_name} {client.last_name}
+                                    </div>
                                 <div className="mt-1 flex flex-wrap items-center gap-2">
                                     <div className="text-xs text-slate-500">Status: {client.status}</div>
                                     {client.onboarding ? (
@@ -135,6 +144,7 @@ export default function ClientsIndex({ clients }) {
                                     ) : (
                                         <span className="text-slate-500">—</span>
                                     )}
+                                </div>
                                 </div>
                             </div>
 
