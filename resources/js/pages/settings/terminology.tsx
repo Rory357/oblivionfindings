@@ -20,6 +20,10 @@ const breadcrumbs: BreadcrumbItem[] = [
 const LABEL_KEYS = [
     'client.singular',
     'client.plural',
+    'site.singular',
+    'site.plural',
+    'asset.singular',
+    'asset.plural',
     'staff.singular',
     'staff.plural',
     'worker.singular',
@@ -28,8 +32,6 @@ const LABEL_KEYS = [
     'shift.plural',
     'timesheet.singular',
     'timesheet.plural',
-    'site.singular',
-    'site.plural',
 ];
 
 export default function TerminologyPage(props: Props) {

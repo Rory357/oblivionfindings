@@ -73,6 +73,12 @@ export default function ReportsIndex() {
                                 Incident reports (no access)
                             </div>
                         )}
+                        <Link href="/reports/assets" className="rounded-md border p-3 hover:bg-slate-50">
+                            <div className="text-sm font-medium">Asset compliance report</div>
+                            <div className="mt-1 text-xs text-slate-500">
+                                Overdue inspections, overdue maintenance, and expiring warranties.
+                            </div>
+                        </Link>
                         <div className="rounded-md border p-3 text-sm text-slate-500">
                             More reports coming next.
                         </div>

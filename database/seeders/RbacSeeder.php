@@ -90,6 +90,17 @@ class RbacSeeder extends Seeder
             ['key' => 'sites.create', 'description' => 'Create sites'],
             ['key' => 'sites.update', 'description' => 'Update sites'],
 
+            // Assets
+            ['key' => 'assets.viewAny', 'description' => 'View all assets'],
+            ['key' => 'assets.viewAssigned', 'description' => 'View assigned assets only'],
+            ['key' => 'assets.create', 'description' => 'Create assets'],
+            ['key' => 'assets.update', 'description' => 'Update assets'],
+            ['key' => 'assets.delete', 'description' => 'Delete assets'],
+            ['key' => 'assets.inspections.record', 'description' => 'Record asset inspections'],
+            ['key' => 'assets.maintenance.record', 'description' => 'Record asset maintenance'],
+            ['key' => 'assets.documents.manage', 'description' => 'Manage asset documents'],
+            ['key' => 'assets.qr.download', 'description' => 'Download asset QR codes'],
+
             // Staff / workers
             ['key' => 'staff.viewAny', 'description' => 'View staff'],
             ['key' => 'staff.create', 'description' => 'Create staff'],
@@ -306,7 +317,15 @@ class RbacSeeder extends Seeder
 
                 // RAG
                 'rag.ask.any',
-            ])->pluck('id')
+                            'assets.viewAny',
+                'assets.create',
+                'assets.update',
+                'assets.delete',
+                'assets.inspections.record',
+                'assets.maintenance.record',
+                'assets.documents.manage',
+                'assets.qr.download',
+])->pluck('id')
         );
 
         // Coordinator (global view, limited settings)
@@ -355,7 +374,14 @@ class RbacSeeder extends Seeder
                 'summaries.generate',
                 'calendar.viewAny',
                 'rag.ask.any',
-            ])->pluck('id')
+                            'assets.viewAny',
+                'assets.create',
+                'assets.update',
+                'assets.inspections.record',
+                'assets.maintenance.record',
+                'assets.documents.manage',
+                'assets.qr.download',
+])->pluck('id')
         );
 
         // Support Worker
@@ -396,7 +422,14 @@ class RbacSeeder extends Seeder
 
                 // RAG
                 'rag.ask.assigned',
-            ])->pluck('id')
+                            'assets.viewAssigned',
+                'assets.create',
+                'assets.update',
+                'assets.inspections.record',
+                'assets.maintenance.record',
+                'assets.documents.manage',
+                'assets.qr.download',
+])->pluck('id')
         );
 
         // Finance (timesheets + reports)
@@ -449,7 +482,8 @@ class RbacSeeder extends Seeder
                 'medications.audit.view',
                 'incidents.viewAny',
                 'risks.viewAny',
-            ])->pluck('id')
+                            'assets.viewAny',
+])->pluck('id')
         );
 
         // Client / Next-of-kin portal users

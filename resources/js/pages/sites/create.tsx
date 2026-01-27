@@ -64,9 +64,7 @@ export default function CreateSite() {
                                 value={data.phone}
                                 onChange={(e) => setData('phone', e.target.value)}
                             />
-                            {errors.phone && (
-                                <div className="mt-1 text-xs text-red-400">{errors.phone}</div>
-                            )}
+                            {errors.phone && <div className="mt-1 text-xs text-red-400">{errors.phone}</div>}
                         </div>
 
                         <div>
@@ -76,9 +74,7 @@ export default function CreateSite() {
                                 value={data.email}
                                 onChange={(e) => setData('email', e.target.value)}
                             />
-                            {errors.email && (
-                                <div className="mt-1 text-xs text-red-400">{errors.email}</div>
-                            )}
+                            {errors.email && <div className="mt-1 text-xs text-red-400">{errors.email}</div>}
                         </div>
 
                         <div>
@@ -88,9 +84,7 @@ export default function CreateSite() {
                                 value={data.manager_name}
                                 onChange={(e) => setData('manager_name', e.target.value)}
                             />
-                            {errors.manager_name && (
-                                <div className="mt-1 text-xs text-red-400">{errors.manager_name}</div>
-                            )}
+                            {errors.manager_name && <div className="mt-1 text-xs text-red-400">{errors.manager_name}</div>}
                         </div>
 
                         <div>
@@ -100,9 +94,7 @@ export default function CreateSite() {
                                 value={data.manager_phone}
                                 onChange={(e) => setData('manager_phone', e.target.value)}
                             />
-                            {errors.manager_phone && (
-                                <div className="mt-1 text-xs text-red-400">{errors.manager_phone}</div>
-                            )}
+                            {errors.manager_phone && <div className="mt-1 text-xs text-red-400">{errors.manager_phone}</div>}
                         </div>
 
                         <div>
@@ -140,7 +132,20 @@ export default function CreateSite() {
                                 <div className="mt-1 text-xs text-red-400">{errors.medication_storage_location}</div>
                             )}
                         </div>
+                    </div>
 
+                    <div>
+                        <label className="text-sm font-medium">Notes</label>
+                        <textarea
+                            className="mt-1 w-full rounded-md border bg-transparent p-2"
+                            rows={4}
+                            value={data.notes}
+                            onChange={(e) => setData('notes', e.target.value)}
+                        />
+                        {errors.notes && <div className="mt-1 text-xs text-red-400">{errors.notes}</div>}
+                    </div>
+
+                    <div className="grid gap-4 sm:grid-cols-2">
                         <div>
                             <label className="text-sm font-medium">Address line 1</label>
                             <input
@@ -212,19 +217,6 @@ export default function CreateSite() {
                                 <div className="mt-1 text-xs text-red-400">{errors.country}</div>
                             )}
                         </div>
-                    </div>
-
-                    <div>
-                        <label className="text-sm font-medium">Notes</label>
-                        <textarea
-                            className="mt-1 w-full rounded-md border bg-transparent p-2"
-                            value={data.notes}
-                            onChange={(e) => setData('notes', e.target.value)}
-                            rows={4}
-                        />
-                        {errors.notes && (
-                            <div className="mt-1 text-xs text-red-400">{errors.notes}</div>
-                        )}
                     </div>
 
                     <div>

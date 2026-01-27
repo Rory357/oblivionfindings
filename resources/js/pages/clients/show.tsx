@@ -227,6 +227,15 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                     <Link href={`/clients/${client.id}/assignments`}>Assign workers</Link>
                                 </Button>
                             ) : null}
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href={`/assets?client_id=${client.id}`}>Assets</Link>
+                            </Button>
+                            {can.edit ? (
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={`/assets/create?client_id=${client.id}`}>Add asset</Link>
+                                </Button>
+                            ) : null}
+
                         </>
                     }
                 />

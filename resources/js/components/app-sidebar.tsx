@@ -25,6 +25,7 @@ import {
     Settings,
     Shield,
     Users,
+    Package,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -73,6 +74,12 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     const staffPlural = labels['staff.plural'] ?? 'Staff';
     const shiftPlural = labels['shift.plural'] ?? 'Shifts';
     const timesheetPlural = labels['timesheet.plural'] ?? 'Timesheets';
+    const assetPlural = labels['asset.plural'] ?? 'Assets';
+    const medicationPlural = labels['medication.plural'] ?? 'Medications';
+    const incidentPlural = labels['incident.plural'] ?? 'Incidents';
+    const notePlural = labels['note.plural'] ?? 'Notes';
+    const timelineLabel = labels['timeline.singular'] ?? 'Timeline';
+    const emergencyLabel = labels['emergency_access.singular'] ?? 'Emergency Access';
 
     // Support Worker nav (kept for now, but also gate via permissions)
     if (role === 'support_worker') {
@@ -93,23 +100,26 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
                 icon: Users,
             },
             {
-                title: 'Notes',
+                title: notePlural,
                 href: '/notes',
                 icon: FileText,
             },
             {
-                title: 'Timeline',
+                title: timelineLabel,
                 href: '/timeline',
                 icon: MessageSquareText,
             },
             ...(can?.medications?.view
-                ? [{ title: 'Medications', href: '/medications', icon: ClipboardList }]
+                ? [{ title: medicationPlural, href: '/medications', icon: ClipboardList }]
                 : []),
             ...(can?.medications?.breakGlass
-                ? [{ title: 'Emergency Access', href: '/emergency-access', icon: Shield }]
+                ? [{ title: emergencyLabel, href: '/emergency-access', icon: Shield }]
+                : []),
+            ...(can?.assets?.viewAssigned || can?.assets?.viewAny
+                ? [{ title: assetPlural, href: '/assets', icon: Package }]
                 : []),
             ...(can?.incidents?.viewAssigned
-                ? [{ title: 'Incidents', href: '/incidents', icon: FileText }]
+                ? [{ title: incidentPlural, href: '/incidents', icon: FileText }]
                 : []),
         );
         return items;
@@ -122,11 +132,15 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     if (can?.clients?.viewAny) {
         items.push({ title: clientPlural, href: '/clients', icon: Users });
     }
+    if (can?.assets?.viewAny || can?.assets?.viewAssigned) {
+        items.push({ title: assetPlural, href: '/assets', icon: Package });
+    }
+
     if (can?.medications?.view) {
-        items.push({ title: 'Medications', href: '/medications', icon: ClipboardList });
+        items.push({ title: medicationPlural, href: '/medications', icon: ClipboardList });
     }
     if (can?.medications?.breakGlass) {
-        items.push({ title: 'Emergency Access', href: '/emergency-access', icon: Shield });
+        items.push({ title: emergencyLabel, href: '/emergency-access', icon: Shield });
     }
     if (can?.shifts?.viewAny) {
         items.push({ title: shiftPlural, href: '/shifts', icon: CalendarDays });
@@ -159,7 +173,7 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
         items.push({ title: 'Summaries', href: '/summaries', icon: FileText });
     }
     if (can?.incidents?.viewAny) {
-        items.push({ title: 'Incidents', href: '/incidents', icon: FileText });
+        items.push({ title: incidentPlural, href: '/incidents', icon: FileText });
     }
     if (can?.compliance?.view) {
         items.push({ title: 'Compliance', href: '/compliance', icon: Shield });

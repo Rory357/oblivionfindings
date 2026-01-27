@@ -47,6 +47,11 @@ class Site extends Model
         return $this->hasMany(SiteDocument::class);
     }
 
+    public function assets()
+    {
+        return $this->hasMany(Asset::class);
+    }
+
     public function getAddressAttribute(): string
     {
         $parts = array_filter([

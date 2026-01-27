@@ -114,14 +114,7 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                             ) : (
                                 sites.map((s) => (
                                     <tr key={s.id} className="border-b last:border-b-0">
-                                        <td className="px-4 py-3 font-medium">
-                                            <Link
-                                                href={`/sites/${s.id}`}
-                                                className="hover:underline"
-                                            >
-                                                {s.name}
-                                            </Link>
-                                        </td>
+                                        <td className="px-4 py-3 font-medium">{s.name}</td>
                                         <td className="px-4 py-3 text-slate-300">
                                             {addressFor(s) || (
                                                 <span className="text-slate-500">—</span>
@@ -138,17 +131,14 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                                                 {s.is_active ? 'Active' : 'Inactive'}
                                             </span>
                                         </td>
-                                        <td className="px-4 py-3 text-right space-x-3">
-                                            <Link
-                                                href={`/sites/${s.id}`}
-                                                className="text-slate-200 hover:text-slate-100"
-                                            >
+                                        <td className="px-4 py-3 text-right">
+                                            <Link href={`/sites/${s.id}`} className="text-indigo-300 hover:text-indigo-200">
                                                 View
                                             </Link>
                                             {can?.sites?.update && (
                                                 <Link
                                                     href={`/sites/${s.id}/edit`}
-                                                    className="text-indigo-300 hover:text-indigo-200"
+                                                    className="ml-3 text-indigo-300 hover:text-indigo-200"
                                                 >
                                                     Edit
                                                 </Link>

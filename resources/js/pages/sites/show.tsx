@@ -51,6 +51,18 @@ type Doc = {
     uploaded_by?: { id: number; name: string; email: string } | null;
 };
 
+type AssetLite = {
+    id: number;
+    name: string;
+    asset_tag?: string | null;
+    category?: string | null;
+    status: string;
+    risk_level: string;
+    location?: string | null;
+    owner: { type: 'site' | 'client'; label: string; id: number };
+    updated_at?: string | null;
+};
+
 type ClientLite = { id: number; first_name: string; last_name: string; status: string };
 type ChecklistItem = { key: string; label: string; done: boolean };
 
@@ -59,11 +71,13 @@ type Props = {
     clients: ClientLite[];
     contacts: Contact[];
     documents: Doc[];
+    assets: AssetLite[];
     checklist: ChecklistItem[];
     can_edit: boolean;
+    can?: { createAsset?: boolean };
 };
 
-type TabKey = 'overview' | 'clients' | 'contacts' | 'documents' | 'compliance';
+type TabKey = 'overview' | 'clients' | 'assets' | 'contacts' | 'documents' | 'compliance';
 
 function bytes(n?: number | null): string {
     if (!n || n <= 0) return '—';
@@ -73,16 +87,17 @@ function bytes(n?: number | null): string {
     return `${mb.toFixed(1)} MB`;
 }
 
-export default function SiteShow({ site, clients, contacts, documents, checklist, can_edit }: Props) {
+export default function SiteShow({ site, clients, assets, contacts, documents, checklist, can_edit, can }: Props) {
     const tabs = useMemo(
         () => [
             { key: 'overview' as const, label: 'Overview' },
             { key: 'clients' as const, label: `Clients (${clients.length})` },
+            { key: 'assets' as const, label: `Assets (${assets.length})` },
             { key: 'contacts' as const, label: `Contacts (${contacts.length})` },
             { key: 'documents' as const, label: `Documents (${documents.length})` },
             { key: 'compliance' as const, label: 'Compliance' },
         ],
-        [clients.length, contacts.length, documents.length],
+        [clients.length, assets.length, contacts.length, documents.length],
     );
 
     const [tab, setTab] = useState<TabKey>('overview');
@@ -278,6 +293,71 @@ export default function SiteShow({ site, clients, contacts, documents, checklist
                                                 ))}
                                             </tbody>
                                         </table>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {tab === 'assets' && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle>Assets at this site</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {assets.length === 0 ? (
+                                    <div className="text-sm text-slate-400">No assets linked to this site yet.</div>
+                                ) : (
+                                    <div className="overflow-hidden rounded-xl border">
+                                        <table className="w-full text-sm">
+                                            <thead className="border-b bg-slate-50/5">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left font-medium">Asset</th>
+                                                    <th className="px-4 py-3 text-left font-medium">Owner</th>
+                                                    <th className="px-4 py-3 text-left font-medium">Status</th>
+                                                    <th className="px-4 py-3 text-left font-medium">Risk</th>
+                                                    <th className="px-4 py-3" />
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {assets.map((a) => (
+                                                    <tr key={a.id} className="border-b last:border-b-0">
+                                                        <td className="px-4 py-3">
+                                                            <div className="font-medium">{a.name}</div>
+                                                            <div className="text-xs text-slate-400">
+                                                                {[a.asset_tag, a.category, a.location].filter(Boolean).join(' • ') || '—'}
+                                                            </div>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-slate-300">
+                                                            <span
+                                                                className={`inline-flex rounded-full border px-2 py-0.5 text-xs ${
+                                                                    a.owner.type === 'client'
+                                                                        ? 'border-indigo-500/30 text-indigo-200'
+                                                                        : 'border-slate-500/30 text-slate-300'
+                                                                }`}
+                                                            >
+                                                                {a.owner.type === 'client' ? `Client: ${a.owner.label}` : 'Site-owned'}
+                                                            </span>
+                                                        </td>
+                                                        <td className="px-4 py-3 text-slate-300">{a.status}</td>
+                                                        <td className="px-4 py-3 text-slate-300">{a.risk_level}</td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <Link href={`/assets/${a.id}`} className="text-indigo-300 hover:text-indigo-200">
+                                                                View
+                                                            </Link>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {can?.createAsset && (
+                                    <div className="mt-3">
+                                        <Button asChild variant="secondary">
+                                            <Link href={`/assets/create?site_id=${site.id}`}>Add asset</Link>
+                                        </Button>
                                     </div>
                                 )}
                             </CardContent>
