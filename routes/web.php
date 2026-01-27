@@ -13,8 +13,12 @@ use App\Http\Controllers\StaffAssignmentController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\TimesheetController;
 use App\Http\Controllers\SiteController;
-use App\Http\Controllers\SiteContactController;
-use App\Http\Controllers\SiteDocumentController;
+use App\Http\Controllers\AssetController;
+use App\Http\Controllers\AssetInspectionController;
+use App\Http\Controllers\AssetMaintenanceController;
+use App\Http\Controllers\AssetDocumentController;
+use App\Http\Controllers\AssetReportController;
+use App\Http\Controllers\AssetQrController;
 use App\Http\Controllers\Auth\MicrosoftController;
 use App\Http\Controllers\Auth\GoogleController;
 use App\Http\Controllers\TimelineController;
@@ -74,11 +78,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/quality/checklist', QualityChecklistController::class)->name('quality.checklist');
 });
 
-Route::get('/auth/google/redirect', [GoogleController::class, 'redirect'])->name('auth.google.redirect');
-Route::get('/auth/google/callback', [GoogleController::class, 'callback'])->name('auth.google.callback');
+Route::middleware(['throttle:auth'])->group(function () {
+    Route::get('/auth/google/redirect', [GoogleController::class, 'redirect'])->name('auth.google.redirect');
+    Route::get('/auth/google/callback', [GoogleController::class, 'callback'])->name('auth.google.callback');
 
-Route::get('/auth/microsoft/redirect', [MicrosoftController::class, 'redirect'])->name('auth.microsoft.redirect');
-Route::get('/auth/microsoft/callback', [MicrosoftController::class, 'callback'])->name('auth.microsoft.callback');
+    Route::get('/auth/microsoft/redirect', [MicrosoftController::class, 'redirect'])->name('auth.microsoft.redirect');
+    Route::get('/auth/microsoft/callback', [MicrosoftController::class, 'callback'])->name('auth.microsoft.callback');
+});
 
 Route::middleware(['auth'])->group(function () {
 
@@ -96,15 +102,19 @@ Route::middleware(['auth'])->group(function () {
         ->name('inbox.announcements.readAll');
 
     // Global RAG endpoints for the header query bar
-    Route::get('/rag/clients', [RagController::class, 'clients'])->name('rag.clients');
-    Route::post('/rag/ask', [RagController::class, 'ask'])->name('rag.ask');
+    Route::middleware(['throttle:ai-queries'])->group(function () {
+        Route::get('/rag/clients', [RagController::class, 'clients'])->name('rag.clients');
+        Route::post('/rag/ask', [RagController::class, 'ask'])->name('rag.ask');
+    });
 
     // Client/Next-of-kin Portal
     Route::get('/portal', [PortalController::class, 'index'])->name('portal.index');
     Route::get('/portal/clients/{client}', [PortalClientController::class, 'show'])->name('portal.clients.show');
     Route::get('/portal/clients/{client}/incidents/{incident}/attachments/{attachment}/download', [PortalIncidentAttachmentController::class, 'download'])
         ->name('portal.clients.incidents.attachments.download');
-    Route::post('/portal/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])->name('portal.clients.rag.ask');
+    Route::post('/portal/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])
+        ->middleware('throttle:ai-queries')
+        ->name('portal.clients.rag.ask');
     Route::get('/portal/clients/{client}/documents/{document}/download', [ClientDocumentController::class, 'download'])->name('portal.clients.documents.download');
     Route::post('/portal/summaries/generate', [SummaryController::class, 'generate'])->name('portal.summaries.generate');
 
@@ -127,7 +137,7 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/summaries/staff/{user}', [SummaryController::class, 'staff'])->name('summaries.staff');
     Route::get('/summaries/clients/{client}', [SummaryController::class, 'client'])->name('summaries.client');
     Route::post('/summaries/generate', [SummaryController::class, 'generate'])
-        ->middleware('permission:summaries.generate')
+        ->middleware(['permission:summaries.generate', 'throttle:ai-queries'])
         ->name('summaries.generate');
 
     // Integrations: UniFi
@@ -145,25 +155,90 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:sites.viewAny')->group(function () {
         Route::get('/sites', [SiteController::class, 'index'])->name('sites.index');
         Route::get('/sites/{site}', [SiteController::class, 'show'])->whereNumber('site')->name('sites.show');
-        Route::get('/sites/{site}/documents/{document}/download', [SiteDocumentController::class, 'download'])->whereNumber('site')->name('sites.documents.download');
+
+        // Documents (view/download) and nested resources on the Site profile
+        Route::get('/sites/{site}/documents/{document}/download', [SiteDocumentController::class, 'download'])
+            ->whereNumber('site')
+            ->name('sites.documents.download');
     });
     Route::middleware('permission:sites.create')->group(function () {
         Route::get('/sites/create', [SiteController::class, 'create'])->name('sites.create');
         Route::post('/sites', [SiteController::class, 'store'])->name('sites.store');
     });
     Route::middleware('permission:sites.update')->group(function () {
-        Route::get('/sites/{site}/edit', [SiteController::class, 'edit'])->whereNumber('site')->name('sites.edit');
-        Route::put('/sites/{site}', [SiteController::class, 'update'])->whereNumber('site')->name('sites.update');
+        Route::get('/sites/{site}/edit', [SiteController::class, 'edit'])->name('sites.edit');
+        Route::put('/sites/{site}', [SiteController::class, 'update'])->name('sites.update');
 
-        // Site contacts
+        // Contacts
         Route::post('/sites/{site}/contacts', [SiteContactController::class, 'store'])->whereNumber('site')->name('sites.contacts.store');
         Route::put('/sites/{site}/contacts/{contact}', [SiteContactController::class, 'update'])->whereNumber('site')->name('sites.contacts.update');
         Route::delete('/sites/{site}/contacts/{contact}', [SiteContactController::class, 'destroy'])->whereNumber('site')->name('sites.contacts.destroy');
 
-        // Site documents
+        // Documents
         Route::post('/sites/{site}/documents', [SiteDocumentController::class, 'store'])->whereNumber('site')->name('sites.documents.store');
         Route::put('/sites/{site}/documents/{document}', [SiteDocumentController::class, 'update'])->whereNumber('site')->name('sites.documents.update');
         Route::delete('/sites/{site}/documents/{document}', [SiteDocumentController::class, 'destroy'])->whereNumber('site')->name('sites.documents.destroy');
+    });
+
+    // Assets
+    Route::middleware('permission:assets.viewAny|assets.viewAssigned')->group(function () {
+        Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
+        Route::get('/assets/{asset}', [AssetController::class, 'show'])->whereNumber('asset')->name('assets.show');
+        Route::get('/assets/qr/{token}', [AssetQrController::class, 'redirectByToken'])
+            ->name('assets.qr.redirect');
+
+        Route::middleware(['throttle:qr-generation'])->group(function () {
+            Route::get('/assets/{asset}/qr.png', [AssetQrController::class, 'png'])
+                ->whereNumber('asset')
+                ->name('assets.qr.png');
+            Route::get('/assets/{asset}/qr.svg', [AssetQrController::class, 'svg'])
+                ->whereNumber('asset')
+                ->name('assets.qr.svg');
+            Route::get('/assets/{asset}/qr.png/download', [AssetQrController::class, 'downloadPng'])
+                ->whereNumber('asset')
+                ->name('assets.qr.download');
+        });
+    });
+
+    Route::middleware('permission:assets.create')->group(function () {
+        Route::get('/assets/create', [AssetController::class, 'create'])->name('assets.create');
+        Route::post('/assets', [AssetController::class, 'store'])->name('assets.store');
+    });
+
+    Route::middleware('permission:assets.update')->group(function () {
+        Route::get('/assets/{asset}/edit', [AssetController::class, 'edit'])->whereNumber('asset')->name('assets.edit');
+        Route::put('/assets/{asset}', [AssetController::class, 'update'])->whereNumber('asset')->name('assets.update');
+    });
+
+    Route::middleware('permission:assets.delete')->group(function () {
+        Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])->whereNumber('asset')->name('assets.destroy');
+    });
+
+    Route::middleware('permission:assets.inspections.record')->group(function () {
+        Route::post('/assets/{asset}/inspections', [AssetInspectionController::class, 'store'])
+            ->whereNumber('asset')
+            ->name('assets.inspections.store');
+    });
+
+    Route::middleware('permission:assets.maintenance.record')->group(function () {
+        Route::post('/assets/{asset}/maintenance', [AssetMaintenanceController::class, 'store'])
+            ->whereNumber('asset')
+            ->name('assets.maintenance.store');
+    });
+
+    Route::middleware('permission:assets.documents.manage')->group(function () {
+        Route::post('/assets/{asset}/documents', [AssetDocumentController::class, 'store'])
+            ->whereNumber('asset')
+            ->name('assets.documents.store');
+        Route::delete('/assets/{asset}/documents/{document}', [AssetDocumentController::class, 'destroy'])
+            ->whereNumber('asset')
+            ->name('assets.documents.destroy');
+    });
+
+    Route::middleware('permission:assets.viewAny|assets.viewAssigned')->group(function () {
+        Route::get('/assets/{asset}/documents/{document}/download', [AssetDocumentController::class, 'download'])
+            ->whereNumber('asset')
+            ->name('assets.documents.download');
     });
 
     // ✅ ALL authenticated users (policy decides data)
@@ -191,6 +266,7 @@ Route::middleware(['auth'])->group(function () {
 
     Route::middleware('permission:reports.viewAny')->group(function () {
         Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
+        Route::get('/reports/assets', [AssetReportController::class, 'index'])->name('reports.assets');
         Route::get('/reports/shifts', [ShiftReportsController::class, 'index'])->name('reports.shifts');
 
         Route::get('/reports/medications', [MedicationsReportController::class, 'index'])
@@ -449,7 +525,9 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/clients/{client}/portal-users', [ClientPortalUserController::class, 'store'])->name('clients.portal_users.store');
         Route::delete('/clients/{client}/portal-users/{user}', [ClientPortalUserController::class, 'destroy'])->name('clients.portal_users.destroy');
 
-        Route::post('/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])->name('clients.rag.ask');
+        Route::post('/clients/{client}/rag/ask', [ClientRagController::class, 'ask'])
+            ->middleware('throttle:ai-queries')
+            ->name('clients.rag.ask');
 
         // Client onboarding checklist overrides ("doesn't have this")
         Route::post('/clients/{client}/onboarding/{key}', [ClientOnboardingController::class, 'toggle'])

@@ -25,142 +25,11 @@ class HandleInertiaRequests extends Middleware
         $user = $request->user();
 
         // Build permissions for frontend (RBAC)
-        // Keep this list small and expand as you add modules.
+        // Optimized: Cache permissions during request to reduce DB queries
         $can = null;
 
         if ($user) {
-            $can = [
-                'sites' => [
-                    'viewAny' => $user->canDo('sites.viewAny'),
-                    'create' => $user->canDo('sites.create'),
-                    'update' => $user->canDo('sites.update'),
-                ],
-
-                'staff' => [
-                    'viewAny' => $user->canDo('staff.viewAny'),
-                    'create'  => $user->canDo('staff.create'),
-                    'update'  => $user->canDo('staff.update'),
-                    'invite'  => $user->canDo('staff.invite'),
-                    'assignmentsUpdate' => $user->canDo('staff.assignments.update'),
-                    'credentialsViewAny' => $user->canDo('staff.credentials.viewAny'),
-                    'credentialsUpdateAny' => $user->canDo('staff.credentials.updateAny'),
-                    'credentialsUpdateSelf' => $user->canDo('staff.credentials.updateSelf'),
-                    'availabilityUpdateAny' => $user->canDo('staff.availability.updateAny'),
-                    'availabilityUpdateSelf' => $user->canDo('staff.availability.updateSelf'),
-                ],
-                'clients' => [
-                    'viewAny' => $user->canDo('clients.viewAny'),
-                    'create'  => $user->canDo('clients.create'),
-                    'update'  => $user->canDo('clients.update'),
-                    'assignmentsUpdate' => $user->canDo('clients.assignments.update'),
-                ],
-                'shifts' => [
-                    'viewAny' => $user->canDo('shifts.viewAny'),
-                    'create' => $user->canDo('shifts.create'),
-                    'update' => $user->canDo('shifts.update'),
-                    'manageAny' => $user->canDo('shifts.manageAny'),
-                    'tasksUpdateSelf' => $user->canDo('shifts.tasks.updateSelf'),
-                ],
-
-                'timesheets' => [
-                    'viewAny' => $user->canDo('timesheets.viewAny'),
-                    'viewAssigned' => $user->canDo('timesheets.viewAssigned'),
-                    'create' => $user->canDo('timesheets.create'),
-                    'update' => $user->canDo('timesheets.update'),
-                    'submit' => $user->canDo('timesheets.submit'),
-                    'approve' => $user->canDo('timesheets.approve'),
-                    'manageAny' => $user->canDo('timesheets.manageAny'),
-                ],
-
-                'reports' => [
-                    'viewAny' => $user->canDo('reports.viewAny'),
-                ],
-
-                'medications' => [
-                    'view' => $user->canDo('medications.view'),
-                    'ordersManage' => $user->canDo('medications.orders.manage'),
-                    'administerRecord' => $user->canDo('medications.administer.record'),
-                    'administerCorrect' => $user->canDo('medications.administer.correct'),
-                    'auditView' => $user->canDo('medications.audit.view'),
-                    'reportsExport' => $user->canDo('medications.reports.export'),
-                    'controlledView' => $user->canDo('medications.controlled.view'),
-                    'controlledRecord' => $user->canDo('medications.controlled.record'),
-                    'controlledWitness' => $user->canDo('medications.controlled.witness'),
-                    'controlledOverride' => $user->canDo('medications.controlled.override'),
-                    'breakGlass' => $user->canDo('medications.breakglass'),
-                ],
-
-                'rostering' => [
-                    'viewAny' => $user->canDo('rostering.viewAny'),
-                ],
-
-                'fleet' => [
-                    'viewAny' => $user->canDo('fleet.viewAny'),
-                ],
-
-                'calendar' => [
-                    'viewAny' => $user->canDo('calendar.viewAny'),
-                ],
-
-                'timeline' => [
-                    'viewAny' => $user->canDo('timeline.viewAny'),
-                    'create' => $user->canDo('timeline.create'),
-                    'pin' => $user->canDo('timeline.pin'),
-                ],
-
-                'summaries' => [
-                    'viewAny' => $user->canDo('summaries.viewAny'),
-                    'generate' => $user->canDo('summaries.generate'),
-                ],
-
-                'audit' => [
-                    'viewAny' => $user->canDo('audit.viewAny'),
-                ],
-
-                'compliance' => [
-                    'view' => $user->canDo('compliance.view'),
-                ],
-
-                'incidents' => [
-                    'viewAny' => $user->canDo('incidents.viewAny'),
-                    'viewAssigned' => $user->canDo('incidents.viewAssigned'),
-                    'create' => $user->canDo('incidents.create'),
-                    'update' => $user->canDo('incidents.update'),
-                    'submit' => $user->canDo('incidents.submit'),
-                    'approve' => $user->canDo('incidents.approve'),
-                    'export' => $user->canDo('incidents.export'),
-                    'templatesManage' => $user->canDo('incidents.templates.manage'),
-                    'followupsManage' => $user->canDo('incidents.followups.manage'),
-                    'followupsComplete' => $user->canDo('incidents.followups.complete'),
-                    'portalManage' => $user->canDo('incidents.portal.manage'),
-                    'portalView' => $user->canDo('incidents.view.portal'),
-                ],
-
-                'risks' => [
-                    'viewAny' => $user->canDo('risks.viewAny'),
-                    'viewAssigned' => $user->canDo('risks.viewAssigned'),
-                    'create' => $user->canDo('risks.create'),
-                    'update' => $user->canDo('risks.update'),
-                    'delete' => $user->canDo('risks.delete'),
-                ],
-
-                'unifi' => [
-                    'manage' => $user->canDo('unifi.manage'),
-                ],
-
-                'rag' => [
-                    'askAny' => $user->canDo('rag.ask.any'),
-                    'askAssigned' => $user->canDo('rag.ask.assigned'),
-                    'askSelf' => $user->canDo('rag.ask.self'),
-                ],
-
-                'settings' => [
-                    'manageAccess' => $user->canDo('settings.access.manage'),
-                    'manageTerminology' => $user->canDo('settings.terminology.manage'),
-                    'manageBranding' => $user->canDo('settings.branding.manage'),
-                    'manageServiceContexts' => $user->canDo('settings.service_contexts.manage'),
-                ],
-            ];
+            $can = $this->getUserPermissions($user);
         }
 
         // UI terminology (defaults merged with saved overrides)
@@ -251,5 +120,159 @@ class HandleInertiaRequests extends Middleware
                 'announcements' => Announcement::inboxFor($user),
             ] : null,
         ];
+    }
+
+    /**
+     * Get user permissions with caching to reduce DB queries.
+     * Permissions are cached for the duration of the request.
+     */
+    protected function getUserPermissions($user): array
+    {
+        return once(function () use ($user) {
+            return [
+                'sites' => [
+                    'viewAny' => $user->canDo('sites.viewAny'),
+                    'create' => $user->canDo('sites.create'),
+                    'update' => $user->canDo('sites.update'),
+                ],
+
+                'staff' => [
+                    'viewAny' => $user->canDo('staff.viewAny'),
+                    'create'  => $user->canDo('staff.create'),
+                    'update'  => $user->canDo('staff.update'),
+                    'invite'  => $user->canDo('staff.invite'),
+                    'assignmentsUpdate' => $user->canDo('staff.assignments.update'),
+                    'credentialsViewAny' => $user->canDo('staff.credentials.viewAny'),
+                    'credentialsUpdateAny' => $user->canDo('staff.credentials.updateAny'),
+                    'credentialsUpdateSelf' => $user->canDo('staff.credentials.updateSelf'),
+                    'availabilityUpdateAny' => $user->canDo('staff.availability.updateAny'),
+                    'availabilityUpdateSelf' => $user->canDo('staff.availability.updateSelf'),
+                ],
+                'clients' => [
+                    'viewAny' => $user->canDo('clients.viewAny'),
+                    'create'  => $user->canDo('clients.create'),
+                    'update'  => $user->canDo('clients.update'),
+                    'assignmentsUpdate' => $user->canDo('clients.assignments.update'),
+                ],
+                'shifts' => [
+                    'viewAny' => $user->canDo('shifts.viewAny'),
+                    'create' => $user->canDo('shifts.create'),
+                    'update' => $user->canDo('shifts.update'),
+                    'manageAny' => $user->canDo('shifts.manageAny'),
+                    'tasksUpdateSelf' => $user->canDo('shifts.tasks.updateSelf'),
+                ],
+
+                'timesheets' => [
+                    'viewAny' => $user->canDo('timesheets.viewAny'),
+                    'viewAssigned' => $user->canDo('timesheets.viewAssigned'),
+                    'create' => $user->canDo('timesheets.create'),
+                    'update' => $user->canDo('timesheets.update'),
+                    'submit' => $user->canDo('timesheets.submit'),
+                    'approve' => $user->canDo('timesheets.approve'),
+                    'manageAny' => $user->canDo('timesheets.manageAny'),
+                ],
+
+                'reports' => [
+                    'viewAny' => $user->canDo('reports.viewAny'),
+                ],
+
+                'assets' => [
+                    'viewAny' => $user->canDo('assets.viewAny'),
+                    'viewAssigned' => $user->canDo('assets.viewAssigned'),
+                    'create' => $user->canDo('assets.create'),
+                    'update' => $user->canDo('assets.update'),
+                    'delete' => $user->canDo('assets.delete'),
+                    'inspectionsRecord' => $user->canDo('assets.inspections.record'),
+                    'maintenanceRecord' => $user->canDo('assets.maintenance.record'),
+                    'documentsManage' => $user->canDo('assets.documents.manage'),
+                    'qrDownload' => $user->canDo('assets.qr.download'),
+                ],
+
+                'medications' => [
+                    'view' => $user->canDo('medications.view'),
+                    'ordersManage' => $user->canDo('medications.orders.manage'),
+                    'administerRecord' => $user->canDo('medications.administer.record'),
+                    'administerCorrect' => $user->canDo('medications.administer.correct'),
+                    'auditView' => $user->canDo('medications.audit.view'),
+                    'reportsExport' => $user->canDo('medications.reports.export'),
+                    'controlledView' => $user->canDo('medications.controlled.view'),
+                    'controlledRecord' => $user->canDo('medications.controlled.record'),
+                    'controlledWitness' => $user->canDo('medications.controlled.witness'),
+                    'controlledOverride' => $user->canDo('medications.controlled.override'),
+                    'breakGlass' => $user->canDo('medications.breakglass'),
+                ],
+
+                'rostering' => [
+                    'viewAny' => $user->canDo('rostering.viewAny'),
+                ],
+
+                'fleet' => [
+                    'viewAny' => $user->canDo('fleet.viewAny'),
+                ],
+
+                'calendar' => [
+                    'viewAny' => $user->canDo('calendar.viewAny'),
+                ],
+
+                'timeline' => [
+                    'viewAny' => $user->canDo('timeline.viewAny'),
+                    'create' => $user->canDo('timeline.create'),
+                    'pin' => $user->canDo('timeline.pin'),
+                ],
+
+                'summaries' => [
+                    'viewAny' => $user->canDo('summaries.viewAny'),
+                    'generate' => $user->canDo('summaries.generate'),
+                ],
+
+                'audit' => [
+                    'viewAny' => $user->canDo('audit.viewAny'),
+                ],
+
+                'compliance' => [
+                    'view' => $user->canDo('compliance.view'),
+                ],
+
+                'incidents' => [
+                    'viewAny' => $user->canDo('incidents.viewAny'),
+                    'viewAssigned' => $user->canDo('incidents.viewAssigned'),
+                    'create' => $user->canDo('incidents.create'),
+                    'update' => $user->canDo('incidents.update'),
+                    'submit' => $user->canDo('incidents.submit'),
+                    'approve' => $user->canDo('incidents.approve'),
+                    'export' => $user->canDo('incidents.export'),
+                    'templatesManage' => $user->canDo('incidents.templates.manage'),
+                    'followupsManage' => $user->canDo('incidents.followups.manage'),
+                    'followupsComplete' => $user->canDo('incidents.followups.complete'),
+                    'portalManage' => $user->canDo('incidents.portal.manage'),
+                    'portalView' => $user->canDo('incidents.view.portal'),
+                ],
+
+                'risks' => [
+                    'viewAny' => $user->canDo('risks.viewAny'),
+                    'viewAssigned' => $user->canDo('risks.viewAssigned'),
+                    'create' => $user->canDo('risks.create'),
+                    'update' => $user->canDo('risks.update'),
+                    'delete' => $user->canDo('risks.delete'),
+                ],
+
+                'unifi' => [
+                    'manage' => $user->canDo('unifi.manage'),
+                ],
+
+                'rag' => [
+                    'askAny' => $user->canDo('rag.ask.any'),
+                    'askAssigned' => $user->canDo('rag.ask.assigned'),
+                    'askSelf' => $user->canDo('rag.ask.self'),
+                ],
+
+                'settings' => [
+                    'manageAccess' => $user->canDo('settings.access.manage'),
+                    'manageTerminology' => $user->canDo('settings.terminology.manage'),
+                    'manageBranding' => $user->canDo('settings.branding.manage'),
+                    'manageServiceContexts' => $user->canDo('settings.service_contexts.manage'),
+                ],
+            ];
+        });
     }
 }
