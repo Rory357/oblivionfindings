@@ -17,6 +17,7 @@
         "laravel/tinker": "^2.10.1",
         "laravel/wayfinder": "^0.1.9",
         "php": "^8.2",
+        "predis/predis": "^2.2",
         "socialiteproviders/google": "^4.1",
         "socialiteproviders/microsoft": "^4.6"
     },
