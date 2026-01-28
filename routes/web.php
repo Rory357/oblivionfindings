@@ -27,6 +27,12 @@ use App\Http\Controllers\QualityChecklistController;
 | - integrations.php: Third-party integrations (UniFi, etc.)
 | - settings.php: Application settings and configuration
 |
+| Compliance Modules:
+| - safeguarding.php: Safeguarding concerns, investigations, alerts
+| - consents.php: Consent management, GDPR Article 7 compliance
+| - training.php: Staff vetting, training, competency assessments
+| - privacy.php: GDPR compliance, data subject requests, breach management
+|
 */
 
 // Public routes
@@ -59,3 +65,9 @@ require __DIR__ . '/medications.php';
 require __DIR__ . '/reports.php';
 require __DIR__ . '/integrations.php';
 require __DIR__ . '/settings.php';
+
+// Compliance module routes
+require __DIR__ . '/safeguarding.php';
+require __DIR__ . '/consents.php';
+require __DIR__ . '/training.php';
+require __DIR__ . '/privacy.php';

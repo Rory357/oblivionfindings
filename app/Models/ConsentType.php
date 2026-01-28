@@ -2,7 +2,7 @@
 
 namespace App\Models;
 
-use App\Concerns\AuditableChanges;
+use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;

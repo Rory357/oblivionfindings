@@ -24,6 +24,12 @@ class DatabaseSeeder extends Seeder
         $this->call(SystemMedicationsSeeder::class);
         $this->call(SystemIncidentsSeeder::class);
         $this->call(SystemDocumentsAndNotesSeeder::class);
+
+        // Compliance module seeders
+        $this->call(ConsentTypesSeeder::class);
+        $this->call(TrainingCoursesSeeder::class);
+        $this->call(CompetencyFrameworksSeeder::class);
+
         // NOTE: RoleCatalogSeeder created a large catalogue of job-title roles.
         // We are not using those roles in the system right now, so we no longer seed them.
         // (Keeps Access Control role list clean and prevents accidental assignment.)
