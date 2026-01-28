@@ -211,6 +211,37 @@ class RbacSeeder extends Seeder
             ['key' => 'rag.ask.any', 'description' => 'Ask AI about any client (within view permissions)'],
             ['key' => 'rag.ask.assigned', 'description' => 'Ask AI about assigned clients'],
             ['key' => 'rag.ask.self', 'description' => 'Ask AI about own / linked client (portal)'],
+
+            // Safeguarding
+            ['key' => 'safeguarding.viewAny', 'description' => 'View all safeguarding concerns'],
+            ['key' => 'safeguarding.create', 'description' => 'Create safeguarding concerns'],
+            ['key' => 'safeguarding.update', 'description' => 'Update safeguarding concerns'],
+            ['key' => 'safeguarding.investigate', 'description' => 'Conduct safeguarding investigations'],
+            ['key' => 'safeguarding.report.external', 'description' => 'Report to external authorities (police, CQC)'],
+            ['key' => 'safeguarding.viewSensitive', 'description' => 'View sensitive allegations'],
+
+            // Consent Management
+            ['key' => 'consents.viewAny', 'description' => 'View consent records'],
+            ['key' => 'consents.manage', 'description' => 'Manage consent types'],
+            ['key' => 'consents.record', 'description' => 'Record client consent'],
+            ['key' => 'consents.withdraw', 'description' => 'Process consent withdrawal'],
+            ['key' => 'consents.export', 'description' => 'Export consent reports'],
+
+            // Staff Vetting & Training
+            ['key' => 'staff.vetting.view', 'description' => 'View background checks'],
+            ['key' => 'staff.vetting.manage', 'description' => 'Manage background checks (DBS, references)'],
+            ['key' => 'staff.training.viewAny', 'description' => 'View all training records'],
+            ['key' => 'staff.training.manage', 'description' => 'Manage training (enroll, record completion)'],
+            ['key' => 'staff.competency.assess', 'description' => 'Conduct competency assessments'],
+            ['key' => 'staff.induction.manage', 'description' => 'Manage staff induction process'],
+
+            // Data Privacy & GDPR
+            ['key' => 'privacy.viewAny', 'description' => 'View data subject requests'],
+            ['key' => 'privacy.requests.view', 'description' => 'View data subject requests'],
+            ['key' => 'privacy.requests.process', 'description' => 'Process GDPR requests (access, erasure, etc.)'],
+            ['key' => 'privacy.export', 'description' => 'Export client data for portability'],
+            ['key' => 'privacy.anonymize', 'description' => 'Anonymize data'],
+            ['key' => 'privacy.manage', 'description' => 'Manage privacy settings and retention policies'],
         ];
 
         foreach ($permissions as $perm) {
@@ -317,7 +348,9 @@ class RbacSeeder extends Seeder
 
                 // RAG
                 'rag.ask.any',
-                            'assets.viewAny',
+
+                // Assets
+                'assets.viewAny',
                 'assets.create',
                 'assets.update',
                 'assets.delete',
@@ -325,6 +358,37 @@ class RbacSeeder extends Seeder
                 'assets.maintenance.record',
                 'assets.documents.manage',
                 'assets.qr.download',
+
+                // Safeguarding
+                'safeguarding.viewAny',
+                'safeguarding.create',
+                'safeguarding.update',
+                'safeguarding.investigate',
+                'safeguarding.report.external',
+                'safeguarding.viewSensitive',
+
+                // Consents
+                'consents.viewAny',
+                'consents.manage',
+                'consents.record',
+                'consents.withdraw',
+                'consents.export',
+
+                // Staff Vetting & Training
+                'staff.vetting.view',
+                'staff.vetting.manage',
+                'staff.training.viewAny',
+                'staff.training.manage',
+                'staff.competency.assess',
+                'staff.induction.manage',
+
+                // Privacy & GDPR
+                'privacy.viewAny',
+                'privacy.requests.view',
+                'privacy.requests.process',
+                'privacy.export',
+                'privacy.anonymize',
+                'privacy.manage',
 ])->pluck('id')
         );
 
@@ -374,13 +438,26 @@ class RbacSeeder extends Seeder
                 'summaries.generate',
                 'calendar.viewAny',
                 'rag.ask.any',
-                            'assets.viewAny',
+
+                // Assets
+                'assets.viewAny',
                 'assets.create',
                 'assets.update',
                 'assets.inspections.record',
                 'assets.maintenance.record',
                 'assets.documents.manage',
                 'assets.qr.download',
+
+                // Safeguarding
+                'safeguarding.viewAny',
+                'safeguarding.create',
+                'safeguarding.update',
+                'safeguarding.investigate',
+
+                // Consents
+                'consents.viewAny',
+                'consents.record',
+                'consents.withdraw',
 ])->pluck('id')
         );
 
@@ -422,13 +499,18 @@ class RbacSeeder extends Seeder
 
                 // RAG
                 'rag.ask.assigned',
-                            'assets.viewAssigned',
+
+                // Assets
+                'assets.viewAssigned',
                 'assets.create',
                 'assets.update',
                 'assets.inspections.record',
                 'assets.maintenance.record',
                 'assets.documents.manage',
                 'assets.qr.download',
+
+                // Safeguarding (can report concerns)
+                'safeguarding.create',
 ])->pluck('id')
         );
 
@@ -462,6 +544,18 @@ class RbacSeeder extends Seeder
                 'audit.viewAny',
 
                 'compliance.view',
+
+                // Staff Vetting & Training (HR focus)
+                'staff.vetting.view',
+                'staff.vetting.manage',
+                'staff.training.viewAny',
+                'staff.training.manage',
+                'staff.competency.assess',
+                'staff.induction.manage',
+
+                // Safeguarding (HR involvement)
+                'safeguarding.viewAny',
+                'safeguarding.create',
             ])->pluck('id')
         );
 
@@ -482,7 +576,15 @@ class RbacSeeder extends Seeder
                 'medications.audit.view',
                 'incidents.viewAny',
                 'risks.viewAny',
-                            'assets.viewAny',
+                'assets.viewAny',
+
+                // New compliance modules (read-only)
+                'safeguarding.viewAny',
+                'consents.viewAny',
+                'staff.vetting.view',
+                'staff.training.viewAny',
+                'privacy.viewAny',
+                'privacy.requests.view',
 ])->pluck('id')
         );
 
