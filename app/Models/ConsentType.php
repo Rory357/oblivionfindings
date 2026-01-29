@@ -18,19 +18,23 @@ class ConsentType extends Model
         'description',
         'purpose',
         'legal_basis',
-        'mandatory',
+        'is_mandatory',
         'requires_capacity_assessment',
-        'validity_period_months',
-        'withdrawable',
+        'allows_withdrawal',
+        'withdrawal_notice_days',
+        'validity_period_days',
+        'renewal_required',
+        'renewal_reminder_days',
         'withdrawal_implications',
         'version',
         'active',
     ];
 
     protected $casts = [
-        'mandatory' => 'boolean',
+        'is_mandatory' => 'boolean',
         'requires_capacity_assessment' => 'boolean',
-        'withdrawable' => 'boolean',
+        'allows_withdrawal' => 'boolean',
+        'renewal_required' => 'boolean',
         'active' => 'boolean',
     ];
 
@@ -77,7 +81,7 @@ class ConsentType extends Model
      */
     public function scopeMandatory($query)
     {
-        return $query->where('mandatory', true);
+        return $query->where('is_mandatory', true);
     }
 
     /**
@@ -97,10 +101,10 @@ class ConsentType extends Model
     }
 
     /**
-     * Check if consent is withdrawable.
+     * Check if consent allows withdrawal.
      */
-    public function isWithdrawable(): bool
+    public function allowsWithdrawal(): bool
     {
-        return $this->withdrawable;
+        return $this->allows_withdrawal;
     }
 }

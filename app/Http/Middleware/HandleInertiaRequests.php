@@ -272,6 +272,32 @@ class HandleInertiaRequests extends Middleware
                     'manageBranding' => $user->canDo('settings.branding.manage'),
                     'manageServiceContexts' => $user->canDo('settings.service_contexts.manage'),
                 ],
+
+                'safeguarding' => [
+                    'viewAny' => $user->canDo('safeguarding.viewAny'),
+                    'create' => $user->canDo('safeguarding.create'),
+                    'update' => $user->canDo('safeguarding.update'),
+                    'investigate' => $user->canDo('safeguarding.investigate'),
+                    'reportExternal' => $user->canDo('safeguarding.report.external'),
+                    'viewSensitive' => $user->canDo('safeguarding.viewSensitive'),
+                ],
+
+                'privacy' => [
+                    'viewRequests' => $user->canDo('privacy.viewRequests'),
+                    'processRequests' => $user->canDo('privacy.processRequests'),
+                    'manageRetention' => $user->canDo('privacy.manageRetention'),
+                    'manageLegalHolds' => $user->canDo('privacy.manageLegalHolds'),
+                    'reportBreaches' => $user->canDo('privacy.reportBreaches'),
+                    'conductDPIA' => $user->canDo('privacy.conductDPIA'),
+                ],
+
+                'consents' => [
+                    'viewAny' => $user->canDo('consents.viewAny'),
+                    'manage' => $user->canDo('consents.manage'),
+                    'record' => $user->canDo('consents.record'),
+                    'withdraw' => $user->canDo('consents.withdraw'),
+                    'export' => $user->canDo('consents.export'),
+                ],
             ];
         });
     }

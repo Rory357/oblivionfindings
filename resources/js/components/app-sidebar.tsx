@@ -20,10 +20,12 @@ import {
     FileText,
     Folder,
     LayoutGrid,
+    Lock,
     MapPin,
     MessageSquareText,
     Settings,
     Shield,
+    ShieldAlert,
     Users,
     Package,
 } from 'lucide-react';
@@ -181,6 +183,12 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     if (can?.audit?.viewAny) {
         items.push({ title: 'Audit Logs', href: '/audit-logs', icon: Shield });
         items.push({ title: 'QA Checklist', href: '/quality/checklist', icon: Shield });
+    }
+    if (can?.safeguarding?.viewAny || can?.safeguarding?.create) {
+        items.push({ title: 'Safeguarding', href: '/safeguarding', icon: ShieldAlert });
+    }
+    if (can?.privacy?.viewRequests) {
+        items.push({ title: 'Privacy & GDPR', href: '/privacy/dashboard', icon: Lock });
     }
     if (can?.unifi?.manage) {
         items.push({ title: 'UniFi', href: '/integrations/unifi', icon: Settings });

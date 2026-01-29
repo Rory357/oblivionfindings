@@ -1,5 +1,13 @@
 <?php
 
+use App\Http\Controllers\DataBreachController;
+use App\Http\Controllers\DataDeletionLogController;
+use App\Http\Controllers\DataRetentionPolicyController;
+use App\Http\Controllers\DataSubjectRequestController;
+use App\Http\Controllers\DPIAController;
+use App\Http\Controllers\LegalHoldController;
+use App\Http\Controllers\PrivacyDashboardController;
+use App\Http\Controllers\PrivacyReportController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -11,15 +19,7 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->group(function () {
     // Data Subject Requests (GDPR Articles 15-22)
-    Route::middleware('permission:privacy.viewRequests')->group(function () {
-        Route::get('/privacy/requests', [DataSubjectRequestController::class, 'index'])
-            ->name('privacy.requests.index');
-        Route::get('/privacy/requests/{request}', [DataSubjectRequestController::class, 'show'])
-            ->name('privacy.requests.show');
-        Route::get('/privacy/requests/{request}/export', [DataSubjectRequestController::class, 'export'])
-            ->name('privacy.requests.export');
-    });
-
+    // Create routes must come before wildcard routes
     Route::middleware('permission:privacy.processRequests')->group(function () {
         Route::get('/privacy/requests/create', [DataSubjectRequestController::class, 'create'])
             ->name('privacy.requests.create');
@@ -35,6 +35,15 @@ Route::middleware(['auth'])->group(function () {
             ->name('privacy.requests.complete');
         Route::post('/privacy/requests/{request}/refuse', [DataSubjectRequestController::class, 'refuse'])
             ->name('privacy.requests.refuse');
+    });
+
+    Route::middleware('permission:privacy.viewRequests')->group(function () {
+        Route::get('/privacy/requests', [DataSubjectRequestController::class, 'index'])
+            ->name('privacy.requests.index');
+        Route::get('/privacy/requests/{request}', [DataSubjectRequestController::class, 'show'])
+            ->name('privacy.requests.show');
+        Route::get('/privacy/requests/{request}/export', [DataSubjectRequestController::class, 'export'])
+            ->name('privacy.requests.export');
     });
 
     // Data Retention Policies
@@ -78,11 +87,12 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Data Breach Management (GDPR Article 33 - 72 hour notification)
+    // Create route must come before wildcard routes
     Route::middleware('permission:privacy.reportBreaches')->group(function () {
-        Route::get('/privacy/breaches', [DataBreachController::class, 'index'])
-            ->name('privacy.breaches.index');
         Route::get('/privacy/breaches/create', [DataBreachController::class, 'create'])
             ->name('privacy.breaches.create');
+        Route::get('/privacy/breaches', [DataBreachController::class, 'index'])
+            ->name('privacy.breaches.index');
         Route::post('/privacy/breaches', [DataBreachController::class, 'store'])
             ->name('privacy.breaches.store');
         Route::get('/privacy/breaches/{breach}', [DataBreachController::class, 'show'])
@@ -98,11 +108,12 @@ Route::middleware(['auth'])->group(function () {
     });
 
     // Data Processing Impact Assessments (DPIA - GDPR Article 35)
+    // Create route must come before wildcard routes
     Route::middleware('permission:privacy.conductDPIA')->group(function () {
-        Route::get('/privacy/dpia', [DPIAController::class, 'index'])
-            ->name('privacy.dpia.index');
         Route::get('/privacy/dpia/create', [DPIAController::class, 'create'])
             ->name('privacy.dpia.create');
+        Route::get('/privacy/dpia', [DPIAController::class, 'index'])
+            ->name('privacy.dpia.index');
         Route::post('/privacy/dpia', [DPIAController::class, 'store'])
             ->name('privacy.dpia.store');
         Route::get('/privacy/dpia/{dpia}', [DPIAController::class, 'show'])

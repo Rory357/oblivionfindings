@@ -67,7 +67,7 @@ class SafeguardingConcernController extends Controller
             'stats' => [
                 'open' => SafeguardingConcern::open()->count(),
                 'critical' => SafeguardingConcern::where('severity', 'critical')->open()->count(),
-                'requiring_referral' => SafeguardingConcern::requireingExternalReferral()->count(),
+                'requiring_referral' => SafeguardingConcern::requiringExternalReferral()->count(),
                 'assigned_to_me' => SafeguardingConcern::where('assigned_to_user_id', auth()->id())->open()->count(),
             ],
         ]);
@@ -81,8 +81,11 @@ class SafeguardingConcernController extends Controller
         $this->authorize('create', SafeguardingConcern::class);
 
         return Inertia::render('safeguarding/create', [
-            'clients' => Client::select('id', 'name')->orderBy('name')->get(),
-            'staff' => User::select('id', 'name')->orderBy('name')->get(),
+            'clients' => Client::select('id', 'first_name', 'last_name')
+                ->orderBy('last_name')
+                ->orderBy('first_name')
+                ->get(),
+            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
             'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
         ]);
     }
@@ -169,8 +172,11 @@ class SafeguardingConcernController extends Controller
 
         return Inertia::render('safeguarding/edit', [
             'concern' => $concern,
-            'clients' => Client::select('id', 'name')->orderBy('name')->get(),
-            'staff' => User::select('id', 'name')->orderBy('name')->get(),
+            'clients' => Client::select('id', 'first_name', 'last_name')
+                ->orderBy('last_name')
+                ->orderBy('first_name')
+                ->get(),
+            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
             'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
         ]);
     }

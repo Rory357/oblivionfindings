@@ -95,24 +95,7 @@ return new class extends Migration
 
             $table->string('name');
             $table->string('code')->unique()->nullable(); // Course code/reference
-            $table->enum('category', [
-                'mandatory',
-                'induction',
-                'safeguarding',
-                'health_safety',
-                'clinical',
-                'medication',
-                'manual_handling',
-                'fire_safety',
-                'food_hygiene',
-                'first_aid',
-                'mental_capacity',
-                'equality_diversity',
-                'data_protection',
-                'professional_development',
-                'specialist',
-                'other'
-            ]);
+            $table->string('category'); // Safeguarding, Clinical Skills, Health and Safety, etc.
 
             $table->text('description')->nullable();
             $table->text('learning_outcomes')->nullable();
@@ -135,15 +118,7 @@ return new class extends Migration
             // Provider
             $table->string('provider')->nullable();
             $table->string('provider_reference')->nullable();
-            $table->enum('delivery_method', [
-                'classroom',
-                'e_learning',
-                'blended',
-                'workshop',
-                'webinar',
-                'self_study',
-                'other'
-            ])->nullable();
+            $table->string('delivery_method')->nullable(); // classroom, elearning, blended, practical, etc.
 
             // Cost
             $table->decimal('cost_per_person', 8, 2)->nullable();
@@ -228,43 +203,36 @@ return new class extends Migration
             $table->id();
 
             $table->string('name');
-            $table->string('category'); // role-specific, universal, specialist
+            $table->string('role')->nullable(); // support_worker, team_leader, etc.
             $table->text('description')->nullable();
-            $table->json('applicable_roles')->nullable(); // Array of role names
-
-            $table->integer('review_frequency_months')->default(12);
+            $table->integer('version')->default(1);
+            $table->timestamp('effective_from')->nullable();
 
             $table->boolean('active')->default(true);
 
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->index(['category', 'active']);
+            $table->index(['role', 'active']);
         });
 
         // Competency items within frameworks
         Schema::create('competency_items', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('competency_framework_id')->constrained('competency_frameworks')->cascadeOnDelete();
+            $table->foreignId('framework_id')->constrained('competency_frameworks')->cascadeOnDelete();
 
+            $table->string('code')->nullable();
             $table->string('name');
             $table->text('description');
-            $table->text('evidence_required')->nullable();
+            $table->string('category')->nullable();
+            $table->string('required_proficiency')->default('competent'); // developing, competent, proficient, expert
+            $table->json('assessment_criteria')->nullable();
 
-            $table->enum('proficiency_level_required', [
-                'awareness',
-                'basic',
-                'proficient',
-                'advanced',
-                'expert'
-            ])->default('proficient');
-
-            $table->boolean('mandatory')->default(true);
             $table->integer('order')->default(0);
 
             $table->timestamps();
 
-            $table->index(['competency_framework_id', 'order']);
+            $table->index(['framework_id', 'order']);
         });
 
         // Staff competency assessments
@@ -273,7 +241,7 @@ return new class extends Migration
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
             $table->foreignId('competency_framework_id')->constrained('competency_frameworks')->cascadeOnDelete();
 
-            $table->foreignId('assessor_id')->constrained('users')->nullOnDelete();
+            $table->foreignId('assessor_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('assessment_date');
 
             $table->enum('overall_outcome', [
@@ -311,7 +279,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('user_id')->constrained('users')->cascadeOnDelete();
 
-            $table->foreignId('induction_manager_id')->constrained('users')->nullOnDelete();
+            $table->foreignId('induction_manager_id')->nullable()->constrained('users')->nullOnDelete();
             $table->date('start_date');
             $table->date('expected_completion_date')->nullable();
             $table->date('actual_completion_date')->nullable();

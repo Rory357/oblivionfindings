@@ -7,14 +7,16 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Head, useForm } from '@inertiajs/react';
-import { FormEventHandler } from 'react';
+import { FormEventHandler, useState } from 'react';
 
 type Props = {
     clients?: Array<{ id: number; first_name: string; last_name: string }>;
-    staff?: Array<{ id: number; first_name: string; last_name: string }>;
+    staff?: Array<{ id: number; name?: string; first_name?: string; last_name?: string }>;
+    sites?: Array<{ id: number; name: string }>;
 };
 
-export default function SafeguardingCreate({ clients = [], staff = [] }: Props) {
+export default function SafeguardingCreate({ clients = [], staff = [], sites = [] }: Props) {
+    const [siteSelection, setSiteSelection] = useState<string>('');
     const { data, setData, post, processing, errors } = useForm({
         // Subject information
         subject_type: '',
@@ -29,6 +31,7 @@ export default function SafeguardingCreate({ clients = [], staff = [] }: Props) 
         occurred_at: '',
         reported_at: '',
         location: '',
+        site_id: '',
         witnesses: '',
 
         // Alleged perpetrator
@@ -123,11 +126,14 @@ export default function SafeguardingCreate({ clients = [], staff = [] }: Props) 
                                         <Select value={data.subject_id} onValueChange={(v) => setData('subject_id', v)}>
                                             <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
                                             <SelectContent>
-                                                {staff.map((s) => (
-                                                    <SelectItem key={s.id} value={String(s.id)}>
-                                                        {s.first_name} {s.last_name}
-                                                    </SelectItem>
-                                                ))}
+                                                {staff.map((s) => {
+                                                    const name = s.name ?? `${s.first_name ?? ''} ${s.last_name ?? ''}`.trim();
+                                                    return (
+                                                        <SelectItem key={s.id} value={String(s.id)}>
+                                                            {name || `Staff #${s.id}`}
+                                                        </SelectItem>
+                                                    );
+                                                })}
                                             </SelectContent>
                                         </Select>
                                         {errors.subject_id && <div className="mt-1 text-xs text-red-500">{errors.subject_id}</div>}
@@ -239,14 +245,43 @@ export default function SafeguardingCreate({ clients = [], staff = [] }: Props) 
 
                                 <div>
                                     <Label>Location</Label>
+                                    <Select
+                                        value={siteSelection}
+                                        onValueChange={(v) => {
+                                            setSiteSelection(v);
+                                            if (v === 'other') {
+                                                setData('site_id', '');
+                                            } else {
+                                                setData('site_id', v);
+                                                setData('location', '');
+                                            }
+                                        }}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="Select site" /></SelectTrigger>
+                                        <SelectContent>
+                                            {sites.map((site) => (
+                                                <SelectItem key={site.id} value={String(site.id)}>
+                                                    {site.name}
+                                                </SelectItem>
+                                            ))}
+                                            <SelectItem value="other">Other (not listed)</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.site_id && <div className="mt-1 text-xs text-red-500">{errors.site_id}</div>}
+                                </div>
+                            </div>
+
+                            {siteSelection === 'other' && (
+                                <div>
+                                    <Label>Other Location *</Label>
                                     <Input
                                         value={data.location}
                                         onChange={(e) => setData('location', e.target.value)}
-                                        placeholder="Where did this occur?"
+                                        placeholder="Enter location details"
                                     />
                                     {errors.location && <div className="mt-1 text-xs text-red-500">{errors.location}</div>}
                                 </div>
-                            </div>
+                            )}
 
                             <div>
                                 <Label>Witnesses</Label>

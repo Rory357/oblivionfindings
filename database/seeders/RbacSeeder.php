@@ -236,12 +236,12 @@ class RbacSeeder extends Seeder
             ['key' => 'staff.induction.manage', 'description' => 'Manage staff induction process'],
 
             // Data Privacy & GDPR
-            ['key' => 'privacy.viewAny', 'description' => 'View data subject requests'],
-            ['key' => 'privacy.requests.view', 'description' => 'View data subject requests'],
-            ['key' => 'privacy.requests.process', 'description' => 'Process GDPR requests (access, erasure, etc.)'],
-            ['key' => 'privacy.export', 'description' => 'Export client data for portability'],
-            ['key' => 'privacy.anonymize', 'description' => 'Anonymize data'],
-            ['key' => 'privacy.manage', 'description' => 'Manage privacy settings and retention policies'],
+            ['key' => 'privacy.viewRequests', 'description' => 'View data subject requests and privacy dashboard'],
+            ['key' => 'privacy.processRequests', 'description' => 'Process GDPR requests (access, erasure, etc.)'],
+            ['key' => 'privacy.manageRetention', 'description' => 'Manage data retention policies'],
+            ['key' => 'privacy.manageLegalHolds', 'description' => 'Manage legal holds on data'],
+            ['key' => 'privacy.reportBreaches', 'description' => 'Report and manage data breaches'],
+            ['key' => 'privacy.conductDPIA', 'description' => 'Conduct Data Protection Impact Assessments'],
         ];
 
         foreach ($permissions as $perm) {
@@ -383,12 +383,12 @@ class RbacSeeder extends Seeder
                 'staff.induction.manage',
 
                 // Privacy & GDPR
-                'privacy.viewAny',
-                'privacy.requests.view',
-                'privacy.requests.process',
-                'privacy.export',
-                'privacy.anonymize',
-                'privacy.manage',
+                'privacy.viewRequests',
+                'privacy.processRequests',
+                'privacy.manageRetention',
+                'privacy.manageLegalHolds',
+                'privacy.reportBreaches',
+                'privacy.conductDPIA',
 ])->pluck('id')
         );
 
@@ -583,8 +583,7 @@ class RbacSeeder extends Seeder
                 'consents.viewAny',
                 'staff.vetting.view',
                 'staff.training.viewAny',
-                'privacy.viewAny',
-                'privacy.requests.view',
+                'privacy.viewRequests',
 ])->pluck('id')
         );
 

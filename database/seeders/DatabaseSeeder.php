@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
         $this->call(SystemMedicationsSeeder::class);
         $this->call(SystemIncidentsSeeder::class);
         $this->call(SystemDocumentsAndNotesSeeder::class);
+        $this->call(SafeguardingSeeder::class);
 
         // Compliance module seeders
         $this->call(ConsentTypesSeeder::class);

@@ -11,19 +11,19 @@ use App\Http\Controllers\SafeguardingConcernController;
  */
 
 Route::middleware(['auth'])->group(function () {
-    // Safeguarding concerns
-    Route::middleware('permission:safeguarding.viewAny')->group(function () {
-        Route::get('/safeguarding', [SafeguardingConcernController::class, 'index'])
-            ->name('safeguarding.index');
-        Route::get('/safeguarding/{concern}', [SafeguardingConcernController::class, 'show'])
-            ->name('safeguarding.show');
-    });
-
+    // Safeguarding concerns - Create routes must come before wildcard routes
     Route::middleware('permission:safeguarding.create')->group(function () {
         Route::get('/safeguarding/create', [SafeguardingConcernController::class, 'create'])
             ->name('safeguarding.create');
         Route::post('/safeguarding', [SafeguardingConcernController::class, 'store'])
             ->name('safeguarding.store');
+    });
+
+    Route::middleware('permission:safeguarding.viewAny')->group(function () {
+        Route::get('/safeguarding', [SafeguardingConcernController::class, 'index'])
+            ->name('safeguarding.index');
+        Route::get('/safeguarding/{concern}', [SafeguardingConcernController::class, 'show'])
+            ->name('safeguarding.show');
     });
 
     Route::middleware('permission:safeguarding.update')->group(function () {

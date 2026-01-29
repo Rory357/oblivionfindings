@@ -247,7 +247,7 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                                                     Requester: {request.requester_name}
                                                     {request.received_at && ` • Received: ${new Date(request.received_at).toLocaleDateString()}`}
                                                     {request.due_date && ` • Due: ${new Date(request.extended_due_date || request.due_date).toLocaleDateString()}`}
-                                                    {request.assigned_to && ` • Assigned: ${request.assigned_to.first_name} ${request.assigned_to.last_name}`}
+                                                    {request.assigned_to && ` • Assigned: ${request.assigned_to.name}`}
                                                 </div>
                                             </div>
                                             <Link href={`/privacy/requests/${request.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">

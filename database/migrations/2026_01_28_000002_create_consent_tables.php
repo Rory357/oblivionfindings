@@ -19,10 +19,13 @@ return new class extends Migration
             $table->text('description');
             $table->text('purpose'); // Why this consent is needed
             $table->text('legal_basis'); // GDPR Article 6 basis
-            $table->boolean('mandatory')->default(false); // Required for service delivery
+            $table->boolean('is_mandatory')->default(false); // Required for service delivery
             $table->boolean('requires_capacity_assessment')->default(false);
-            $table->integer('validity_period_months')->nullable(); // Renewal period
-            $table->boolean('withdrawable')->default(true);
+            $table->boolean('allows_withdrawal')->default(true);
+            $table->integer('withdrawal_notice_days')->nullable();
+            $table->integer('validity_period_days')->nullable(); // Renewal period
+            $table->boolean('renewal_required')->default(false);
+            $table->integer('renewal_reminder_days')->nullable();
             $table->text('withdrawal_implications')->nullable();
             $table->integer('version')->default(1);
             $table->boolean('active')->default(true);
@@ -30,7 +33,7 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->index(['category', 'active']);
-            $table->index('mandatory');
+            $table->index('is_mandatory');
         });
 
         // Consent type versions (for audit trail)

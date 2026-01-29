@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('reference_number')->unique(); // e.g., SG-2026-001
 
             // Subject of concern (polymorphic - can be Client, User/Staff, or Other)
-            $table->nullableMorphs('subject');
+            $table->nullableMorphs('subject', 'sg_concern_subject_idx');
             $table->string('subject_name')->nullable(); // For external/unnamed subjects
 
             // Concern details
@@ -43,7 +43,7 @@ return new class extends Migration
             $table->text('location')->nullable();
 
             // Alleged perpetrator (polymorphic or named)
-            $table->nullableMorphs('alleged_perpetrator');
+            $table->nullableMorphs('alleged_perpetrator', 'sg_concern_perpetrator_idx');
             $table->string('alleged_perpetrator_name')->nullable();
             $table->text('alleged_perpetrator_details')->nullable();
 
@@ -91,7 +91,6 @@ return new class extends Migration
             // Related records
             $table->foreignId('related_incident_id')->nullable()->constrained('client_incidents')->nullOnDelete();
             $table->foreignId('site_id')->nullable()->constrained('sites')->nullOnDelete();
-            $table->foreignId('organization_id')->nullable()->constrained('organizations')->nullOnDelete();
 
             // Audit
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
@@ -104,7 +103,6 @@ return new class extends Migration
             $table->index(['status', 'severity']);
             $table->index('reported_at');
             $table->index('assigned_to_user_id');
-            $table->index('organization_id');
         });
 
         // Safeguarding investigations
@@ -158,7 +156,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['safeguarding_concern_id', 'status']);
+            $table->index(['safeguarding_concern_id', 'status'], 'sg_investigation_concern_status_idx');
             $table->index('lead_investigator_id');
         });
 
@@ -202,7 +200,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['safeguarding_concern_id', 'authority_type']);
+            $table->index(['safeguarding_concern_id', 'authority_type'], 'sg_ext_report_concern_auth_idx');
             $table->index('reported_at');
         });
 
@@ -211,7 +209,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('safeguarding_concern_id')->constrained('safeguarding_concerns')->cascadeOnDelete();
 
-            $table->foreignId('assessor_id')->constrained('users')->nullOnDelete();
+            $table->foreignId('assessor_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('assessed_at');
 
             // Risk factors
@@ -247,7 +245,7 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['safeguarding_concern_id', 'assessed_at']);
+            $table->index(['safeguarding_concern_id', 'assessed_at'], 'sg_risk_assess_concern_date_idx');
             $table->index('overall_risk_level');
             $table->index('next_review_date');
         });
@@ -286,14 +284,14 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['safeguarding_concern_id', 'status']);
+            $table->index(['safeguarding_concern_id', 'status'], 'sg_action_plan_concern_status_idx');
             $table->index(['assigned_to_user_id', 'due_date']);
         });
 
         // Safeguarding alerts (on client/staff profiles)
         Schema::create('safeguarding_alerts', function (Blueprint $table) {
             $table->id();
-            $table->morphs('alertable'); // Client or User/Staff
+            $table->morphs('alertable', 'sg_alert_alertable_idx'); // Client or User/Staff
 
             $table->foreignId('safeguarding_concern_id')->nullable()->constrained('safeguarding_concerns')->nullOnDelete();
 

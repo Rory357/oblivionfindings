@@ -142,7 +142,7 @@ return new class extends Migration
             $table->integer('file_size_bytes')->nullable();
 
             $table->timestamp('generated_at');
-            $table->foreignId('generated_by_user_id')->constrained('users')->nullOnDelete();
+            $table->foreignId('generated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
 
             $table->timestamp('expires_at')->nullable(); // Auto-delete export after X days
             $table->boolean('password_protected')->default(false);
@@ -174,7 +174,7 @@ return new class extends Migration
             $table->enum('status', ['active', 'released'])->default('active');
 
             $table->timestamp('imposed_at');
-            $table->foreignId('imposed_by_user_id')->constrained('users')->nullOnDelete();
+            $table->foreignId('imposed_by_user_id')->nullable()->constrained('users')->nullOnDelete();
 
             $table->timestamp('released_at')->nullable();
             $table->foreignId('released_by_user_id')->nullable()->constrained('users')->nullOnDelete();
@@ -203,7 +203,7 @@ return new class extends Migration
             $table->foreignId('data_subject_request_id')->nullable()->constrained('data_subject_requests')->nullOnDelete();
 
             $table->timestamp('anonymized_at');
-            $table->foreignId('anonymized_by_user_id')->constrained('users')->nullOnDelete();
+            $table->foreignId('anonymized_by_user_id')->nullable()->constrained('users')->nullOnDelete();
 
             $table->boolean('reversible')->default(false);
             $table->string('reversal_key_path')->nullable(); // If reversible, where is the key stored
@@ -220,7 +220,7 @@ return new class extends Migration
             $table->string('breach_reference')->unique();
 
             $table->timestamp('discovered_at');
-            $table->foreignId('discovered_by_user_id')->constrained('users')->nullOnDelete();
+            $table->foreignId('discovered_by_user_id')->nullable()->constrained('users')->nullOnDelete();
 
             $table->text('nature_of_breach'); // What happened
             $table->json('affected_data_categories')->nullable(); // What types of data
@@ -265,7 +265,7 @@ return new class extends Migration
 
             $table->enum('assessment_type', ['new_project', 'process_change', 'system_upgrade', 'periodic_review']);
 
-            $table->foreignId('assessor_id')->constrained('users')->nullOnDelete();
+            $table->foreignId('assessor_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamp('assessment_date');
 
             // Data processing details
@@ -291,7 +291,7 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['overall_risk_level', 'assessment_date']);
+            $table->index(['overall_risk_level', 'assessment_date'], 'pia_risk_date_idx');
             $table->index('review_date');
         });
     }
