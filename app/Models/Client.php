@@ -135,6 +135,16 @@ class Client extends Model
         return $this->hasMany(\App\Models\ClientIncident::class);
     }
 
+    public function respiteBookings()
+    {
+        return $this->hasMany(\App\Models\RespiteBooking::class);
+    }
+
+    public function respiteBookingRequests()
+    {
+        return $this->hasMany(\App\Models\RespiteBookingRequest::class);
+    }
+
     public function risks()
     {
         return $this->hasMany(\App\Models\ClientRisk::class);

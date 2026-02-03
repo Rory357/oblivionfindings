@@ -6,7 +6,11 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
+use App\Models\FleetSignal;
+use App\Models\FleetTrip;
+use App\Models\FleetVehicleStateSnapshot;
 
 class Asset extends Model
 {
@@ -32,6 +36,7 @@ class Asset extends Model
         'qr_token',
         'name',
         'category',
+        'asset_category_id',
         'description',
         'manufacturer',
         'model',
@@ -62,6 +67,11 @@ class Asset extends Model
         return $this->belongsTo(Site::class);
     }
 
+    public function categoryRef(): BelongsTo
+    {
+        return $this->belongsTo(AssetCategory::class, 'asset_category_id');
+    }
+
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
@@ -90,5 +100,70 @@ class Asset extends Model
     public function documents(): HasMany
     {
         return $this->hasMany(AssetDocument::class);
+    }
+
+    public function ownerships(): HasMany
+    {
+        return $this->hasMany(AssetOwnership::class);
+    }
+
+    public function value(): HasOne
+    {
+        return $this->hasOne(AssetValue::class);
+    }
+
+    public function assignments(): HasMany
+    {
+        return $this->hasMany(AssetAssignment::class);
+    }
+
+    public function trackers(): HasMany
+    {
+        return $this->hasMany(AssetTracker::class);
+    }
+
+    public function telemetrySnapshots(): HasMany
+    {
+        return $this->hasMany(AssetTelemetrySnapshot::class);
+    }
+
+    public function telemetryHistories(): HasMany
+    {
+        return $this->hasMany(AssetTelemetryHistory::class);
+    }
+
+    public function alerts(): HasMany
+    {
+        return $this->hasMany(AssetAlert::class);
+    }
+
+    public function scanEvents(): HasMany
+    {
+        return $this->hasMany(AssetScanEvent::class);
+    }
+
+    public function geofences(): HasMany
+    {
+        return $this->hasMany(AssetGeofence::class);
+    }
+
+    public function fleetState()
+    {
+        return $this->hasOne(FleetVehicleStateSnapshot::class, 'asset_id');
+    }
+
+    public function fleetTrips(): HasMany
+    {
+        return $this->hasMany(FleetTrip::class, 'asset_id');
+    }
+
+    public function fleetSignals(): HasMany
+    {
+        return $this->hasMany(FleetSignal::class, 'asset_id');
+    }
+
+    public function incidentLinks(): HasMany
+    {
+        return $this->hasMany(AssetIncidentLink::class);
     }
 }
