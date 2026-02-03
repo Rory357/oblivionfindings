@@ -20,14 +20,62 @@ class ShiftController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('shifts.viewAny') || $auth->canDo('shifts.viewAssigned')), 403);
 
-        $date = $request->query('date');
-        $day = $date ? now()->parse($date)->startOfDay() : now()->startOfDay();
-        $next = (clone $day)->addDay();
+        $from = $request->query('from');
+        $to = $request->query('to');
+
+        if ($from) {
+            $start = now()->parse($from)->startOfDay();
+        } elseif ($to) {
+            $start = now()->parse($to)->startOfDay();
+        } else {
+            $start = now()->startOfDay();
+        }
+
+        if ($to) {
+            $end = now()->parse($to)->endOfDay();
+        } elseif ($from) {
+            $end = now()->parse($from)->endOfDay();
+        } else {
+            $end = now()->endOfDay();
+        }
 
         $query = Shift::query()
             ->with(['client:id,first_name,last_name', 'staff:id,name,email'])
-            ->whereBetween('starts_at', [$day, $next])
+            ->whereBetween('starts_at', [$start, $end])
             ->orderBy('starts_at');
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->query('status'));
+        }
+
+        if ($request->filled('client_id')) {
+            $query->where('client_id', $request->query('client_id'));
+        }
+
+        if ($request->filled('user_id')) {
+            $query->where('user_id', $request->query('user_id'));
+        }
+
+        if ($request->query('assigned') === 'assigned') {
+            $query->whereNotNull('user_id');
+        } elseif ($request->query('assigned') === 'unassigned') {
+            $query->whereNull('user_id');
+        }
+
+        if ($request->filled('q')) {
+            $q = $request->query('q');
+            $query->where(function ($builder) use ($q) {
+                $builder->where('location', 'like', "%{$q}%")
+                    ->orWhereHas('client', function ($cq) use ($q) {
+                        $cq->where('first_name', 'like', "%{$q}%")
+                            ->orWhere('last_name', 'like', "%{$q}%");
+                    })
+                    ->orWhereHas('staff', function ($sq) use ($q) {
+                        $sq->where('name', 'like', "%{$q}%")
+                            ->orWhere('email', 'like', "%{$q}%");
+                    });
+            });
+        }
 
         if (!$auth->canDo('shifts.manageAny')) {
             // Assigned-only access: only their own shifts
@@ -36,11 +84,28 @@ class ShiftController extends Controller
 
         $shifts = $query->paginate(25)->withQueryString();
 
+        $clients = Client::query()
+            ->orderBy('first_name')
+            ->get(['id', 'first_name', 'last_name']);
+
+        $staff = User::staff()
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
         return inertia('shifts/index', [
             'shifts' => $shifts,
             'filters' => [
-                'date' => $day->toDateString(),
+                'from' => $start->toDateString(),
+                'to' => $end->toDateString(),
+                'status' => $request->query('status'),
+                'client_id' => $request->query('client_id'),
+                'user_id' => $request->query('user_id'),
+                'assigned' => $request->query('assigned'),
+                'q' => $request->query('q'),
             ],
+            'clients' => $clients,
+            'staff' => $staff,
+            'statuses' => ['draft', 'scheduled', 'in_progress', 'completed', 'cancelled'],
             'canCreate' => $auth->canDo('shifts.create'),
         ]);
     }

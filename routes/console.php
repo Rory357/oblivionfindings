@@ -3,6 +3,9 @@
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Support\Facades\Artisan;
+use App\Jobs\DetectFleetOfflineDevices;
+use App\Jobs\PruneFleetTelemetry;
+use App\Jobs\PruneAssetTelemetry;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -31,3 +34,21 @@ app(Schedule::class)
     ->command('notifications:escalate')
     ->timezone('Pacific/Auckland')
     ->everyTenMinutes();
+
+// Fleet device offline detection
+app(Schedule::class)
+    ->job(new DetectFleetOfflineDevices())
+    ->timezone('Pacific/Auckland')
+    ->everyFiveMinutes();
+
+// Fleet telemetry retention cleanup
+app(Schedule::class)
+    ->job(new PruneFleetTelemetry())
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('02:00');
+
+// Asset telemetry retention cleanup
+app(Schedule::class)
+    ->job(new PruneAssetTelemetry())
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('02:30');

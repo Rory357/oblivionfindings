@@ -15,45 +15,13 @@ class TimesheetController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
 
-        $from = $request->query('from');
-        $to = $request->query('to');
-        $clientId = $request->query('client_id');
-        $staffId = $request->query('staff_id');
-
-        $q = Timesheet::query()
-            ->with(['client:id,first_name,last_name', 'staff:id,name,email'])
-            ->where('status', 'submitted')
-            ->orderByDesc('submitted_at');
-
-        if ($from) {
-            $q->whereDate('work_date', '>=', $from);
-        }
-        if ($to) {
-            $q->whereDate('work_date', '<=', $to);
-        }
-        if ($clientId) {
-            $q->where('client_id', $clientId);
-        }
-        if ($staffId) {
-            $q->where('user_id', $staffId);
-        }
-
-        $timesheets = $q->paginate(25)->withQueryString();
-
-        $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
-        $staff = \App\Models\User::staff()->orderBy('name')->get(['id', 'name', 'email']);
-
-        return inertia('timesheets/approvals', [
-            'timesheets' => $timesheets,
-            'filters' => [
-                'from' => $from,
-                'to' => $to,
-                'client_id' => $clientId,
-                'staff_id' => $staffId,
-            ],
-            'clients' => $clients,
-            'staff' => $staff,
-        ]);
+        return redirect()->route('timesheets.index', array_filter([
+            'mode' => 'approvals',
+            'from' => $request->query('from'),
+            'to' => $request->query('to'),
+            'client_id' => $request->query('client_id'),
+            'staff_id' => $request->query('staff_id'),
+        ], fn($v) => $v !== null && $v !== ''));
     }
 
     public function bulkApprove(Request $request)
@@ -169,15 +137,20 @@ class TimesheetController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned')), 403);
 
-        $status = $request->query('status');
+        $canApprove = $auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny');
+        $approvalMode = $request->query('mode') === 'approvals' && $canApprove;
+
+        $status = $approvalMode ? 'submitted' : $request->query('status');
         $from = $request->query('from');
         $to = $request->query('to');
+        $clientId = $request->query('client_id');
+        $staffId = $request->query('staff_id');
 
         $q = Timesheet::query()
             ->with(['client:id,first_name,last_name', 'staff:id,name,email'])
             ->orderByDesc('work_date');
 
-        if (!$auth->canDo('timesheets.manageAny')) {
+        if (!$auth->canDo('timesheets.manageAny') && !$approvalMode) {
             $q->where('user_id', $auth->id);
         }
 
@@ -190,13 +163,32 @@ class TimesheetController extends Controller
         if ($to) {
             $q->whereDate('work_date', '<=', $to);
         }
+        if ($clientId) {
+            $q->where('client_id', $clientId);
+        }
+        if ($staffId) {
+            $q->where('user_id', $staffId);
+        }
 
         $timesheets = $q->paginate(25)->withQueryString();
 
+        $clients = $canApprove ? Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']) : [];
+        $staff = $canApprove ? \App\Models\User::staff()->orderBy('name')->get(['id', 'name', 'email']) : [];
+
         return inertia('timesheets/index', [
             'timesheets' => $timesheets,
-            'filters' => compact('status', 'from', 'to'),
-            'canApprove' => $auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny'),
+            'filters' => [
+                'status' => $status,
+                'from' => $from,
+                'to' => $to,
+                'client_id' => $clientId,
+                'staff_id' => $staffId,
+                'mode' => $approvalMode ? 'approvals' : null,
+            ],
+            'approvalMode' => $approvalMode,
+            'clients' => $clients,
+            'staff' => $staff,
+            'canApprove' => $canApprove,
             'canCreate' => $auth->canDo('timesheets.create'),
         ]);
     }

@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientDocument;
+use App\Models\RespiteBooking;
+use App\Models\RespiteBookingRequest;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\User;
@@ -20,7 +22,7 @@ use App\Http\Requests\UpdateClientRequest;
 
 class ClientController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $this->authorize('viewAny', Client::class);
 
@@ -40,6 +42,8 @@ class ClientController extends Controller
                 'assessments',
                 'documents',
                 'supportPlan',
+                'respiteBookings',
+                'respiteBookingRequests',
             ])
             ->orderBy('last_name')
             ->get([
@@ -59,6 +63,7 @@ class ClientController extends Controller
 
         $clients = $clients->map(function (Client $c) {
             $summary = $this->buildOnboardingSummaryFromCounts($c);
+            $hasRespite = ((int) ($c->respite_bookings_count ?? 0) + (int) ($c->respite_booking_requests_count ?? 0)) > 0;
             return [
                 'id' => $c->id,
                 'first_name' => $c->first_name,
@@ -68,6 +73,7 @@ class ClientController extends Controller
                 'status' => $c->status,
                 'site' => $c->site ? ['id' => $c->site->id, 'name' => $c->site->name] : null,
                 'onboarding' => $summary,
+                'has_respite' => $hasRespite,
             ];
         })->values();
 
@@ -288,6 +294,33 @@ class ClientController extends Controller
                 ] : null,
             ],
             'onboarding' => $this->buildOnboardingChecklist($client),
+            'respite' => [
+                'bookings' => RespiteBooking::query()
+                    ->where('client_id', $client->id)
+                    ->orderByDesc('start_at')
+                    ->limit(10)
+                    ->with(['coordinator', 'shift'])
+                    ->get()
+                    ->map(fn($b) => [
+                        'id' => $b->id,
+                        'start_at' => optional($b->start_at)->toISOString(),
+                        'end_at' => optional($b->end_at)->toISOString(),
+                        'status' => $b->status,
+                        'shift_id' => $b->shift?->id,
+                        'coordinator' => $b->coordinator ? ['id' => $b->coordinator->id, 'name' => $b->coordinator->name] : null,
+                    ])->values(),
+                'requests' => RespiteBookingRequest::query()
+                    ->where('client_id', $client->id)
+                    ->orderByDesc('requested_start')
+                    ->limit(10)
+                    ->get()
+                    ->map(fn($r) => [
+                        'id' => $r->id,
+                        'requested_start' => optional($r->requested_start)->toISOString(),
+                        'requested_end' => optional($r->requested_end)->toISOString(),
+                        'status' => $r->status,
+                    ])->values(),
+            ],
             'can' => [
                 'edit' => $request->user()?->canDo('clients.update') ?? false,
                 'assign_workers' => $request->user()?->canDo('clients.assignments.update') ?? false,

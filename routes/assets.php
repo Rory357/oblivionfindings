@@ -6,6 +6,13 @@ use App\Http\Controllers\AssetInspectionController;
 use App\Http\Controllers\AssetMaintenanceController;
 use App\Http\Controllers\AssetDocumentController;
 use App\Http\Controllers\AssetQrController;
+use App\Http\Controllers\AssetTrackerController;
+use App\Http\Controllers\AssetTelemetryIngestController;
+use App\Http\Controllers\AssetAlertController;
+use App\Http\Controllers\AssetScanEventController;
+use App\Http\Controllers\AssetOwnershipController;
+use App\Http\Controllers\AssetAssignmentController;
+use App\Http\Controllers\AssetGeofenceController;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\SiteContactController;
 use App\Http\Controllers\SiteDocumentController;
@@ -68,6 +75,8 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/assets/{asset}', [AssetController::class, 'show'])
             ->whereNumber('asset')
             ->name('assets.show');
+        Route::get('/assets/alerts', [AssetAlertController::class, 'index'])
+            ->name('assets.alerts.index');
 
         // QR code redirect (public-ish, but auth required)
         Route::get('/assets/qr/{token}', [AssetQrController::class, 'redirectByToken'])
@@ -90,6 +99,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/assets/{asset}/documents/{document}/download', [AssetDocumentController::class, 'download'])
             ->whereNumber('asset')
             ->name('assets.documents.download');
+    });
+
+    Route::middleware('permission:assets.alerts.manage')->group(function () {
+        Route::post('/assets/alerts/{alert}/acknowledge', [AssetAlertController::class, 'acknowledge'])
+            ->whereNumber('alert')
+            ->name('assets.alerts.acknowledge');
+        Route::post('/assets/alerts/{alert}/resolve', [AssetAlertController::class, 'resolve'])
+            ->whereNumber('alert')
+            ->name('assets.alerts.resolve');
     });
 
     // Asset creation
@@ -137,5 +155,52 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/assets/{asset}/documents/{document}', [AssetDocumentController::class, 'destroy'])
             ->whereNumber('asset')
             ->name('assets.documents.destroy');
+    });
+
+    Route::middleware('permission:assets.trackers.manage')->group(function () {
+        Route::post('/assets/{asset}/trackers/pair', [AssetTrackerController::class, 'store'])
+            ->whereNumber('asset')
+            ->name('assets.trackers.pair');
+        Route::post('/assets/{asset}/trackers/{tracker}/unpair', [AssetTrackerController::class, 'unpair'])
+            ->whereNumber('asset')
+            ->whereNumber('tracker')
+            ->name('assets.trackers.unpair');
+    });
+
+    Route::middleware('permission:assets.scan.record')->group(function () {
+        Route::post('/assets/{asset}/scan-events', [AssetScanEventController::class, 'store'])
+            ->whereNumber('asset')
+            ->name('assets.scan-events.store');
+    });
+
+    Route::middleware('permission:assets.ownership.manage')->group(function () {
+        Route::post('/assets/{asset}/ownerships', [AssetOwnershipController::class, 'store'])
+            ->whereNumber('asset')
+            ->name('assets.ownerships.store');
+    });
+
+    Route::middleware('permission:assets.assignments.manage')->group(function () {
+        Route::post('/assets/{asset}/assignments', [AssetAssignmentController::class, 'store'])
+            ->whereNumber('asset')
+            ->name('assets.assignments.store');
+        Route::post('/assets/{asset}/assignments/{assignment}/release', [AssetAssignmentController::class, 'release'])
+            ->whereNumber('asset')
+            ->whereNumber('assignment')
+            ->name('assets.assignments.release');
+    });
+
+    Route::middleware('permission:assets.geofences.manage')->group(function () {
+        Route::post('/assets/{asset}/geofences', [AssetGeofenceController::class, 'store'])
+            ->whereNumber('asset')
+            ->name('assets.geofences.store');
+        Route::delete('/assets/{asset}/geofences/{geofence}', [AssetGeofenceController::class, 'destroy'])
+            ->whereNumber('asset')
+            ->whereNumber('geofence')
+            ->name('assets.geofences.destroy');
+    });
+
+    Route::middleware('permission:assets.telemetry.ingest')->group(function () {
+        Route::post('/telemetry/ingest/{vendor}', [AssetTelemetryIngestController::class, 'store'])
+            ->name('assets.telemetry.ingest');
     });
 });

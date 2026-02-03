@@ -86,6 +86,11 @@ class HandleInertiaRequests extends Middleware
                 'name' => is_string($brandingName) && trim($brandingName) !== '' ? $brandingName : config('app.name'),
                 'logoUrl' => $logoUrl,
             ],
+            'fleet' => [
+                'maps' => [
+                    'apiKey' => config('fleet.maps.api_key'),
+                ],
+            ],
 
             'sidebarOpen' => ! $request->hasCookie('sidebar_state') || $request->cookie('sidebar_state') === 'true',
 
@@ -186,6 +191,15 @@ class HandleInertiaRequests extends Middleware
                     'maintenanceRecord' => $user->canDo('assets.maintenance.record'),
                     'documentsManage' => $user->canDo('assets.documents.manage'),
                     'qrDownload' => $user->canDo('assets.qr.download'),
+                    'ownershipManage' => $user->canDo('assets.ownership.manage'),
+                    'assignmentsManage' => $user->canDo('assets.assignments.manage'),
+                    'trackersManage' => $user->canDo('assets.trackers.manage'),
+                    'telemetryIngest' => $user->canDo('assets.telemetry.ingest'),
+                    'telemetryView' => $user->canDo('assets.telemetry.view'),
+                    'alertsView' => $user->canDo('assets.alerts.view'),
+                    'alertsManage' => $user->canDo('assets.alerts.manage'),
+                    'scanRecord' => $user->canDo('assets.scan.record'),
+                    'geofencesManage' => $user->canDo('assets.geofences.manage'),
                 ],
 
                 'medications' => [
@@ -208,6 +222,11 @@ class HandleInertiaRequests extends Middleware
 
                 'fleet' => [
                     'viewAny' => $user->canDo('fleet.viewAny'),
+                    'driverSessionsManage' => $user->canDo('fleet.driverSessions.manage'),
+                    'signalsView' => $user->canDo('fleet.signals.view'),
+                ],
+                'controlRoom' => [
+                    'viewAny' => $user->canDo('controlRoom.viewAny'),
                 ],
 
                 'calendar' => [
@@ -289,6 +308,18 @@ class HandleInertiaRequests extends Middleware
                     'manageLegalHolds' => $user->canDo('privacy.manageLegalHolds'),
                     'reportBreaches' => $user->canDo('privacy.reportBreaches'),
                     'conductDPIA' => $user->canDo('privacy.conductDPIA'),
+                ],
+
+                'respite' => [
+                    'viewAny' => $user->canDo('respite.viewAny'),
+                    'create' => $user->canDo('respite.create'),
+                    'update' => $user->canDo('respite.update'),
+                    'bookingsManage' => $user->canDo('respite.bookings.manage'),
+                    'staysManage' => $user->canDo('respite.stays.manage'),
+                    'resourcesManage' => $user->canDo('respite.resources.manage'),
+                    'proceduresManage' => $user->canDo('respite.procedures.manage'),
+                    'calendarView' => $user->canDo('respite.calendar.view'),
+                    'evidenceView' => $user->canDo('respite.evidence.view'),
                 ],
 
                 'consents' => [

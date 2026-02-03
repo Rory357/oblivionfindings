@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\ClientDocument;
 use App\Models\ClientIncident;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
+use App\Models\Asset;
 use App\Models\TimelineEvent;
 use Illuminate\Http\Request;
 
@@ -42,6 +45,25 @@ class PortalClientController extends Controller
                 ->with(['attachments' => fn($q) => $q->where('portal_visible', true)])
                 ->limit(40)
                 ->get();
+        }
+
+        $assets = Asset::query()
+            ->where('client_id', $client->id)
+            ->orderBy('name')
+            ->get(['id', 'name', 'asset_tag', 'status', 'risk_level']);
+
+        $trackingConsentType = ConsentType::query()
+            ->where('name', 'Asset Location Tracking (Safety)')
+            ->first();
+
+        $trackingConsent = null;
+        if ($trackingConsentType) {
+            $trackingConsent = ClientConsent::query()
+                ->where('client_id', $client->id)
+                ->where('consent_type_id', $trackingConsentType->id)
+                ->active()
+                ->orderByDesc('given_at')
+                ->first();
         }
 
         return inertia('portal/client', [
@@ -84,6 +106,19 @@ class PortalClientController extends Controller
                 'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
                 'site' => $e->site ? ['id' => $e->site->id, 'name' => $e->site->name] : null,
             ])->values(),
+            'assets' => $assets->map(fn($a) => [
+                'id' => $a->id,
+                'name' => $a->name,
+                'asset_tag' => $a->asset_tag,
+                'status' => $a->status,
+                'risk_level' => $a->risk_level,
+            ])->values(),
+            'tracking_consent' => $trackingConsent ? [
+                'id' => $trackingConsent->id,
+                'status' => $trackingConsent->status,
+                'given_at' => optional($trackingConsent->given_at)->toISOString(),
+                'expires_at' => optional($trackingConsent->expires_at)->toISOString(),
+            ] : null,
             'rag_answer' => session('rag_answer'),
             'can' => [
                 'viewIncidents' => $user?->canDo('incidents.view.portal') ?? false,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\AssetCategory;
 use App\Models\Client;
 use App\Models\Site;
 use App\Services\AuditLogger;
@@ -85,10 +86,12 @@ class AssetController extends Controller
 
         $sites = Site::query()->orderBy('name')->get(['id', 'name']);
         $clients = Client::query()->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'site_id']);
+        $categories = AssetCategory::query()->orderBy('name')->get(['id', 'name']);
 
         return inertia('assets/create', [
             'sites' => $sites,
             'clients' => $clients,
+            'categories' => $categories,
             'prefill' => [
                 'site_id' => $request->integer('site_id') ?: null,
                 'client_id' => $request->integer('client_id') ?: null,
@@ -107,6 +110,7 @@ class AssetController extends Controller
             'asset_tag' => ['nullable', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
+            'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
             'description' => ['nullable', 'string'],
             'manufacturer' => ['nullable', 'string', 'max:120'],
             'model' => ['nullable', 'string', 'max:120'],
@@ -159,6 +163,10 @@ class AssetController extends Controller
             'inspections.inspectedBy:id,name,email',
             'maintenanceLogs.performedBy:id,name,email',
             'documents.uploadedBy:id,name,email',
+            'trackers',
+            'alerts',
+            'scanEvents',
+            'geofences',
         ]);
 
         AuditLogger::log('assets.view', $asset, [
@@ -232,6 +240,36 @@ class AssetController extends Controller
                 'uploaded_by'=>$d->uploadedBy?->only(['id','name','email']),
                 'download_url'=>route('assets.documents.download', [$asset, $d]),
             ]),
+            'trackers' => $asset->trackers->sortByDesc('paired_at')->values()->map(fn($t) => [
+                'id' => $t->id,
+                'vendor' => $t->vendor,
+                'device_uid' => $t->device_uid,
+                'status' => $t->status,
+                'paired_at' => $t->paired_at?->toDateTimeString(),
+                'unpaired_at' => $t->unpaired_at?->toDateTimeString(),
+                'last_seen_at' => $t->last_seen_at?->toDateTimeString(),
+                'consent_id' => $t->consent_id,
+            ]),
+            'alerts' => $asset->alerts->sortByDesc('triggered_at')->values()->take(5)->map(fn($a) => [
+                'id' => $a->id,
+                'alert_type' => $a->alert_type,
+                'severity' => $a->severity,
+                'status' => $a->status,
+                'triggered_at' => $a->triggered_at?->toDateTimeString(),
+                'resolved_at' => $a->resolved_at?->toDateTimeString(),
+            ]),
+            'scan_events' => $asset->scanEvents->sortByDesc('scanned_at')->values()->take(5)->map(fn($s) => [
+                'id' => $s->id,
+                'qr_token' => $s->qr_token,
+                'scanned_at' => $s->scanned_at?->toDateTimeString(),
+            ]),
+            'geofences' => $asset->geofences->values()->map(fn($g) => [
+                'id' => $g->id,
+                'name' => $g->name,
+                'type' => $g->type,
+                'breach_type' => $g->breach_type,
+                'is_active' => (bool) $g->is_active,
+            ]),
             'can' => [
                 'update' => $user?->canDo('assets.update') ? ($user?->can('update', $asset) ?? false) : false,
                 'delete' => $user?->canDo('assets.delete') ? ($user?->can('delete', $asset) ?? false) : false,
@@ -239,6 +277,9 @@ class AssetController extends Controller
                 'recordMaintenance' => $user?->can('recordMaintenance', $asset) ?? false,
                 'manageDocuments' => $user?->can('manageDocuments', $asset) ?? false,
                 'downloadQr' => ($user?->canDo('assets.qr.download') ?? false) && ($user?->can('view', $asset) ?? false),
+                'manageTrackers' => $user?->canDo('assets.trackers.manage') ?? false,
+                'manageGeofences' => $user?->canDo('assets.geofences.manage') ?? false,
+                'manageAlerts' => $user?->canDo('assets.alerts.manage') ?? false,
             ],
         ]);
     }
@@ -249,6 +290,7 @@ class AssetController extends Controller
 
         $sites = Site::query()->orderBy('name')->get(['id', 'name']);
         $clients = Client::query()->orderBy('first_name')->orderBy('last_name')->get(['id', 'first_name', 'last_name', 'site_id']);
+        $categories = AssetCategory::query()->orderBy('name')->get(['id', 'name']);
 
         return inertia('assets/edit', [
             'asset' => [
@@ -258,6 +300,7 @@ class AssetController extends Controller
                 'asset_tag'=>$asset->asset_tag,
                 'name'=>$asset->name,
                 'category'=>$asset->category,
+                'asset_category_id'=>$asset->asset_category_id,
                 'description'=>$asset->description,
                 'manufacturer'=>$asset->manufacturer,
                 'model'=>$asset->model,
@@ -275,6 +318,7 @@ class AssetController extends Controller
             ],
             'sites'=>$sites,
             'clients'=>$clients,
+            'categories'=>$categories,
         ]);
     }
 
@@ -288,6 +332,7 @@ class AssetController extends Controller
             'asset_tag' => ['nullable', 'string', 'max:100'],
             'name' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
+            'asset_category_id' => ['nullable', 'integer', 'exists:asset_categories,id'],
             'description' => ['nullable', 'string'],
             'manufacturer' => ['nullable', 'string', 'max:120'],
             'model' => ['nullable', 'string', 'max:120'],
