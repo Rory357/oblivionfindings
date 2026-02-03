@@ -6,9 +6,12 @@ use App\Models\ClientNote;
 use App\Models\Shift;
 use App\Observers\ClientNoteObserver;
 use App\Observers\ShiftObserver;
+use App\Events\FleetSignalEmitted;
+use App\Services\AuditLogger;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -28,6 +31,15 @@ class AppServiceProvider extends ServiceProvider
     {
         Shift::observe(ShiftObserver::class);
         ClientNote::observe(ClientNoteObserver::class);
+
+        Event::listen(FleetSignalEmitted::class, function (FleetSignalEmitted $event) {
+            AuditLogger::log('fleet.signal.emitted', $event->signal->asset, [
+                'signal_id' => $event->signal->id,
+                'signal_type' => $event->signal->signal_type,
+                'severity' => $event->signal->severity_hint,
+                'occurred_at' => optional($event->signal->occurred_at)->toISOString(),
+            ]);
+        });
 
         $this->configureRateLimiting();
     }

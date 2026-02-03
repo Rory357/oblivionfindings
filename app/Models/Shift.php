@@ -15,6 +15,7 @@ class Shift extends Model
     protected $fillable = [
         'shift_series_id',
         'client_id',
+        'respite_booking_id',
         'service_context_id',
         'user_id',
         'starts_at',
@@ -54,6 +55,11 @@ class Shift extends Model
     public function staff()
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    public function respiteBooking()
+    {
+        return $this->belongsTo(RespiteBooking::class, 'respite_booking_id');
     }
 
     public function creator()
