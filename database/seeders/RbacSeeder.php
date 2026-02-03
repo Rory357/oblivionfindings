@@ -100,6 +100,15 @@ class RbacSeeder extends Seeder
             ['key' => 'assets.maintenance.record', 'description' => 'Record asset maintenance'],
             ['key' => 'assets.documents.manage', 'description' => 'Manage asset documents'],
             ['key' => 'assets.qr.download', 'description' => 'Download asset QR codes'],
+            ['key' => 'assets.ownership.manage', 'description' => 'Manage asset ownership'],
+            ['key' => 'assets.assignments.manage', 'description' => 'Manage asset assignments'],
+            ['key' => 'assets.trackers.manage', 'description' => 'Manage asset trackers'],
+            ['key' => 'assets.telemetry.ingest', 'description' => 'Ingest asset telemetry'],
+            ['key' => 'assets.telemetry.view', 'description' => 'View asset telemetry'],
+            ['key' => 'assets.alerts.view', 'description' => 'View asset alerts'],
+            ['key' => 'assets.alerts.manage', 'description' => 'Manage asset alerts'],
+            ['key' => 'assets.scan.record', 'description' => 'Record asset scans'],
+            ['key' => 'assets.geofences.manage', 'description' => 'Manage asset geofences and policies'],
 
             // Staff / workers
             ['key' => 'staff.viewAny', 'description' => 'View staff'],
@@ -118,6 +127,9 @@ class RbacSeeder extends Seeder
             ['key' => 'reports.viewAny', 'description' => 'View reports'],
             ['key' => 'rostering.viewAny', 'description' => 'View rostering'],
             ['key' => 'fleet.viewAny', 'description' => 'View fleet management'],
+            ['key' => 'fleet.driverSessions.manage', 'description' => 'Start/end driver sessions'],
+            ['key' => 'fleet.signals.view', 'description' => 'View fleet signals'],
+            ['key' => 'controlRoom.viewAny', 'description' => 'View Control Room'],
             ['key' => 'calendar.viewAny', 'description' => 'View calendar'],
             // Shifts (appointments)
             ['key' => 'shifts.viewAny', 'description' => 'View shifts'],
@@ -175,6 +187,17 @@ class RbacSeeder extends Seeder
 
             ['key' => 'incidents.followups.manage', 'description' => 'Create/assign incident follow-ups'],
             ['key' => 'incidents.followups.complete', 'description' => 'Complete assigned incident follow-ups'],
+
+            // Respite
+            ['key' => 'respite.viewAny', 'description' => 'View all respite records'],
+            ['key' => 'respite.create', 'description' => 'Create respite referrals and requests'],
+            ['key' => 'respite.update', 'description' => 'Update respite records'],
+            ['key' => 'respite.bookings.manage', 'description' => 'Manage respite bookings'],
+            ['key' => 'respite.stays.manage', 'description' => 'Manage respite stays (check-in/extend/discharge)'],
+            ['key' => 'respite.resources.manage', 'description' => 'Manage respite resource allocations'],
+            ['key' => 'respite.procedures.manage', 'description' => 'Manage respite procedures and tasks'],
+            ['key' => 'respite.calendar.view', 'description' => 'View respite calendar'],
+            ['key' => 'respite.evidence.view', 'description' => 'View respite evidence packs'],
 
             // Risks
             ['key' => 'risks.viewAny', 'description' => 'View all client risks'],
@@ -280,6 +303,9 @@ class RbacSeeder extends Seeder
                 'reports.viewAny',
                 'rostering.viewAny',
                 'fleet.viewAny',
+                'fleet.driverSessions.manage',
+                'fleet.signals.view',
+                'controlRoom.viewAny',
                 'calendar.viewAny',
 
                 'compliance.view',
@@ -334,6 +360,16 @@ class RbacSeeder extends Seeder
                 'incidents.view.portal',
                 'incidents.attachments.view.portal',
 
+                'respite.viewAny',
+                'respite.create',
+                'respite.update',
+                'respite.bookings.manage',
+                'respite.stays.manage',
+                'respite.resources.manage',
+                'respite.procedures.manage',
+                'respite.calendar.view',
+                'respite.evidence.view',
+
                 'risks.viewAny',
                 'risks.create',
                 'risks.update',
@@ -358,6 +394,15 @@ class RbacSeeder extends Seeder
                 'assets.maintenance.record',
                 'assets.documents.manage',
                 'assets.qr.download',
+                'assets.ownership.manage',
+                'assets.assignments.manage',
+                'assets.trackers.manage',
+                'assets.telemetry.ingest',
+                'assets.telemetry.view',
+                'assets.alerts.view',
+                'assets.alerts.manage',
+                'assets.scan.record',
+                'assets.geofences.manage',
 
                 // Safeguarding
                 'safeguarding.viewAny',
@@ -422,6 +467,15 @@ class RbacSeeder extends Seeder
                 'incidents.approve',
                                 'incidents.reopen',
                 'incidents.followups.manage',
+                'respite.viewAny',
+                'respite.create',
+                'respite.update',
+                'respite.bookings.manage',
+                'respite.stays.manage',
+                'respite.resources.manage',
+                'respite.procedures.manage',
+                'respite.calendar.view',
+                'respite.evidence.view',
                 'risks.viewAny',
                 'risks.create',
                 'risks.update',
@@ -438,6 +492,10 @@ class RbacSeeder extends Seeder
                 'summaries.generate',
                 'calendar.viewAny',
                 'rag.ask.any',
+                'fleet.viewAny',
+                'fleet.driverSessions.manage',
+                'fleet.signals.view',
+                'controlRoom.viewAny',
 
                 // Assets
                 'assets.viewAny',
@@ -447,6 +505,15 @@ class RbacSeeder extends Seeder
                 'assets.maintenance.record',
                 'assets.documents.manage',
                 'assets.qr.download',
+                'assets.ownership.manage',
+                'assets.assignments.manage',
+                'assets.trackers.manage',
+                'assets.telemetry.ingest',
+                'assets.telemetry.view',
+                'assets.alerts.view',
+                'assets.alerts.manage',
+                'assets.scan.record',
+                'assets.geofences.manage',
 
                 // Safeguarding
                 'safeguarding.viewAny',
@@ -481,6 +548,8 @@ class RbacSeeder extends Seeder
                 'incidents.followups.complete',
                 'risks.viewAssigned',
 
+                'respite.viewAny',
+
                 'medications.administer.record',
                 'medications.administer.correct',
                 'medications.controlled.view',
@@ -500,6 +569,10 @@ class RbacSeeder extends Seeder
                 // RAG
                 'rag.ask.assigned',
 
+                // Fleet
+                'fleet.viewAny',
+                'fleet.driverSessions.manage',
+
                 // Assets
                 'assets.viewAssigned',
                 'assets.create',
@@ -508,6 +581,10 @@ class RbacSeeder extends Seeder
                 'assets.maintenance.record',
                 'assets.documents.manage',
                 'assets.qr.download',
+                'assets.assignments.manage',
+                'assets.telemetry.view',
+                'assets.alerts.view',
+                'assets.scan.record',
 
                 // Safeguarding (can report concerns)
                 'safeguarding.create',
@@ -577,6 +654,10 @@ class RbacSeeder extends Seeder
                 'incidents.viewAny',
                 'risks.viewAny',
                 'assets.viewAny',
+                'respite.viewAny',
+                'respite.evidence.view',
+                'assets.telemetry.view',
+                'assets.alerts.view',
 
                 // New compliance modules (read-only)
                 'safeguarding.viewAny',

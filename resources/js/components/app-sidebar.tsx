@@ -82,6 +82,7 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     const notePlural = labels['note.plural'] ?? 'Notes';
     const timelineLabel = labels['timeline.singular'] ?? 'Timeline';
     const emergencyLabel = labels['emergency_access.singular'] ?? 'Emergency Access';
+    const respitePlural = labels['respite.plural'] ?? 'Respite';
 
     // Support Worker nav (kept for now, but also gate via permissions)
     if (role === 'support_worker') {
@@ -120,6 +121,9 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
             ...(can?.assets?.viewAssigned || can?.assets?.viewAny
                 ? [{ title: assetPlural, href: '/assets', icon: Package }]
                 : []),
+            ...(can?.assets?.alertsView
+                ? [{ title: 'Asset Alerts', href: '/assets/alerts', icon: ShieldAlert }]
+                : []),
             ...(can?.incidents?.viewAssigned
                 ? [{ title: incidentPlural, href: '/incidents', icon: FileText }]
                 : []),
@@ -137,6 +141,9 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     if (can?.assets?.viewAny || can?.assets?.viewAssigned) {
         items.push({ title: assetPlural, href: '/assets', icon: Package });
     }
+    if (can?.assets?.alertsView) {
+        items.push({ title: 'Asset Alerts', href: '/assets/alerts', icon: ShieldAlert });
+    }
 
     if (can?.medications?.view) {
         items.push({ title: medicationPlural, href: '/medications', icon: ClipboardList });
@@ -147,12 +154,13 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     if (can?.shifts?.viewAny) {
         items.push({ title: shiftPlural, href: '/shifts', icon: CalendarDays });
     }
+    if (can?.respite?.viewAny) {
+        items.push({ title: respitePlural, href: '/respite', icon: CalendarDays });
+    }
     if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned) {
         items.push({ title: timesheetPlural, href: '/timesheets', icon: ClipboardList });
     }
-    if (can?.timesheets?.approve || can?.timesheets?.manageAny) {
-        items.push({ title: 'Timesheet Approvals', href: '/timesheets/approvals', icon: ClipboardList });
-    }
+    // Approval queue is now part of Timesheets module.
     if (can?.staff?.viewAny) {
         items.push({ title: staffPlural, href: '/staff', icon: ClipboardList });
     }
@@ -164,6 +172,9 @@ function buildMainNav({ role, can, labels }: { role?: string | null; can?: any; 
     }
     if (can?.fleet?.viewAny) {
         items.push({ title: 'Fleet Management', href: '/fleet-management', icon: Settings });
+    }
+    if (can?.controlRoom?.viewAny) {
+        items.push({ title: 'Control Room', href: '/control-room', icon: ShieldAlert });
     }
     if (can?.calendar?.viewAny) {
         items.push({ title: 'Calendar', href: '/calendar', icon: CalendarDays });

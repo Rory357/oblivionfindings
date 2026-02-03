@@ -60,11 +60,14 @@ require __DIR__ . '/clients.php';
 require __DIR__ . '/staff.php';
 require __DIR__ . '/incidents.php';
 require __DIR__ . '/assets.php';
+require __DIR__ . '/fleet.php';
+require __DIR__ . '/control-room.php';
 require __DIR__ . '/shifts.php';
 require __DIR__ . '/medications.php';
 require __DIR__ . '/reports.php';
 require __DIR__ . '/integrations.php';
 require __DIR__ . '/settings.php';
+require __DIR__ . '/respite.php';
 
 // Compliance module routes
 require __DIR__ . '/safeguarding.php';

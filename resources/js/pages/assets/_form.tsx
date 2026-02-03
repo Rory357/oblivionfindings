@@ -12,6 +12,7 @@ import { useMemo } from 'react';
 
 type Site = { id: number; name: string };
 type Client = { id: number; first_name: string; last_name: string; site_id?: number | null };
+type AssetCategory = { id: number; name: string };
 
 type Mode = 'create' | 'edit';
 
@@ -20,6 +21,7 @@ export default function AssetForm({ mode }: { mode: Mode }) {
 
     const sites: Site[] = props.sites ?? [];
     const clients: Client[] = props.clients ?? [];
+    const categories: AssetCategory[] = props.categories ?? [];
     const asset = props.asset ?? null;
     const prefill = props.prefill ?? {};
 
@@ -29,6 +31,7 @@ export default function AssetForm({ mode }: { mode: Mode }) {
         asset_tag: asset?.asset_tag ?? '',
         name: asset?.name ?? '',
         category: asset?.category ?? '',
+        asset_category_id: asset?.asset_category_id ?? '',
         description: asset?.description ?? '',
         manufacturer: asset?.manufacturer ?? '',
         model: asset?.model ?? '',
@@ -151,6 +154,26 @@ export default function AssetForm({ mode }: { mode: Mode }) {
                             <Label>Category</Label>
                             <Input value={form.data.category} onChange={(e) => form.setData('category', e.target.value)} />
                             <InputError message={form.errors.category} />
+                        </div>
+                        <div className="space-y-1">
+                            <Label>Category type</Label>
+                            <Select
+                                value={form.data.asset_category_id ? String(form.data.asset_category_id) : 'none'}
+                                onValueChange={(v) => form.setData('asset_category_id', v === 'none' ? '' : v)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select category type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="none">â€”</SelectItem>
+                                    {categories.map((c) => (
+                                        <SelectItem key={c.id} value={String(c.id)}>
+                                            {c.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            <InputError message={form.errors.asset_category_id} />
                         </div>
                         <div className="space-y-1">
                             <Label>Status</Label>

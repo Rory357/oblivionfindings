@@ -30,6 +30,10 @@ class DatabaseSeeder extends Seeder
         $this->call(ConsentTypesSeeder::class);
         $this->call(TrainingCoursesSeeder::class);
         $this->call(CompetencyFrameworksSeeder::class);
+        $this->call(AssetCategoriesSeeder::class);
+        $this->call(AssetProcedureTemplatesSeeder::class);
+        $this->call(AssetAlertPoliciesSeeder::class);
+        $this->call(FleetDemoSeeder::class);
 
         // NOTE: RoleCatalogSeeder created a large catalogue of job-title roles.
         // We are not using those roles in the system right now, so we no longer seed them.

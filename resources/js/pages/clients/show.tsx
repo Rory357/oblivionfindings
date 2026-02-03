@@ -1,18 +1,25 @@
-import AppLayout from '@/layouts/app-layout';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Separator } from '@/components/ui/separator';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { Tabs } from '@/components/ui/tabs';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Textarea } from '@/components/ui/textarea';
 import { useInitials } from '@/hooks/use-initials';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import AppLayout from '@/layouts/app-layout';
+import { formatDateTime } from '@/lib/date-format';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 type Props = {
@@ -36,7 +43,11 @@ type Props = {
         funding_type?: string | null;
         funding_notes?: string | null;
         site: { id: number; name: string } | null;
-        service_context?: { id: number; type: string | null; name: string } | null;
+        service_context?: {
+            id: number;
+            type: string | null;
+            name: string;
+        } | null;
         support_workers: Array<{ id: number; name: string; email: string }>;
     };
     medical: {
@@ -55,8 +66,30 @@ type Props = {
         next: any | null;
         last: any | null;
     };
+    respite?: {
+        bookings: Array<{
+            id: number;
+            start_at?: string | null;
+            end_at?: string | null;
+            status: string;
+            shift_id?: number | null;
+            coordinator?: { id: number; name: string } | null;
+        }>;
+        requests: Array<{
+            id: number;
+            requested_start?: string | null;
+            requested_end?: string | null;
+            status: string;
+        }>;
+    };
     onboarding: {
-        items: Array<{ key: string; label: string; has_data: boolean; override: boolean; complete: boolean }>;
+        items: Array<{
+            key: string;
+            label: string;
+            has_data: boolean;
+            override: boolean;
+            complete: boolean;
+        }>;
         completed: number;
         total: number;
         percent: number;
@@ -81,9 +114,25 @@ type TabKey =
     | 'timeline'
     | 'documents'
     | 'portal'
+    | 'respite'
     | 'assignments';
 
-export default function ClientShow({ client, medical, support_plan, assessments, documents, portal_users, events, handover, onboarding, shifts_summary, can }: Props) {
+export default function ClientShow({
+    client,
+    medical,
+    support_plan,
+    assessments,
+    documents,
+    portal_users,
+    events,
+    handover,
+    onboarding,
+    shifts_summary,
+    respite,
+    can,
+}: Props) {
+    const { auth } = usePage().props as any;
+    const respiteCan = auth?.can?.respite ?? {};
     const name = `${client.first_name} ${client.last_name}`.trim();
     const getInitials = useInitials();
     const photoForm = useForm<{ photo: File | null }>({ photo: null });
@@ -99,20 +148,40 @@ export default function ClientShow({ client, medical, support_plan, assessments,
             { key: 'timeline', label: 'Timeline', show: true },
             { key: 'documents', label: 'Documents', show: true },
             { key: 'portal', label: 'Next of Kin / Portal', show: true },
-            { key: 'assignments', label: 'Assign workers', show: can.assign_workers || can.edit },
+            { key: 'respite', label: 'Respite', show: !!respiteCan?.viewAny },
+            {
+                key: 'assignments',
+                label: 'Assign workers',
+                show: can.assign_workers || can.edit,
+            },
         ],
-        [can.assign_workers, can.edit],
+        [can.assign_workers, can.edit, respiteCan?.viewAny],
     );
 
     const [tab, setTab] = useState<TabKey>('profile');
 
     const templates = [
         { key: 'note', label: 'Note', body: '' },
-        { key: 'progress_note', label: 'Progress note', body: 'Goal/outcome:\n\nWhat happened:\n\nNext steps:' },
-        { key: 'handover', label: 'Handover', body: 'Key points for next shift:\n-\n-\n\nRisks/alerts:\n-\n\nActions needed:\n-' },
+        {
+            key: 'progress_note',
+            label: 'Progress note',
+            body: 'Goal/outcome:\n\nWhat happened:\n\nNext steps:',
+        },
+        {
+            key: 'handover',
+            label: 'Handover',
+            body: 'Key points for next shift:\n-\n-\n\nRisks/alerts:\n-\n\nActions needed:\n-',
+        },
     ];
 
-    const noteForm = useForm<{ type: string; subject: string; goal: string; body: string; visibility: string; pin: boolean }>({
+    const noteForm = useForm<{
+        type: string;
+        subject: string;
+        goal: string;
+        body: string;
+        visibility: string;
+        pin: boolean;
+    }>({
         type: 'note',
         subject: '',
         goal: '',
@@ -120,6 +189,9 @@ export default function ClientShow({ client, medical, support_plan, assessments,
         visibility: 'internal',
         pin: false,
     });
+
+    const respiteBookings = respite?.bookings ?? [];
+    const respiteRequests = respite?.requests ?? [];
 
     return (
         <AppLayout
@@ -134,9 +206,18 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                 <PageHeader
                     title={
                         <div className="flex items-center gap-3">
-                            <Avatar className="h-10 w-10">
-                                <AvatarImage src={client.avatar ?? client.profile_photo_url ?? undefined} alt={name} />
-                                <AvatarFallback>{getInitials(name)}</AvatarFallback>
+                            <Avatar className="h-25 w-25">
+                                <AvatarImage
+                                    src={
+                                        client.avatar ??
+                                        client.profile_photo_url ??
+                                        undefined
+                                    }
+                                    alt={name}
+                                />
+                                <AvatarFallback>
+                                    {getInitials(name)}
+                                </AvatarFallback>
                             </Avatar>
                             <span>{name}</span>
                         </div>
@@ -150,10 +231,13 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                     onSubmit={(e) => {
                                         e.preventDefault();
                                         if (!photoForm.data.photo) return;
-                                        photoForm.post(`/clients/${client.id}/photo`, {
-                                            forceFormData: true,
-                                            preserveScroll: true,
-                                        });
+                                        photoForm.post(
+                                            `/clients/${client.id}/photo`,
+                                            {
+                                                forceFormData: true,
+                                                preserveScroll: true,
+                                            },
+                                        );
                                     }}
                                     className="flex items-center gap-2"
                                 >
@@ -174,9 +258,11 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                         variant="outline"
                                         size="sm"
                                         onClick={() =>
-                                            (document.getElementById(
-                                                'client-photo',
-                                            ) as HTMLInputElement | null)?.click()
+                                            (
+                                                document.getElementById(
+                                                    'client-photo',
+                                                ) as HTMLInputElement | null
+                                            )?.click()
                                         }
                                     >
                                         Change photo
@@ -197,7 +283,9 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                             type="button"
                                             size="sm"
                                             variant="outline"
-                                            disabled={removePhotoForm.processing}
+                                            disabled={
+                                                removePhotoForm.processing
+                                            }
                                             onClick={() =>
                                                 removePhotoForm.delete(
                                                     `/clients/${client.id}/photo`,
@@ -212,54 +300,71 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                             ) : null}
 
                             <Button variant="outline" size="sm" asChild>
-                                <Link href={`/clients/${client.id}/incidents`}>Incidents</Link>
+                                <Link href={`/clients/${client.id}/incidents`}>
+                                    Incidents
+                                </Link>
                             </Button>
                             <Button variant="outline" size="sm" asChild>
-                                <Link href={`/clients/${client.id}/risks`}>Risks</Link>
+                                <Link href={`/clients/${client.id}/risks`}>
+                                    Risks
+                                </Link>
                             </Button>
                             {can.edit ? (
                                 <Button variant="outline" size="sm" asChild>
-                                    <Link href={`/clients/${client.id}/edit`}>Edit</Link>
+                                    <Link href={`/clients/${client.id}/edit`}>
+                                        Edit
+                                    </Link>
                                 </Button>
                             ) : null}
-                            {(can.assign_workers || can.edit) ? (
+                            {can.assign_workers || can.edit ? (
                                 <Button variant="outline" size="sm" asChild>
-                                    <Link href={`/clients/${client.id}/assignments`}>Assign workers</Link>
+                                    <Link
+                                        href={`/clients/${client.id}/assignments`}
+                                    >
+                                        Assign workers
+                                    </Link>
                                 </Button>
                             ) : null}
                             <Button variant="outline" size="sm" asChild>
-                                <Link href={`/assets?client_id=${client.id}`}>Assets</Link>
+                                <Link href={`/assets?client_id=${client.id}`}>
+                                    Assets
+                                </Link>
                             </Button>
                             {can.edit ? (
                                 <Button variant="outline" size="sm" asChild>
-                                    <Link href={`/assets/create?client_id=${client.id}`}>Add asset</Link>
+                                    <Link
+                                        href={`/assets/create?client_id=${client.id}`}
+                                    >
+                                        Add asset
+                                    </Link>
                                 </Button>
                             ) : null}
-
                         </>
                     }
                 />
 
                 <div className="-mx-4 overflow-x-auto px-4">
                     <div className="flex w-max items-center gap-2 pb-1">
-                    {tabs
-                        .filter((t) => t.show)
-                        .map((t) => (
-                            <Button
-                                key={t.key}
-                                variant={tab === t.key ? 'default' : 'outline'}
-                                size="sm"
-                                onClick={() => {
-                                    if (t.key === 'mar') {
-                                        window.location.href = `/clients/${client.id}/mar`;
-                                        return;
+                        {tabs
+                            .filter((t) => t.show)
+                            .map((t) => (
+                                <Button
+                                    key={t.key}
+                                    variant={
+                                        tab === t.key ? 'default' : 'outline'
                                     }
-                                    setTab(t.key);
-                                }}
-                            >
-                                {t.label}
-                            </Button>
-                        ))}
+                                    size="sm"
+                                    onClick={() => {
+                                        if (t.key === 'mar') {
+                                            window.location.href = `/clients/${client.id}/mar`;
+                                            return;
+                                        }
+                                        setTab(t.key);
+                                    }}
+                                >
+                                    {t.label}
+                                </Button>
+                            ))}
                     </div>
                 </div>
 
@@ -272,11 +377,21 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                             <div className="rounded-md border p-3">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <div className="text-sm font-medium">Onboarding checklist</div>
-                                        <div className="text-xs text-slate-500">{onboarding.completed}/{onboarding.total} complete • {onboarding.percent}%</div>
+                                        <div className="text-sm font-medium">
+                                            Onboarding checklist
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                            {onboarding.completed}/
+                                            {onboarding.total} complete •{' '}
+                                            {onboarding.percent}%
+                                        </div>
                                     </div>
-                                    <div className={`rounded-full px-2 py-1 text-xs ${onboarding.status === 'complete' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                                        {onboarding.status === 'complete' ? 'Complete' : 'In progress'}
+                                    <div
+                                        className={`rounded-full px-2 py-1 text-xs ${onboarding.status === 'complete' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}
+                                    >
+                                        {onboarding.status === 'complete'
+                                            ? 'Complete'
+                                            : 'In progress'}
                                     </div>
                                 </div>
 
@@ -284,27 +399,49 @@ export default function ClientShow({ client, medical, support_plan, assessments,
 
                                 <div className="space-y-2">
                                     {onboarding.items.map((item) => (
-                                        <div key={item.key} className="flex flex-col gap-2 rounded-md border p-2 sm:flex-row sm:items-center sm:justify-between">
+                                        <div
+                                            key={item.key}
+                                            className="flex flex-col gap-2 rounded-md border p-2 sm:flex-row sm:items-center sm:justify-between"
+                                        >
                                             <div className="flex items-start gap-2">
-                                                <div className={`mt-0.5 h-2 w-2 rounded-full ${item.complete ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                                                <div
+                                                    className={`mt-0.5 h-2 w-2 rounded-full ${item.complete ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                                                />
                                                 <div>
-                                                    <div className="text-sm font-medium">{item.label}</div>
+                                                    <div className="text-sm font-medium">
+                                                        {item.label}
+                                                    </div>
                                                     <div className="text-xs text-slate-500">
-                                                        {item.complete ? (item.has_data ? 'Added' : 'Marked as not applicable') : 'Not completed'}
+                                                        {item.complete
+                                                            ? item.has_data
+                                                                ? 'Added'
+                                                                : 'Marked as not applicable'
+                                                            : 'Not completed'}
                                                     </div>
                                                 </div>
                                             </div>
 
                                             <div className="flex items-center gap-3">
-                                                {!item.has_data && (can.manage_onboarding || can.edit) ? (
+                                                {!item.has_data &&
+                                                (can.manage_onboarding ||
+                                                    can.edit) ? (
                                                     <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
                                                         <Checkbox
-                                                            checked={item.override}
-                                                            onCheckedChange={(v) => {
+                                                            checked={
+                                                                item.override
+                                                            }
+                                                            onCheckedChange={(
+                                                                v,
+                                                            ) => {
                                                                 router.post(
                                                                     `/clients/${client.id}/onboarding/${item.key}`,
-                                                                    { checked: !!v },
-                                                                    { preserveScroll: true },
+                                                                    {
+                                                                        checked:
+                                                                            !!v,
+                                                                    },
+                                                                    {
+                                                                        preserveScroll: true,
+                                                                    },
                                                                 );
                                                             }}
                                                         />
@@ -314,40 +451,110 @@ export default function ClientShow({ client, medical, support_plan, assessments,
 
                                                 {item.key === 'profile' ? (
                                                     can.edit ? (
-                                                        <Button size="sm" variant="outline" asChild>
-                                                            <Link href={`/clients/${client.id}/edit`}>Open</Link>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/clients/${client.id}/edit`}
+                                                            >
+                                                                Open
+                                                            </Link>
                                                         </Button>
                                                     ) : (
-                                                        <Button size="sm" variant="outline" disabled>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            disabled
+                                                        >
                                                             Review
                                                         </Button>
                                                     )
-                                                ) : item.key === 'medications' ? (
-                                                    <Button size="sm" variant="outline" asChild>
-                                                        <Link href={`/clients/${client.id}/medical?section=medications`}>Open</Link>
+                                                ) : item.key ===
+                                                  'medications' ? (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={`/clients/${client.id}/medical?section=medications`}
+                                                        >
+                                                            Open
+                                                        </Link>
                                                     </Button>
-                                                ) : item.key === 'conditions' ? (
-                                                    <Button size="sm" variant="outline" asChild>
-                                                        <Link href={`/clients/${client.id}/medical?section=conditions`}>Open</Link>
+                                                ) : item.key ===
+                                                  'conditions' ? (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={`/clients/${client.id}/medical?section=conditions`}
+                                                        >
+                                                            Open
+                                                        </Link>
                                                     </Button>
-                                                ) : item.key === 'emergency_contacts' ? (
-                                                    <Button size="sm" variant="outline" asChild>
-                                                        <Link href={`/clients/${client.id}/medical?section=emergency_contacts`}>Open</Link>
+                                                ) : item.key ===
+                                                  'emergency_contacts' ? (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={`/clients/${client.id}/medical?section=emergency_contacts`}
+                                                        >
+                                                            Open
+                                                        </Link>
                                                     </Button>
-                                                ) : item.key === 'next_of_kin' ? (
+                                                ) : item.key ===
+                                                  'next_of_kin' ? (
                                                     can.edit ? (
-                                                        <Button size="sm" variant="outline" asChild>
-                                                            <Link href={`/clients/${client.id}/portal-users`}>Open</Link>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/clients/${client.id}/portal-users`}
+                                                            >
+                                                                Open
+                                                            </Link>
                                                         </Button>
                                                     ) : null
                                                 ) : item.key === 'documents' ? (
-                                                    <Button size="sm" variant="outline" asChild>
-                                                        <Link href={`/clients/${client.id}/documents`}>Open</Link>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={`/clients/${client.id}/documents`}
+                                                        >
+                                                            Open
+                                                        </Link>
                                                     </Button>
                                                 ) : item.key === 'history' ? (
-                                                    <Button size="sm" variant="outline" onClick={() => setTab('support_plan')}>Open</Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setTab(
+                                                                'support_plan',
+                                                            )
+                                                        }
+                                                    >
+                                                        Open
+                                                    </Button>
                                                 ) : (
-                                                    <Button size="sm" variant="outline" disabled>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        disabled
+                                                    >
                                                         Review
                                                     </Button>
                                                 )}
@@ -358,38 +565,74 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                             </div>
 
                             <div className="rounded-md border p-3">
-                                <div className="text-sm font-medium">Details</div>
+                                <div className="text-sm font-medium">
+                                    Details
+                                </div>
                                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <div className="text-sm">
-                                        <div className="text-xs text-slate-500">Preferred name</div>
-                                        <div className="font-medium">{client.preferred_name || '—'}</div>
+                                        <div className="text-xs text-slate-500">
+                                            Preferred name
+                                        </div>
+                                        <div className="font-medium">
+                                            {client.preferred_name || '—'}
+                                        </div>
                                     </div>
                                     <div className="text-sm">
-                                        <div className="text-xs text-slate-500">Date of birth</div>
-                                        <div className="font-medium">{client.date_of_birth || '—'}</div>
+                                        <div className="text-xs text-slate-500">
+                                            Date of birth
+                                        </div>
+                                        <div className="font-medium">
+                                            {client.date_of_birth || '—'}
+                                        </div>
                                     </div>
                                     <div className="text-sm">
-                                        <div className="text-xs text-slate-500">Gender</div>
-                                        <div className="font-medium">{client.gender || '—'}</div>
+                                        <div className="text-xs text-slate-500">
+                                            Gender
+                                        </div>
+                                        <div className="font-medium">
+                                            {client.gender || '—'}
+                                        </div>
                                     </div>
                                     <div className="text-sm">
-                                        <div className="text-xs text-slate-500">Phone</div>
-                                        <div className="font-medium">{client.phone || '—'}</div>
+                                        <div className="text-xs text-slate-500">
+                                            Phone
+                                        </div>
+                                        <div className="font-medium">
+                                            {client.phone || '—'}
+                                        </div>
                                     </div>
                                     <div className="text-sm">
-                                        <div className="text-xs text-slate-500">Email</div>
-                                        <div className="font-medium">{client.email || '—'}</div>
+                                        <div className="text-xs text-slate-500">
+                                            Email
+                                        </div>
+                                        <div className="font-medium">
+                                            {client.email || '—'}
+                                        </div>
                                     </div>
                                     <div className="text-sm">
-                                        <div className="text-xs text-slate-500">Funding</div>
-                                        <div className="font-medium">{client.funding_type || '—'}</div>
+                                        <div className="text-xs text-slate-500">
+                                            Funding
+                                        </div>
+                                        <div className="font-medium">
+                                            {client.funding_type || '—'}
+                                        </div>
                                     </div>
                                 </div>
-                                {(client.address_line_1 || client.city || client.postcode) && (
+                                {(client.address_line_1 ||
+                                    client.city ||
+                                    client.postcode) && (
                                     <div className="mt-3 text-sm">
-                                        <div className="text-xs text-slate-500">Address</div>
+                                        <div className="text-xs text-slate-500">
+                                            Address
+                                        </div>
                                         <div className="font-medium">
-                                            {[client.address_line_1, client.address_line_2, client.suburb, client.city, client.postcode]
+                                            {[
+                                                client.address_line_1,
+                                                client.address_line_2,
+                                                client.suburb,
+                                                client.city,
+                                                client.postcode,
+                                            ]
                                                 .filter(Boolean)
                                                 .join(', ')}
                                         </div>
@@ -397,23 +640,38 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                 )}
                                 {client.funding_notes && (
                                     <div className="mt-3 text-sm">
-                                        <div className="text-xs text-slate-500">Funding notes</div>
-                                        <div className="whitespace-pre-wrap">{client.funding_notes}</div>
+                                        <div className="text-xs text-slate-500">
+                                            Funding notes
+                                        </div>
+                                        <div className="whitespace-pre-wrap">
+                                            {client.funding_notes}
+                                        </div>
                                     </div>
                                 )}
                             </div>
 
                             <div className="text-sm">
-                                <div className="font-medium">Assigned support workers</div>
+                                <div className="font-medium">
+                                    Assigned support workers
+                                </div>
                                 <div className="mt-2 space-y-2">
                                     {client.support_workers.map((w) => (
-                                        <div key={w.id} className="rounded-md border p-2">
-                                            <div className="text-sm font-medium">{w.name}</div>
-                                            <div className="text-xs text-slate-500">{w.email}</div>
+                                        <div
+                                            key={w.id}
+                                            className="rounded-md border p-2"
+                                        >
+                                            <div className="text-sm font-medium">
+                                                {w.name}
+                                            </div>
+                                            <div className="text-xs text-slate-500">
+                                                {w.email}
+                                            </div>
                                         </div>
                                     ))}
                                     {!client.support_workers.length && (
-                                        <div className="text-sm text-slate-500">No workers assigned.</div>
+                                        <div className="text-sm text-slate-500">
+                                            No workers assigned.
+                                        </div>
                                     )}
                                 </div>
                             </div>
@@ -421,12 +679,21 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                             <div className="rounded-md border p-3">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <div className="text-sm font-medium">Shifts</div>
-                                        <div className="text-xs text-slate-500">Next and recent rostered shifts for this client.</div>
+                                        <div className="text-sm font-medium">
+                                            Shifts
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                            Next and recent rostered shifts for
+                                            this client.
+                                        </div>
                                     </div>
                                     {can.create_shift ? (
                                         <Button size="sm" asChild>
-                                            <Link href={`/shifts/create?client_id=${client.id}`}>Create shift</Link>
+                                            <Link
+                                                href={`/shifts/create?client_id=${client.id}`}
+                                            >
+                                                Create shift
+                                            </Link>
                                         </Button>
                                     ) : null}
                                 </div>
@@ -435,46 +702,98 @@ export default function ClientShow({ client, medical, support_plan, assessments,
 
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <div className="rounded-md border p-3">
-                                        <div className="text-xs text-slate-500">Next shift</div>
+                                        <div className="text-xs text-slate-500">
+                                            Next shift
+                                        </div>
                                         {shifts_summary?.next ? (
                                             <div className="mt-1 space-y-1">
                                                 <div className="text-sm font-medium">
-                                                    {new Date(shifts_summary.next.starts_at).toLocaleString()} – {new Date(shifts_summary.next.ends_at).toLocaleTimeString()}
+                                                    {new Date(
+                                                        shifts_summary.next
+                                                            .starts_at,
+                                                    ).toLocaleString()}{' '}
+                                                    –{' '}
+                                                    {new Date(
+                                                        shifts_summary.next
+                                                            .ends_at,
+                                                    ).toLocaleTimeString()}
                                                 </div>
                                                 <div className="text-xs text-slate-500">
-                                                    {shifts_summary.next.staff?.name ? `Staff: ${shifts_summary.next.staff.name}` : 'Staff: —'}
-                                                    {shifts_summary.next.location ? ` • ${shifts_summary.next.location}` : ''}
+                                                    {shifts_summary.next.staff
+                                                        ?.name
+                                                        ? `Staff: ${shifts_summary.next.staff.name}`
+                                                        : 'Staff: —'}
+                                                    {shifts_summary.next
+                                                        .location
+                                                        ? ` • ${shifts_summary.next.location}`
+                                                        : ''}
                                                 </div>
                                                 <div className="mt-2">
-                                                    <Button variant="outline" size="sm" asChild>
-                                                        <Link href={`/shifts/${shifts_summary.next.id}`}>Open</Link>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={`/shifts/${shifts_summary.next.id}`}
+                                                        >
+                                                            Open
+                                                        </Link>
                                                     </Button>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="mt-1 text-sm text-slate-500">No upcoming shifts.</div>
+                                            <div className="mt-1 text-sm text-slate-500">
+                                                No upcoming shifts.
+                                            </div>
                                         )}
                                     </div>
 
                                     <div className="rounded-md border p-3">
-                                        <div className="text-xs text-slate-500">Most recent shift</div>
+                                        <div className="text-xs text-slate-500">
+                                            Most recent shift
+                                        </div>
                                         {shifts_summary?.last ? (
                                             <div className="mt-1 space-y-1">
                                                 <div className="text-sm font-medium">
-                                                    {new Date(shifts_summary.last.starts_at).toLocaleString()} – {new Date(shifts_summary.last.ends_at).toLocaleTimeString()}
+                                                    {new Date(
+                                                        shifts_summary.last
+                                                            .starts_at,
+                                                    ).toLocaleString()}{' '}
+                                                    –{' '}
+                                                    {new Date(
+                                                        shifts_summary.last
+                                                            .ends_at,
+                                                    ).toLocaleTimeString()}
                                                 </div>
                                                 <div className="text-xs text-slate-500">
-                                                    {shifts_summary.last.staff?.name ? `Staff: ${shifts_summary.last.staff.name}` : 'Staff: —'}
-                                                    {shifts_summary.last.location ? ` • ${shifts_summary.last.location}` : ''}
+                                                    {shifts_summary.last.staff
+                                                        ?.name
+                                                        ? `Staff: ${shifts_summary.last.staff.name}`
+                                                        : 'Staff: —'}
+                                                    {shifts_summary.last
+                                                        .location
+                                                        ? ` • ${shifts_summary.last.location}`
+                                                        : ''}
                                                 </div>
                                                 <div className="mt-2">
-                                                    <Button variant="outline" size="sm" asChild>
-                                                        <Link href={`/shifts/${shifts_summary.last.id}`}>Open</Link>
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        asChild
+                                                    >
+                                                        <Link
+                                                            href={`/shifts/${shifts_summary.last.id}`}
+                                                        >
+                                                            Open
+                                                        </Link>
                                                     </Button>
                                                 </div>
                                             </div>
                                         ) : (
-                                            <div className="mt-1 text-sm text-slate-500">No previous shifts yet.</div>
+                                            <div className="mt-1 text-sm text-slate-500">
+                                                No previous shifts yet.
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -517,30 +836,62 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                         <Card>
                                             <CardHeader>
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <CardTitle className="text-base">Medical profile</CardTitle>
+                                                    <CardTitle className="text-base">
+                                                        Medical profile
+                                                    </CardTitle>
                                                     {can.edit ? (
-                                                        <Button variant="outline" size="sm" asChild>
-                                                            <Link href={`/clients/${client.id}/medical`}>Edit</Link>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/clients/${client.id}/medical`}
+                                                            >
+                                                                Edit
+                                                            </Link>
                                                         </Button>
                                                     ) : null}
                                                 </div>
                                             </CardHeader>
                                             <CardContent className="space-y-3 text-sm">
                                                 <div>
-                                                    <div className="font-medium">Medical history</div>
-                                                    <div className="whitespace-pre-wrap text-slate-600">{medical.profile?.medical_history || '-'}</div>
+                                                    <div className="font-medium">
+                                                        Medical history
+                                                    </div>
+                                                    <div className="whitespace-pre-wrap text-slate-600">
+                                                        {medical.profile
+                                                            ?.medical_history ||
+                                                            '-'}
+                                                    </div>
                                                 </div>
                                                 <div>
-                                                    <div className="font-medium">Disabilities</div>
-                                                    <div className="whitespace-pre-wrap text-slate-600">{medical.profile?.disabilities || '-'}</div>
+                                                    <div className="font-medium">
+                                                        Disabilities
+                                                    </div>
+                                                    <div className="whitespace-pre-wrap text-slate-600">
+                                                        {medical.profile
+                                                            ?.disabilities ||
+                                                            '-'}
+                                                    </div>
                                                 </div>
                                                 <div>
-                                                    <div className="font-medium">Allergies</div>
-                                                    <div className="whitespace-pre-wrap text-slate-600">{medical.profile?.allergies || '-'}</div>
+                                                    <div className="font-medium">
+                                                        Allergies
+                                                    </div>
+                                                    <div className="whitespace-pre-wrap text-slate-600">
+                                                        {medical.profile
+                                                            ?.allergies || '-'}
+                                                    </div>
                                                 </div>
                                                 <div>
-                                                    <div className="font-medium">Notes</div>
-                                                    <div className="whitespace-pre-wrap text-slate-600">{medical.profile?.notes || '-'}</div>
+                                                    <div className="font-medium">
+                                                        Notes
+                                                    </div>
+                                                    <div className="whitespace-pre-wrap text-slate-600">
+                                                        {medical.profile
+                                                            ?.notes || '-'}
+                                                    </div>
                                                 </div>
                                             </CardContent>
                                         </Card>
@@ -553,27 +904,65 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                         <Card>
                                             <CardHeader>
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <CardTitle className="text-base">Medications</CardTitle>
+                                                    <CardTitle className="text-base">
+                                                        Medications
+                                                    </CardTitle>
                                                     {can.edit ? (
-                                                        <Button variant="outline" size="sm" asChild>
-                                                            <Link href={`/clients/${client.id}/medical?section=medications`}>Manage</Link>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/clients/${client.id}/medical?section=medications`}
+                                                            >
+                                                                Manage
+                                                            </Link>
                                                         </Button>
                                                     ) : null}
                                                 </div>
                                             </CardHeader>
                                             <CardContent className="space-y-2">
-                                                {medical.medications.map((m) => (
-                                                    <div key={m.id} className="rounded-md border p-3">
-                                                        <div className="text-sm font-medium">{m.name}</div>
-                                                        <div className="mt-1 text-xs text-slate-500">
-                                                            {[m.dosage && `Dosage: ${m.dosage}`, m.frequency && `Frequency: ${m.frequency}`, m.route && `Route: ${m.route}`]
-                                                                .filter(Boolean)
-                                                                .join(' - ') || '-'}
+                                                {medical.medications.map(
+                                                    (m) => (
+                                                        <div
+                                                            key={m.id}
+                                                            className="rounded-md border p-3"
+                                                        >
+                                                            <div className="text-sm font-medium">
+                                                                {m.name}
+                                                            </div>
+                                                            <div className="mt-1 text-xs text-slate-500">
+                                                                {[
+                                                                    m.dosage &&
+                                                                        `Dosage: ${m.dosage}`,
+                                                                    m.frequency &&
+                                                                        `Frequency: ${m.frequency}`,
+                                                                    m.route &&
+                                                                        `Route: ${m.route}`,
+                                                                ]
+                                                                    .filter(
+                                                                        Boolean,
+                                                                    )
+                                                                    .join(
+                                                                        ' - ',
+                                                                    ) || '-'}
+                                                            </div>
+                                                            {m.instructions ? (
+                                                                <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                                                    {
+                                                                        m.instructions
+                                                                    }
+                                                                </div>
+                                                            ) : null}
                                                         </div>
-                                                        {m.instructions ? <div className="mt-2 whitespace-pre-wrap text-xs text-slate-600">{m.instructions}</div> : null}
+                                                    ),
+                                                )}
+                                                {!medical.medications.length ? (
+                                                    <div className="text-sm text-slate-500">
+                                                        No medications listed.
                                                     </div>
-                                                ))}
-                                                {!medical.medications.length ? <div className="text-sm text-slate-500">No medications listed.</div> : null}
+                                                ) : null}
                                             </CardContent>
                                         </Card>
                                     ),
@@ -585,25 +974,52 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                         <Card>
                                             <CardHeader>
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <CardTitle className="text-base">Conditions</CardTitle>
+                                                    <CardTitle className="text-base">
+                                                        Conditions
+                                                    </CardTitle>
                                                     {can.edit ? (
-                                                        <Button variant="outline" size="sm" asChild>
-                                                            <Link href={`/clients/${client.id}/medical?section=conditions`}>Manage</Link>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/clients/${client.id}/medical?section=conditions`}
+                                                            >
+                                                                Manage
+                                                            </Link>
                                                         </Button>
                                                     ) : null}
                                                 </div>
                                             </CardHeader>
                                             <CardContent className="space-y-2">
                                                 {medical.conditions.map((c) => (
-                                                    <div key={c.id} className="rounded-md border p-3">
+                                                    <div
+                                                        key={c.id}
+                                                        className="rounded-md border p-3"
+                                                    >
                                                         <div className="text-sm font-medium">
                                                             {c.label}
-                                                            {c.severity ? <span className="ml-2 text-xs text-slate-500">({c.severity})</span> : null}
+                                                            {c.severity ? (
+                                                                <span className="ml-2 text-xs text-slate-500">
+                                                                    (
+                                                                    {c.severity}
+                                                                    )
+                                                                </span>
+                                                            ) : null}
                                                         </div>
-                                                        {c.notes ? <div className="mt-2 whitespace-pre-wrap text-xs text-slate-600">{c.notes}</div> : null}
+                                                        {c.notes ? (
+                                                            <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                                                {c.notes}
+                                                            </div>
+                                                        ) : null}
                                                     </div>
                                                 ))}
-                                                {!medical.conditions.length ? <div className="text-sm text-slate-500">No conditions listed.</div> : null}
+                                                {!medical.conditions.length ? (
+                                                    <div className="text-sm text-slate-500">
+                                                        No conditions listed.
+                                                    </div>
+                                                ) : null}
                                             </CardContent>
                                         </Card>
                                     ),
@@ -615,27 +1031,65 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                         <Card>
                                             <CardHeader>
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <CardTitle className="text-base">Emergency contacts</CardTitle>
+                                                    <CardTitle className="text-base">
+                                                        Emergency contacts
+                                                    </CardTitle>
                                                     {can.edit ? (
-                                                        <Button variant="outline" size="sm" asChild>
-                                                            <Link href={`/clients/${client.id}/medical?section=emergency_contacts`}>Manage</Link>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            asChild
+                                                        >
+                                                            <Link
+                                                                href={`/clients/${client.id}/medical?section=emergency_contacts`}
+                                                            >
+                                                                Manage
+                                                            </Link>
                                                         </Button>
                                                     ) : null}
                                                 </div>
                                             </CardHeader>
                                             <CardContent className="space-y-2">
-                                                {medical.emergency_contacts.map((e) => (
-                                                    <div key={e.id} className="rounded-md border p-3">
-                                                        <div className="text-sm font-medium">{e.name}</div>
-                                                        <div className="mt-1 text-xs text-slate-500">
-                                                            {[e.relationship && `Relationship: ${e.relationship}`, e.phone && `Phone: ${e.phone}`, e.email && `Email: ${e.email}`]
-                                                                .filter(Boolean)
-                                                                .join(' - ') || '-'}
+                                                {medical.emergency_contacts.map(
+                                                    (e) => (
+                                                        <div
+                                                            key={e.id}
+                                                            className="rounded-md border p-3"
+                                                        >
+                                                            <div className="text-sm font-medium">
+                                                                {e.name}
+                                                            </div>
+                                                            <div className="mt-1 text-xs text-slate-500">
+                                                                {[
+                                                                    e.relationship &&
+                                                                        `Relationship: ${e.relationship}`,
+                                                                    e.phone &&
+                                                                        `Phone: ${e.phone}`,
+                                                                    e.email &&
+                                                                        `Email: ${e.email}`,
+                                                                ]
+                                                                    .filter(
+                                                                        Boolean,
+                                                                    )
+                                                                    .join(
+                                                                        ' - ',
+                                                                    ) || '-'}
+                                                            </div>
+                                                            {e.notes ? (
+                                                                <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                                                    {e.notes}
+                                                                </div>
+                                                            ) : null}
                                                         </div>
-                                                        {e.notes ? <div className="mt-2 whitespace-pre-wrap text-xs text-slate-600">{e.notes}</div> : null}
+                                                    ),
+                                                )}
+                                                {!medical.emergency_contacts
+                                                    .length ? (
+                                                    <div className="text-sm text-slate-500">
+                                                        No emergency contacts
+                                                        listed.
                                                     </div>
-                                                ))}
-                                                {!medical.emergency_contacts.length ? <div className="text-sm text-slate-500">No emergency contacts listed.</div> : null}
+                                                ) : null}
                                             </CardContent>
                                         </Card>
                                     ),
@@ -646,43 +1100,87 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                 )}
 
                 {tab === 'support_plan' && (
-                    <SupportPlanTab clientId={client.id} plan={support_plan} canEdit={can.edit} />
+                    <SupportPlanTab
+                        clientId={client.id}
+                        plan={support_plan}
+                        canEdit={can.edit}
+                    />
                 )}
 
                 {tab === 'assessments' && (
-                    <AssessmentsTab clientId={client.id} assessments={assessments} canEdit={can.edit} />
+                    <AssessmentsTab
+                        clientId={client.id}
+                        assessments={assessments}
+                        canEdit={can.edit}
+                    />
                 )}
 
                 {tab === 'timeline' && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Timeline</CardTitle>
+                            <CardTitle className="text-base">
+                                Timeline
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {handover.length ? (
                                 <div className="rounded-md border p-3">
-                                    <div className="text-sm font-medium">Pinned handover</div>
+                                    <div className="text-sm font-medium">
+                                        Pinned handover
+                                    </div>
                                     <div className="mt-2 space-y-2">
                                         {handover.map((h) => (
-                                            <div key={h.id} className="rounded-md border p-3">
+                                            <div
+                                                key={h.id}
+                                                className="rounded-md border p-3"
+                                            >
                                                 <div className="flex items-center justify-between gap-3">
-                                                    <div className="text-sm font-medium">{h.subject || 'Handover'}</div>
-                                                    <div className="text-xs text-slate-500">{h.occurred_at ? new Date(h.occurred_at).toLocaleString() : ''}</div>
+                                                    <div className="text-sm font-medium">
+                                                        {h.subject ||
+                                                            'Handover'}
+                                                    </div>
+                                                    <div className="text-xs text-slate-500">
+                                                        {h.occurred_at
+                                                            ? new Date(
+                                                                  h.occurred_at,
+                                                              ).toLocaleString()
+                                                            : ''}
+                                                    </div>
                                                 </div>
-                                                {h.body && <div className="mt-2 whitespace-pre-wrap text-xs text-slate-600">{h.body}</div>}
+                                                {h.body && (
+                                                    <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                                        {h.body}
+                                                    </div>
+                                                )}
                                                 <div className="mt-2 flex items-center justify-between gap-2">
-                                                    <div className="text-xs text-slate-500">{h.actor?.name ? `By ${h.actor.name}` : ''}</div>
-                                                    {can.pin_handover && h.source_id ? (
+                                                    <div className="text-xs text-slate-500">
+                                                        {h.actor?.name
+                                                            ? `By ${h.actor.name}`
+                                                            : ''}
+                                                    </div>
+                                                    {can.pin_handover &&
+                                                    h.source_id ? (
                                                         <button
                                                             className="text-xs underline"
                                                             onClick={async () => {
-                                                                await fetch(`/clients/${client.id}/notes/${h.source_id}/pin`, {
-                                                                    method: 'POST',
-                                                                    headers: {
-                                                                        'X-Requested-With': 'XMLHttpRequest',
-                                                                        'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content,
+                                                                await fetch(
+                                                                    `/clients/${client.id}/notes/${h.source_id}/pin`,
+                                                                    {
+                                                                        method: 'POST',
+                                                                        headers:
+                                                                            {
+                                                                                'X-Requested-With':
+                                                                                    'XMLHttpRequest',
+                                                                                'X-CSRF-TOKEN':
+                                                                                    (
+                                                                                        document.querySelector(
+                                                                                            'meta[name="csrf-token"]',
+                                                                                        ) as HTMLMetaElement
+                                                                                    )
+                                                                                        ?.content,
+                                                                            },
                                                                     },
-                                                                });
+                                                                );
                                                                 window.location.reload();
                                                             }}
                                                         >
@@ -698,7 +1196,9 @@ export default function ClientShow({ client, medical, support_plan, assessments,
 
                             {can.create_note && (
                                 <div className="rounded-md border p-3">
-                                    <div className="text-sm font-medium">Add note</div>
+                                    <div className="text-sm font-medium">
+                                        Add note
+                                    </div>
                                     <div className="mt-3 grid grid-cols-1 gap-3">
                                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                             <div>
@@ -706,12 +1206,29 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                                 <Select
                                                     value={noteForm.data.type}
                                                     onValueChange={(v) => {
-                                                        noteForm.setData('type', v);
-                                                        const tpl = templates.find((t) => t.key === v);
-                                                        if (tpl && noteForm.data.body.trim() === '') {
-                                                            noteForm.setData('body', tpl.body);
+                                                        noteForm.setData(
+                                                            'type',
+                                                            v,
+                                                        );
+                                                        const tpl =
+                                                            templates.find(
+                                                                (t) =>
+                                                                    t.key === v,
+                                                            );
+                                                        if (
+                                                            tpl &&
+                                                            noteForm.data.body.trim() ===
+                                                                ''
+                                                        ) {
+                                                            noteForm.setData(
+                                                                'body',
+                                                                tpl.body,
+                                                            );
                                                         }
-                                                        noteForm.setData('pin', v === 'handover');
+                                                        noteForm.setData(
+                                                            'pin',
+                                                            v === 'handover',
+                                                        );
                                                     }}
                                                 >
                                                     <SelectTrigger>
@@ -719,7 +1236,10 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                                     </SelectTrigger>
                                                     <SelectContent>
                                                         {templates.map((t) => (
-                                                            <SelectItem key={t.key} value={t.key}>
+                                                            <SelectItem
+                                                                key={t.key}
+                                                                value={t.key}
+                                                            >
                                                                 {t.label}
                                                             </SelectItem>
                                                         ))}
@@ -727,15 +1247,38 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                                 </Select>
                                             </div>
                                             <div>
-                                                <Label>Subject (optional)</Label>
-                                                <Input value={noteForm.data.subject} onChange={(e) => noteForm.setData('subject', e.target.value)} />
+                                                <Label>
+                                                    Subject (optional)
+                                                </Label>
+                                                <Input
+                                                    value={
+                                                        noteForm.data.subject
+                                                    }
+                                                    onChange={(e) =>
+                                                        noteForm.setData(
+                                                            'subject',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
                                             </div>
                                         </div>
 
-                                        {noteForm.data.type === 'progress_note' ? (
+                                        {noteForm.data.type ===
+                                        'progress_note' ? (
                                             <div>
-                                                <Label>Goal/outcome (optional)</Label>
-                                                <Input value={noteForm.data.goal} onChange={(e) => noteForm.setData('goal', e.target.value)} />
+                                                <Label>
+                                                    Goal/outcome (optional)
+                                                </Label>
+                                                <Input
+                                                    value={noteForm.data.goal}
+                                                    onChange={(e) =>
+                                                        noteForm.setData(
+                                                            'goal',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                />
                                             </div>
                                         ) : null}
                                         <div>
@@ -743,30 +1286,71 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                             <Textarea
                                                 rows={3}
                                                 value={noteForm.data.body}
-                                                onChange={(e) => noteForm.setData('body', e.target.value)}
+                                                onChange={(e) =>
+                                                    noteForm.setData(
+                                                        'body',
+                                                        e.target.value,
+                                                    )
+                                                }
                                             />
                                         </div>
                                     </div>
                                     <div className="mt-3 flex flex-wrap items-center gap-3">
                                         <div className="flex items-center gap-2 text-xs">
-                                            <Checkbox checked={noteForm.data.visibility === 'portal'} onCheckedChange={(v) => noteForm.setData('visibility', v ? 'portal' : 'internal')} />
+                                            <Checkbox
+                                                checked={
+                                                    noteForm.data.visibility ===
+                                                    'portal'
+                                                }
+                                                onCheckedChange={(v) =>
+                                                    noteForm.setData(
+                                                        'visibility',
+                                                        v
+                                                            ? 'portal'
+                                                            : 'internal',
+                                                    )
+                                                }
+                                            />
                                             <span>Share in portal</span>
                                         </div>
                                         {noteForm.data.type === 'handover' ? (
                                             <div className="flex items-center gap-2 text-xs">
-                                                <Checkbox checked={noteForm.data.pin} onCheckedChange={(v) => noteForm.setData('pin', Boolean(v))} />
+                                                <Checkbox
+                                                    checked={noteForm.data.pin}
+                                                    onCheckedChange={(v) =>
+                                                        noteForm.setData(
+                                                            'pin',
+                                                            Boolean(v),
+                                                        )
+                                                    }
+                                                />
                                                 <span>Pin as handover</span>
                                             </div>
                                         ) : null}
 
                                         <Button
                                             onClick={() =>
-                                                noteForm.post(`/clients/${client.id}/notes`, {
-                                                    preserveScroll: true,
-                                                    onSuccess: () => noteForm.reset({ type: 'note', subject: '', goal: '', body: '', visibility: 'internal', pin: false }),
-                                                })
+                                                noteForm.post(
+                                                    `/clients/${client.id}/notes`,
+                                                    {
+                                                        preserveScroll: true,
+                                                        onSuccess: () =>
+                                                            noteForm.reset({
+                                                                type: 'note',
+                                                                subject: '',
+                                                                goal: '',
+                                                                body: '',
+                                                                visibility:
+                                                                    'internal',
+                                                                pin: false,
+                                                            }),
+                                                    },
+                                                )
                                             }
-                                            disabled={noteForm.processing || !noteForm.data.body}
+                                            disabled={
+                                                noteForm.processing ||
+                                                !noteForm.data.body
+                                            }
                                         >
                                             Add
                                         </Button>
@@ -775,18 +1359,40 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                             )}
 
                             {events.map((e) => (
-                                <div key={e.id} className="rounded-md border p-3">
+                                <div
+                                    key={e.id}
+                                    className="rounded-md border p-3"
+                                >
                                     <div className="flex items-center justify-between gap-3">
-                                        <div className="text-sm font-medium">{e.subject || e.type}</div>
-                                        <div className="text-xs text-slate-500">{e.occurred_at ? new Date(e.occurred_at).toLocaleString() : ''}</div>
+                                        <div className="text-sm font-medium">
+                                            {e.subject || e.type}
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                            {e.occurred_at
+                                                ? new Date(
+                                                      e.occurred_at,
+                                                  ).toLocaleString()
+                                                : ''}
+                                        </div>
                                     </div>
-                                    {e.body && <div className="mt-1 text-xs text-slate-600 whitespace-pre-wrap">{e.body}</div>}
+                                    {e.body && (
+                                        <div className="mt-1 text-xs whitespace-pre-wrap text-slate-600">
+                                            {e.body}
+                                        </div>
+                                    )}
                                     <div className="mt-2 text-xs text-slate-500">
-                                        {e.actor?.name ? `By ${e.actor.name}` : ''} {e.site?.name ? `- ${e.site.name}` : ''}
+                                        {e.actor?.name
+                                            ? `By ${e.actor.name}`
+                                            : ''}{' '}
+                                        {e.site?.name ? `- ${e.site.name}` : ''}
                                     </div>
                                 </div>
                             ))}
-                            {!events.length && <div className="text-sm text-slate-500">No timeline events yet.</div>}
+                            {!events.length && (
+                                <div className="text-sm text-slate-500">
+                                    No timeline events yet.
+                                </div>
+                            )}
 
                             <div className="pt-2">
                                 <Link
@@ -803,17 +1409,34 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                 {tab === 'documents' && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Documents</CardTitle>
+                            <CardTitle className="text-base">
+                                Documents
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {documents.map((d) => (
-                                <div key={d.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
+                                <div
+                                    key={d.id}
+                                    className="flex items-start justify-between gap-3 rounded-md border p-3"
+                                >
                                     <div>
-                                        <div className="text-sm font-medium">{d.title || d.original_name}</div>
-                                        <div className="mt-1 text-xs text-slate-500">
-                                            {[d.category && `Category: ${d.category}`, d.mime_type && d.mime_type].filter(Boolean).join(' - ') || '-'}
+                                        <div className="text-sm font-medium">
+                                            {d.title || d.original_name}
                                         </div>
-                                        {d.notes && <div className="mt-2 text-xs text-slate-600 whitespace-pre-wrap">{d.notes}</div>}
+                                        <div className="mt-1 text-xs text-slate-500">
+                                            {[
+                                                d.category &&
+                                                    `Category: ${d.category}`,
+                                                d.mime_type && d.mime_type,
+                                            ]
+                                                .filter(Boolean)
+                                                .join(' - ') || '-'}
+                                        </div>
+                                        {d.notes && (
+                                            <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                                {d.notes}
+                                            </div>
+                                        )}
                                     </div>
                                     <a
                                         href={`/clients/${client.id}/documents/${d.id}/download`}
@@ -823,7 +1446,11 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                                     </a>
                                 </div>
                             ))}
-                            {!documents.length && <div className="text-sm text-slate-500">No documents uploaded.</div>}
+                            {!documents.length && (
+                                <div className="text-sm text-slate-500">
+                                    No documents uploaded.
+                                </div>
+                            )}
 
                             <div className="pt-2">
                                 <Link
@@ -837,25 +1464,179 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                     </Card>
                 )}
 
+                {tab === 'respite' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Respite</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {respiteCan?.create ? (
+                                    <Button size="sm" asChild>
+                                        <Link
+                                            href={`/respite/requests/create?client_id=${client.id}`}
+                                        >
+                                            New booking request
+                                        </Link>
+                                    </Button>
+                                ) : null}
+                                <Link
+                                    href="/respite/requests"
+                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                >
+                                    View booking requests
+                                </Link>
+                                <Link
+                                    href="/respite/bookings"
+                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                >
+                                    View approved bookings
+                                </Link>
+                            </div>
+
+                            <Separator />
+
+                            <div>
+                                <div className="text-sm font-medium">
+                                    Bookings
+                                </div>
+                                <div className="mt-2 space-y-2">
+                                    {respiteBookings.map((b) => (
+                                        <div
+                                            key={b.id}
+                                            className="rounded-md border p-3"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <div className="text-sm font-medium">
+                                                        {formatDateTime(
+                                                            b.start_at,
+                                                        )}{' '}
+                                                        -{' '}
+                                                        {formatDateTime(
+                                                            b.end_at,
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-1 text-xs text-slate-500">
+                                                        Status: {b.status}
+                                                        {b.coordinator?.name
+                                                            ? ` | Coordinator: ${b.coordinator.name}`
+                                                            : ''}
+                                                    </div>
+                                                    {b.shift_id ? (
+                                                        <div className="mt-1 text-xs text-slate-500">
+                                                            Shift:{' '}
+                                                            <Link
+                                                                href={`/shifts/${b.shift_id}`}
+                                                                className="text-indigo-500 hover:text-indigo-400"
+                                                            >
+                                                                View shift
+                                                            </Link>
+                                                        </div>
+                                                    ) : null}
+                                                </div>
+                                                <Link
+                                                    href={`/respite/bookings/${b.id}`}
+                                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                                >
+                                                    View
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {!respiteBookings.length && (
+                                        <div className="text-sm text-slate-500">
+                                            No respite bookings yet.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <Separator />
+
+                            <div>
+                                <div className="text-sm font-medium">
+                                    Booking Requests
+                                </div>
+                                <div className="mt-2 space-y-2">
+                                    {respiteRequests.map((r) => (
+                                        <div
+                                            key={r.id}
+                                            className="rounded-md border p-3"
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div>
+                                                    <div className="text-sm font-medium">
+                                                        {formatDateTime(
+                                                            r.requested_start,
+                                                        )}{' '}
+                                                        -{' '}
+                                                        {formatDateTime(
+                                                            r.requested_end,
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-1 text-xs text-slate-500">
+                                                        Status: {r.status}
+                                                    </div>
+                                                </div>
+                                                <Link
+                                                    href={`/respite/requests/${r.id}`}
+                                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                                >
+                                                    View
+                                                </Link>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {!respiteRequests.length && (
+                                        <div className="text-sm text-slate-500">
+                                            No respite booking requests yet.
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {tab === 'portal' && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Portal access (Client / Next of Kin)</CardTitle>
+                            <CardTitle className="text-base">
+                                Portal access (Client / Next of Kin)
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             <div className="text-sm text-slate-600">
-                                Portal users can view this client’s medical, documents, and timeline, and can query the RAG assistant.
+                                Portal users can view this client’s medical,
+                                documents, and timeline, and can query the RAG
+                                assistant.
                             </div>
                             <Separator />
                             <div className="space-y-2">
                                 {portal_users.map((u) => (
-                                    <div key={u.id} className="rounded-md border p-3">
-                                        <div className="text-sm font-medium">{u.name}</div>
-                                        <div className="text-xs text-slate-500">{u.email}</div>
-                                        {u.relation && <div className="mt-1 text-xs text-slate-500">Relation: {u.relation}</div>}
+                                    <div
+                                        key={u.id}
+                                        className="rounded-md border p-3"
+                                    >
+                                        <div className="text-sm font-medium">
+                                            {u.name}
+                                        </div>
+                                        <div className="text-xs text-slate-500">
+                                            {u.email}
+                                        </div>
+                                        {u.relation && (
+                                            <div className="mt-1 text-xs text-slate-500">
+                                                Relation: {u.relation}
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
-                                {!portal_users.length && <div className="text-sm text-slate-500">No portal users linked.</div>}
+                                {!portal_users.length && (
+                                    <div className="text-sm text-slate-500">
+                                        No portal users linked.
+                                    </div>
+                                )}
                             </div>
 
                             {can.edit && (
@@ -875,11 +1656,14 @@ export default function ClientShow({ client, medical, support_plan, assessments,
                 {tab === 'assignments' && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Assignments</CardTitle>
+                            <CardTitle className="text-base">
+                                Assignments
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             <div className="text-sm text-slate-600">
-                                Assign support workers to this client. This controls which staff can see the client.
+                                Assign support workers to this client. This
+                                controls which staff can see the client.
                             </div>
                             <div className="pt-2">
                                 <Link
@@ -897,7 +1681,15 @@ export default function ClientShow({ client, medical, support_plan, assessments,
     );
 }
 
-function SupportPlanTab({ clientId, plan, canEdit }: { clientId: number; plan: any | null; canEdit: boolean }) {
+function SupportPlanTab({
+    clientId,
+    plan,
+    canEdit,
+}: {
+    clientId: number;
+    plan: any | null;
+    canEdit: boolean;
+}) {
     const form = useForm<{
         goals: string;
         routines: string;
@@ -924,40 +1716,103 @@ function SupportPlanTab({ clientId, plan, canEdit }: { clientId: number; plan: a
                 <CardTitle className="text-base">Support plan</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-                {!canEdit && !plan && <div className="text-sm text-slate-500">No support plan recorded.</div>}
+                {!canEdit && !plan && (
+                    <div className="text-sm text-slate-500">
+                        No support plan recorded.
+                    </div>
+                )}
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div>
                         <Label>Reviewed at</Label>
-                        <Input type="date" value={form.data.reviewed_at} onChange={(e) => form.setData('reviewed_at', e.target.value)} disabled={!canEdit} />
+                        <Input
+                            type="date"
+                            value={form.data.reviewed_at}
+                            onChange={(e) =>
+                                form.setData('reviewed_at', e.target.value)
+                            }
+                            disabled={!canEdit}
+                        />
                     </div>
                     <div>
                         <Label>Next review</Label>
-                        <Input type="date" value={form.data.next_review_at} onChange={(e) => form.setData('next_review_at', e.target.value)} disabled={!canEdit} />
+                        <Input
+                            type="date"
+                            value={form.data.next_review_at}
+                            onChange={(e) =>
+                                form.setData('next_review_at', e.target.value)
+                            }
+                            disabled={!canEdit}
+                        />
                     </div>
                     <div className="md:col-span-2">
                         <Label>Goals</Label>
-                        <Textarea rows={4} value={form.data.goals} onChange={(e) => form.setData('goals', e.target.value)} disabled={!canEdit} />
+                        <Textarea
+                            rows={4}
+                            value={form.data.goals}
+                            onChange={(e) =>
+                                form.setData('goals', e.target.value)
+                            }
+                            disabled={!canEdit}
+                        />
                     </div>
                     <div className="md:col-span-2">
                         <Label>Daily routines</Label>
-                        <Textarea rows={4} value={form.data.routines} onChange={(e) => form.setData('routines', e.target.value)} disabled={!canEdit} />
+                        <Textarea
+                            rows={4}
+                            value={form.data.routines}
+                            onChange={(e) =>
+                                form.setData('routines', e.target.value)
+                            }
+                            disabled={!canEdit}
+                        />
                     </div>
                     <div className="md:col-span-2">
                         <Label>Preferences</Label>
-                        <Textarea rows={4} value={form.data.preferences} onChange={(e) => form.setData('preferences', e.target.value)} disabled={!canEdit} />
+                        <Textarea
+                            rows={4}
+                            value={form.data.preferences}
+                            onChange={(e) =>
+                                form.setData('preferences', e.target.value)
+                            }
+                            disabled={!canEdit}
+                        />
                     </div>
                     <div className="md:col-span-2">
                         <Label>Communication needs</Label>
-                        <Textarea rows={4} value={form.data.communication_needs} onChange={(e) => form.setData('communication_needs', e.target.value)} disabled={!canEdit} />
+                        <Textarea
+                            rows={4}
+                            value={form.data.communication_needs}
+                            onChange={(e) =>
+                                form.setData(
+                                    'communication_needs',
+                                    e.target.value,
+                                )
+                            }
+                            disabled={!canEdit}
+                        />
                     </div>
                     <div className="md:col-span-2">
                         <Label>Cultural needs</Label>
-                        <Textarea rows={3} value={form.data.cultural_needs} onChange={(e) => form.setData('cultural_needs', e.target.value)} disabled={!canEdit} />
+                        <Textarea
+                            rows={3}
+                            value={form.data.cultural_needs}
+                            onChange={(e) =>
+                                form.setData('cultural_needs', e.target.value)
+                            }
+                            disabled={!canEdit}
+                        />
                     </div>
                     <div className="md:col-span-2">
                         <Label>Risk notes</Label>
-                        <Textarea rows={3} value={form.data.risk_notes} onChange={(e) => form.setData('risk_notes', e.target.value)} disabled={!canEdit} />
+                        <Textarea
+                            rows={3}
+                            value={form.data.risk_notes}
+                            onChange={(e) =>
+                                form.setData('risk_notes', e.target.value)
+                            }
+                            disabled={!canEdit}
+                        />
                     </div>
                 </div>
 
@@ -980,7 +1835,15 @@ function SupportPlanTab({ clientId, plan, canEdit }: { clientId: number; plan: a
     );
 }
 
-function AssessmentsTab({ clientId, assessments, canEdit }: { clientId: number; assessments: Array<any>; canEdit: boolean }) {
+function AssessmentsTab({
+    clientId,
+    assessments,
+    canEdit,
+}: {
+    clientId: number;
+    assessments: Array<any>;
+    canEdit: boolean;
+}) {
     const [editingId, setEditingId] = useState<number | null>(null);
 
     const form = useForm<{
@@ -1022,7 +1885,11 @@ function AssessmentsTab({ clientId, assessments, canEdit }: { clientId: number; 
                 {canEdit && (
                     <div className="rounded-md border p-3">
                         <div className="flex items-center justify-between gap-3">
-                            <div className="text-sm font-medium">{editingId ? 'Edit assessment' : 'Add assessment'}</div>
+                            <div className="text-sm font-medium">
+                                {editingId
+                                    ? 'Edit assessment'
+                                    : 'Add assessment'}
+                            </div>
                             {editingId ? (
                                 <Button variant="ghost" onClick={resetForm}>
                                     Cancel
@@ -1032,23 +1899,58 @@ function AssessmentsTab({ clientId, assessments, canEdit }: { clientId: number; 
                         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                             <div>
                                 <Label>Type</Label>
-                                <Input value={form.data.type} onChange={(e) => form.setData('type', e.target.value)} placeholder="e.g. WHODAS, risk, medication review" />
+                                <Input
+                                    value={form.data.type}
+                                    onChange={(e) =>
+                                        form.setData('type', e.target.value)
+                                    }
+                                    placeholder="e.g. WHODAS, risk, medication review"
+                                />
                             </div>
                             <div>
                                 <Label>Score (optional)</Label>
-                                <Input value={form.data.score} onChange={(e) => form.setData('score', e.target.value)} />
+                                <Input
+                                    value={form.data.score}
+                                    onChange={(e) =>
+                                        form.setData('score', e.target.value)
+                                    }
+                                />
                             </div>
                             <div>
                                 <Label>Assessed at</Label>
-                                <Input type="date" value={form.data.assessed_at} onChange={(e) => form.setData('assessed_at', e.target.value)} />
+                                <Input
+                                    type="date"
+                                    value={form.data.assessed_at}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'assessed_at',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
                             </div>
                             <div>
                                 <Label>Next review</Label>
-                                <Input type="date" value={form.data.next_review_at} onChange={(e) => form.setData('next_review_at', e.target.value)} />
+                                <Input
+                                    type="date"
+                                    value={form.data.next_review_at}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'next_review_at',
+                                            e.target.value,
+                                        )
+                                    }
+                                />
                             </div>
                             <div className="md:col-span-2">
                                 <Label>Notes</Label>
-                                <Textarea rows={3} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} />
+                                <Textarea
+                                    rows={3}
+                                    value={form.data.notes}
+                                    onChange={(e) =>
+                                        form.setData('notes', e.target.value)
+                                    }
+                                />
                             </div>
                         </div>
                         <div className="mt-3 flex items-center gap-2">
@@ -1077,26 +1979,44 @@ function AssessmentsTab({ clientId, assessments, canEdit }: { clientId: number; 
                         <div key={a.id} className="rounded-md border p-3">
                             <div className="flex items-start justify-between gap-3">
                                 <div>
-                                    <div className="text-sm font-medium">{a.type}</div>
+                                    <div className="text-sm font-medium">
+                                        {a.type}
+                                    </div>
                                     <div className="mt-1 text-xs text-slate-500">
-                                        {[a.score && `Score: ${a.score}`, a.assessed_at && `Assessed: ${a.assessed_at}`, a.next_review_at && `Next review: ${a.next_review_at}`]
+                                        {[
+                                            a.score && `Score: ${a.score}`,
+                                            a.assessed_at &&
+                                                `Assessed: ${a.assessed_at}`,
+                                            a.next_review_at &&
+                                                `Next review: ${a.next_review_at}`,
+                                        ]
                                             .filter(Boolean)
                                             .join(' • ') || '-'}
                                     </div>
-                                    {a.notes && <div className="mt-2 text-xs text-slate-600 whitespace-pre-wrap">{a.notes}</div>}
+                                    {a.notes && (
+                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                            {a.notes}
+                                        </div>
+                                    )}
                                 </div>
 
                                 {canEdit && (
                                     <div className="flex items-center gap-2">
-                                        <Button variant="secondary" onClick={() => startEdit(a)}>
+                                        <Button
+                                            variant="secondary"
+                                            onClick={() => startEdit(a)}
+                                        >
                                             Edit
                                         </Button>
                                         <Button
                                             variant="destructive"
                                             onClick={() =>
-                                                form.delete(`/clients/${clientId}/assessments/${a.id}`, {
-                                                    preserveScroll: true,
-                                                })
+                                                form.delete(
+                                                    `/clients/${clientId}/assessments/${a.id}`,
+                                                    {
+                                                        preserveScroll: true,
+                                                    },
+                                                )
                                             }
                                         >
                                             Delete
@@ -1107,7 +2027,11 @@ function AssessmentsTab({ clientId, assessments, canEdit }: { clientId: number; 
                         </div>
                     ))}
 
-                    {!assessments.length && <div className="text-sm text-slate-500">No assessments recorded.</div>}
+                    {!assessments.length && (
+                        <div className="text-sm text-slate-500">
+                            No assessments recorded.
+                        </div>
+                    )}
                 </div>
             </CardContent>
         </Card>

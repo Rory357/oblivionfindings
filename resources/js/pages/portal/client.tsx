@@ -18,6 +18,8 @@ type Props = {
     documents: Array<any>;
     incidents: Array<any>;
     events: Array<any>;
+    assets?: Array<any>;
+    tracking_consent?: { id: number; status: string; given_at?: string | null; expires_at?: string | null } | null;
     rag_answer?: { text: string | null; sources?: Array<any> } | null;
     can?: { viewIncidents: boolean; downloadIncidentAttachments: boolean };
 };
@@ -31,6 +33,8 @@ export default function PortalClient({
     documents,
     incidents,
     events,
+    assets = [],
+    tracking_consent,
     rag_answer,
     can,
 }: Props) {
@@ -270,6 +274,46 @@ export default function PortalClient({
                                         <div className="text-xs text-slate-500">
                                             No documents uploaded.
                                         </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <Separator />
+
+                            <div>
+                                <div className="font-medium">Assets</div>
+                                <div className="mt-2 space-y-2">
+                                    {assets.map((a: any) => (
+                                        <div key={a.id} className="rounded-md border p-2">
+                                            <div className="text-sm font-medium">{a.name}</div>
+                                            <div className="text-xs text-slate-500">
+                                                {[a.asset_tag ? `#${a.asset_tag}` : null, a.status, a.risk_level]
+                                                    .filter(Boolean)
+                                                    .join(' â€¢ ') || '-'}
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {!assets.length && (
+                                        <div className="text-xs text-slate-500">No assets linked.</div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <Separator />
+
+                            <div>
+                                <div className="font-medium">Tracking consent</div>
+                                <div className="mt-2 text-xs text-slate-600">
+                                    {tracking_consent ? (
+                                        <div>
+                                            Status: {tracking_consent.status}
+                                            {tracking_consent.given_at ? ` â€¢ Given: ${new Date(tracking_consent.given_at).toLocaleDateString()}` : ''}
+                                            {tracking_consent.expires_at
+                                                ? ` â€¢ Expires: ${new Date(tracking_consent.expires_at).toLocaleDateString()}`
+                                                : ''}
+                                        </div>
+                                    ) : (
+                                        'No tracking consent on file.'
                                     )}
                                 </div>
                             </div>

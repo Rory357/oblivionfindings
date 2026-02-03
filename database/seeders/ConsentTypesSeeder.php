@@ -170,6 +170,22 @@ class ConsentTypesSeeder extends Seeder
                 'version' => 1,
                 'active' => true,
             ],
+            [
+                'name' => 'Asset Location Tracking (Safety)',
+                'category' => 'safety',
+                'description' => 'Consent to use asset location tracking for safety, loss prevention, and emergency response.',
+                'purpose' => 'To protect clients and high-value equipment by monitoring asset location and movement when consent is active.',
+                'legal_basis' => 'consent',
+                'is_mandatory' => false,
+                'requires_capacity_assessment' => true,
+                'allows_withdrawal' => true,
+                'withdrawal_notice_days' => 0,
+                'validity_period_days' => 365,
+                'renewal_required' => true,
+                'renewal_reminder_days' => 30,
+                'version' => 1,
+                'active' => true,
+            ],
         ];
 
         foreach ($consentTypes as $type) {

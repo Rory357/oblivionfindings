@@ -38,7 +38,7 @@ type Asset = {
 };
 
 export default function AssetShow() {
-    const { asset, inspections, maintenance, documents, can } = usePage().props as any;
+    const { asset, inspections, maintenance, documents, trackers, alerts, scan_events, geofences, can } = usePage().props as any;
 
     const a: Asset = asset;
 
@@ -66,6 +66,14 @@ export default function AssetShow() {
         effective_date: '',
         expiry_date: '',
         notes: '',
+    });
+
+    const trackerForm = useForm({
+        vendor: '',
+        device_uid: '',
+        imei: '',
+        serial_number: '',
+        consent_id: '',
     });
 
     const headerBadges = useMemo(() => {
@@ -521,6 +529,152 @@ export default function AssetShow() {
                                                 ))
                                             ) : (
                                                 <div className="text-sm text-slate-500">No documents uploaded.</div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            ),
+                        },
+                        {
+                            key: 'tracking',
+                            label: `Tracking (${trackers?.length ?? 0})`,
+                            content: (
+                                <div className="space-y-4">
+                                    {can?.manageTrackers ? (
+                                        <Card>
+                                            <CardHeader>
+                                                <CardTitle className="text-base">Pair tracker</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                                <div className="space-y-1">
+                                                    <Label>Vendor</Label>
+                                                    <Input value={trackerForm.data.vendor} onChange={(e) => trackerForm.setData('vendor', e.target.value)} />
+                                                    <InputError message={trackerForm.errors.vendor} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label>Device UID</Label>
+                                                    <Input value={trackerForm.data.device_uid} onChange={(e) => trackerForm.setData('device_uid', e.target.value)} />
+                                                    <InputError message={trackerForm.errors.device_uid} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label>IMEI</Label>
+                                                    <Input value={trackerForm.data.imei} onChange={(e) => trackerForm.setData('imei', e.target.value)} />
+                                                    <InputError message={trackerForm.errors.imei} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label>Serial number</Label>
+                                                    <Input value={trackerForm.data.serial_number} onChange={(e) => trackerForm.setData('serial_number', e.target.value)} />
+                                                    <InputError message={trackerForm.errors.serial_number} />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <Label>Consent ID</Label>
+                                                    <Input value={trackerForm.data.consent_id} onChange={(e) => trackerForm.setData('consent_id', e.target.value)} />
+                                                    <InputError message={trackerForm.errors.consent_id} />
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <Button
+                                                        onClick={() =>
+                                                            trackerForm.post(`/assets/${a.id}/trackers/pair`, {
+                                                                preserveScroll: true,
+                                                                onSuccess: () => trackerForm.reset('vendor', 'device_uid', 'imei', 'serial_number', 'consent_id'),
+                                                            })
+                                                        }
+                                                        disabled={trackerForm.processing}
+                                                    >
+                                                        Pair tracker
+                                                    </Button>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    ) : null}
+
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="text-base">Trackers</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2">
+                                            {trackers?.length ? (
+                                                trackers.map((t: any) => (
+                                                    <div key={t.id} className="flex items-start justify-between gap-3 rounded-md border p-3">
+                                                        <div className="min-w-0">
+                                                            <div className="text-sm font-medium">
+                                                                {t.vendor} â€¢ {t.device_uid}
+                                                            </div>
+                                                            <div className="mt-1 text-xs text-slate-500">
+                                                                Status: {t.status}
+                                                                {t.last_seen_at ? ` â€¢ Last seen: ${t.last_seen_at}` : ''}
+                                                            </div>
+                                                        </div>
+                                                        {can?.manageTrackers && t.status === 'paired' ? (
+                                                            <Button
+                                                                variant="secondary"
+                                                                onClick={() =>
+                                                                    router.post(`/assets/${a.id}/trackers/${t.id}/unpair`, {}, { preserveScroll: true })
+                                                                }
+                                                            >
+                                                                Unpair
+                                                            </Button>
+                                                        ) : null}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-sm text-slate-500">No trackers paired.</div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="text-base">Recent alerts</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2">
+                                            {alerts?.length ? (
+                                                alerts.map((al: any) => (
+                                                    <div key={al.id} className="rounded-md border p-3">
+                                                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                                                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{al.alert_type}</span>
+                                                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{al.severity}</span>
+                                                            <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-700">{al.status}</span>
+                                                        </div>
+                                                        <div className="mt-1 text-xs text-slate-500">{al.triggered_at ?? ''}</div>
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-sm text-slate-500">No alerts.</div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="text-base">Scan events</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2">
+                                            {scan_events?.length ? (
+                                                scan_events.map((s: any) => (
+                                                    <div key={s.id} className="rounded-md border p-3 text-sm">
+                                                        {s.scanned_at} â€¢ {s.qr_token}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-sm text-slate-500">No scans recorded.</div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="text-base">Geofences</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2">
+                                            {geofences?.length ? (
+                                                geofences.map((g: any) => (
+                                                    <div key={g.id} className="rounded-md border p-3 text-sm">
+                                                        {g.name} â€¢ {g.type} â€¢ {g.breach_type} â€¢ {g.is_active ? 'active' : 'inactive'}
+                                                    </div>
+                                                ))
+                                            ) : (
+                                                <div className="text-sm text-slate-500">No geofences configured.</div>
                                             )}
                                         </CardContent>
                                     </Card>

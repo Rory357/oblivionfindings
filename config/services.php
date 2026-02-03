@@ -55,5 +55,8 @@ return [
         'tenant' => env('MICROSOFT_TENANT_ID'), // single org lock
     ],
 
+    'telemetry' => [
+        'ingest_token' => env('TELEMETRY_INGEST_TOKEN'),
+    ],
 
 ];

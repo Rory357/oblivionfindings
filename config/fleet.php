@@ -1,0 +1,28 @@
+<?php
+
+return [
+    'trip' => [
+        'start_speed_kph' => env('FLEET_TRIP_START_SPEED_KPH', 5),
+        'stop_speed_kph' => env('FLEET_TRIP_STOP_SPEED_KPH', 2),
+        'stop_after_minutes' => env('FLEET_TRIP_STOP_AFTER_MINUTES', 5),
+    ],
+
+    'signals' => [
+        'geofence_debounce_minutes' => env('FLEET_GEOFENCE_DEBOUNCE_MINUTES', 5),
+        'offline_after_minutes' => env('FLEET_OFFLINE_AFTER_MINUTES', 15),
+    ],
+
+    'maps' => [
+        'api_key' => env('GOOGLE_MAPS_API_KEY'),
+        'reverse_geocode_enabled' => env('FLEET_REVERSE_GEOCODE_ENABLED', false),
+        'reverse_geocode_min_distance_km' => env('FLEET_REVERSE_GEOCODE_MIN_DISTANCE_KM', 1),
+        'reverse_geocode_cache_ttl_days' => env('FLEET_REVERSE_GEOCODE_CACHE_TTL_DAYS', 30),
+        'reverse_geocode_rate_limit_per_minute' => env('FLEET_REVERSE_GEOCODE_RATE_LIMIT_PER_MINUTE', 30),
+    ],
+
+    'retention' => [
+        'telemetry_days' => env('FLEET_TELEMETRY_RETENTION_DAYS', 365),
+        'asset_snapshot_days' => env('ASSET_TELEMETRY_SNAPSHOT_RETENTION_DAYS', 365),
+        'asset_history_days' => env('ASSET_TELEMETRY_HISTORY_RETENTION_DAYS', 730),
+    ],
+];

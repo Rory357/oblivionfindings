@@ -1,9 +1,16 @@
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
@@ -24,12 +31,21 @@ export default function ClientsIndex({ clients }) {
 
     const [query, setQuery] = useState('');
     const [onlyIncomplete, setOnlyIncomplete] = useState(false);
+    const [respiteFilter, setRespiteFilter] = useState<'all' | 'yes' | 'no'>(
+        'all',
+    );
 
     const filteredClients = useMemo(() => {
         const q = query.trim().toLowerCase();
         let rows = clients as any[];
         if (onlyIncomplete) {
             rows = rows.filter((c) => c.onboarding?.status !== 'complete');
+        }
+        if (respiteFilter === 'yes') {
+            rows = rows.filter((c) => c.has_respite);
+        }
+        if (respiteFilter === 'no') {
+            rows = rows.filter((c) => !c.has_respite);
         }
         if (!q) return rows;
         return rows.filter((c) => {
@@ -38,11 +54,7 @@ export default function ClientsIndex({ clients }) {
                 .toLowerCase();
             const site = (c.site?.name ?? '').toLowerCase();
             const status = (c.status ?? '').toLowerCase();
-            return (
-                name.includes(q) ||
-                site.includes(q) ||
-                status.includes(q)
-            );
+            return name.includes(q) || site.includes(q) || status.includes(q);
         });
     }, [clients, query, onlyIncomplete]);
 
@@ -69,7 +81,8 @@ export default function ClientsIndex({ clients }) {
                         canManage ? (
                             <Button asChild>
                                 <Link href="/clients/create">
-                                    Add {labels?.['client.singular'] ?? 'Client'}
+                                    Add{' '}
+                                    {labels?.['client.singular'] ?? 'Client'}
                                 </Link>
                             </Button>
                         ) : null
@@ -85,8 +98,34 @@ export default function ClientsIndex({ clients }) {
                         />
                     </div>
                     <div className="flex items-center gap-3">
+                        <div className="w-40">
+                            <Select
+                                value={respiteFilter}
+                                onValueChange={(v) =>
+                                    setRespiteFilter(v as 'all' | 'yes' | 'no')
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Respite" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">
+                                        Respite: All
+                                    </SelectItem>
+                                    <SelectItem value="yes">
+                                        Respite: Yes
+                                    </SelectItem>
+                                    <SelectItem value="no">
+                                        Respite: No
+                                    </SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                            <Checkbox checked={onlyIncomplete} onCheckedChange={(v) => setOnlyIncomplete(!!v)} />
+                            <Checkbox
+                                checked={onlyIncomplete}
+                                onCheckedChange={(v) => setOnlyIncomplete(!!v)}
+                            />
                             Onboarding incomplete only
                         </label>
                         <div className="text-sm text-muted-foreground">
@@ -96,61 +135,85 @@ export default function ClientsIndex({ clients }) {
                 </div>
 
                 {/* List */}
-                <div className="space-y-2">
+                <div className="grid grid-cols-3 gap-1 space-y-2">
                     {filteredClients.map((client) => (
                         <div
                             key={client.id}
                             className="flex flex-col gap-3 rounded-md border p-4 sm:flex-row sm:items-center sm:justify-between"
                         >
                             <div className="flex items-start gap-3">
-                                <Avatar className="h-10 w-10">
-                                    <AvatarImage src={client.avatar ?? client.profile_photo_url} alt={`${client.first_name} ${client.last_name}`} />
-                                    <AvatarFallback>{getInitials(`${client.first_name} ${client.last_name}`)}</AvatarFallback>
+                                <Avatar className="h-25 w-25">
+                                    <AvatarImage
+                                        src={
+                                            client.avatar ??
+                                            client.profile_photo_url
+                                        }
+                                        alt={`${client.first_name} ${client.last_name}`}
+                                    />
+                                    <AvatarFallback>
+                                        {getInitials(
+                                            `${client.first_name} ${client.last_name}`,
+                                        )}
+                                    </AvatarFallback>
                                 </Avatar>
                                 <div>
                                     <div className="text-sm font-medium">
                                         {client.first_name} {client.last_name}
                                     </div>
-                                <div className="mt-1 flex flex-wrap items-center gap-2">
-                                    <div className="text-xs text-slate-500">Status: {client.status}</div>
-                                    {client.onboarding ? (
-                                        <div
-                                            className={`rounded-full px-2 py-0.5 text-xs ${
-                                                client.onboarding.status === 'complete'
-                                                    ? 'bg-emerald-50 text-emerald-700'
-                                                    : 'bg-amber-50 text-amber-700'
-                                            }`}
-                                        >
-                                            Onboarding: {client.onboarding.status === 'complete' ? 'Complete' : 'Incomplete'}
-                                            {typeof client.onboarding.percent === 'number' ? ` • ${client.onboarding.percent}%` : ''}
+                                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                                        <div className="text-xs text-slate-500">
+                                            Status: {client.status}
                                         </div>
-                                    ) : null}
-                                </div>
-                                <div className="mt-1 text-xs text-slate-500">
-                                    {siteSingular}:{' '}
-                                    {client.site ? (
-                                        can?.sites?.update ? (
-                                            <Link
-                                                href={`/sites/${client.site.id}/edit`}
-                                                className="text-indigo-300 hover:text-indigo-200"
+                                        {client.onboarding ? (
+                                            <div
+                                                className={`rounded-full px-2 py-0.5 text-xs ${
+                                                    client.onboarding.status ===
+                                                    'complete'
+                                                        ? 'bg-emerald-50 text-emerald-700'
+                                                        : 'bg-amber-50 text-amber-700'
+                                                }`}
                                             >
-                                                {client.site.name}
-                                            </Link>
+                                                Onboarding:{' '}
+                                                {client.onboarding.status ===
+                                                'complete'
+                                                    ? 'Complete'
+                                                    : 'Incomplete'}
+                                                {typeof client.onboarding
+                                                    .percent === 'number'
+                                                    ? ` • ${client.onboarding.percent}%`
+                                                    : ''}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                    <div className="mt-1 text-xs text-slate-500">
+                                        {siteSingular}:{' '}
+                                        {client.site ? (
+                                            can?.sites?.update ? (
+                                                <Link
+                                                    href={`/sites/${client.site.id}/edit`}
+                                                    className="text-indigo-300 hover:text-indigo-200"
+                                                >
+                                                    {client.site.name}
+                                                </Link>
+                                            ) : (
+                                                <span className="text-slate-300">
+                                                    {client.site.name}
+                                                </span>
+                                            )
                                         ) : (
-                                            <span className="text-slate-300">
-                                                {client.site.name}
+                                            <span className="text-slate-500">
+                                                —
                                             </span>
-                                        )
-                                    ) : (
-                                        <span className="text-slate-500">—</span>
-                                    )}
-                                </div>
+                                        )}
+                                    </div>
                                 </div>
                             </div>
 
                             <div className="flex items-center gap-2">
                                 <Button variant="outline" size="sm" asChild>
-                                    <Link href={`/clients/${client.id}`}>View</Link>
+                                    <Link href={`/clients/${client.id}`}>
+                                        View
+                                    </Link>
                                 </Button>
 
                                 {canManage && (
@@ -160,15 +223,6 @@ export default function ClientsIndex({ clients }) {
                                             className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
                                         >
                                             Edit
-                                        </Link>
-
-                                        <Link
-                                            href={`/clients/${client.id}/assignments`}
-                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                        >
-                                            Assign{' '}
-                                            {labels?.['worker.plural'] ??
-                                                'Workers'}
                                         </Link>
                                     </>
                                 )}
@@ -194,11 +248,11 @@ export default function ClientsIndex({ clients }) {
 
                 {canManage ? (
                     <div className="rounded-md border bg-muted/30 p-4 text-sm text-muted-foreground">
-                        Tip: open a client profile to access tabs for medical, support plan, documents, portal users, and timeline.
+                        Tip: open a client profile to access tabs for medical,
+                        support plan, documents, portal users, and timeline.
                     </div>
                 ) : null}
             </PageShell>
-
         </AppLayout>
     );
 }

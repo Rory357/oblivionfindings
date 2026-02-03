@@ -553,7 +553,7 @@ export default function RosteringIndex(props: Props) {
                                                                                         <SelectValue placeholder="Assign staff" />
                                                                                     </SelectTrigger>
                                                                                     <SelectContent>
-                                                                                        {props.staff.map((s) => (
+                                                                                        {availableStaffForShift(sh).map((s) => (
                                                                                             <SelectItem key={s.id} value={String(s.id)}>
                                                                                                 {s.name}
                                                                                             </SelectItem>
@@ -1063,7 +1063,7 @@ export default function RosteringIndex(props: Props) {
                                                                                 <SelectValue placeholder="Assign staff" />
                                                                             </SelectTrigger>
                                                                             <SelectContent>
-                                                                                {props.staff.map((s) => (
+                                                                                {availableStaffForShift(sh).map((s) => (
                                                                                     <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
                                                                                 ))}
                                                                             </SelectContent>

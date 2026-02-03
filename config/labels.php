@@ -46,4 +46,7 @@ return [
 
     'timesheet.singular' => 'Timesheet',
     'timesheet.plural' => 'Timesheets',
+
+    'respite.singular' => 'Respite',
+    'respite.plural' => 'Respite',
 ];
