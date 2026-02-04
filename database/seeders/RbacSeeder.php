@@ -129,7 +129,18 @@ class RbacSeeder extends Seeder
             ['key' => 'fleet.viewAny', 'description' => 'View fleet management'],
             ['key' => 'fleet.driverSessions.manage', 'description' => 'Start/end driver sessions'],
             ['key' => 'fleet.signals.view', 'description' => 'View fleet signals'],
+            ['key' => 'fleet.trips.manage', 'description' => 'Manage fleet trips (edit/delete)'],
+            ['key' => 'fleet.fuel.manage', 'description' => 'Manage fleet fuel records'],
+            ['key' => 'fleet.reports.view', 'description' => 'View fleet reports'],
+
+            // Control Room
             ['key' => 'controlRoom.viewAny', 'description' => 'View Control Room'],
+            ['key' => 'controlRoom.alerts.manage', 'description' => 'Manage alerts (acknowledge, triage, resolve, close)'],
+            ['key' => 'controlRoom.alerts.assign', 'description' => 'Assign alerts to staff'],
+            ['key' => 'controlRoom.alerts.escalate', 'description' => 'Escalate alerts'],
+            ['key' => 'controlRoom.alerts.create', 'description' => 'Create alerts manually or via API'],
+            ['key' => 'controlRoom.reports.view', 'description' => 'View Control Room reports'],
+
             ['key' => 'calendar.viewAny', 'description' => 'View calendar'],
             // Shifts (appointments)
             ['key' => 'shifts.viewAny', 'description' => 'View shifts'],
@@ -305,7 +316,15 @@ class RbacSeeder extends Seeder
                 'fleet.viewAny',
                 'fleet.driverSessions.manage',
                 'fleet.signals.view',
+                'fleet.trips.manage',
+                'fleet.fuel.manage',
+                'fleet.reports.view',
                 'controlRoom.viewAny',
+                'controlRoom.alerts.manage',
+                'controlRoom.alerts.assign',
+                'controlRoom.alerts.escalate',
+                'controlRoom.alerts.create',
+                'controlRoom.reports.view',
                 'calendar.viewAny',
 
                 'compliance.view',
@@ -495,7 +514,14 @@ class RbacSeeder extends Seeder
                 'fleet.viewAny',
                 'fleet.driverSessions.manage',
                 'fleet.signals.view',
+                'fleet.trips.manage',
+                'fleet.fuel.manage',
+                'fleet.reports.view',
                 'controlRoom.viewAny',
+                'controlRoom.alerts.manage',
+                'controlRoom.alerts.assign',
+                'controlRoom.alerts.escalate',
+                'controlRoom.reports.view',
 
                 // Assets
                 'assets.viewAny',
@@ -572,6 +598,10 @@ class RbacSeeder extends Seeder
                 // Fleet
                 'fleet.viewAny',
                 'fleet.driverSessions.manage',
+                'fleet.signals.view',
+
+                // Control Room (view only for support workers)
+                'controlRoom.viewAny',
 
                 // Assets
                 'assets.viewAssigned',

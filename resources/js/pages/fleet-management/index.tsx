@@ -161,13 +161,34 @@ export default function FleetManagementIndex({ vehicles }) {
                                 </div>
                             </div>
                         </div>
-                        <div className="rounded-md border p-4 text-sm">
-                            <a
-                                href="/fleet-management/maps-usage"
-                                className="text-indigo-300 hover:text-indigo-200"
-                            >
-                                View map usage
-                            </a>
+                        <div className="rounded-md border p-4">
+                            <div className="text-sm font-medium mb-2">Quick Links</div>
+                            <div className="space-y-2 text-sm">
+                                <div>
+                                    <Link
+                                        href="/fleet/fuel"
+                                        className="text-primary hover:underline"
+                                    >
+                                        Fuel Logs
+                                    </Link>
+                                </div>
+                                <div>
+                                    <Link
+                                        href="/fleet/reports"
+                                        className="text-primary hover:underline"
+                                    >
+                                        Fleet Reports
+                                    </Link>
+                                </div>
+                                <div>
+                                    <Link
+                                        href="/fleet-management/maps-usage"
+                                        className="text-primary hover:underline"
+                                    >
+                                        Map Usage
+                                    </Link>
+                                </div>
+                            </div>
                         </div>
                         <div className="rounded-md border p-4 text-sm text-muted-foreground">
                             Signals are emitted to Control Room for triage and

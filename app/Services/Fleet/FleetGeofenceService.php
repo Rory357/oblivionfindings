@@ -5,7 +5,7 @@ namespace App\Services\Fleet;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\FleetGeofenceState;
-use Illuminate\Support\Carbon;
+use Carbon\CarbonInterface;
 
 class FleetGeofenceService
 {
@@ -13,7 +13,7 @@ class FleetGeofenceService
     {
     }
 
-    public function evaluate(Asset $asset, float $lat, float $lon, Carbon $occurredAt): void
+    public function evaluate(Asset $asset, float $lat, float $lon, CarbonInterface $occurredAt): void
     {
         $geofences = AssetGeofence::query()
             ->where('asset_id', $asset->id)

@@ -29,14 +29,16 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
                 {({ processing, errors }) => (
                     <div className="grid gap-6">
                         <div className="grid gap-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email" className="text-foreground">
+                                Email
+                            </Label>
                             <Input
                                 id="email"
                                 type="email"
                                 name="email"
                                 autoComplete="email"
                                 value={email}
-                                className="mt-1 block w-full"
+                                className="bg-background/80"
                                 readOnly
                             />
                             <InputError
@@ -46,13 +48,15 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password" className="text-foreground">
+                                Password
+                            </Label>
                             <Input
                                 id="password"
                                 type="password"
                                 name="password"
                                 autoComplete="new-password"
-                                className="mt-1 block w-full"
+                                className="bg-background/80"
                                 autoFocus
                                 placeholder="Password"
                             />
@@ -60,7 +64,10 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
                         </div>
 
                         <div className="grid gap-2">
-                            <Label htmlFor="password_confirmation">
+                            <Label
+                                htmlFor="password_confirmation"
+                                className="text-foreground"
+                            >
                                 Confirm password
                             </Label>
                             <Input
@@ -68,7 +75,7 @@ export default function ResetPassword({ token, email }: ResetPasswordProps) {
                                 type="password"
                                 name="password_confirmation"
                                 autoComplete="new-password"
-                                className="mt-1 block w-full"
+                                className="bg-background/80"
                                 placeholder="Confirm password"
                             />
                             <InputError

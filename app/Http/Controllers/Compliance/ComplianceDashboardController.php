@@ -9,6 +9,7 @@ use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientIncident;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientSupportPlan;
+use App\Models\ControlRoomAlert;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -129,6 +130,42 @@ class ComplianceDashboardController extends Controller
             ->where('created_at', '>=', $from30)
             ->count();
 
+        // ------------------------------
+        // Control Room Alerts
+        // ------------------------------
+        $controlRoomOpen = ControlRoomAlert::whereNotIn('status', ['resolved', 'closed'])->count();
+        $controlRoomCritical = ControlRoomAlert::where('severity', 'critical')
+            ->whereNotIn('status', ['resolved', 'closed'])
+            ->count();
+        $controlRoomEscalated = ControlRoomAlert::where('escalation_level', '>', 0)
+            ->whereNotIn('status', ['resolved', 'closed'])
+            ->count();
+
+        // Recent alerts for quick view (last 5 unresolved)
+        $recentAlerts = ControlRoomAlert::query()
+            ->whereNotIn('status', ['resolved', 'closed'])
+            ->orderByRaw("CASE WHEN severity = 'critical' THEN 0 WHEN severity = 'high' THEN 1 WHEN severity = 'medium' THEN 2 ELSE 3 END")
+            ->orderByDesc('triggered_at')
+            ->limit(5)
+            ->get()
+            ->map(fn($a) => [
+                'id' => $a->id,
+                'alert_type' => $a->alert_type,
+                'severity' => $a->severity,
+                'status' => $a->status,
+                'source' => $a->source,
+                'triggered_at' => $a->triggered_at?->toISOString(),
+            ]);
+
+        // Alert trend for last 14 days
+        $alertTrend = ControlRoomAlert::where('triggered_at', '>=', $from14)
+            ->selectRaw('DATE(triggered_at) as d, COUNT(*) as total')
+            ->groupBy('d')
+            ->orderBy('d')
+            ->get()
+            ->map(fn($r) => ['date' => (string) $r->d, 'total' => (int) $r->total])
+            ->values();
+
         return inertia('compliance/index', [
             'kpis' => [
                 'openIncidents' => $openIncidents,
@@ -137,6 +174,13 @@ class ComplianceDashboardController extends Controller
                 'breakGlassLast30d' => $breakGlassLast30d,
                 'carePlanReviewsDue' => $carePlanReviewsDue,
                 'auditEvents30d' => $auditEvents30d,
+            ],
+            'controlRoom' => [
+                'open' => $controlRoomOpen,
+                'critical' => $controlRoomCritical,
+                'escalated' => $controlRoomEscalated,
+                'recentAlerts' => $recentAlerts,
+                'alertTrend' => $alertTrend,
             ],
             'charts' => [
                 'incidentBySeverity' => $incidentBySeverity,

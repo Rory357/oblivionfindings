@@ -14,7 +14,20 @@ import {
     Line,
     XAxis,
     YAxis,
+    AreaChart,
+    Area,
 } from 'recharts';
+import { AlertTriangle, Bell, TrendingUp, ArrowRight } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+
+interface ControlRoomAlert {
+    id: number;
+    alert_type: string;
+    severity: string;
+    status: string;
+    source: string;
+    triggered_at: string | null;
+}
 
 type Props = {
     kpis: {
@@ -24,6 +37,13 @@ type Props = {
         breakGlassLast30d: number;
         carePlanReviewsDue: number;
         auditEvents30d: number;
+    };
+    controlRoom: {
+        open: number;
+        critical: number;
+        escalated: number;
+        recentAlerts: ControlRoomAlert[];
+        alertTrend: Array<{ date: string; total: number }>;
     };
     charts: {
         incidentBySeverity: Array<{ severity: string; total: number }>;
@@ -74,7 +94,29 @@ function KpiCard({
     );
 }
 
-export default function ComplianceIndex({ kpis, charts }: Props) {
+const severityColors: Record<string, string> = {
+    critical: 'bg-red-600 text-white',
+    high: 'bg-orange-500 text-white',
+    medium: 'bg-yellow-500 text-black',
+    low: 'bg-blue-500 text-white',
+};
+
+function formatRelativeTime(isoString: string | null): string {
+    if (!isoString) return '-';
+    const date = new Date(isoString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMins / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    return `${diffDays}d ago`;
+}
+
+export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
     return (
         <AppLayout breadcrumbs={[{ title: 'Compliance', href: '/compliance' }]}>
             <Head title="Compliance" />
@@ -141,6 +183,95 @@ export default function ComplianceIndex({ kpis, charts }: Props) {
                         href="/audit-logs"
                     />
                 </div>
+
+                {/* Control Room Section */}
+                <Card>
+                    <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                                <Bell className="h-5 w-5 text-red-500" />
+                                Control Room Alerts
+                            </CardTitle>
+                            <Button asChild variant="outline" size="sm">
+                                <Link href="/control-room">
+                                    View All
+                                    <ArrowRight className="ml-1 h-4 w-4" />
+                                </Link>
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid grid-cols-3 gap-4 mb-4">
+                            <div className="text-center p-3 rounded-lg bg-red-50 border border-red-100">
+                                <div className="flex items-center justify-center gap-1 text-red-600 mb-1">
+                                    <Bell className="h-4 w-4" />
+                                    <span className="text-xs font-medium">Open</span>
+                                </div>
+                                <div className="text-2xl font-bold text-red-700">{controlRoom.open}</div>
+                            </div>
+                            <div className="text-center p-3 rounded-lg bg-orange-50 border border-orange-100">
+                                <div className="flex items-center justify-center gap-1 text-orange-600 mb-1">
+                                    <AlertTriangle className="h-4 w-4" />
+                                    <span className="text-xs font-medium">Critical</span>
+                                </div>
+                                <div className="text-2xl font-bold text-orange-700">{controlRoom.critical}</div>
+                            </div>
+                            <div className="text-center p-3 rounded-lg bg-yellow-50 border border-yellow-100">
+                                <div className="flex items-center justify-center gap-1 text-yellow-600 mb-1">
+                                    <TrendingUp className="h-4 w-4" />
+                                    <span className="text-xs font-medium">Escalated</span>
+                                </div>
+                                <div className="text-2xl font-bold text-yellow-700">{controlRoom.escalated}</div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            {/* Recent Alerts */}
+                            <div>
+                                <h4 className="text-sm font-medium text-slate-600 mb-2">Recent Alerts</h4>
+                                {controlRoom.recentAlerts.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {controlRoom.recentAlerts.map((alert) => (
+                                            <Link
+                                                key={alert.id}
+                                                href={`/control-room/alerts/${alert.id}`}
+                                                className="flex items-center justify-between p-2 rounded border hover:bg-slate-50 transition-colors"
+                                            >
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="text-sm font-medium truncate">{alert.alert_type}</div>
+                                                    <div className="text-xs text-slate-500">
+                                                        {alert.source} &middot; {formatRelativeTime(alert.triggered_at)}
+                                                    </div>
+                                                </div>
+                                                <Badge className={severityColors[alert.severity] || 'bg-gray-500'}>
+                                                    {alert.severity}
+                                                </Badge>
+                                            </Link>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-slate-500 text-center py-4">No open alerts</p>
+                                )}
+                            </div>
+
+                            {/* Alert Trend */}
+                            <div>
+                                <h4 className="text-sm font-medium text-slate-600 mb-2">Alert Trend (14 days)</h4>
+                                <div style={{ height: 140 }}>
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <AreaChart data={controlRoom.alertTrend}>
+                                            <CartesianGrid strokeDasharray="3 3" />
+                                            <XAxis dataKey="date" hide />
+                                            <YAxis allowDecimals={false} width={30} />
+                                            <Tooltip />
+                                            <Area type="monotone" dataKey="total" fill="#ef4444" stroke="#dc2626" fillOpacity={0.3} />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 <Separator />
 

@@ -1,6 +1,4 @@
 import AppLogoIcon from '@/components/app-logo-icon';
-import { home } from '@/routes';
-import { Link } from '@inertiajs/react';
 import { type PropsWithChildren } from 'react';
 
 interface AuthLayoutProps {
@@ -15,28 +13,39 @@ export default function AuthSimpleLayout({
     description,
 }: PropsWithChildren<AuthLayoutProps>) {
     return (
-        <div className="flex min-h-svh flex-col items-center justify-center gap-6 bg-background p-6 md:p-10">
-            <div className="w-full max-w-sm">
-                <div className="flex flex-col gap-8">
-                    <div className="flex flex-col items-center gap-4">
-                        <Link
-                            href={home()}
-                            className="flex flex-col items-center gap-2 font-medium"
-                        >
-                            <div className="mb-1 flex h-9 w-9 items-center justify-center rounded-md">
-                                <AppLogoIcon className="size-9 fill-current text-[var(--foreground)] dark:text-white" />
+        <div className="relative min-h-svh w-full overflow-hidden bg-background">
+            <div className="relative grid min-h-svh w-full grid-cols-1">
+                <div className="absolute inset-0">
+                    <div
+                        className="absolute inset-0"
+                        style={{
+                            backgroundImage:
+                                "url('/images/auth/BackgroundImageOF5.jpg')",
+                            backgroundSize: 'cover',
+                            backgroundPosition: 'center',
+                        }}
+                    />
+                    <div className="absolute inset-0 bg-background/0" />
+                </div>
+                <div className="flex min-h-svh items-center justify-center px-6 py-6">
+                    <div className="w-full max-w-[420px] rounded-2xl border border-white/70 bg-card/45 p-6 shadow-2xl backdrop-blur-[32px] md:p-8">
+                        <div className="mb-4 flex flex-col gap-3">
+                            <div className="flex items-center gap-2">
+                                <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                                    <AppLogoIcon className="size-4 fill-current" />
+                                </div>
                             </div>
-                            <span className="sr-only">{title}</span>
-                        </Link>
-
-                        <div className="space-y-2 text-center">
-                            <h1 className="text-xl font-medium">{title}</h1>
-                            <p className="text-center text-sm text-muted-foreground">
-                                {description}
-                            </p>
+                            <div className="space-y-1.5">
+                                <h1 className="text-2xl font-semibold text-foreground">
+                                    {title}
+                                </h1>
+                                <p className="text-sm text-foreground/70">
+                                    {description}
+                                </p>
+                            </div>
                         </div>
+                        <div className="text-foreground">{children}</div>
                     </div>
-                    {children}
                 </div>
             </div>
         </div>
