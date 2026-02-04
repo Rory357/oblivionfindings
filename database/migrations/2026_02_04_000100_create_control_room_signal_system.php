@@ -60,7 +60,7 @@ return new class extends Migration
             $table->enum('output_severity', ['info', 'low', 'medium', 'high', 'critical'])->nullable();
             $table->unsignedTinyInteger('output_escalation_level')->default(0);
             $table->unsignedTinyInteger('output_tier')->default(1); // Triage tier 1, 2, 3
-            $table->foreignId('playbook_id')->nullable()->constrained('control_room_playbooks')->nullOnDelete();
+            $table->unsignedBigInteger('playbook_id')->nullable();
 
             // Notification targets
             $table->json('notify_roles')->nullable(); // ['coordinator', 'on_call_manager']
@@ -73,8 +73,8 @@ return new class extends Migration
 
             $table->timestamps();
 
-            $table->index(['signal_type_code', 'is_active', 'priority']);
-            $table->index(['is_active', 'priority']);
+            $table->index(['signal_type_code', 'is_active', 'priority'], 'cr_signal_rules_type_active_pri_idx');
+            $table->index(['is_active', 'priority'], 'cr_signal_rules_active_pri_idx');
         });
 
         // Maintenance Windows - suppress alerts during planned downtime

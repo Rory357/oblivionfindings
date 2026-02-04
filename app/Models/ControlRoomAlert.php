@@ -14,6 +14,11 @@ class ControlRoomAlert extends Model
         'status',
         'asset_id',
         'fleet_signal_id',
+        'device_id',
+        'queue_id',
+        'playbook_run_id',
+        'site_id',
+        'client_id',
         'triggered_at',
         'acknowledged_at',
         'acknowledged_by_user_id',
@@ -51,6 +56,46 @@ class ControlRoomAlert extends Model
     public function fleetSignal(): BelongsTo
     {
         return $this->belongsTo(FleetSignal::class, 'fleet_signal_id');
+    }
+
+    public function device(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\ControlRoom\Device::class, 'device_id');
+    }
+
+    public function queue(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\ControlRoom\TriageQueue::class, 'queue_id');
+    }
+
+    public function playbookRun(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\ControlRoom\PlaybookRun::class, 'playbook_run_id');
+    }
+
+    public function signals()
+    {
+        return $this->hasMany(\App\Models\ControlRoom\Signal::class, 'alert_id');
+    }
+
+    public function sla()
+    {
+        return $this->hasOne(\App\Models\ControlRoom\AlertSla::class, 'alert_id');
+    }
+
+    public function evidencePacks()
+    {
+        return $this->hasMany(\App\Models\ControlRoom\EvidencePack::class, 'alert_id');
+    }
+
+    public function communications()
+    {
+        return $this->hasMany(\App\Models\ControlRoom\Communication::class, 'alert_id');
+    }
+
+    public function operatorNotes()
+    {
+        return $this->hasMany(\App\Models\ControlRoom\OperatorNote::class, 'alert_id');
     }
 
     public function assignedTo(): BelongsTo

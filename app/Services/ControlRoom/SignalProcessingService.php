@@ -3,6 +3,7 @@
 namespace App\Services\ControlRoom;
 
 use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\Device;
 use App\Models\ControlRoom\MaintenanceWindow;
 use App\Models\ControlRoom\Playbook;
@@ -16,11 +17,16 @@ use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
 use App\Services\AuditLogger;
+use App\Services\ControlRoom\ControlRoomNotificationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class SignalProcessingService
 {
+    public function __construct(protected ControlRoomNotificationService $notifications)
+    {
+    }
+
     /**
      * Ingest a raw signal from an integration.
      */
@@ -154,7 +160,11 @@ class SignalProcessingService
             ?? str_replace('_', ' ', ucwords($signal->signal_type_code, '_'));
 
         // Find appropriate queue
-        $queue = TriageQueue::findForAlert($severity, $signal->signalSource?->slug ?? 'unknown', $signal->signal_type_code);
+        $queue = null;
+        if ($rule?->output_tier) {
+            $queue = TriageQueue::active()->byTier($rule->output_tier)->first();
+        }
+        $queue ??= TriageQueue::findForAlert($severity, $signal->signalSource?->slug ?? 'unknown', $signal->signal_type_code);
 
         // Create the alert
         $alert = ControlRoomAlert::create([
@@ -180,6 +190,14 @@ class SignalProcessingService
 
         // Mark signal as processed
         $signal->markProcessed($alert);
+
+        if ($queue) {
+            AlertQueue::create([
+                'alert_id' => $alert->id,
+                'queue_id' => $queue->id,
+                'entered_at' => now(),
+            ]);
+        }
 
         // Attach SLA
         $this->attachSla($alert);
@@ -216,7 +234,7 @@ class SignalProcessingService
             'severity' => $severity,
         ]);
 
-        // TODO: Dispatch notifications based on rule
+        $this->notifications->notifyAlert($alert, $rule, $queue);
 
         return $alert;
     }

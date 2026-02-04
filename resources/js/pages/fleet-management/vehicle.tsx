@@ -4,7 +4,8 @@ import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { useEffect } from 'react';
 
 export default function FleetVehicle({
     asset,
@@ -17,6 +18,15 @@ export default function FleetVehicle({
     const { fleet, auth } = usePage().props as any;
     const apiKey = fleet?.maps?.apiKey;
     const canManageGeofences = !!auth?.can?.assets?.geofencesManage;
+
+    useEffect(() => {
+        const interval = window.setInterval(() => {
+            if (document.hidden) return;
+            router.reload({ only: ['state', 'telemetry', 'signals', 'trips'] });
+        }, 30000);
+
+        return () => window.clearInterval(interval);
+    }, []);
 
     const geofenceForm = useForm({
         name: '',

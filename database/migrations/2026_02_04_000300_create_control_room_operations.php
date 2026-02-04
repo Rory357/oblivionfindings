@@ -76,9 +76,9 @@ return new class extends Migration
             $table->timestamps();
 
             $table->unique('alert_id');
-            $table->index(['acknowledge_breached', 'acknowledge_deadline']);
-            $table->index(['response_breached', 'response_deadline']);
-            $table->index(['resolution_breached', 'resolution_deadline']);
+            $table->index(['acknowledge_breached', 'acknowledge_deadline'], 'cr_alert_sla_ack_idx');
+            $table->index(['response_breached', 'response_deadline'], 'cr_alert_sla_resp_idx');
+            $table->index(['resolution_breached', 'resolution_deadline'], 'cr_alert_sla_res_idx');
         });
 
         // Communication Log

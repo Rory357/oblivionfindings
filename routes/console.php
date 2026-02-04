@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Artisan;
 use App\Jobs\DetectFleetOfflineDevices;
 use App\Jobs\PruneFleetTelemetry;
 use App\Jobs\PruneAssetTelemetry;
+use App\Jobs\ProcessControlRoomSignals;
+use App\Jobs\CheckControlRoomSlaBreaches;
+use App\Jobs\AutoEscalateControlRoomQueues;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -52,3 +55,21 @@ app(Schedule::class)
     ->job(new PruneAssetTelemetry())
     ->timezone('Pacific/Auckland')
     ->dailyAt('02:30');
+
+// Control Room signal processing
+app(Schedule::class)
+    ->job(new ProcessControlRoomSignals())
+    ->timezone('Pacific/Auckland')
+    ->everyMinute();
+
+// Control Room SLA breach checks
+app(Schedule::class)
+    ->job(new CheckControlRoomSlaBreaches())
+    ->timezone('Pacific/Auckland')
+    ->everyFiveMinutes();
+
+// Control Room auto escalation between queues
+app(Schedule::class)
+    ->job(new AutoEscalateControlRoomQueues())
+    ->timezone('Pacific/Auckland')
+    ->everyTenMinutes();

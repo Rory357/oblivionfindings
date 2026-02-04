@@ -51,7 +51,6 @@ class SystemCatalogSeeder extends Seeder
             ]
         );
 
-        // In your enum, “community” maps to HomeSupport.
         ServiceContext::firstOrCreate(
             ['type' => ServiceType::HomeSupport->value, 'site_id' => $siteA->id],
             [
@@ -72,8 +71,7 @@ class SystemCatalogSeeder extends Seeder
 
         // ----------------------
         // Incident templates
-        // incident_templates schema:
-        // name, type, severity, default_description, prompts, checklist, is_active
+        // Schema: name, type, severity, default_description, prompts, checklist, is_active
         // ----------------------
         $templates = [
             [
@@ -115,7 +113,7 @@ class SystemCatalogSeeder extends Seeder
                 'name' => 'Behaviour / escalation',
                 'type' => 'behaviour',
                 'severity' => 'medium',
-                'default_description' => 'Use this for behavioural incidents, escalation, or distress events.',
+                'default_description' => 'Use this for behavioural incidents, escalation, absconding risk, or distress events.',
                 'prompts' => [
                     ['key' => 'triggers', 'label' => 'Known triggers', 'type' => 'textarea', 'required' => false],
                     ['key' => 'deescalation', 'label' => 'De-escalation steps used', 'type' => 'textarea', 'required' => false],
@@ -132,7 +130,7 @@ class SystemCatalogSeeder extends Seeder
 
         foreach ($templates as $t) {
             IncidentTemplate::updateOrCreate(
-                ['name' => $t['name']],
+                ['name' => $t['name']], // ✅ correct column
                 [
                     'type' => $t['type'],
                     'severity' => $t['severity'],

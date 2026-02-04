@@ -4,6 +4,13 @@ namespace Database\Seeders;
 
 use App\Models\Asset;
 use App\Models\ControlRoomAlert;
+use App\Models\ControlRoom\Playbook;
+use App\Models\ControlRoom\PlaybookStep;
+use App\Models\ControlRoom\SignalRule;
+use App\Models\ControlRoom\SignalSource;
+use App\Models\ControlRoom\SignalType;
+use App\Models\ControlRoom\SlaDefinition;
+use App\Models\ControlRoom\TriageQueue;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 
@@ -16,6 +23,211 @@ class ControlRoomSeeder extends Seeder
 
         if ($users->isEmpty()) {
             return;
+        }
+
+        $sources = [
+            ['name' => 'UniFi Protect', 'slug' => 'unifi_protect', 'vendor' => 'ubiquiti'],
+            ['name' => 'UniFi Access', 'slug' => 'unifi_access', 'vendor' => 'ubiquiti'],
+            ['name' => 'UniFi Network', 'slug' => 'unifi_network', 'vendor' => 'ubiquiti'],
+            ['name' => 'Queclink Fleet', 'slug' => 'queclink_fleet', 'vendor' => 'queclink'],
+            ['name' => 'Personal Tracker', 'slug' => 'personal_tracker', 'vendor' => 'generic'],
+            ['name' => 'Asset Tracker', 'slug' => 'asset_tracker', 'vendor' => 'generic'],
+            ['name' => 'Manual Entry', 'slug' => 'manual', 'vendor' => 'internal'],
+        ];
+
+        foreach ($sources as $source) {
+            SignalSource::firstOrCreate(
+                ['slug' => $source['slug']],
+                array_merge($source, ['status' => 'active'])
+            );
+        }
+
+        $signalTypes = [
+            ['code' => 'panic_sos_person', 'name' => 'Panic/SOS (Person)', 'category' => SignalType::CATEGORY_PEOPLE_SAFETY, 'default_severity' => 'critical'],
+            ['code' => 'panic_sos_vehicle', 'name' => 'Panic/SOS (Vehicle)', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'critical'],
+            ['code' => 'fall_detected', 'name' => 'Fall Detected', 'category' => SignalType::CATEGORY_PEOPLE_SAFETY, 'default_severity' => 'critical'],
+            ['code' => 'wandering_geofence_breach', 'name' => 'Wandering/Geofence Breach', 'category' => SignalType::CATEGORY_PEOPLE_SAFETY, 'default_severity' => 'high'],
+            ['code' => 'missed_check_in', 'name' => 'Missed Check-in', 'category' => SignalType::CATEGORY_PEOPLE_SAFETY, 'default_severity' => 'high'],
+            ['code' => 'bed_exit_night', 'name' => 'Bed Exit (Night)', 'category' => SignalType::CATEGORY_MEDICAL_WELLBEING, 'default_severity' => 'high'],
+            ['code' => 'bed_absence_prolonged', 'name' => 'Prolonged Bed Absence', 'category' => SignalType::CATEGORY_MEDICAL_WELLBEING, 'default_severity' => 'medium'],
+            ['code' => 'fire_alarm', 'name' => 'Fire Alarm', 'category' => SignalType::CATEGORY_HOME_FACILITY, 'default_severity' => 'critical'],
+            ['code' => 'intrusion_alarm', 'name' => 'Intrusion Alarm', 'category' => SignalType::CATEGORY_HOME_FACILITY, 'default_severity' => 'high'],
+            ['code' => 'door_forced_open', 'name' => 'Door Forced/Open', 'category' => SignalType::CATEGORY_HOME_FACILITY, 'default_severity' => 'high'],
+            ['code' => 'access_denied_spike', 'name' => 'Access Denied Spike', 'category' => SignalType::CATEGORY_HOME_FACILITY, 'default_severity' => 'medium'],
+            ['code' => 'power_outage', 'name' => 'Power Outage', 'category' => SignalType::CATEGORY_HOME_FACILITY, 'default_severity' => 'high'],
+            ['code' => 'water_leak', 'name' => 'Water Leak', 'category' => SignalType::CATEGORY_HOME_FACILITY, 'default_severity' => 'high'],
+            ['code' => 'temperature_extreme', 'name' => 'Temperature Extreme', 'category' => SignalType::CATEGORY_HOME_FACILITY, 'default_severity' => 'medium'],
+            ['code' => 'network_offline', 'name' => 'Network Offline', 'category' => SignalType::CATEGORY_SECURITY, 'default_severity' => 'medium'],
+            ['code' => 'camera_offline', 'name' => 'Camera Offline', 'category' => SignalType::CATEGORY_SECURITY, 'default_severity' => 'medium'],
+            ['code' => 'camera_motion', 'name' => 'Camera Motion', 'category' => SignalType::CATEGORY_SECURITY, 'default_severity' => 'low'],
+            ['code' => 'ai_detection', 'name' => 'AI Detection', 'category' => SignalType::CATEGORY_SECURITY, 'default_severity' => 'medium'],
+            ['code' => 'asset_moved', 'name' => 'Asset Moved', 'category' => SignalType::CATEGORY_ASSETS, 'default_severity' => 'medium'],
+            ['code' => 'asset_tamper', 'name' => 'Asset Tamper', 'category' => SignalType::CATEGORY_ASSETS, 'default_severity' => 'high'],
+            ['code' => 'asset_geofence_breach', 'name' => 'Asset Geofence Breach', 'category' => SignalType::CATEGORY_ASSETS, 'default_severity' => 'high'],
+            ['code' => 'fleet_speeding', 'name' => 'Fleet Speeding', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'medium'],
+            ['code' => 'fleet_geofence_exit', 'name' => 'Fleet Geofence Exit', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'high'],
+            ['code' => 'fleet_geofence_enter', 'name' => 'Fleet Geofence Enter', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'low'],
+            ['code' => 'fleet_device_offline', 'name' => 'Fleet Device Offline', 'category' => SignalType::CATEGORY_FLEET, 'default_severity' => 'high'],
+        ];
+
+        foreach ($signalTypes as $type) {
+            SignalType::firstOrCreate(
+                ['code' => $type['code']],
+                array_merge($type, ['debounce_seconds' => 60, 'is_active' => true])
+            );
+        }
+
+        $queues = [
+            [
+                'name' => 'Tier 1',
+                'code' => 'tier_1',
+                'tier' => 1,
+                'handle_severities' => ['low', 'medium'],
+                'handle_sources' => ['manual', 'queclink_fleet', 'personal_tracker', 'asset_tracker', 'unifi_protect', 'unifi_access', 'unifi_network'],
+                'assigned_roles' => ['coordinator', 'operator_t1'],
+            ],
+            [
+                'name' => 'Tier 2',
+                'code' => 'tier_2',
+                'tier' => 2,
+                'handle_severities' => ['high'],
+                'assigned_roles' => ['supervisor', 'operator_t2'],
+            ],
+            [
+                'name' => 'Emergency',
+                'code' => 'emergency',
+                'tier' => 3,
+                'handle_severities' => ['critical'],
+                'assigned_roles' => ['manager', 'operator_t3'],
+            ],
+        ];
+
+        foreach ($queues as $queue) {
+            TriageQueue::firstOrCreate(
+                ['code' => $queue['code']],
+                array_merge($queue, ['is_active' => true])
+            );
+        }
+
+        $tier1 = TriageQueue::where('code', 'tier_1')->first();
+        $tier2 = TriageQueue::where('code', 'tier_2')->first();
+        $tier3 = TriageQueue::where('code', 'emergency')->first();
+
+        if ($tier1 && $tier2) {
+            $tier1->update(['escalate_to_queue_id' => $tier2->id, 'auto_escalate_after_minutes' => 20]);
+        }
+        if ($tier2 && $tier3) {
+            $tier2->update(['escalate_to_queue_id' => $tier3->id, 'auto_escalate_after_minutes' => 30]);
+        }
+
+        $slaDefinitions = [
+            [
+                'name' => 'Critical Alerts',
+                'code' => 'critical_default',
+                'severities' => ['critical'],
+                'acknowledge_target_minutes' => 2,
+                'response_target_minutes' => 5,
+                'resolution_target_minutes' => 30,
+                'escalate_on_acknowledge_breach' => true,
+                'escalate_on_response_breach' => true,
+                'escalate_on_resolution_breach' => true,
+            ],
+            [
+                'name' => 'High Alerts',
+                'code' => 'high_default',
+                'severities' => ['high'],
+                'acknowledge_target_minutes' => 5,
+                'response_target_minutes' => 15,
+                'resolution_target_minutes' => 60,
+                'escalate_on_acknowledge_breach' => true,
+                'escalate_on_response_breach' => true,
+            ],
+            [
+                'name' => 'Medium Alerts',
+                'code' => 'medium_default',
+                'severities' => ['medium'],
+                'acknowledge_target_minutes' => 15,
+                'response_target_minutes' => 60,
+                'resolution_target_minutes' => 240,
+                'escalate_on_response_breach' => true,
+            ],
+            [
+                'name' => 'Low Alerts',
+                'code' => 'low_default',
+                'severities' => ['low'],
+                'acknowledge_target_minutes' => 60,
+                'response_target_minutes' => 240,
+                'resolution_target_minutes' => 1440,
+            ],
+        ];
+
+        foreach ($slaDefinitions as $sla) {
+            SlaDefinition::firstOrCreate(
+                ['code' => $sla['code']],
+                array_merge($sla, ['is_active' => true])
+            );
+        }
+
+        $playbooks = [
+            ['code' => 'panic_sos_person', 'name' => 'Panic/SOS (Person)', 'category' => Playbook::CATEGORY_EMERGENCY, 'trigger_alert_types' => ['Panic/SOS (Person)'], 'trigger_severities' => ['critical'], 'auto_attach' => true],
+            ['code' => 'panic_sos_vehicle', 'name' => 'Panic/SOS (Vehicle)', 'category' => Playbook::CATEGORY_EMERGENCY, 'trigger_alert_types' => ['Panic/SOS (Vehicle)'], 'trigger_severities' => ['critical'], 'auto_attach' => true],
+            ['code' => 'fire_alarm', 'name' => 'Fire Alarm', 'category' => Playbook::CATEGORY_EMERGENCY, 'trigger_alert_types' => ['Fire Alarm'], 'trigger_severities' => ['critical'], 'auto_attach' => true],
+            ['code' => 'intrusion_alarm', 'name' => 'Intrusion Alarm', 'category' => Playbook::CATEGORY_SAFETY, 'trigger_alert_types' => ['Intrusion Alarm'], 'trigger_severities' => ['high'], 'auto_attach' => true],
+            ['code' => 'bed_exit_night', 'name' => 'Bed Exit (Night)', 'category' => Playbook::CATEGORY_SAFETY, 'trigger_alert_types' => ['Bed Exit (Night)'], 'trigger_severities' => ['high'], 'auto_attach' => true],
+            ['code' => 'wandering', 'name' => 'Wandering/Geofence Breach', 'category' => Playbook::CATEGORY_SAFETY, 'trigger_alert_types' => ['Wandering/Geofence Breach'], 'trigger_severities' => ['high'], 'auto_attach' => true],
+            ['code' => 'missed_check_in', 'name' => 'Missed Check-in', 'category' => Playbook::CATEGORY_SAFETY, 'trigger_alert_types' => ['Missed Check-in'], 'trigger_severities' => ['high'], 'auto_attach' => true],
+            ['code' => 'camera_offline', 'name' => 'Camera Offline Investigation', 'category' => Playbook::CATEGORY_MAINTENANCE, 'trigger_alert_types' => ['Camera Offline'], 'trigger_severities' => ['medium'], 'auto_attach' => true],
+            ['code' => 'network_offline', 'name' => 'Network Offline', 'category' => Playbook::CATEGORY_MAINTENANCE, 'trigger_alert_types' => ['Network Offline'], 'trigger_severities' => ['medium'], 'auto_attach' => true],
+            ['code' => 'power_outage', 'name' => 'Power Outage', 'category' => Playbook::CATEGORY_MAINTENANCE, 'trigger_alert_types' => ['Power Outage'], 'trigger_severities' => ['high'], 'auto_attach' => true],
+            ['code' => 'water_leak', 'name' => 'Water Leak', 'category' => Playbook::CATEGORY_MAINTENANCE, 'trigger_alert_types' => ['Water Leak'], 'trigger_severities' => ['high'], 'auto_attach' => true],
+            ['code' => 'temperature_extreme', 'name' => 'Temperature Extreme', 'category' => Playbook::CATEGORY_MAINTENANCE, 'trigger_alert_types' => ['Temperature Extreme'], 'trigger_severities' => ['medium'], 'auto_attach' => true],
+            ['code' => 'asset_tamper', 'name' => 'Asset Tamper', 'category' => Playbook::CATEGORY_INVESTIGATION, 'trigger_alert_types' => ['Asset Tamper'], 'trigger_severities' => ['high'], 'auto_attach' => true],
+            ['code' => 'asset_geofence', 'name' => 'Asset Geofence Breach', 'category' => Playbook::CATEGORY_INVESTIGATION, 'trigger_alert_types' => ['Asset Geofence Breach'], 'trigger_severities' => ['high'], 'auto_attach' => true],
+            ['code' => 'vehicle_geofence', 'name' => 'Vehicle Geofence Breach', 'category' => Playbook::CATEGORY_SAFETY, 'trigger_alert_types' => ['Fleet Geofence Exit'], 'trigger_severities' => ['high'], 'auto_attach' => true],
+            ['code' => 'vehicle_speeding', 'name' => 'Vehicle Speeding', 'category' => Playbook::CATEGORY_SAFETY, 'trigger_alert_types' => ['Fleet Speeding'], 'trigger_severities' => ['medium'], 'auto_attach' => true],
+            ['code' => 'device_offline', 'name' => 'Device Offline', 'category' => Playbook::CATEGORY_MAINTENANCE, 'trigger_alert_types' => ['Fleet Device Offline'], 'trigger_severities' => ['high'], 'auto_attach' => true],
+            ['code' => 'false_positive_review', 'name' => 'False Positive Review', 'category' => Playbook::CATEGORY_INVESTIGATION, 'trigger_alert_types' => null, 'trigger_severities' => ['low', 'medium'], 'auto_attach' => false],
+        ];
+
+        foreach ($playbooks as $playbookData) {
+            $playbook = Playbook::firstOrCreate(
+                ['code' => $playbookData['code']],
+                array_merge($playbookData, ['version' => 1, 'is_active' => true])
+            );
+
+            if ($playbook->steps()->count() === 0) {
+                $steps = [
+                    ['title' => 'Acknowledge alert', 'instructions' => 'Acknowledge and review the alert context.', 'type' => PlaybookStep::TYPE_TASK, 'is_required' => true],
+                    ['title' => 'Assess safety', 'instructions' => 'Confirm client/staff safety and immediate risks.', 'type' => PlaybookStep::TYPE_TASK, 'is_required' => true],
+                    ['title' => 'Document outcome', 'instructions' => 'Record actions taken and outcome summary.', 'type' => PlaybookStep::TYPE_EVIDENCE, 'is_required' => true],
+                ];
+
+                foreach ($steps as $index => $step) {
+                    PlaybookStep::create(array_merge($step, [
+                        'playbook_id' => $playbook->id,
+                        'order' => $index,
+                        'is_blocking' => $index === 0,
+                    ]));
+                }
+            }
+        }
+
+        $rules = [
+            ['name' => 'Panic/SOS person -> Critical', 'signal_type_code' => 'panic_sos_person', 'output_severity' => 'critical', 'output_tier' => 3],
+            ['name' => 'Panic/SOS vehicle -> Critical', 'signal_type_code' => 'panic_sos_vehicle', 'output_severity' => 'critical', 'output_tier' => 3],
+            ['name' => 'Bed exit at night -> High', 'signal_type_code' => 'bed_exit_night', 'output_severity' => 'high', 'output_tier' => 2, 'conditions' => ['time_of_day' => 'night']],
+            ['name' => 'Fire alarm -> Critical', 'signal_type_code' => 'fire_alarm', 'output_severity' => 'critical', 'output_tier' => 3],
+            ['name' => 'Network offline -> Medium', 'signal_type_code' => 'network_offline', 'output_severity' => 'medium', 'output_tier' => 1],
+            ['name' => 'Fleet speeding -> Medium', 'signal_type_code' => 'fleet_speeding', 'output_severity' => 'medium', 'output_tier' => 1],
+            ['name' => 'Fleet geofence exit -> High', 'signal_type_code' => 'fleet_geofence_exit', 'output_severity' => 'high', 'output_tier' => 2],
+            ['name' => 'Fleet device offline -> High', 'signal_type_code' => 'fleet_device_offline', 'output_severity' => 'high', 'output_tier' => 2],
+        ];
+
+        foreach ($rules as $rule) {
+            SignalRule::firstOrCreate(
+                ['name' => $rule['name']],
+                array_merge($rule, ['priority' => 10, 'is_active' => true])
+            );
         }
 
         $alertTypes = [

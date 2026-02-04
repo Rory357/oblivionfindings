@@ -8,6 +8,8 @@ use App\Models\FleetTrip;
 use App\Models\FleetFuelLog;
 use App\Models\FleetSignal;
 use App\Models\FleetDriverSession;
+use App\Models\FleetDrivingMetric;
+use App\Models\FleetTelemetryEvent;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -139,6 +141,42 @@ class FleetReportController extends Controller
             ])
             ->toArray();
 
+        // Consent enforcement audit (telemetry blocked by consent)
+        $consentTotals = FleetTelemetryEvent::query()
+            ->whereIn('asset_id', $vehicleIds)
+            ->where('occurred_at', '>=', $startDate)
+            ->selectRaw('COUNT(*) as total_events, SUM(CASE WHEN consent_blocked = 1 THEN 1 ELSE 0 END) as blocked_events')
+            ->first();
+
+        $consentByVehicle = FleetTelemetryEvent::query()
+            ->whereIn('asset_id', $vehicleIds)
+            ->where('occurred_at', '>=', $startDate)
+            ->where('consent_blocked', true)
+            ->with('asset:id,name,asset_tag')
+            ->select('asset_id', DB::raw('COUNT(*) as blocked_count'))
+            ->groupBy('asset_id')
+            ->orderByDesc('blocked_count')
+            ->limit(10)
+            ->get()
+            ->map(fn($row) => [
+                'vehicle' => $row->asset?->name ?? 'Unknown',
+                'blocked' => (int) $row->blocked_count,
+            ])
+            ->toArray();
+
+        // Driving behaviour summary
+        $drivingStats = FleetDrivingMetric::query()
+            ->whereIn('asset_id', $vehicleIds)
+            ->where('period_start', '>=', $startDate->toDateString())
+            ->selectRaw('
+                SUM(harsh_brake_count) as harsh_brake_count,
+                SUM(accel_count) as accel_count,
+                SUM(speeding_events) as speeding_events,
+                SUM(idle_minutes) as idle_minutes,
+                AVG(score) as avg_score
+            ')
+            ->first();
+
         AuditLogger::log('fleet.reports.view', null, [
             'period' => $period,
         ]);
@@ -163,6 +201,18 @@ class FleetReportController extends Controller
             'fuel_by_vehicle' => $fuelByVehicle,
             'daily_trips' => $dailyTrips,
             'driver_stats' => $driverStats,
+            'consent_stats' => [
+                'total_events' => (int) ($consentTotals->total_events ?? 0),
+                'blocked_events' => (int) ($consentTotals->blocked_events ?? 0),
+                'blocked_by_vehicle' => $consentByVehicle,
+            ],
+            'driving_stats' => [
+                'harsh_brake_count' => (int) ($drivingStats->harsh_brake_count ?? 0),
+                'accel_count' => (int) ($drivingStats->accel_count ?? 0),
+                'speeding_events' => (int) ($drivingStats->speeding_events ?? 0),
+                'idle_minutes' => (int) ($drivingStats->idle_minutes ?? 0),
+                'avg_score' => round((float) ($drivingStats->avg_score ?? 0), 0),
+            ],
         ]);
     }
 

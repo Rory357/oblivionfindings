@@ -23,6 +23,11 @@ class FleetMapUsageDashboardController extends Controller
 
         return Inertia::render('fleet-management/maps-usage', [
             'rows' => $rows,
+            'reverse_geocode' => [
+                'enabled' => (bool) config('fleet.maps.reverse_geocode_enabled', false),
+                'rate_limit_per_minute' => (int) config('fleet.maps.reverse_geocode_rate_limit_per_minute', 30),
+                'cache_ttl_days' => (int) config('fleet.maps.reverse_geocode_cache_ttl_days', 30),
+            ],
         ]);
     }
 }

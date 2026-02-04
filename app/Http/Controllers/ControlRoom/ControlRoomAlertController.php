@@ -5,6 +5,9 @@ namespace App\Http\Controllers\ControlRoom;
 use App\Http\Controllers\Controller;
 use App\Models\AuditLog;
 use App\Models\ControlRoomAlert;
+use App\Models\ControlRoom\AlertSla;
+use App\Models\ControlRoom\SlaDefinition;
+use App\Models\ControlRoom\TriageQueue;
 use App\Models\User;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
@@ -151,6 +154,8 @@ class ControlRoomAlertController extends Controller
             'notes' => $request->input('notes') ?: $alert->notes,
         ]);
 
+        $alert->sla?->recordAcknowledge();
+
         AuditLogger::log('controlRoom.alert.acknowledge', $alert, [
             'alert_id' => $alert->id,
             'acknowledged_by' => $user->id,
@@ -179,6 +184,8 @@ class ControlRoomAlertController extends Controller
             'status' => 'triaging',
             'notes' => $request->input('notes') ?: $alert->notes,
         ]);
+
+        $alert->sla?->recordResponse();
 
         AuditLogger::log('controlRoom.alert.triage', $alert, [
             'alert_id' => $alert->id,
@@ -210,6 +217,8 @@ class ControlRoomAlertController extends Controller
             'resolved_by_user_id' => $user->id,
             'notes' => $request->input('resolution_notes'),
         ]);
+
+        $alert->sla?->recordResolution();
 
         AuditLogger::log('controlRoom.alert.resolve', $alert, [
             'alert_id' => $alert->id,
@@ -403,8 +412,25 @@ class ControlRoomAlertController extends Controller
         $data['status'] = 'open';
         $data['triggered_at'] = now();
         $data['created_by_user_id'] = $user->id;
+        $queue = TriageQueue::findForAlert($data['severity'], $data['source'], $data['alert_type']);
+        $data['queue_id'] = $queue?->id;
 
         $alert = ControlRoomAlert::create($data);
+
+        if ($queue) {
+            \App\Models\ControlRoom\AlertQueue::create([
+                'alert_id' => $alert->id,
+                'queue_id' => $queue->id,
+                'entered_at' => now(),
+            ]);
+        }
+
+        if (!$alert->sla) {
+            $slaDefinition = SlaDefinition::findForAlert($alert->alert_type, $alert->severity, $alert->source);
+            if ($slaDefinition) {
+                AlertSla::createFromDefinition($alert, $slaDefinition);
+            }
+        }
 
         AuditLogger::log('controlRoom.alert.create', $alert, [
             'alert_id' => $alert->id,

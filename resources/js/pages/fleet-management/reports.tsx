@@ -41,6 +41,18 @@ interface Props {
     fuel_by_vehicle: { vehicle: string; litres: number; cost: number }[];
     daily_trips: { date: string; trips: number; distance_km: number }[];
     driver_stats: { driver: string; sessions: number; hours: number }[];
+    consent_stats: {
+        total_events: number;
+        blocked_events: number;
+        blocked_by_vehicle: { vehicle: string; blocked: number }[];
+    };
+    driving_stats: {
+        harsh_brake_count: number;
+        accel_count: number;
+        speeding_events: number;
+        idle_minutes: number;
+        avg_score: number;
+    };
 }
 
 export default function FleetReports({
@@ -52,6 +64,8 @@ export default function FleetReports({
     fuel_by_vehicle,
     daily_trips,
     driver_stats,
+    consent_stats,
+    driving_stats,
 }: Props) {
     const handlePeriodChange = (newPeriod: string) => {
         router.get(
@@ -374,6 +388,90 @@ export default function FleetReports({
                                     No driver data
                                 </p>
                             )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div className="mt-4 grid gap-4 lg:grid-cols-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Driver Behaviour Summary</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Avg Score
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {driving_stats.avg_score}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Idle Minutes
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {driving_stats.idle_minutes}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Harsh Brakes
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {driving_stats.harsh_brake_count}
+                                    </div>
+                                </div>
+                                <div>
+                                    <div className="text-sm text-muted-foreground">
+                                        Speeding Events
+                                    </div>
+                                    <div className="text-2xl font-bold">
+                                        {driving_stats.speeding_events}
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Consent Enforcement Audit</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="text-muted-foreground">
+                                    Blocked events
+                                </span>
+                                <span className="font-medium">
+                                    {consent_stats.blocked_events} /{' '}
+                                    {consent_stats.total_events}
+                                </span>
+                            </div>
+                            <div className="mt-3 space-y-2">
+                                {consent_stats.blocked_by_vehicle?.length ? (
+                                    consent_stats.blocked_by_vehicle.map(
+                                        (row, i) => (
+                                            <div
+                                                key={i}
+                                                className="flex items-center justify-between text-sm"
+                                            >
+                                                <span className="truncate">
+                                                    {row.vehicle}
+                                                </span>
+                                                <span className="font-medium">
+                                                    {row.blocked}
+                                                </span>
+                                            </div>
+                                        ),
+                                    )
+                                ) : (
+                                    <div className="text-sm text-muted-foreground">
+                                        No blocked telemetry events.
+                                    </div>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
                 </div>

@@ -1,9 +1,10 @@
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import AppLayout from '@/layouts/app-layout';
+import { Badge } from '@/components/ui/badge';
 import { Head } from '@inertiajs/react';
 
-export default function FleetMapsUsage({ rows }) {
+export default function FleetMapsUsage({ rows, reverse_geocode }) {
     return (
         <AppLayout
             breadcrumbs={[
@@ -17,6 +18,28 @@ export default function FleetMapsUsage({ rows }) {
                     title="Fleet Map Usage"
                     description="Basic counts for Google Maps usage by context."
                 />
+                <div className="rounded-md border p-4 text-sm">
+                    <div className="mb-2 text-sm font-medium">
+                        Reverse geocoding
+                    </div>
+                    {reverse_geocode?.enabled ? (
+                        <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+                            <Badge>Enabled</Badge>
+                            <span>
+                                Cache TTL: {reverse_geocode.cache_ttl_days} days
+                            </span>
+                            <span>
+                                Rate limit: {reverse_geocode.rate_limit_per_minute}/min
+                            </span>
+                        </div>
+                    ) : (
+                        <div className="text-muted-foreground">
+                            Not enabled. Reverse geocoding is currently disabled
+                            to control cost. Enable FLEET_REVERSE_GEOCODE_ENABLED
+                            when ready.
+                        </div>
+                    )}
+                </div>
                 <div className="rounded-md border p-4">
                     <div className="mb-3 text-sm font-medium">Usage</div>
                     <div className="grid gap-2 text-sm">

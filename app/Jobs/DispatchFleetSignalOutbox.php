@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\FleetSignalOutbox;
-use App\Models\ControlRoomAlert;
+use App\Services\ControlRoom\SignalProcessingService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -28,16 +28,9 @@ class DispatchFleetSignalOutbox implements ShouldQueue
         try {
             $signal = $outbox->signal()->first();
             if ($signal) {
-                ControlRoomAlert::create([
-                    'source' => 'fleet',
-                    'alert_type' => $signal->signal_type,
-                    'severity' => $signal->severity_hint,
-                    'status' => 'open',
-                    'asset_id' => $signal->asset_id,
-                    'fleet_signal_id' => $signal->id,
-                    'triggered_at' => $signal->occurred_at ?? now(),
-                    'context' => $signal->payload,
-                ]);
+                $processor = app(SignalProcessingService::class);
+                $controlSignal = $processor->ingestFromFleetSignal($signal);
+                $processor->process($controlSignal);
             }
 
             $outbox->update([

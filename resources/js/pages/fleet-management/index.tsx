@@ -3,14 +3,58 @@ import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import { useEffect, useMemo, useState } from 'react';
 
 export default function FleetManagementIndex({ vehicles }) {
     const { fleet } = usePage().props as any;
     const apiKey = fleet?.maps?.apiKey;
+    const [searchTerm, setSearchTerm] = useState('');
+    const [statusFilter, setStatusFilter] = useState('all');
 
-    const markers = (vehicles ?? [])
+    useEffect(() => {
+        const interval = window.setInterval(() => {
+            if (document.hidden) return;
+            router.reload({ only: ['vehicles'] });
+        }, 30000);
+
+        return () => window.clearInterval(interval);
+    }, []);
+
+    const filteredVehicles = useMemo(() => {
+        const term = searchTerm.trim().toLowerCase();
+        return (vehicles ?? []).filter((vehicle) => {
+            const name =
+                (vehicle.name ?? vehicle.asset_tag ?? `vehicle ${vehicle.id}`)
+                    .toLowerCase();
+            const matchesTerm = term ? name.includes(term) : true;
+            const status = vehicle.state?.status ?? 'offline';
+            const consentBlocked = vehicle.state?.consent_blocked;
+
+            if (statusFilter === 'online' && status !== 'online') {
+                return false;
+            }
+            if (statusFilter === 'offline' && status === 'online') {
+                return false;
+            }
+            if (statusFilter === 'consent_blocked' && !consentBlocked) {
+                return false;
+            }
+
+            return matchesTerm;
+        });
+    }, [vehicles, searchTerm, statusFilter]);
+
+    const markers = (filteredVehicles ?? [])
         .filter((v) => v.state?.lat && v.state?.lng)
         .map((v) => ({
             id: v.id,
@@ -60,8 +104,40 @@ export default function FleetManagementIndex({ vehicles }) {
                                 Live vehicles
                             </div>
                             <div className="grid gap-3">
-                                {vehicles?.length ? (
-                                    vehicles.map((vehicle) => (
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                    <Input
+                                        placeholder="Search vehicles..."
+                                        value={searchTerm}
+                                        onChange={(event) =>
+                                            setSearchTerm(event.target.value)
+                                        }
+                                        className="sm:max-w-xs"
+                                    />
+                                    <Select
+                                        value={statusFilter}
+                                        onValueChange={setStatusFilter}
+                                    >
+                                        <SelectTrigger className="sm:w-44">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">
+                                                All statuses
+                                            </SelectItem>
+                                            <SelectItem value="online">
+                                                Online
+                                            </SelectItem>
+                                            <SelectItem value="offline">
+                                                Offline
+                                            </SelectItem>
+                                            <SelectItem value="consent_blocked">
+                                                Consent blocked
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                {filteredVehicles?.length ? (
+                                    filteredVehicles.map((vehicle) => (
                                         <div
                                             key={vehicle.id}
                                             className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between"
@@ -129,7 +205,7 @@ export default function FleetManagementIndex({ vehicles }) {
                                     ))
                                 ) : (
                                     <div className="text-sm text-muted-foreground">
-                                        No vehicles found.
+                                        No vehicles match your filters.
                                     </div>
                                 )}
                             </div>

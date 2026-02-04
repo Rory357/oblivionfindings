@@ -20,6 +20,19 @@ return [
         'reverse_geocode_rate_limit_per_minute' => env('FLEET_REVERSE_GEOCODE_RATE_LIMIT_PER_MINUTE', 30),
     ],
 
+    'behaviour' => [
+        'speeding_kph' => env('FLEET_SPEEDING_KPH', 100),
+        'idle_speed_kph' => env('FLEET_IDLE_SPEED_KPH', 3),
+        'idle_after_minutes' => env('FLEET_IDLE_AFTER_MINUTES', 2),
+        'max_idle_increment_minutes' => env('FLEET_IDLE_MAX_INCREMENT_MINUTES', 15),
+        'score_weights' => [
+            'harsh_brake' => env('FLEET_SCORE_HARSH_BRAKE', 5),
+            'accel' => env('FLEET_SCORE_ACCEL', 3),
+            'speeding' => env('FLEET_SCORE_SPEEDING', 4),
+            'idle' => env('FLEET_SCORE_IDLE', 0.5),
+        ],
+    ],
+
     'retention' => [
         'telemetry_days' => env('FLEET_TELEMETRY_RETENTION_DAYS', 365),
         'asset_snapshot_days' => env('ASSET_TELEMETRY_SNAPSHOT_RETENTION_DAYS', 365),

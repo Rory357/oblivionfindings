@@ -7,6 +7,7 @@ use App\Models\AssetTracker;
 use App\Models\FleetTelemetryEvent;
 use App\Models\FleetVehicleStateSnapshot;
 use App\Services\Fleet\Telemetry\AdapterRegistry;
+use App\Services\Fleet\FleetDrivingMetricsService;
 use Illuminate\Support\Facades\DB;
 
 class FleetTelemetryIngestService
@@ -15,7 +16,8 @@ class FleetTelemetryIngestService
         protected AdapterRegistry $adapters,
         protected FleetGeofenceService $geofences,
         protected FleetSignalService $signals,
-        protected FleetTripService $trips
+        protected FleetTripService $trips,
+        protected FleetDrivingMetricsService $metrics
     ) {
     }
 
@@ -107,6 +109,10 @@ class FleetTelemetryIngestService
             $state = FleetVehicleStateSnapshot::query()
                 ->firstOrNew(['asset_id' => $asset->id]);
 
+            $previousEvent = $state->last_event_id
+                ? FleetTelemetryEvent::query()->find($state->last_event_id)
+                : null;
+
             $state->fill([
                 'last_event_id' => $event->id,
                 'last_seen_at' => now(),
@@ -121,7 +127,8 @@ class FleetTelemetryIngestService
                 'consent_blocked' => $consentBlocked,
             ]);
 
-            $this->trips->handleTelemetry($event, $state);
+            $this->trips->handleTelemetry($event, $state, $previousEvent);
+            $this->metrics->handleTelemetry($event, $previousEvent, $state);
             $state->save();
 
             if (!empty($normalized['sos_flag'])) {
