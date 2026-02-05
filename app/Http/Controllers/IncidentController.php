@@ -32,10 +32,11 @@ class IncidentController extends Controller
                 $query->whereHas('client.supportWorkers', fn ($q) => $q->whereKey($user->id));
             })
             ->when($q, function ($query) use ($q) {
-                $query->where(function ($sub) use ($q) {
-                    $sub->where('description', 'like', "%{$q}%")
-                        ->orWhere('type', 'like', "%{$q}%")
-                        ->orWhere('title', 'like', "%{$q}%");
+                $searchTerm = '%' . $q . '%';
+                $query->where(function ($sub) use ($searchTerm) {
+                    $sub->where('description', 'like', $searchTerm)
+                        ->orWhere('type', 'like', $searchTerm)
+                        ->orWhere('title', 'like', $searchTerm);
                 });
             })
             ->when($status, fn($query) => $query->where('status', $status))

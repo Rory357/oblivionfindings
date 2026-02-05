@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\ServiceType;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\AppSetting;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -19,6 +20,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class ServiceContext extends Model
 {
     use AuditableChanges;
+    use HasFactory;
 
     protected $fillable = [
         'type',

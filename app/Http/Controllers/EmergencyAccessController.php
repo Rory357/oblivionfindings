@@ -26,10 +26,11 @@ class EmergencyAccessController extends Controller
             $results = Client::query()
                 ->with('site:id,name')
                 ->where(function ($query) use ($q) {
+                    $searchTerm = '%' . $q . '%';
                     $query
-                        ->where('first_name', 'like', "%{$q}%")
-                        ->orWhere('last_name', 'like', "%{$q}%")
-                        ->orWhereRaw("concat(first_name, ' ', last_name) like ?", ["%{$q}%"]);
+                        ->where('first_name', 'like', $searchTerm)
+                        ->orWhere('last_name', 'like', $searchTerm)
+                        ->orWhereRaw("concat(first_name, ' ', last_name) like ?", [$searchTerm]);
                 })
                 ->orderBy('last_name')
                 ->limit(25)

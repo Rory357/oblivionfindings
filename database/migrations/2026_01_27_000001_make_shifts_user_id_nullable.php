@@ -9,6 +9,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Skip for SQLite (doesn't support MODIFY)
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         try {
             Schema::table('shifts', function (Blueprint $table) {
                 $table->dropForeign(['user_id']);
@@ -28,6 +33,11 @@ return new class extends Migration
 
     public function down(): void
     {
+        // Skip for SQLite (doesn't support MODIFY)
+        if (DB::getDriverName() === 'sqlite') {
+            return;
+        }
+
         try {
             Schema::table('shifts', function (Blueprint $table) {
                 $table->dropForeign(['user_id']);

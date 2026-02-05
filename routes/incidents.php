@@ -13,7 +13,13 @@ use App\Http\Controllers\IncidentReportController;
  * Handles incident reporting, follow-ups, templates, and reporting.
  */
 
-Route::middleware(['auth'])->group(function () {
+Route::middleware(['auth', 'verified'])->group(function () {
+    // Incident creation (must come before /incidents/{incident})
+    Route::middleware('permission:incidents.create')->group(function () {
+        Route::get('/incidents/create', [IncidentController::class, 'create'])->name('incidents.create');
+        Route::post('/incidents', [IncidentController::class, 'store'])->name('incidents.store');
+    });
+
     // Incident management (assigned staff + managers)
     Route::middleware('permission:incidents.viewAny|incidents.viewAssigned')->group(function () {
         Route::get('/incidents', [IncidentController::class, 'index'])->name('incidents.index');
@@ -22,12 +28,6 @@ Route::middleware(['auth'])->group(function () {
         // Attachments
         Route::get('/incidents/{incident}/attachments/{attachment}/download', [IncidentController::class, 'downloadAttachment'])
             ->name('incidents.attachments.download');
-    });
-
-    // Incident creation
-    Route::middleware('permission:incidents.create')->group(function () {
-        Route::get('/incidents/create', [IncidentController::class, 'create'])->name('incidents.create');
-        Route::post('/incidents', [IncidentController::class, 'store'])->name('incidents.store');
     });
 
     // Incident updates

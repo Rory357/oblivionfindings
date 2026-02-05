@@ -26,7 +26,7 @@ class WorkstreamService
             ->whereBetween('starts_at', [$from, $to])
             ->orderBy('starts_at')
             ->with('client:id,first_name,last_name')
-            ->limit(300)
+            ->limit(config('dashboard.max_workstream_items', 300))
             ->get()
             ->map(function (Shift $s) {
                 $clientName = $s->client ? trim($s->client->first_name . ' ' . $s->client->last_name) : '—';
@@ -56,7 +56,7 @@ class WorkstreamService
             })
             ->orderBy('due_at')
             ->with(['incident:id,client_id,type,severity,occurred_at', 'incident.client:id,first_name,last_name'])
-            ->limit(300)
+            ->limit(config('dashboard.max_workstream_items', 300))
             ->get()
             ->map(function (IncidentFollowup $f) use ($now) {
                 $clientName = $f->incident?->client ? trim($f->incident->client->first_name . ' ' . $f->incident->client->last_name) : '—';

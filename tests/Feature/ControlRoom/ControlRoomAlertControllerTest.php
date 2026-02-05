@@ -1,0 +1,644 @@
+<?php
+
+namespace Tests\Feature\ControlRoom;
+
+use App\Models\ControlRoomAlert;
+use App\Models\Role;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
+class ControlRoomAlertControllerTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected User $admin;
+    protected User $coordinator;
+    protected User $supportWorker;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(\Database\Seeders\RbacSeeder::class);
+
+        $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
+        $this->admin->roles()->attach(Role::where('name', 'admin')->first());
+
+        $this->coordinator = User::factory()->create(['role' => 'coordinator', 'approved_at' => now()]);
+        $this->coordinator->roles()->attach(Role::where('name', 'coordinator')->first());
+
+        $this->supportWorker = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $this->supportWorker->roles()->attach(Role::where('name', 'support_worker')->first());
+    }
+
+    // ──────────────────────────────────────
+    // Show Alert
+    // ──────────────────────────────────────
+
+    public function test_show_requires_authentication(): void
+    {
+        $alert = ControlRoomAlert::factory()->create();
+        $this->get("/control-room/alerts/{$alert->id}")->assertRedirect('/login');
+    }
+
+    public function test_show_displays_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->create();
+
+        $this->actingAs($this->admin)
+            ->get("/control-room/alerts/{$alert->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('control-room/show')
+                ->where('alert.id', $alert->id)
+                ->where('alert.severity', $alert->severity)
+                ->where('alert.status', $alert->status)
+                ->has('audit_logs')
+                ->has('can')
+                ->has('staff')
+            );
+    }
+
+    public function test_show_returns_404_for_nonexistent_alert(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/control-room/alerts/99999')
+            ->assertNotFound();
+    }
+
+    public function test_show_displays_assigned_user_info(): void
+    {
+        $alert = ControlRoomAlert::factory()->assignedTo($this->coordinator)->create();
+
+        $this->actingAs($this->admin)
+            ->get("/control-room/alerts/{$alert->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('alert.assigned_to.id', $this->coordinator->id)
+                ->where('alert.assigned_to.name', $this->coordinator->name)
+            );
+    }
+
+    public function test_show_blocked_for_user_without_permission(): void
+    {
+        $alert = ControlRoomAlert::factory()->create();
+        $noPermUser = User::factory()->create(['approved_at' => now()]);
+
+        $this->actingAs($noPermUser)
+            ->get("/control-room/alerts/{$alert->id}")
+            ->assertForbidden();
+    }
+
+    // ──────────────────────────────────────
+    // Acknowledge Alert
+    // ──────────────────────────────────────
+
+    public function test_acknowledge_open_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/acknowledge", ['notes' => 'Acknowledged'])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'id' => $alert->id,
+            'status' => 'ack',
+            'acknowledged_by_user_id' => $this->admin->id,
+        ]);
+
+        $alert->refresh();
+        $this->assertNotNull($alert->acknowledged_at);
+    }
+
+    public function test_acknowledge_without_notes(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->withNotes('Original notes')->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/acknowledge")
+            ->assertRedirect();
+
+        $alert->refresh();
+        $this->assertEquals('ack', $alert->status);
+        $this->assertEquals('Original notes', $alert->notes);
+    }
+
+    public function test_cannot_acknowledge_resolved_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->resolved()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/acknowledge")
+            ->assertSessionHasErrors('alert');
+    }
+
+    public function test_cannot_acknowledge_closed_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->closed()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/acknowledge")
+            ->assertSessionHasErrors('alert');
+    }
+
+    public function test_acknowledge_requires_manage_permission(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->supportWorker)
+            ->post("/control-room/alerts/{$alert->id}/acknowledge")
+            ->assertForbidden();
+    }
+
+    // ──────────────────────────────────────
+    // Triage Alert
+    // ──────────────────────────────────────
+
+    public function test_triage_open_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/triage")
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'id' => $alert->id,
+            'status' => 'triaging',
+        ]);
+    }
+
+    public function test_triage_acknowledged_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->acknowledged()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/triage")
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'id' => $alert->id,
+            'status' => 'triaging',
+        ]);
+    }
+
+    public function test_cannot_triage_resolved_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->resolved()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/triage")
+            ->assertSessionHasErrors('alert');
+    }
+
+    // ──────────────────────────────────────
+    // Resolve Alert
+    // ──────────────────────────────────────
+
+    public function test_resolve_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->triaging()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/resolve", [
+                'resolution_notes' => 'Issue resolved successfully',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'id' => $alert->id,
+            'status' => 'resolved',
+            'resolved_by_user_id' => $this->admin->id,
+            'notes' => 'Issue resolved successfully',
+        ]);
+
+        $alert->refresh();
+        $this->assertNotNull($alert->resolved_at);
+    }
+
+    public function test_resolve_requires_resolution_notes(): void
+    {
+        $alert = ControlRoomAlert::factory()->triaging()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/resolve", [])
+            ->assertSessionHasErrors('resolution_notes');
+    }
+
+    public function test_cannot_resolve_already_resolved_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->resolved()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/resolve", [
+                'resolution_notes' => 'Trying again',
+            ])
+            ->assertSessionHasErrors('alert');
+    }
+
+    public function test_cannot_resolve_closed_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->closed()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/resolve", [
+                'resolution_notes' => 'Trying',
+            ])
+            ->assertSessionHasErrors('alert');
+    }
+
+    // ──────────────────────────────────────
+    // Close Alert
+    // ──────────────────────────────────────
+
+    public function test_close_resolved_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->resolved()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/close", [
+                'closure_notes' => 'Confirmed closed',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'id' => $alert->id,
+            'status' => 'closed',
+            'closed_by_user_id' => $this->admin->id,
+        ]);
+
+        $alert->refresh();
+        $this->assertNotNull($alert->closed_at);
+    }
+
+    public function test_close_open_alert_directly(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/close")
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'id' => $alert->id,
+            'status' => 'closed',
+        ]);
+    }
+
+    public function test_cannot_close_already_closed_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->closed()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/close")
+            ->assertSessionHasErrors('alert');
+    }
+
+    // ──────────────────────────────────────
+    // Assign Alert
+    // ──────────────────────────────────────
+
+    public function test_assign_alert_to_user(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/assign", [
+                'assigned_to_user_id' => $this->coordinator->id,
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'id' => $alert->id,
+            'assigned_to_user_id' => $this->coordinator->id,
+            'assigned_by_user_id' => $this->admin->id,
+        ]);
+
+        $alert->refresh();
+        $this->assertNotNull($alert->assigned_at);
+    }
+
+    public function test_assign_requires_valid_user_id(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/assign", [
+                'assigned_to_user_id' => 99999,
+            ])
+            ->assertSessionHasErrors('assigned_to_user_id');
+    }
+
+    public function test_assign_requires_assign_permission(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->supportWorker)
+            ->post("/control-room/alerts/{$alert->id}/assign", [
+                'assigned_to_user_id' => $this->coordinator->id,
+            ])
+            ->assertForbidden();
+    }
+
+    // ──────────────────────────────────────
+    // Unassign Alert
+    // ──────────────────────────────────────
+
+    public function test_unassign_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->assignedTo($this->coordinator)->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/unassign")
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'id' => $alert->id,
+            'assigned_to_user_id' => null,
+            'assigned_by_user_id' => null,
+        ]);
+    }
+
+    // ──────────────────────────────────────
+    // Escalate Alert
+    // ──────────────────────────────────────
+
+    public function test_escalate_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create(['escalation_level' => 0]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/escalate", [
+                'escalation_reason' => 'Needs senior attention',
+            ])
+            ->assertRedirect();
+
+        $alert->refresh();
+        $this->assertEquals(1, $alert->escalation_level);
+        $this->assertEquals($this->admin->id, $alert->escalated_by_user_id);
+        $this->assertNotNull($alert->escalated_at);
+    }
+
+    public function test_escalate_with_specific_level(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create(['escalation_level' => 0]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/escalate", [
+                'escalation_reason' => 'Critical situation',
+                'escalation_level' => 3,
+            ])
+            ->assertRedirect();
+
+        $alert->refresh();
+        $this->assertEquals(3, $alert->escalation_level);
+    }
+
+    public function test_escalation_capped_at_5(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create(['escalation_level' => 4]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/escalate", [
+                'escalation_reason' => 'Maximum escalation',
+                'escalation_level' => 10,
+            ])
+            ->assertRedirect();
+
+        $alert->refresh();
+        $this->assertEquals(5, $alert->escalation_level);
+    }
+
+    public function test_cannot_escalate_resolved_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->resolved()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/escalate", [
+                'escalation_reason' => 'Should fail',
+            ])
+            ->assertSessionHasErrors('alert');
+    }
+
+    public function test_escalate_requires_reason(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/escalate", [])
+            ->assertSessionHasErrors('escalation_reason');
+    }
+
+    public function test_escalate_requires_permission(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->supportWorker)
+            ->post("/control-room/alerts/{$alert->id}/escalate", [
+                'escalation_reason' => 'Test',
+            ])
+            ->assertForbidden();
+    }
+
+    // ──────────────────────────────────────
+    // Add Note
+    // ──────────────────────────────────────
+
+    public function test_add_note_to_alert(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create(['context' => []]);
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/note", [
+                'note' => 'Test note content',
+            ])
+            ->assertRedirect();
+
+        $alert->refresh();
+        $activityLog = $alert->context['activity_log'] ?? [];
+        $this->assertNotEmpty($activityLog);
+        $this->assertEquals('Test note content', $activityLog[0]['content']);
+        $this->assertEquals($this->admin->id, $activityLog[0]['user_id']);
+    }
+
+    public function test_add_note_requires_content(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/note", [])
+            ->assertSessionHasErrors('note');
+    }
+
+    public function test_add_note_validates_max_length(): void
+    {
+        $alert = ControlRoomAlert::factory()->open()->create();
+
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/note", [
+                'note' => str_repeat('A', 2001),
+            ])
+            ->assertSessionHasErrors('note');
+    }
+
+    // ──────────────────────────────────────
+    // Store (Create) Alert
+    // ──────────────────────────────────────
+
+    public function test_create_alert(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/control-room/alerts', [
+                'source' => 'manual',
+                'alert_type' => 'Test Alert',
+                'severity' => 'high',
+            ])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'source' => 'manual',
+            'alert_type' => 'Test Alert',
+            'severity' => 'high',
+            'status' => 'open',
+            'created_by_user_id' => $this->admin->id,
+        ]);
+    }
+
+    public function test_create_alert_via_json(): void
+    {
+        $this->actingAs($this->admin)
+            ->postJson('/control-room/alerts', [
+                'source' => 'external',
+                'alert_type' => 'API Alert',
+                'severity' => 'critical',
+                'notes' => 'Created via API',
+            ])
+            ->assertCreated()
+            ->assertJsonStructure([
+                'message',
+                'alert' => ['id', 'status'],
+            ]);
+    }
+
+    public function test_create_alert_validates_source(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/control-room/alerts', [
+                'source' => 'invalid_source',
+                'alert_type' => 'Test',
+                'severity' => 'high',
+            ])
+            ->assertSessionHasErrors('source');
+    }
+
+    public function test_create_alert_validates_severity(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/control-room/alerts', [
+                'source' => 'manual',
+                'alert_type' => 'Test',
+                'severity' => 'ultra_critical',
+            ])
+            ->assertSessionHasErrors('severity');
+    }
+
+    public function test_create_alert_requires_permission(): void
+    {
+        // Support worker does not have controlRoom.alerts.create
+        $this->actingAs($this->supportWorker)
+            ->post('/control-room/alerts', [
+                'source' => 'manual',
+                'alert_type' => 'Test',
+                'severity' => 'high',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_create_alert_with_compliance_source(): void
+    {
+        $this->actingAs($this->admin)
+            ->postJson('/control-room/alerts', [
+                'source' => 'compliance',
+                'alert_type' => 'Training Expired',
+                'severity' => 'high',
+                'notes' => 'Staff training expired',
+            ])
+            ->assertCreated();
+
+        $this->assertDatabaseHas('control_room_alerts', [
+            'source' => 'compliance',
+            'alert_type' => 'Training Expired',
+        ]);
+    }
+
+    // ──────────────────────────────────────
+    // Full Alert Lifecycle
+    // ──────────────────────────────────────
+
+    public function test_full_alert_lifecycle(): void
+    {
+        // 1. Create
+        $this->actingAs($this->admin)
+            ->postJson('/control-room/alerts', [
+                'source' => 'manual',
+                'alert_type' => 'Lifecycle Test',
+                'severity' => 'high',
+            ])
+            ->assertCreated();
+
+        $alert = ControlRoomAlert::where('alert_type', 'Lifecycle Test')->firstOrFail();
+        $this->assertEquals('open', $alert->status);
+
+        // 2. Acknowledge
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/acknowledge", ['notes' => 'Acknowledged'])
+            ->assertRedirect();
+        $alert->refresh();
+        $this->assertEquals('ack', $alert->status);
+
+        // 3. Triage
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/triage")
+            ->assertRedirect();
+        $alert->refresh();
+        $this->assertEquals('triaging', $alert->status);
+
+        // 4. Assign
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/assign", [
+                'assigned_to_user_id' => $this->coordinator->id,
+            ])
+            ->assertRedirect();
+        $alert->refresh();
+        $this->assertEquals($this->coordinator->id, $alert->assigned_to_user_id);
+
+        // 5. Escalate
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/escalate", [
+                'escalation_reason' => 'Needs manager review',
+            ])
+            ->assertRedirect();
+        $alert->refresh();
+        $this->assertEquals(1, $alert->escalation_level);
+
+        // 6. Resolve
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/resolve", [
+                'resolution_notes' => 'Issue fixed',
+            ])
+            ->assertRedirect();
+        $alert->refresh();
+        $this->assertEquals('resolved', $alert->status);
+
+        // 7. Close
+        $this->actingAs($this->admin)
+            ->post("/control-room/alerts/{$alert->id}/close", [
+                'closure_notes' => 'Confirmed closed',
+            ])
+            ->assertRedirect();
+        $alert->refresh();
+        $this->assertEquals('closed', $alert->status);
+    }
+}

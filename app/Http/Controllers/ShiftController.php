@@ -12,6 +12,8 @@ use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Services\NotificationService;
+use App\Services\ServiceContextResolver;
+use Illuminate\Support\Facades\Log;
 
 class ShiftController extends Controller
 {
@@ -64,15 +66,16 @@ class ShiftController extends Controller
 
         if ($request->filled('q')) {
             $q = $request->query('q');
-            $query->where(function ($builder) use ($q) {
-                $builder->where('location', 'like', "%{$q}%")
-                    ->orWhereHas('client', function ($cq) use ($q) {
-                        $cq->where('first_name', 'like', "%{$q}%")
-                            ->orWhere('last_name', 'like', "%{$q}%");
+            $searchTerm = '%' . $q . '%';
+            $query->where(function ($builder) use ($searchTerm) {
+                $builder->where('location', 'like', $searchTerm)
+                    ->orWhereHas('client', function ($cq) use ($searchTerm) {
+                        $cq->where('first_name', 'like', $searchTerm)
+                            ->orWhere('last_name', 'like', $searchTerm);
                     })
-                    ->orWhereHas('staff', function ($sq) use ($q) {
-                        $sq->where('name', 'like', "%{$q}%")
-                            ->orWhere('email', 'like', "%{$q}%");
+                    ->orWhereHas('staff', function ($sq) use ($searchTerm) {
+                        $sq->where('name', 'like', $searchTerm)
+                            ->orWhere('email', 'like', $searchTerm);
                     });
             });
         }
@@ -219,31 +222,30 @@ class ShiftController extends Controller
             'service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
             // user_id may be null to create an "open" / unassigned shift for rostering.
             'user_id' => ['nullable', 'integer', 'exists:users,id'],
-            'starts_at' => ['required', 'date'],
+            'starts_at' => ['required', 'date', 'after_or_equal:today'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string', 'max:10000'],
             'status' => ['nullable', 'in:draft,scheduled,in_progress,completed,cancelled'],
-            'tasks' => ['sometimes', 'array'],
+            'tasks' => ['sometimes', 'array', 'max:50'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
         ]);
 
-        // If not explicitly provided, inherit the client's service context.
-        if (empty($data['service_context_id'])) {
-            $data['service_context_id'] = Client::query()
-                ->whereKey($data['client_id'])
-                ->value('service_context_id');
+        // Additional validation: shift duration cannot exceed 24 hours
+        $startsAt = \Carbon\Carbon::parse($data['starts_at']);
+        $endsAt = \Carbon\Carbon::parse($data['ends_at']);
+        if ($startsAt->diffInHours($endsAt) > 24) {
+            return back()->withErrors([
+                'ends_at' => 'Shift duration cannot exceed 24 hours.',
+            ])->withInput();
         }
 
-        // If still not set, apply organisation default service context (if configured).
-        if (empty($data['service_context_id'])) {
-            $data['service_context_id'] = ServiceContext::defaultId();
-        }
-
-        // If still not set, apply organisation default service context (if configured).
-        if (empty($data['service_context_id'])) {
-            $data['service_context_id'] = ServiceContext::defaultId();
-        }
+        // Resolve service context using dedicated service
+        $data['service_context_id'] = app(ServiceContextResolver::class)
+            ->resolveForClient(
+                $data['client_id'],
+                $data['service_context_id'] ?? null
+            );
 
         // Conflict check: staff or client overlap
         $conflicts = Shift::query()
@@ -286,15 +288,24 @@ class ShiftController extends Controller
         });
 
         // Notify assigned staff only (open shifts have no assignee).
+        // Wrapped in try-catch to prevent notification failures from breaking the request.
         if (!empty($shift->user_id)) {
-            $client = Client::query()->find($shift->client_id);
-        $targetUserIds = $shift->user_id ? [$shift->user_id] : [];
-        app(NotificationService::class)->notifyCrud($request->user(), 'created', 'shift', $shift, $client, [
-                'title' => 'Shift created',
-                'body' => $client ? ("Client: {$client->first_name} {$client->last_name}") : null,
-                'url' => url("/shifts/{$shift->id}"),
-            'target_user_ids' => $targetUserIds,
-            ]);
+            try {
+                $client = Client::query()->find($shift->client_id);
+                $targetUserIds = $shift->user_id ? [$shift->user_id] : [];
+                app(NotificationService::class)->notifyCrud($request->user(), 'created', 'shift', $shift, $client, [
+                    'title' => 'Shift created',
+                    'body' => $client ? ("Client: {$client->first_name} {$client->last_name}") : null,
+                    'url' => url("/shifts/{$shift->id}"),
+                    'target_user_ids' => $targetUserIds,
+                ]);
+            } catch (\Throwable $e) {
+                Log::warning('Failed to send shift creation notification', [
+                    'shift_id' => $shift->id,
+                    'error' => $e->getMessage(),
+                ]);
+                // Continue - don't fail the request due to notification issues
+            }
         }
 
         return redirect()->route('shifts.index')->with('success', 'Shift created.');
@@ -349,25 +360,29 @@ class ShiftController extends Controller
             'starts_at' => ['required', 'date'],
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'location' => ['nullable', 'string', 'max:255'],
-            'notes' => ['nullable', 'string'],
+            'notes' => ['nullable', 'string', 'max:10000'],
             'status' => ['nullable', 'in:draft,scheduled,in_progress,completed,cancelled'],
-            'tasks' => ['sometimes', 'array'],
+            'tasks' => ['sometimes', 'array', 'max:50'],
             'tasks.*.id' => ['sometimes', 'integer', 'exists:shift_tasks,id'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
             'tasks.*.is_completed' => ['sometimes', 'boolean'],
         ]);
 
-        // If not explicitly provided, inherit the client's service context.
-        if (empty($data['service_context_id'])) {
-            $data['service_context_id'] = Client::query()
-                ->whereKey($data['client_id'])
-                ->value('service_context_id');
+        // Additional validation: shift duration cannot exceed 24 hours
+        $startsAt = \Carbon\Carbon::parse($data['starts_at']);
+        $endsAt = \Carbon\Carbon::parse($data['ends_at']);
+        if ($startsAt->diffInHours($endsAt) > 24) {
+            return back()->withErrors([
+                'ends_at' => 'Shift duration cannot exceed 24 hours.',
+            ])->withInput();
         }
 
-        // If still not set, apply organisation default service context (if configured).
-        if (empty($data['service_context_id'])) {
-            $data['service_context_id'] = ServiceContext::defaultId();
-        }
+        // Resolve service context using dedicated service
+        $data['service_context_id'] = app(ServiceContextResolver::class)
+            ->resolveForClient(
+                $data['client_id'],
+                $data['service_context_id'] ?? null
+            );
 
         // Conflict check: staff or client overlap (ignore self)
         $conflicts = Shift::query()
@@ -424,14 +439,22 @@ class ShiftController extends Controller
             }
         });
 
-        $client = Client::query()->find($shift->client_id);
-        $targetUserIds = $shift->user_id ? [$shift->user_id] : [];
-        app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'shift', $shift, $client, [
-            'title' => 'Shift updated',
-            'body' => $client ? ("Client: {$client->first_name} {$client->last_name}") : null,
-            'url' => url("/shifts/{$shift->id}"),
-            'target_user_ids' => $targetUserIds,
-        ]);
+        // Notify assigned staff - wrapped in try-catch to prevent failures from breaking the request
+        try {
+            $client = Client::query()->find($shift->client_id);
+            $targetUserIds = $shift->user_id ? [$shift->user_id] : [];
+            app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'shift', $shift, $client, [
+                'title' => 'Shift updated',
+                'body' => $client ? ("Client: {$client->first_name} {$client->last_name}") : null,
+                'url' => url("/shifts/{$shift->id}"),
+                'target_user_ids' => $targetUserIds,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Failed to send shift update notification', [
+                'shift_id' => $shift->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
 
         return redirect()->route('shifts.index')->with('success', 'Shift updated.');
     }

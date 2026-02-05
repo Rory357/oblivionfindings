@@ -39,7 +39,7 @@ class DashboardController extends Controller
 
         $today = now()->startOfDay();
         $tomorrow = (clone $today)->addDay();
-        $weekEnd = (clone $today)->addDays(7);
+        $weekEnd = (clone $today)->addDays(config('dashboard.short_range_days', 7));
 
         // Dashboard filters (used mainly for staff workflow)
         $range = (string) ($request->query('range') ?? 'week'); // today|week
@@ -89,7 +89,7 @@ class DashboardController extends Controller
             ->whereBetween('occurred_at', [$today, $weekEnd])
             ->orderBy('occurred_at')
             ->with(['client:id,first_name,last_name', 'site:id,name'])
-            ->limit(200)
+            ->limit(config('dashboard.max_upcoming_events', 200))
             ->get();
 
         $todayShifts = Shift::query()
@@ -110,7 +110,7 @@ class DashboardController extends Controller
                 ->whereBetween('starts_at', [$today, $weekEnd])
                 ->orderBy('starts_at')
                 ->with('client:id,first_name,last_name')
-                ->limit(75)
+                ->limit(config('dashboard.max_upcoming_shifts', 75))
                 ->get();
         }
 
@@ -138,7 +138,7 @@ class DashboardController extends Controller
         // so the dashboard can render richer graphs without extra API calls.
         $range7Start = (clone $today);
         $range7End = (clone $weekEnd);
-        $range30Start = (clone $today)->subDays(30);
+        $range30Start = (clone $today)->subDays(config('dashboard.history_days', 30));
         $range30End = (clone $tomorrow);
 
         $shiftScope = Shift::query()
@@ -226,8 +226,8 @@ class DashboardController extends Controller
         $incidentBySeverity30 = collect();
         $incidentKpis = null;
         if ($canSeeIncidents) {
-            $incidentStart = (clone $today)->subDays(14);
-            $incidentStart30 = (clone $today)->subDays(30);
+            $incidentStart = (clone $today)->subDays(config('dashboard.incident_short_days', 14));
+            $incidentStart30 = (clone $today)->subDays(config('dashboard.incident_history_days', 30));
 
             $incidentQuery = ClientIncident::query()->whereBetween('occurred_at', [$incidentStart, $tomorrow]);
             if ($user->canDo('incidents.viewAssigned') && !$user->canDo('incidents.viewAny')) {
@@ -321,7 +321,6 @@ class DashboardController extends Controller
                     'site' => $e->site ? ['id' => $e->site->id, 'name' => $e->site->name] : null,
                 ];
             })->values(),
-            'myDayItems' => $myDayItems,
             'todayTimesheets' => $todayTimesheets,
             'managerSummary' => $managerSummary,
             'incidentKpis' => $incidentKpis,
