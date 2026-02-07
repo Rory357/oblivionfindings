@@ -1,4 +1,4 @@
-import MarketingLayout from '@/Layouts/marketing-layout';
+import MarketingLayout from '@/layouts/marketing-layout';
 import { Link } from '@inertiajs/react';
 import {
     Activity,
@@ -31,7 +31,8 @@ const Features: React.FC = () => {
         {
             icon: Users,
             title: 'Resident Management',
-            description: 'Complete digital care records for every person you support.',
+            description:
+                'Complete digital care records for every person you support.',
             items: [
                 'Comprehensive resident profiles with support history',
                 'Digital care plans and risk assessments',
@@ -44,7 +45,8 @@ const Features: React.FC = () => {
         {
             icon: Activity,
             title: 'Visit & Task Management',
-            description: 'Schedule, track and evidence support visits seamlessly.',
+            description:
+                'Schedule, track and evidence support visits seamlessly.',
             items: [
                 'Intelligent visit scheduling and routing',
                 'Real-time visit status tracking',
@@ -57,7 +59,8 @@ const Features: React.FC = () => {
         {
             icon: Pill,
             title: 'Medication Management',
-            description: 'Full eMAR functionality with controlled drug tracking.',
+            description:
+                'Full eMAR functionality with controlled drug tracking.',
             items: [
                 'Electronic Medication Administration Records (eMAR)',
                 'Controlled drug registers and audits',
@@ -70,7 +73,8 @@ const Features: React.FC = () => {
         {
             icon: Shield,
             title: 'Compliance & Safeguarding',
-            description: 'Stay inspection-ready with comprehensive incident and audit tools.',
+            description:
+                'Stay inspection-ready with comprehensive incident and audit tools.',
             items: [
                 'Incident and accident reporting',
                 'Safeguarding concern management',
@@ -83,7 +87,8 @@ const Features: React.FC = () => {
         {
             icon: Calendar,
             title: 'Staff Rostering',
-            description: 'Efficient shift planning with availability and skills matching.',
+            description:
+                'Efficient shift planning with availability and skills matching.',
             items: [
                 'Drag-and-drop shift scheduling',
                 'Staff availability management',
@@ -96,7 +101,8 @@ const Features: React.FC = () => {
         {
             icon: GraduationCap,
             title: 'Training & Competency',
-            description: 'Track staff credentials, training and professional development.',
+            description:
+                'Track staff credentials, training and professional development.',
             items: [
                 'Training record management',
                 'Competency assessments',
@@ -109,34 +115,63 @@ const Features: React.FC = () => {
     ];
 
     const additionalFeatures = [
-        { icon: Building2, title: 'Property & Asset Management', description: 'Track equipment, maintenance and site compliance.' },
-        { icon: MapPin, title: 'Fleet Tracking', description: 'Vehicle tracking for services with transport needs.' },
-        { icon: BarChart3, title: 'Analytics & Reporting', description: 'Insights into service performance and trends.' },
-        { icon: FileText, title: 'Document Management', description: 'Centralised policies, procedures and templates.' },
-        { icon: Clock, title: 'Timesheets', description: 'Digital timesheet submission and approval workflows.' },
-        { icon: Heart, title: 'Respite Management', description: 'Dedicated tools for respite and short break services.' },
+        {
+            icon: Building2,
+            title: 'Property & Asset Management',
+            description: 'Track equipment, maintenance and site compliance.',
+        },
+        {
+            icon: MapPin,
+            title: 'Fleet Tracking',
+            description: 'Vehicle tracking for services with transport needs.',
+        },
+        {
+            icon: BarChart3,
+            title: 'Analytics & Reporting',
+            description: 'Insights into service performance and trends.',
+        },
+        {
+            icon: FileText,
+            title: 'Document Management',
+            description: 'Centralised policies, procedures and templates.',
+        },
+        {
+            icon: Clock,
+            title: 'Timesheets',
+            description: 'Digital timesheet submission and approval workflows.',
+        },
+        {
+            icon: Heart,
+            title: 'Respite Management',
+            description:
+                'Dedicated tools for respite and short break services.',
+        },
     ];
 
     const benefits = [
         {
             icon: Smartphone,
             title: 'Mobile-First Design',
-            description: 'Support workers can access everything they need from any device, anywhere.',
+            description:
+                'Support workers can access everything they need from any device, anywhere.',
         },
         {
             icon: Shield,
             title: 'Bank-Grade Security',
-            description: 'Privacy Act compliant with end-to-end encryption and role-based access control.',
+            description:
+                'Privacy Act compliant with end-to-end encryption and role-based access control.',
         },
         {
             icon: AlertTriangle,
             title: 'Real-Time Alerts',
-            description: 'Automatic notifications for missed visits, overdue tasks and incidents.',
+            description:
+                'Automatic notifications for missed visits, overdue tasks and incidents.',
         },
         {
             icon: LayoutDashboard,
             title: 'Customisable Dashboards',
-            description: 'Each role sees what matters most to them—from managers to support workers.',
+            description:
+                'Each role sees what matters most to them—from managers to support workers.',
         },
     ];
 
@@ -144,27 +179,34 @@ const Features: React.FC = () => {
         {
             icon: ScanEye,
             title: 'Smart Motion Detection',
-            description: 'Advanced sensors detect movement patterns and distinguish between normal and unusual activity.',
+            description:
+                'Advanced sensors detect movement patterns and distinguish between normal and unusual activity.',
         },
         {
             icon: Bell,
             title: 'Instant Alerts',
-            description: 'Real-time notifications when activity is detected in specific zones or during unusual hours.',
+            description:
+                'Real-time notifications when activity is detected in specific zones or during unusual hours.',
         },
         {
             icon: Radar,
             title: 'Presence Sensing',
-            description: 'Know when someone enters or leaves a monitored area with accurate presence detection.',
+            description:
+                'Know when someone enters or leaves a monitored area with accurate presence detection.',
         },
         {
             icon: Zap,
             title: 'Timeline Reconstruction',
-            description: 'Automatically piece together movement events across multiple zones to understand what happened.',
+            description:
+                'Automatically piece together movement events across multiple zones to understand what happened.',
         },
     ];
 
     return (
-        <MarketingLayout title="Features" description="Explore the complete feature set of Oblivion Findings - the modern operations platform for supported living.">
+        <MarketingLayout
+            title="Features"
+            description="Explore the complete feature set of Oblivion Findings - the modern operations platform for supported living."
+        >
             {/* Hero */}
             <section className="text-center">
                 <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
@@ -172,8 +214,9 @@ const Features: React.FC = () => {
                     <span className="text-primary">exceptional care</span>
                 </h1>
                 <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-                    From resident records to staff scheduling, smart monitoring to 
-                    compliance reporting—all the tools you need in one integrated platform.
+                    From resident records to staff scheduling, smart monitoring
+                    to compliance reporting—all the tools you need in one
+                    integrated platform.
                 </p>
             </section>
 
@@ -183,42 +226,51 @@ const Features: React.FC = () => {
                     <div className="rounded-[20px] bg-card p-8 sm:p-12">
                         <div className="grid items-center gap-10 lg:grid-cols-2">
                             <div>
-                                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm text-primary mb-6">
+                                <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm text-primary">
                                     <Eye size={16} />
                                     <span>Smart Monitoring</span>
                                 </div>
-                                
+
                                 <h2 className="text-3xl font-bold text-foreground">
                                     Smart Monitoring
                                 </h2>
                                 <p className="mt-4 text-lg text-muted-foreground">
-                                    Intelligent monitoring that provides situational awareness without 
-                                    compromising privacy. Automated detection, timeline reconstruction, 
-                                    and real-time alerts give you the full picture of what's happening 
+                                    Intelligent monitoring that provides
+                                    situational awareness without compromising
+                                    privacy. Automated detection, timeline
+                                    reconstruction, and real-time alerts give
+                                    you the full picture of what's happening
                                     across all your locations.
                                 </p>
 
                                 <div className="mt-8 grid gap-6 sm:grid-cols-2">
-                                    {controlRoomFeatures.map((feature, index) => {
-                                        const Icon = feature.icon;
-                                        return (
-                                            <div key={index} className="group relative flex gap-4 overflow-hidden rounded-xl p-3 transition-all hover:bg-muted/30">
-                                                {/* Gloss overlay */}
-                                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/10" />
-                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary shadow-inner shadow-primary/10">
-                                                    <Icon size={20} />
+                                    {controlRoomFeatures.map(
+                                        (feature, index) => {
+                                            const Icon = feature.icon;
+                                            return (
+                                                <div
+                                                    key={index}
+                                                    className="group relative flex gap-4 overflow-hidden rounded-xl p-3 transition-all hover:bg-muted/30"
+                                                >
+                                                    {/* Gloss overlay */}
+                                                    <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/10" />
+                                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary shadow-inner shadow-primary/10">
+                                                        <Icon size={20} />
+                                                    </div>
+                                                    <div>
+                                                        <h3 className="font-semibold text-foreground">
+                                                            {feature.title}
+                                                        </h3>
+                                                        <p className="mt-1 text-sm text-muted-foreground">
+                                                            {
+                                                                feature.description
+                                                            }
+                                                        </p>
+                                                    </div>
                                                 </div>
-                                                <div>
-                                                    <h3 className="font-semibold text-foreground">
-                                                        {feature.title}
-                                                    </h3>
-                                                    <p className="mt-1 text-sm text-muted-foreground">
-                                                        {feature.description}
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        },
+                                    )}
                                 </div>
 
                                 <div className="mt-8">
@@ -238,42 +290,59 @@ const Features: React.FC = () => {
                                 <div className="relative rounded-2xl border border-border bg-background p-4 shadow-2xl">
                                     <div className="mb-4 flex items-center justify-between">
                                         <div className="flex items-center gap-2">
-                                            <LayoutDashboard size={20} className="text-primary" />
-                                            <span className="font-medium text-foreground">Control Room</span>
+                                            <LayoutDashboard
+                                                size={20}
+                                                className="text-primary"
+                                            />
+                                            <span className="font-medium text-foreground">
+                                                Control Room
+                                            </span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                            <span className="text-xs text-muted-foreground">Monitoring Active</span>
+                                            <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                                            <span className="text-xs text-muted-foreground">
+                                                Monitoring Active
+                                            </span>
                                         </div>
                                     </div>
-                                    
+
                                     {/* Location Status Overview */}
                                     <div className="mb-3 rounded-lg border border-border bg-muted/50 p-3">
-                                        <div className="text-xs font-medium text-foreground mb-2">Location Status</div>
+                                        <div className="mb-2 text-xs font-medium text-foreground">
+                                            Location Status
+                                        </div>
                                         <div className="grid grid-cols-2 gap-2 text-xs">
                                             <div className="flex items-center justify-between rounded bg-background p-2">
-                                                <span className="text-muted-foreground">Main Entrance</span>
+                                                <span className="text-muted-foreground">
+                                                    Main Entrance
+                                                </span>
                                                 <span className="flex items-center gap-1 text-emerald-500">
                                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                                     Clear
                                                 </span>
                                             </div>
                                             <div className="flex items-center justify-between rounded bg-background p-2">
-                                                <span className="text-muted-foreground">Lounge</span>
+                                                <span className="text-muted-foreground">
+                                                    Lounge
+                                                </span>
                                                 <span className="flex items-center gap-1 text-emerald-500">
                                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                                     Clear
                                                 </span>
                                             </div>
                                             <div className="flex items-center justify-between rounded bg-background p-2">
-                                                <span className="text-muted-foreground">Kitchen</span>
+                                                <span className="text-muted-foreground">
+                                                    Kitchen
+                                                </span>
                                                 <span className="flex items-center gap-1 text-amber-500">
                                                     <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                                                     Activity
                                                 </span>
                                             </div>
                                             <div className="flex items-center justify-between rounded bg-background p-2">
-                                                <span className="text-muted-foreground">Garden</span>
+                                                <span className="text-muted-foreground">
+                                                    Garden
+                                                </span>
                                                 <span className="flex items-center gap-1 text-emerald-500">
                                                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                                     Clear
@@ -285,13 +354,17 @@ const Features: React.FC = () => {
                                     {/* Alert Panel */}
                                     <div className="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
                                         <div className="flex items-start gap-3">
-                                            <AlertTriangle size={16} className="mt-0.5 text-amber-500" />
+                                            <AlertTriangle
+                                                size={16}
+                                                className="mt-0.5 text-amber-500"
+                                            />
                                             <div>
                                                 <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
                                                     Activity Detected
                                                 </p>
                                                 <p className="text-[10px] text-muted-foreground">
-                                                    Kitchen zone • 14:32:18 • Unusual motion pattern
+                                                    Kitchen zone • 14:32:18 •
+                                                    Unusual motion pattern
                                                 </p>
                                             </div>
                                         </div>
@@ -299,19 +372,33 @@ const Features: React.FC = () => {
 
                                     {/* Detection Timeline */}
                                     <div className="rounded-lg border border-border bg-muted/50 p-3">
-                                        <div className="text-xs font-medium text-foreground mb-2">Recent Detections</div>
+                                        <div className="mb-2 text-xs font-medium text-foreground">
+                                            Recent Detections
+                                        </div>
                                         <div className="space-y-2 text-[11px]">
                                             <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Motion detected</span>
-                                                <span className="text-foreground">Kitchen • 2 min ago</span>
+                                                <span className="text-muted-foreground">
+                                                    Motion detected
+                                                </span>
+                                                <span className="text-foreground">
+                                                    Kitchen • 2 min ago
+                                                </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Presence ended</span>
-                                                <span className="text-foreground">Lounge • 15 min ago</span>
+                                                <span className="text-muted-foreground">
+                                                    Presence ended
+                                                </span>
+                                                <span className="text-foreground">
+                                                    Lounge • 15 min ago
+                                                </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Motion detected</span>
-                                                <span className="text-foreground">Entrance • 32 min ago</span>
+                                                <span className="text-muted-foreground">
+                                                    Motion detected
+                                                </span>
+                                                <span className="text-foreground">
+                                                    Entrance • 32 min ago
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -327,7 +414,7 @@ const Features: React.FC = () => {
                 {mainFeatures.map((feature, index) => {
                     const Icon = feature.icon;
                     const isEven = index % 2 === 0;
-                    
+
                     return (
                         <div
                             key={index}
@@ -347,16 +434,30 @@ const Features: React.FC = () => {
                                 </p>
                                 <ul className="mt-6 grid gap-3 sm:grid-cols-2">
                                     {feature.items.map((item, i) => (
-                                        <li key={i} className="flex items-start gap-3">
-                                            <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-500" />
-                                            <span className="text-sm text-muted-foreground">{item}</span>
+                                        <li
+                                            key={i}
+                                            className="flex items-start gap-3"
+                                        >
+                                            <CheckCircle2
+                                                size={18}
+                                                className="mt-0.5 shrink-0 text-emerald-500"
+                                            />
+                                            <span className="text-sm text-muted-foreground">
+                                                {item}
+                                            </span>
                                         </li>
                                     ))}
                                 </ul>
                             </div>
-                            
+
                             {/* Feature illustration placeholder */}
-                            <div className={isEven ? '' : 'lg:col-start-1 lg:row-start-1'}>
+                            <div
+                                className={
+                                    isEven
+                                        ? ''
+                                        : 'lg:col-start-1 lg:row-start-1'
+                                }
+                            >
                                 <div className="group relative overflow-hidden rounded-2xl border border-border bg-card p-2 transition-all hover:shadow-lg hover:shadow-primary/5">
                                     {/* Gloss overlay */}
                                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/10" />
@@ -364,8 +465,11 @@ const Features: React.FC = () => {
                                     <div className="relative rounded-xl bg-muted/50 p-8">
                                         <div className="flex items-center justify-center">
                                             <div className="text-center">
-                                                <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 mx-auto shadow-inner shadow-primary/10">
-                                                    <Icon size={40} className="text-primary" />
+                                                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 to-primary/5 shadow-inner shadow-primary/10">
+                                                    <Icon
+                                                        size={40}
+                                                        className="text-primary"
+                                                    />
                                                 </div>
                                                 <p className="mt-4 text-sm text-muted-foreground">
                                                     {feature.title}
@@ -419,8 +523,8 @@ const Features: React.FC = () => {
                             Built for modern care providers
                         </h2>
                         <p className="mx-auto mt-4 max-w-xl text-muted-foreground">
-                            Technology should make care delivery easier, not harder. 
-                            Here's how we help:
+                            Technology should make care delivery easier, not
+                            harder. Here's how we help:
                         </p>
                     </div>
 
@@ -428,7 +532,10 @@ const Features: React.FC = () => {
                         {benefits.map((benefit, index) => {
                             const Icon = benefit.icon;
                             return (
-                                <div key={index} className="group relative flex gap-4 overflow-hidden rounded-xl p-4 transition-all hover:bg-muted/30">
+                                <div
+                                    key={index}
+                                    className="group relative flex gap-4 overflow-hidden rounded-xl p-4 transition-all hover:bg-muted/30"
+                                >
                                     {/* Gloss overlay */}
                                     <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/10" />
                                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary shadow-inner shadow-primary/10">
@@ -451,15 +558,16 @@ const Features: React.FC = () => {
 
             {/* Integrations */}
             <section className="mt-24">
-                <div className="rounded-3xl bg-gradient-to-br from-primary/5 to-transparent border border-border p-8 sm:p-12">
+                <div className="rounded-3xl border border-border bg-gradient-to-br from-primary/5 to-transparent p-8 sm:p-12">
                     <div className="grid items-center gap-10 lg:grid-cols-2">
                         <div>
                             <h2 className="text-2xl font-bold text-foreground">
                                 Integrates with your existing tools
                             </h2>
                             <p className="mt-4 text-muted-foreground">
-                                Oblivion Findings plays nicely with the software you already use. 
-                                Our API and webhooks make it easy to connect with:
+                                Oblivion Findings plays nicely with the software
+                                you already use. Our API and webhooks make it
+                                easy to connect with:
                             </p>
                             <ul className="mt-6 space-y-3">
                                 {[
@@ -470,9 +578,17 @@ const Features: React.FC = () => {
                                     'Business intelligence platforms',
                                     'Smart sensor and detection systems',
                                 ].map((item, i) => (
-                                    <li key={i} className="flex items-center gap-3">
-                                        <CheckCircle2 size={18} className="text-emerald-500" />
-                                        <span className="text-sm text-muted-foreground">{item}</span>
+                                    <li
+                                        key={i}
+                                        className="flex items-center gap-3"
+                                    >
+                                        <CheckCircle2
+                                            size={18}
+                                            className="text-emerald-500"
+                                        />
+                                        <span className="text-sm text-muted-foreground">
+                                            {item}
+                                        </span>
                                     </li>
                                 ))}
                             </ul>
@@ -503,7 +619,8 @@ const Features: React.FC = () => {
                             See these features in action
                         </h2>
                         <p className="mt-4 text-primary-foreground/80">
-                            Get a personalised demo tailored to your service's specific needs.
+                            Get a personalised demo tailored to your service's
+                            specific needs.
                         </p>
                         <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                             <Link

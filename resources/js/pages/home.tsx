@@ -1,17 +1,17 @@
-import MarketingLayout from '@/Layouts/marketing-layout';
+import MarketingLayout from '@/layouts/marketing-layout';
 import { Link } from '@inertiajs/react';
-import { 
-    Activity, 
-    ArrowRight, 
+import {
+    Activity,
+    ArrowRight,
     Camera,
-    CheckCircle2, 
-    FileText, 
+    CheckCircle2,
+    FileText,
     Heart,
-    LayoutDashboard, 
-    Pill, 
+    LayoutDashboard,
+    Pill,
     ScanEye,
-    Shield, 
-    Users 
+    Shield,
+    Users,
 } from 'lucide-react';
 import React from 'react';
 
@@ -20,32 +20,38 @@ const Home: React.FC = () => {
         {
             icon: Users,
             title: 'Resident Management',
-            description: 'Complete profiles, care plans, risk assessments and support histories in one place.',
+            description:
+                'Complete profiles, care plans, risk assessments and support histories in one place.',
         },
         {
             icon: Activity,
             title: 'Visit & Task Tracking',
-            description: 'Schedule, assign and track support visits with real-time status updates.',
+            description:
+                'Schedule, assign and track support visits with real-time status updates.',
         },
         {
             icon: Pill,
             title: 'Medication Management',
-            description: 'eMAR integration, controlled drug tracking and administration records.',
+            description:
+                'eMAR integration, controlled drug tracking and administration records.',
         },
         {
             icon: Shield,
             title: 'Compliance & Safeguarding',
-            description: 'Incident reporting, investigations, audits and regulatory readiness.',
+            description:
+                'Incident reporting, investigations, audits and regulatory readiness.',
         },
         {
             icon: LayoutDashboard,
             title: 'Staff & Rostering',
-            description: 'Shift scheduling, availability, credentials and competency tracking.',
+            description:
+                'Shift scheduling, availability, credentials and competency tracking.',
         },
         {
             icon: FileText,
             title: 'Documentation',
-            description: 'Digital notes, assessments, handovers and evidence packs.',
+            description:
+                'Digital notes, assessments, handovers and evidence packs.',
         },
     ];
 
@@ -68,8 +74,10 @@ const Home: React.FC = () => {
 
                 <div className="relative mx-auto max-w-4xl text-center">
                     <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm text-primary">
-                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <span>Built for New Zealand supported living providers</span>
+                        <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                        <span>
+                            Built for New Zealand supported living providers
+                        </span>
                     </div>
 
                     <p className="mb-4 text-lg font-medium text-primary italic">
@@ -84,9 +92,10 @@ const Home: React.FC = () => {
                     </h1>
 
                     <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-                        Oblivion Findings is a modern operations platform built specifically for 
-                        New Zealand supported living providers. Manage residents, staff, compliance, 
-                        smart monitoring and care delivery—all in one intuitive system.
+                        Oblivion Findings is a modern operations platform built
+                        specifically for New Zealand supported living providers.
+                        Manage residents, staff, compliance, smart monitoring
+                        and care delivery—all in one intuitive system.
                     </p>
 
                     <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
@@ -108,8 +117,14 @@ const Home: React.FC = () => {
 
                     <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
                         {benefits.map((benefit, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                                <CheckCircle2 size={16} className="text-emerald-500" />
+                            <div
+                                key={index}
+                                className="flex items-center gap-2"
+                            >
+                                <CheckCircle2
+                                    size={16}
+                                    className="text-emerald-500"
+                                />
                                 <span>{benefit}</span>
                             </div>
                         ))}
@@ -128,12 +143,16 @@ const Home: React.FC = () => {
                             </div>
                             <h2 className="text-3xl font-bold text-foreground">
                                 Know what's happening.{' '}
-                                <span className="text-primary">Even when you're not there.</span>
+                                <span className="text-primary">
+                                    Even when you're not there.
+                                </span>
                             </h2>
                             <p className="mt-4 text-lg text-muted-foreground">
-                                Our Control Room system provides intelligent monitoring with automatic 
-                                incident detection, timeline reconstruction, and real-time alerts—
-                                giving you complete situational awareness across all your locations.
+                                Our Control Room system provides intelligent
+                                monitoring with automatic incident detection,
+                                timeline reconstruction, and real-time alerts—
+                                giving you complete situational awareness across
+                                all your locations.
                             </p>
                             <ul className="mt-6 space-y-3">
                                 {[
@@ -143,9 +162,17 @@ const Home: React.FC = () => {
                                     'Integrated with your Control Room dashboard',
                                     'Privacy-compliant with configurable zones',
                                 ].map((item, index) => (
-                                    <li key={index} className="flex items-start gap-3">
-                                        <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-500" />
-                                        <span className="text-muted-foreground">{item}</span>
+                                    <li
+                                        key={index}
+                                        className="flex items-start gap-3"
+                                    >
+                                        <CheckCircle2
+                                            size={18}
+                                            className="mt-0.5 shrink-0 text-emerald-500"
+                                        />
+                                        <span className="text-muted-foreground">
+                                            {item}
+                                        </span>
                                     </li>
                                 ))}
                             </ul>
@@ -166,39 +193,66 @@ const Home: React.FC = () => {
                             <div className="relative rounded-2xl border border-border bg-background p-4 shadow-2xl">
                                 <div className="mb-4 flex items-center justify-between">
                                     <div className="flex items-center gap-2">
-                                        <ScanEye size={20} className="text-primary" />
-                                        <span className="font-medium text-foreground">Control Room</span>
+                                        <ScanEye
+                                            size={20}
+                                            className="text-primary"
+                                        />
+                                        <span className="font-medium text-foreground">
+                                            Control Room
+                                        </span>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                                        <span className="text-xs text-muted-foreground">Active</span>
+                                        <span className="h-2 w-2 animate-pulse rounded-full bg-emerald-500" />
+                                        <span className="text-xs text-muted-foreground">
+                                            Active
+                                        </span>
                                     </div>
                                 </div>
-                                
+
                                 {/* Detection Timeline */}
                                 <div className="space-y-3">
                                     <div className="rounded-lg border border-border bg-muted/50 p-3">
-                                        <div className="flex items-center gap-2 mb-2">
+                                        <div className="mb-2 flex items-center gap-2">
                                             <div className="h-2 w-2 rounded-full bg-emerald-500" />
-                                            <span className="text-xs font-medium text-foreground">Location Status</span>
-                                            <span className="ml-auto text-[10px] text-muted-foreground">Now</span>
+                                            <span className="text-xs font-medium text-foreground">
+                                                Location Status
+                                            </span>
+                                            <span className="ml-auto text-[10px] text-muted-foreground">
+                                                Now
+                                            </span>
                                         </div>
                                         <div className="grid grid-cols-2 gap-2 text-[11px]">
                                             <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Main Entrance</span>
-                                                <span className="text-emerald-500">Normal</span>
+                                                <span className="text-muted-foreground">
+                                                    Main Entrance
+                                                </span>
+                                                <span className="text-emerald-500">
+                                                    Normal
+                                                </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Lounge</span>
-                                                <span className="text-emerald-500">Normal</span>
+                                                <span className="text-muted-foreground">
+                                                    Lounge
+                                                </span>
+                                                <span className="text-emerald-500">
+                                                    Normal
+                                                </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Kitchen</span>
-                                                <span className="text-amber-500">Activity</span>
+                                                <span className="text-muted-foreground">
+                                                    Kitchen
+                                                </span>
+                                                <span className="text-amber-500">
+                                                    Activity
+                                                </span>
                                             </div>
                                             <div className="flex justify-between">
-                                                <span className="text-muted-foreground">Garden</span>
-                                                <span className="text-emerald-500">Normal</span>
+                                                <span className="text-muted-foreground">
+                                                    Garden
+                                                </span>
+                                                <span className="text-emerald-500">
+                                                    Normal
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -212,14 +266,22 @@ const Home: React.FC = () => {
                                                     <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
                                                         Activity Detected
                                                     </p>
-                                                    <span className="text-[10px] text-muted-foreground">14:32:18</span>
+                                                    <span className="text-[10px] text-muted-foreground">
+                                                        14:32:18
+                                                    </span>
                                                 </div>
-                                                <p className="text-[10px] text-muted-foreground mt-1">
-                                                    Unusual motion pattern in Kitchen area during typically quiet period
+                                                <p className="mt-1 text-[10px] text-muted-foreground">
+                                                    Unusual motion pattern in
+                                                    Kitchen area during
+                                                    typically quiet period
                                                 </p>
                                                 <div className="mt-2 flex gap-2">
-                                                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] text-amber-600">Kitchen</span>
-                                                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] text-amber-600">Motion</span>
+                                                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] text-amber-600">
+                                                        Kitchen
+                                                    </span>
+                                                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] text-amber-600">
+                                                        Motion
+                                                    </span>
                                                 </div>
                                             </div>
                                         </div>
@@ -227,28 +289,54 @@ const Home: React.FC = () => {
 
                                     {/* Timeline Reconstruction */}
                                     <div className="rounded-lg border border-border bg-muted/50 p-3">
-                                        <div className="flex items-center gap-2 mb-2">
+                                        <div className="mb-2 flex items-center gap-2">
                                             <div className="h-2 w-2 rounded-full bg-primary" />
-                                            <span className="text-xs font-medium text-foreground">Timeline Reconstruction</span>
+                                            <span className="text-xs font-medium text-foreground">
+                                                Timeline Reconstruction
+                                            </span>
                                         </div>
                                         <div className="space-y-2">
                                             <div className="flex items-center gap-2 text-[11px]">
-                                                <span className="text-muted-foreground w-12">14:32</span>
-                                                <span className="text-emerald-500">●</span>
-                                                <span className="text-foreground">Entry detected</span>
-                                                <span className="ml-auto text-muted-foreground">Main Entrance</span>
+                                                <span className="w-12 text-muted-foreground">
+                                                    14:32
+                                                </span>
+                                                <span className="text-emerald-500">
+                                                    ●
+                                                </span>
+                                                <span className="text-foreground">
+                                                    Entry detected
+                                                </span>
+                                                <span className="ml-auto text-muted-foreground">
+                                                    Main Entrance
+                                                </span>
                                             </div>
                                             <div className="flex items-center gap-2 text-[11px]">
-                                                <span className="text-muted-foreground w-12">14:33</span>
-                                                <span className="text-emerald-500">●</span>
-                                                <span className="text-foreground">Movement to lounge</span>
-                                                <span className="ml-auto text-muted-foreground">Hallway</span>
+                                                <span className="w-12 text-muted-foreground">
+                                                    14:33
+                                                </span>
+                                                <span className="text-emerald-500">
+                                                    ●
+                                                </span>
+                                                <span className="text-foreground">
+                                                    Movement to lounge
+                                                </span>
+                                                <span className="ml-auto text-muted-foreground">
+                                                    Hallway
+                                                </span>
                                             </div>
                                             <div className="flex items-center gap-2 text-[11px]">
-                                                <span className="text-muted-foreground w-12">14:35</span>
-                                                <span className="text-amber-500">●</span>
-                                                <span className="text-foreground">Activity in kitchen</span>
-                                                <span className="ml-auto text-muted-foreground">Kitchen</span>
+                                                <span className="w-12 text-muted-foreground">
+                                                    14:35
+                                                </span>
+                                                <span className="text-amber-500">
+                                                    ●
+                                                </span>
+                                                <span className="text-foreground">
+                                                    Activity in kitchen
+                                                </span>
+                                                <span className="ml-auto text-muted-foreground">
+                                                    Kitchen
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
@@ -266,8 +354,9 @@ const Home: React.FC = () => {
                         Built for the realities of supported living
                     </h2>
                     <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
-                        Every feature designed with input from service managers, support workers 
-                        and compliance officers who understand what it takes to deliver great care.
+                        Every feature designed with input from service managers,
+                        support workers and compliance officers who understand
+                        what it takes to deliver great care.
                     </p>
                 </div>
 
@@ -316,14 +405,15 @@ const Home: React.FC = () => {
                                 <Heart className="h-6 w-6 text-primary" />
                             </div>
                         </div>
-                        <blockquote className="text-2xl font-medium text-foreground sm:text-3xl leading-relaxed">
-                            "Every person has a story worth telling. We're here to help you capture 
-                            those moments, preserve precious memories, and create a legacy that 
-                            lasts forever."
+                        <blockquote className="text-2xl leading-relaxed font-medium text-foreground sm:text-3xl">
+                            "Every person has a story worth telling. We're here
+                            to help you capture those moments, preserve precious
+                            memories, and create a legacy that lasts forever."
                         </blockquote>
                         <p className="mt-6 text-muted-foreground">
-                            More than just records and compliance—Oblivion Findings helps you honour 
-                            the lives and journeys of the people you support.
+                            More than just records and compliance—Oblivion
+                            Findings helps you honour the lives and journeys of
+                            the people you support.
                         </p>
                     </div>
                 </div>
@@ -338,14 +428,18 @@ const Home: React.FC = () => {
                                 <h2 className="text-2xl font-bold text-foreground sm:text-3xl">
                                     Clarity for managers.
                                     <br />
-                                    <span className="text-primary">Simplicity for staff.</span>
+                                    <span className="text-primary">
+                                        Simplicity for staff.
+                                    </span>
                                 </h2>
                                 <p className="mt-4 text-muted-foreground">
-                                    Give your team the tools they need to focus on what matters—
-                                    delivering excellent person-centred support. No more 
-                                    paper diaries, missed handovers or hunting for information.
+                                    Give your team the tools they need to focus
+                                    on what matters— delivering excellent
+                                    person-centred support. No more paper
+                                    diaries, missed handovers or hunting for
+                                    information.
                                 </p>
-                                
+
                                 <div className="mt-8 space-y-4">
                                     {[
                                         'Real-time view of visits, incidents and tasks',
@@ -353,11 +447,19 @@ const Home: React.FC = () => {
                                         'Mobile-friendly for staff on the move',
                                         'Instant reports for inspections and audits',
                                     ].map((item, index) => (
-                                        <div key={index} className="flex items-start gap-3">
+                                        <div
+                                            key={index}
+                                            className="flex items-start gap-3"
+                                        >
                                             <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10">
-                                                <CheckCircle2 size={14} className="text-emerald-500" />
+                                                <CheckCircle2
+                                                    size={14}
+                                                    className="text-emerald-500"
+                                                />
                                             </div>
-                                            <span className="text-sm text-muted-foreground">{item}</span>
+                                            <span className="text-sm text-muted-foreground">
+                                                {item}
+                                            </span>
                                         </div>
                                     ))}
                                 </div>
@@ -377,25 +479,37 @@ const Home: React.FC = () => {
                                             Dashboard Preview
                                         </div>
                                     </div>
-                                    
+
                                     <div className="space-y-3">
                                         <div className="grid grid-cols-2 gap-3">
                                             <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-muted/80 to-muted/40 p-3 transition-all">
                                                 {/* Gloss overlay */}
                                                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/5" />
                                                 <div className="relative">
-                                                    <div className="text-xs text-muted-foreground">Active Residents</div>
-                                                    <div className="text-xl font-semibold text-foreground">42</div>
-                                                    <div className="text-[10px] text-emerald-500">+4 this month</div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Active Residents
+                                                    </div>
+                                                    <div className="text-xl font-semibold text-foreground">
+                                                        42
+                                                    </div>
+                                                    <div className="text-[10px] text-emerald-500">
+                                                        +4 this month
+                                                    </div>
                                                 </div>
                                             </div>
                                             <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-muted/80 to-muted/40 p-3 transition-all">
                                                 {/* Gloss overlay */}
                                                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/5" />
                                                 <div className="relative">
-                                                    <div className="text-xs text-muted-foreground">Visits Today</div>
-                                                    <div className="text-xl font-semibold text-foreground">28</div>
-                                                    <div className="text-[10px] text-muted-foreground">Across 6 locations</div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                        Visits Today
+                                                    </div>
+                                                    <div className="text-xl font-semibold text-foreground">
+                                                        28
+                                                    </div>
+                                                    <div className="text-[10px] text-muted-foreground">
+                                                        Across 6 locations
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -403,11 +517,21 @@ const Home: React.FC = () => {
                                             {/* Gloss overlay */}
                                             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/5" />
                                             <div className="relative">
-                                                <div className="mb-2 text-xs text-muted-foreground">Recent Activity</div>
+                                                <div className="mb-2 text-xs text-muted-foreground">
+                                                    Recent Activity
+                                                </div>
                                                 {[1, 2, 3].map((_, i) => (
-                                                    <div key={i} className="flex items-center justify-between py-1.5 text-xs">
-                                                        <span className="text-foreground">Visit completed • Alex M</span>
-                                                        <span className="text-muted-foreground">{10 + i * 5}m ago</span>
+                                                    <div
+                                                        key={i}
+                                                        className="flex items-center justify-between py-1.5 text-xs"
+                                                    >
+                                                        <span className="text-foreground">
+                                                            Visit completed •
+                                                            Alex M
+                                                        </span>
+                                                        <span className="text-muted-foreground">
+                                                            {10 + i * 5}m ago
+                                                        </span>
                                                     </div>
                                                 ))}
                                             </div>
@@ -428,7 +552,8 @@ const Home: React.FC = () => {
                             Ready to modernise your supported living operations?
                         </h2>
                         <p className="mt-4 text-primary-foreground/80">
-                            Get a personalised demo tailored to your New Zealand service.
+                            Get a personalised demo tailored to your New Zealand
+                            service.
                         </p>
                         <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                             <Link

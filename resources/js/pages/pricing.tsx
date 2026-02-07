@@ -1,4 +1,4 @@
-import MarketingLayout from '@/Layouts/marketing-layout';
+import MarketingLayout from '@/layouts/marketing-layout';
 import { Link } from '@inertiajs/react';
 import { ArrowRight, Check, HelpCircle, X } from 'lucide-react';
 import React from 'react';
@@ -45,10 +45,7 @@ const Pricing: React.FC = () => {
                 'Priority support',
                 'Data migration assistance',
             ],
-            notIncluded: [
-                'White-label options',
-                'Custom integrations',
-            ],
+            notIncluded: ['White-label options', 'Custom integrations'],
             cta: 'Start free trial',
             ctaLink: '/contact',
             popular: true,
@@ -95,7 +92,7 @@ const Pricing: React.FC = () => {
         },
         {
             question: 'Is my data secure?',
-            answer: 'Absolutely. We use bank-grade encryption, GDPR-compliant data handling, and UK-based servers. We\'re registered with the ICO and undergo regular security audits. Your data is never sold or shared.',
+            answer: "Absolutely. We use bank-grade encryption, GDPR-compliant data handling, and UK-based servers. We're registered with the ICO and undergo regular security audits. Your data is never sold or shared.",
         },
         {
             question: 'What support do you offer?',
@@ -104,28 +101,82 @@ const Pricing: React.FC = () => {
     ];
 
     const comparisons = [
-        { feature: 'Resident management', starter: true, professional: true, enterprise: true },
-        { feature: 'Visit scheduling', starter: true, professional: true, enterprise: true },
-        { feature: 'Digital notes', starter: true, professional: true, enterprise: true },
-        { feature: 'eMAR medication', starter: false, professional: true, enterprise: true },
-        { feature: 'Incident reporting', starter: 'Basic', professional: 'Advanced', enterprise: 'Advanced' },
-        { feature: 'Staff rostering', starter: false, professional: true, enterprise: true },
-        { feature: 'Training tracking', starter: false, professional: true, enterprise: true },
-        { feature: 'Family portal', starter: false, professional: true, enterprise: true },
-        { feature: 'API access', starter: false, professional: false, enterprise: true },
-        { feature: 'Custom integrations', starter: false, professional: false, enterprise: true },
+        {
+            feature: 'Resident management',
+            starter: true,
+            professional: true,
+            enterprise: true,
+        },
+        {
+            feature: 'Visit scheduling',
+            starter: true,
+            professional: true,
+            enterprise: true,
+        },
+        {
+            feature: 'Digital notes',
+            starter: true,
+            professional: true,
+            enterprise: true,
+        },
+        {
+            feature: 'eMAR medication',
+            starter: false,
+            professional: true,
+            enterprise: true,
+        },
+        {
+            feature: 'Incident reporting',
+            starter: 'Basic',
+            professional: 'Advanced',
+            enterprise: 'Advanced',
+        },
+        {
+            feature: 'Staff rostering',
+            starter: false,
+            professional: true,
+            enterprise: true,
+        },
+        {
+            feature: 'Training tracking',
+            starter: false,
+            professional: true,
+            enterprise: true,
+        },
+        {
+            feature: 'Family portal',
+            starter: false,
+            professional: true,
+            enterprise: true,
+        },
+        {
+            feature: 'API access',
+            starter: false,
+            professional: false,
+            enterprise: true,
+        },
+        {
+            feature: 'Custom integrations',
+            starter: false,
+            professional: false,
+            enterprise: true,
+        },
     ];
 
     return (
-        <MarketingLayout title="Pricing" description="Simple, transparent pricing for supported living providers. No hidden fees, no long-term contracts.">
+        <MarketingLayout
+            title="Pricing"
+            description="Simple, transparent pricing for supported living providers. No hidden fees, no long-term contracts."
+        >
             {/* Hero */}
             <section className="text-center">
                 <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
                     Simple, transparent pricing
                 </h1>
                 <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-                    No hidden fees, no long-term contracts. Pay only for the residents you actively 
-                    support, with unlimited staff accounts on every plan.
+                    No hidden fees, no long-term contracts. Pay only for the
+                    residents you actively support, with unlimited staff
+                    accounts on every plan.
                 </p>
             </section>
 
@@ -149,7 +200,7 @@ const Pricing: React.FC = () => {
                                     Most popular
                                 </div>
                             )}
-                            
+
                             <div>
                                 <h2 className="text-xl font-semibold text-foreground">
                                     {plan.name}
@@ -166,7 +217,9 @@ const Pricing: React.FC = () => {
                                     </div>
                                 ) : (
                                     <div className="flex items-baseline gap-1">
-                                        <span className="text-muted-foreground">£</span>
+                                        <span className="text-muted-foreground">
+                                            £
+                                        </span>
                                         <span className="text-4xl font-bold text-foreground">
                                             {plan.price}
                                         </span>
@@ -192,12 +245,22 @@ const Pricing: React.FC = () => {
                             </div>
 
                             <div className="mt-8 space-y-4">
-                                <p className="text-sm font-medium text-foreground">Included:</p>
+                                <p className="text-sm font-medium text-foreground">
+                                    Included:
+                                </p>
                                 <ul className="space-y-3">
                                     {plan.features.map((feature, i) => (
-                                        <li key={i} className="flex items-start gap-3">
-                                            <Check size={18} className="mt-0.5 shrink-0 text-emerald-500" />
-                                            <span className="text-sm text-muted-foreground">{feature}</span>
+                                        <li
+                                            key={i}
+                                            className="flex items-start gap-3"
+                                        >
+                                            <Check
+                                                size={18}
+                                                className="mt-0.5 shrink-0 text-emerald-500"
+                                            />
+                                            <span className="text-sm text-muted-foreground">
+                                                {feature}
+                                            </span>
                                         </li>
                                     ))}
                                 </ul>
@@ -208,14 +271,22 @@ const Pricing: React.FC = () => {
                                             Not included:
                                         </p>
                                         <ul className="space-y-3">
-                                            {plan.notIncluded.map((feature, i) => (
-                                                <li key={i} className="flex items-start gap-3">
-                                                    <X size={18} className="mt-0.5 shrink-0 text-muted-foreground/50" />
-                                                    <span className="text-sm text-muted-foreground/70">
-                                                        {feature}
-                                                    </span>
-                                                </li>
-                                            ))}
+                                            {plan.notIncluded.map(
+                                                (feature, i) => (
+                                                    <li
+                                                        key={i}
+                                                        className="flex items-start gap-3"
+                                                    >
+                                                        <X
+                                                            size={18}
+                                                            className="mt-0.5 shrink-0 text-muted-foreground/50"
+                                                        />
+                                                        <span className="text-sm text-muted-foreground/70">
+                                                            {feature}
+                                                        </span>
+                                                    </li>
+                                                ),
+                                            )}
                                         </ul>
                                     </>
                                 )}
@@ -250,16 +321,25 @@ const Pricing: React.FC = () => {
                         </thead>
                         <tbody>
                             {comparisons.map((row, index) => (
-                                <tr key={index} className="border-b border-border">
+                                <tr
+                                    key={index}
+                                    className="border-b border-border"
+                                >
                                     <td className="py-4 pr-4 text-sm text-foreground">
                                         {row.feature}
                                     </td>
                                     <td className="px-4 py-4 text-center">
                                         {typeof row.starter === 'boolean' ? (
                                             row.starter ? (
-                                                <Check size={18} className="mx-auto text-emerald-500" />
+                                                <Check
+                                                    size={18}
+                                                    className="mx-auto text-emerald-500"
+                                                />
                                             ) : (
-                                                <X size={18} className="mx-auto text-muted-foreground/30" />
+                                                <X
+                                                    size={18}
+                                                    className="mx-auto text-muted-foreground/30"
+                                                />
                                             )
                                         ) : (
                                             <span className="text-sm text-muted-foreground">
@@ -267,12 +347,19 @@ const Pricing: React.FC = () => {
                                             </span>
                                         )}
                                     </td>
-                                    <td className="px-4 py-4 text-center bg-primary/5">
-                                        {typeof row.professional === 'boolean' ? (
+                                    <td className="bg-primary/5 px-4 py-4 text-center">
+                                        {typeof row.professional ===
+                                        'boolean' ? (
                                             row.professional ? (
-                                                <Check size={18} className="mx-auto text-emerald-500" />
+                                                <Check
+                                                    size={18}
+                                                    className="mx-auto text-emerald-500"
+                                                />
                                             ) : (
-                                                <X size={18} className="mx-auto text-muted-foreground/30" />
+                                                <X
+                                                    size={18}
+                                                    className="mx-auto text-muted-foreground/30"
+                                                />
                                             )
                                         ) : (
                                             <span className="text-sm text-muted-foreground">
@@ -283,9 +370,15 @@ const Pricing: React.FC = () => {
                                     <td className="px-4 py-4 text-center">
                                         {typeof row.enterprise === 'boolean' ? (
                                             row.enterprise ? (
-                                                <Check size={18} className="mx-auto text-emerald-500" />
+                                                <Check
+                                                    size={18}
+                                                    className="mx-auto text-emerald-500"
+                                                />
                                             ) : (
-                                                <X size={18} className="mx-auto text-muted-foreground/30" />
+                                                <X
+                                                    size={18}
+                                                    className="mx-auto text-muted-foreground/30"
+                                                />
                                             )
                                         ) : (
                                             <span className="text-sm text-muted-foreground">
@@ -315,7 +408,10 @@ const Pricing: React.FC = () => {
                             <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/10" />
                             <div className="pointer-events-none absolute -inset-full top-0 block h-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent to-white/20 opacity-0 transition-all duration-700 group-hover:animate-shine" />
                             <div className="relative flex items-start gap-3">
-                                <HelpCircle size={20} className="mt-0.5 shrink-0 text-primary" />
+                                <HelpCircle
+                                    size={20}
+                                    className="mt-0.5 shrink-0 text-primary"
+                                />
                                 <div>
                                     <h3 className="font-medium text-foreground">
                                         {faq.question}
@@ -338,7 +434,8 @@ const Pricing: React.FC = () => {
                             Not sure which plan is right for you?
                         </h2>
                         <p className="mt-4 text-primary-foreground/80">
-                            Get in touch and we'll help you find the perfect fit for your service.
+                            Get in touch and we'll help you find the perfect fit
+                            for your service.
                         </p>
                         <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
                             <Link

@@ -1,6 +1,14 @@
-import MarketingLayout from '@/Layouts/marketing-layout';
+import MarketingLayout from '@/layouts/marketing-layout';
 import { useForm } from '@inertiajs/react';
-import { Building2, Loader2, Mail, MapPin, Phone, Send, User } from 'lucide-react';
+import {
+    Building2,
+    Loader2,
+    Mail,
+    MapPin,
+    Phone,
+    Send,
+    User,
+} from 'lucide-react';
 import React, { FormEvent } from 'react';
 import { toast } from 'sonner';
 
@@ -15,21 +23,24 @@ interface ContactFormData {
 }
 
 const Contact: React.FC = () => {
-    const { data, setData, post, processing, errors, reset } = useForm<ContactFormData>({
-        name: '',
-        email: '',
-        company: '',
-        phone: '',
-        service_type: '',
-        residents_count: '',
-        message: '',
-    });
+    const { data, setData, post, processing, errors, reset } =
+        useForm<ContactFormData>({
+            name: '',
+            email: '',
+            company: '',
+            phone: '',
+            service_type: '',
+            residents_count: '',
+            message: '',
+        });
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
         post('/contact', {
             onSuccess: () => {
-                toast.success('Message sent successfully! We\'ll be in touch soon.');
+                toast.success(
+                    "Message sent successfully! We'll be in touch soon.",
+                );
                 reset();
             },
             onError: () => {
@@ -80,15 +91,18 @@ const Contact: React.FC = () => {
     ];
 
     return (
-        <MarketingLayout title="Contact" description="Get in touch with the Oblivion Findings team. Book a demo, ask questions, or learn more about our supported living platform.">
+        <MarketingLayout
+            title="Contact"
+            description="Get in touch with the Oblivion Findings team. Book a demo, ask questions, or learn more about our supported living platform."
+        >
             {/* Hero */}
             <section className="text-center">
                 <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
                     Let's talk about your service
                 </h1>
                 <p className="mx-auto mt-6 max-w-2xl text-lg text-muted-foreground">
-                    Whether you're looking for a demo, have questions about pricing, or just 
-                    want to learn more—we're here to help.
+                    Whether you're looking for a demo, have questions about
+                    pricing, or just want to learn more—we're here to help.
                 </p>
             </section>
 
@@ -105,7 +119,8 @@ const Contact: React.FC = () => {
                                 Get in touch
                             </h2>
                             <p className="mt-2 text-sm text-muted-foreground">
-                                Our team typically responds within 24 hours during business days.
+                                Our team typically responds within 24 hours
+                                during business days.
                             </p>
 
                             <div className="relative mt-8 space-y-6">
@@ -144,7 +159,10 @@ const Contact: React.FC = () => {
                                         'We schedule a personalised demo at your convenience',
                                         'You get a tailored quote based on your requirements',
                                     ].map((step, i) => (
-                                        <li key={i} className="flex gap-3 text-sm text-muted-foreground">
+                                        <li
+                                            key={i}
+                                            className="flex gap-3 text-sm text-muted-foreground"
+                                        >
                                             <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-medium text-primary">
                                                 {i + 1}
                                             </span>
@@ -158,56 +176,92 @@ const Contact: React.FC = () => {
 
                     {/* Contact Form */}
                     <div className="lg:col-span-3">
-                        <form onSubmit={handleSubmit} className="rounded-3xl border border-border bg-card p-8">
+                        <form
+                            onSubmit={handleSubmit}
+                            className="rounded-3xl border border-border bg-card p-8"
+                        >
                             <h2 className="text-xl font-semibold text-foreground">
                                 Send us a message
                             </h2>
                             <p className="mt-2 text-sm text-muted-foreground">
-                                Fill out the form below and we'll get back to you shortly.
+                                Fill out the form below and we'll get back to
+                                you shortly.
                             </p>
 
                             <div className="mt-8 grid gap-6">
                                 {/* Name & Email Row */}
                                 <div className="grid gap-6 sm:grid-cols-2">
                                     <div>
-                                        <label htmlFor="name" className="block text-sm font-medium text-foreground">
-                                            Full name <span className="text-rose-500">*</span>
+                                        <label
+                                            htmlFor="name"
+                                            className="block text-sm font-medium text-foreground"
+                                        >
+                                            Full name{' '}
+                                            <span className="text-rose-500">
+                                                *
+                                            </span>
                                         </label>
                                         <div className="relative mt-2">
-                                            <User className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                                            <User
+                                                className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+                                                size={18}
+                                            />
                                             <input
                                                 type="text"
                                                 id="name"
                                                 value={data.name}
-                                                onChange={(e) => setData('name', e.target.value)}
-                                                className="w-full rounded-xl border border-border bg-background px-10 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'name',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-xl border border-border bg-background px-10 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                                                 placeholder="John Smith"
                                                 required
                                             />
                                         </div>
                                         {errors.name && (
-                                            <p className="mt-1 text-xs text-rose-500">{errors.name}</p>
+                                            <p className="mt-1 text-xs text-rose-500">
+                                                {errors.name}
+                                            </p>
                                         )}
                                     </div>
 
                                     <div>
-                                        <label htmlFor="email" className="block text-sm font-medium text-foreground">
-                                            Email address <span className="text-rose-500">*</span>
+                                        <label
+                                            htmlFor="email"
+                                            className="block text-sm font-medium text-foreground"
+                                        >
+                                            Email address{' '}
+                                            <span className="text-rose-500">
+                                                *
+                                            </span>
                                         </label>
                                         <div className="relative mt-2">
-                                            <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                                            <Mail
+                                                className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+                                                size={18}
+                                            />
                                             <input
                                                 type="email"
                                                 id="email"
                                                 value={data.email}
-                                                onChange={(e) => setData('email', e.target.value)}
-                                                className="w-full rounded-xl border border-border bg-background px-10 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'email',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-xl border border-border bg-background px-10 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                                                 placeholder="john@company.co.nz"
                                                 required
                                             />
                                         </div>
                                         {errors.email && (
-                                            <p className="mt-1 text-xs text-rose-500">{errors.email}</p>
+                                            <p className="mt-1 text-xs text-rose-500">
+                                                {errors.email}
+                                            </p>
                                         )}
                                     </div>
                                 </div>
@@ -215,42 +269,68 @@ const Contact: React.FC = () => {
                                 {/* Company & Phone Row */}
                                 <div className="grid gap-6 sm:grid-cols-2">
                                     <div>
-                                        <label htmlFor="company" className="block text-sm font-medium text-foreground">
+                                        <label
+                                            htmlFor="company"
+                                            className="block text-sm font-medium text-foreground"
+                                        >
                                             Organisation name
                                         </label>
                                         <div className="relative mt-2">
-                                            <Building2 className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                                            <Building2
+                                                className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+                                                size={18}
+                                            />
                                             <input
                                                 type="text"
                                                 id="company"
                                                 value={data.company}
-                                                onChange={(e) => setData('company', e.target.value)}
-                                                className="w-full rounded-xl border border-border bg-background px-10 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'company',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-xl border border-border bg-background px-10 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                                                 placeholder="Acme Care Services"
                                             />
                                         </div>
                                         {errors.company && (
-                                            <p className="mt-1 text-xs text-rose-500">{errors.company}</p>
+                                            <p className="mt-1 text-xs text-rose-500">
+                                                {errors.company}
+                                            </p>
                                         )}
                                     </div>
 
                                     <div>
-                                        <label htmlFor="phone" className="block text-sm font-medium text-foreground">
+                                        <label
+                                            htmlFor="phone"
+                                            className="block text-sm font-medium text-foreground"
+                                        >
                                             Phone number
                                         </label>
                                         <div className="relative mt-2">
-                                            <Phone className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
+                                            <Phone
+                                                className="absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+                                                size={18}
+                                            />
                                             <input
                                                 type="tel"
                                                 id="phone"
                                                 value={data.phone}
-                                                onChange={(e) => setData('phone', e.target.value)}
-                                                className="w-full rounded-xl border border-border bg-background px-10 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                                onChange={(e) =>
+                                                    setData(
+                                                        'phone',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-xl border border-border bg-background px-10 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                                                 placeholder="09 123 4567"
                                             />
                                         </div>
                                         {errors.phone && (
-                                            <p className="mt-1 text-xs text-rose-500">{errors.phone}</p>
+                                            <p className="mt-1 text-xs text-rose-500">
+                                                {errors.phone}
+                                            </p>
                                         )}
                                     </div>
                                 </div>
@@ -258,64 +338,98 @@ const Contact: React.FC = () => {
                                 {/* Service Type & Residents Row */}
                                 <div className="grid gap-6 sm:grid-cols-2">
                                     <div>
-                                        <label htmlFor="service_type" className="block text-sm font-medium text-foreground">
+                                        <label
+                                            htmlFor="service_type"
+                                            className="block text-sm font-medium text-foreground"
+                                        >
                                             Service type
                                         </label>
                                         <select
                                             id="service_type"
                                             value={data.service_type}
-                                            onChange={(e) => setData('service_type', e.target.value)}
-                                            className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                            onChange={(e) =>
+                                                setData(
+                                                    'service_type',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                                         >
                                             {serviceTypes.map((type) => (
-                                                <option key={type.value} value={type.value}>
+                                                <option
+                                                    key={type.value}
+                                                    value={type.value}
+                                                >
                                                     {type.label}
                                                 </option>
                                             ))}
                                         </select>
                                         {errors.service_type && (
-                                            <p className="mt-1 text-xs text-rose-500">{errors.service_type}</p>
+                                            <p className="mt-1 text-xs text-rose-500">
+                                                {errors.service_type}
+                                            </p>
                                         )}
                                     </div>
 
                                     <div>
-                                        <label htmlFor="residents_count" className="block text-sm font-medium text-foreground">
+                                        <label
+                                            htmlFor="residents_count"
+                                            className="block text-sm font-medium text-foreground"
+                                        >
                                             Number of residents
                                         </label>
                                         <select
                                             id="residents_count"
                                             value={data.residents_count}
-                                            onChange={(e) => setData('residents_count', e.target.value)}
-                                            className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                                            onChange={(e) =>
+                                                setData(
+                                                    'residents_count',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                                         >
                                             {residentCounts.map((count) => (
-                                                <option key={count.value} value={count.value}>
+                                                <option
+                                                    key={count.value}
+                                                    value={count.value}
+                                                >
                                                     {count.label}
                                                 </option>
                                             ))}
                                         </select>
                                         {errors.residents_count && (
-                                            <p className="mt-1 text-xs text-rose-500">{errors.residents_count}</p>
+                                            <p className="mt-1 text-xs text-rose-500">
+                                                {errors.residents_count}
+                                            </p>
                                         )}
                                     </div>
                                 </div>
 
                                 {/* Message */}
                                 <div>
-                                    <label htmlFor="message" className="block text-sm font-medium text-foreground">
-                                        Message <span className="text-rose-500">*</span>
+                                    <label
+                                        htmlFor="message"
+                                        className="block text-sm font-medium text-foreground"
+                                    >
+                                        Message{' '}
+                                        <span className="text-rose-500">*</span>
                                     </label>
                                     <textarea
                                         id="message"
                                         rows={5}
                                         value={data.message}
-                                        onChange={(e) => setData('message', e.target.value)}
-                                        className="mt-2 w-full rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 resize-none"
+                                        onChange={(e) =>
+                                            setData('message', e.target.value)
+                                        }
+                                        className="mt-2 w-full resize-none rounded-xl border border-border bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none"
                                         placeholder="Tell us about your service and what you're looking for..."
                                         required
                                     />
                                     {errors.message && (
-                                        <p className="mt-1 text-xs text-rose-500">{errors.message}</p>
+                                        <p className="mt-1 text-xs text-rose-500">
+                                            {errors.message}
+                                        </p>
                                     )}
                                 </div>
 
@@ -323,11 +437,14 @@ const Contact: React.FC = () => {
                                 <button
                                     type="submit"
                                     disabled={processing}
-                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-4 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 disabled:opacity-70 disabled:cursor-not-allowed sm:w-auto"
+                                    className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-8 py-4 text-sm font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70 sm:w-auto"
                                 >
                                     {processing ? (
                                         <>
-                                            <Loader2 size={18} className="animate-spin" />
+                                            <Loader2
+                                                size={18}
+                                                className="animate-spin"
+                                            />
                                             Sending...
                                         </>
                                     ) : (
