@@ -1,0 +1,1 @@
+import{c as r,r as o,b as s}from"./app-Kc5Uqsfy.js";/* empty css            */function m(){const t=r.c(1);let e;return t[0]===Symbol.for("react.memo_cache_sentinel")?(e=[],t[0]=e):e=t[0],o.useEffect(c,e),null}function c(){s.visit("/timesheets?mode=approvals",{replace:!0})}export{m as default};
