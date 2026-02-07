@@ -1,7 +1,7 @@
+import { useAppearance } from '@/hooks/use-appearance';
 import { Link, usePage } from '@inertiajs/react';
 import { Menu, Moon, Sun, X } from 'lucide-react';
 import React, { useState } from 'react';
-import { useAppearance } from '@/Hooks/use-appearance';
 
 const Header: React.FC = () => {
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -25,13 +25,16 @@ const Header: React.FC = () => {
         updateAppearance(newAppearance);
     };
 
-    const isDark = appearance === 'dark' || 
-        (appearance === 'system' && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+    const isDark =
+        appearance === 'dark' ||
+        (appearance === 'system' &&
+            typeof window !== 'undefined' &&
+            window.matchMedia('(prefers-color-scheme: dark)').matches);
 
     return (
         <header className="flex items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-3 group">
-                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-primary-foreground text-sm font-semibold shadow-lg shadow-primary/20 transition-transform group-hover:scale-105">
+            <Link href="/" className="group flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-primary to-primary/80 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/20 transition-transform group-hover:scale-105">
                     OF
                 </div>
                 <div>
@@ -52,8 +55,8 @@ const Header: React.FC = () => {
                         href={item.href}
                         className={`rounded-full px-4 py-2 transition-colors ${
                             isActive(item.href)
-                                ? 'text-foreground bg-muted font-medium'
-                                : 'hover:text-foreground hover:bg-muted/50'
+                                ? 'bg-muted font-medium text-foreground'
+                                : 'hover:bg-muted/50 hover:text-foreground'
                         }`}
                     >
                         {item.label}
@@ -63,8 +66,8 @@ const Header: React.FC = () => {
                     href="/contact"
                     className={`rounded-full px-4 py-2 transition-colors ${
                         isActive('/contact')
-                            ? 'text-foreground bg-muted font-medium'
-                            : 'hover:text-foreground hover:bg-muted/50'
+                            ? 'bg-muted font-medium text-foreground'
+                            : 'hover:bg-muted/50 hover:text-foreground'
                     }`}
                 >
                     Contact
@@ -75,7 +78,7 @@ const Header: React.FC = () => {
                 {/* Theme toggle */}
                 <button
                     onClick={toggleTheme}
-                    className="hidden sm:flex h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                    className="hidden h-10 w-10 items-center justify-center rounded-full border border-border bg-background text-muted-foreground transition-colors hover:bg-muted hover:text-foreground sm:flex"
                     aria-label="Toggle theme"
                 >
                     {isDark ? <Sun size={18} /> : <Moon size={18} />}
@@ -107,7 +110,7 @@ const Header: React.FC = () => {
 
             {/* Mobile nav */}
             {mobileMenuOpen && (
-                <div className="absolute left-4 right-4 top-20 z-50 rounded-2xl border border-border bg-popover/95 p-4 shadow-2xl backdrop-blur-xl sm:hidden">
+                <div className="absolute top-20 right-4 left-4 z-50 rounded-2xl border border-border bg-popover/95 p-4 shadow-2xl backdrop-blur-xl sm:hidden">
                     <nav className="flex flex-col gap-1">
                         {navItems.map((item) => (
                             <Link
@@ -116,7 +119,7 @@ const Header: React.FC = () => {
                                 onClick={() => setMobileMenuOpen(false)}
                                 className={`rounded-xl px-4 py-3 text-sm transition-colors ${
                                     isActive(item.href)
-                                        ? 'bg-primary/10 text-primary font-medium'
+                                        ? 'bg-primary/10 font-medium text-primary'
                                         : 'text-muted-foreground hover:bg-muted'
                                 }`}
                             >
@@ -128,7 +131,7 @@ const Header: React.FC = () => {
                             onClick={() => setMobileMenuOpen(false)}
                             className={`rounded-xl px-4 py-3 text-sm transition-colors ${
                                 isActive('/contact')
-                                    ? 'bg-primary/10 text-primary font-medium'
+                                    ? 'bg-primary/10 font-medium text-primary'
                                     : 'text-muted-foreground hover:bg-muted'
                             }`}
                         >
@@ -143,7 +146,9 @@ const Header: React.FC = () => {
                             className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm text-muted-foreground transition-colors hover:bg-muted"
                         >
                             {isDark ? <Sun size={18} /> : <Moon size={18} />}
-                            <span>Switch to {isDark ? 'light' : 'dark'} mode</span>
+                            <span>
+                                Switch to {isDark ? 'light' : 'dark'} mode
+                            </span>
                         </button>
                         <Link
                             href="/login"
