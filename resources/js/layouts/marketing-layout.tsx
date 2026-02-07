@@ -1,5 +1,5 @@
-import Footer from '@/Components/Footer';
-import Header from '@/Components/Header';
+import Footer from '@/components/Footer';
+import Header from '@/components/Header';
 import { Head } from '@inertiajs/react';
 import React from 'react';
 
@@ -14,7 +14,9 @@ const MarketingLayout: React.FC<MarketingLayoutProps> = ({
     title,
     description = 'Oblivion Findings helps supported living providers manage residents, visits, notes, and compliance in one simple, web-based dashboard.',
 }) => {
-    const fullTitle = title ? `${title} · Oblivion Findings` : 'Oblivion Findings · Supported Living Platform';
+    const fullTitle = title
+        ? `${title} · Oblivion Findings`
+        : 'Oblivion Findings · Supported Living Platform';
 
     return (
         <>
@@ -31,7 +33,7 @@ const MarketingLayout: React.FC<MarketingLayoutProps> = ({
                 <div className="pointer-events-none fixed inset-0 -z-10">
                     <div className="absolute inset-0 bg-gradient-to-b from-background via-muted/30 to-background" />
                     <div className="absolute top-0 left-1/4 h-[500px] w-[500px] rounded-full bg-primary/5 blur-3xl dark:bg-primary/5" />
-                    <div className="absolute bottom-0 right-1/4 h-[400px] w-[400px] rounded-full bg-emerald-500/5 blur-3xl dark:bg-emerald-500/5" />
+                    <div className="absolute right-1/4 bottom-0 h-[400px] w-[400px] rounded-full bg-emerald-500/5 blur-3xl dark:bg-emerald-500/5" />
                 </div>
 
                 {/* Page container */}
@@ -40,9 +42,7 @@ const MarketingLayout: React.FC<MarketingLayoutProps> = ({
                     <Header />
 
                     {/* Main content */}
-                    <main className="mt-8 sm:mt-12">
-                        {children}
-                    </main>
+                    <main className="mt-8 sm:mt-12">{children}</main>
 
                     {/* Footer */}
                     <Footer />
