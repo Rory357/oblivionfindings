@@ -151,7 +151,7 @@ class DashboardController extends Controller
         $shiftScope = Shift::query()
             ->when(!$user->canDo('shifts.manageAny'), fn ($q) => $q->where('user_id', $user->id));
 
-        $shiftSeries = $shiftScope
+        $shiftSeries = (clone $shiftScope)
             ->whereBetween('starts_at', [$range7Start, $range7End])
             ->selectRaw('DATE(starts_at) as d')
             ->selectRaw('COUNT(*) as c')
@@ -176,7 +176,7 @@ class DashboardController extends Controller
             ])
             ->values();
 
-        $shiftSeries30 = $shiftScope
+        $shiftSeries30 = (clone $shiftScope)
             ->whereBetween('starts_at', [$range30Start, $range30End])
             ->selectRaw('DATE(starts_at) as d')
             ->selectRaw('COUNT(*) as c')
@@ -204,14 +204,14 @@ class DashboardController extends Controller
         $timesheetScope = Timesheet::query()
             ->when(!$user->canDo('timesheets.manageAny'), fn ($q) => $q->where('user_id', $user->id));
 
-        $timesheetByStatus = $timesheetScope
+        $timesheetByStatus = (clone $timesheetScope)
             ->select('status', DB::raw('COUNT(*) as c'))
             ->groupBy('status')
             ->get()
             ->map(fn ($r) => ['status' => (string) $r->status, 'count' => (int) $r->c])
             ->values();
 
-        $timesheetSeries30 = $timesheetScope
+        $timesheetSeries30 = (clone $timesheetScope)
             ->whereBetween('work_date', [$range30Start->toDateString(), $today->toDateString()])
             ->selectRaw('DATE(work_date) as d')
             ->selectRaw('COUNT(*) as c')
