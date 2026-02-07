@@ -1,6 +1,12 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Staff\StaffBackgroundCheckController;
+use App\Http\Controllers\Training\TrainingCourseController;
+use App\Http\Controllers\Training\StaffTrainingRecordController;
+use App\Http\Controllers\Training\CompetencyFrameworkController;
+use App\Http\Controllers\Training\StaffCompetencyController;
+use App\Http\Controllers\Training\StaffInductionController;
 
 /**
  * Staff Vetting & Training Routes

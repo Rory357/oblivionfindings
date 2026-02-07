@@ -51,6 +51,12 @@ class Timesheet extends Model
         return $this->belongsTo(User::class, 'user_id');
     }
 
+    // Alias kept for compatibility with code/tests that eager load `user`.
+    public function user()
+    {
+        return $this->belongsTo(User::class, 'user_id');
+    }
+
     public function shift()
     {
         return $this->belongsTo(Shift::class);

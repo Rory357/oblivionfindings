@@ -257,6 +257,7 @@ class NotificationService
 
         // Expand target groups into flags + explicit user ids.
         $groups = (array) ($rule['target_groups'] ?? []);
+        $roleGroups = [];
 
         // Preserve explicit overrides if provided.
         $extra['include_managers'] = array_key_exists('include_managers', $extra)
@@ -274,8 +275,27 @@ class NotificationService
         $targetIds = collect($extra['target_user_ids'] ?? []);
         $client = $extra['client'] ?? null;
 
-        // Group routing (role-based)
-        $extra['_target_role_groups'] = $groups;
+        // Group routing (role-based + special groups)
+        foreach ($groups as $group) {
+            $group = (string) $group;
+            if ($group === 'entity_user') {
+                $extra['include_entity_user'] = true;
+                continue;
+            }
+            if ($group === 'assigned_workers') {
+                $extra['include_assigned_workers'] = true;
+                continue;
+            }
+            if ($group === 'managers') {
+                $extra['include_managers'] = true;
+                $roleGroups[] = $group;
+                continue;
+            }
+
+            $roleGroups[] = $group;
+        }
+
+        $extra['_target_role_groups'] = $roleGroups;
 
         if (!$targetIds->isEmpty()) {
             $extra['target_user_ids'] = $targetIds->unique()->values()->all();
@@ -381,12 +401,17 @@ class NotificationService
         }
 
         if ($entity instanceof Timesheet) {
-            $entity->loadMissing(['user:id,name', 'shift.client:id,first_name,last_name,site_id', 'shift.site:id,name']);
+            $entity->loadMissing(['user:id,name', 'shift.client:id,first_name,last_name,site_id']);
             $ctx['Staff'] = $entity->user?->name;
             if ($entity->shift) {
-                $ctx['Shift'] = optional($entity->shift->start_time)->format('Y-m-d H:i')
-                    . ' → ' . optional($entity->shift->end_time)->format('Y-m-d H:i');
-                $ctx['Site'] = $entity->shift->site?->name;
+                $ctx['Shift'] = optional($entity->shift->starts_at)->format('Y-m-d H:i')
+                    . ' → ' . optional($entity->shift->ends_at)->format('Y-m-d H:i');
+                if (method_exists($entity->shift, 'site')) {
+                    $entity->shift->loadMissing('site:id,name');
+                    $ctx['Site'] = $entity->shift->site?->name;
+                } elseif (!empty($entity->shift->location)) {
+                    $ctx['Site'] = (string) $entity->shift->location;
+                }
                 if (!$client && $entity->shift->client) {
                     $ctx['Client'] = trim($entity->shift->client->first_name . ' ' . $entity->shift->client->last_name);
                 }

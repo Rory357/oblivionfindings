@@ -64,6 +64,18 @@ class User extends Authenticatable
         ];
     }
 
+    protected static function booted(): void
+    {
+        static::updating(function (self $user): void {
+            if (
+                $user->isDirty('password')
+                && !$user->email_verified_at
+            ) {
+                $user->email_verified_at = now();
+            }
+        });
+    }
+
     public function isApproved(): bool
     {
         return !is_null($this->approved_at);
@@ -130,6 +142,12 @@ class User extends Authenticatable
     public function staffAvailabilities()
     {
         return $this->hasMany(\App\Models\StaffAvailability::class);
+    }
+
+    public function boardMember()
+    {
+        return $this->hasOne(\App\Domain\Governance\Models\BoardMember::class)
+            ->where('is_active', true);
     }
 
     public function shifts()

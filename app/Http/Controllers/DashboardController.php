@@ -140,6 +140,13 @@ class DashboardController extends Controller
         $range7End = (clone $weekEnd);
         $range30Start = (clone $today)->subDays(config('dashboard.history_days', 30));
         $range30End = (clone $tomorrow);
+        $driver = DB::connection()->getDriverName();
+        $shiftHoursExpr = $driver === 'sqlite'
+            ? "SUM((strftime('%s', ends_at) - strftime('%s', starts_at)) / 3600.0)"
+            : "SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)) / 60";
+        $timesheetHoursExpr = $driver === 'sqlite'
+            ? "SUM(((strftime('%s', ends_at) - strftime('%s', starts_at)) / 60.0 - COALESCE(break_minutes, 0)) / 60.0)"
+            : 'SUM((TIMESTAMPDIFF(MINUTE, starts_at, ends_at) - COALESCE(break_minutes, 0)))/60';
 
         $shiftScope = Shift::query()
             ->when(!$user->canDo('shifts.manageAny'), fn ($q) => $q->where('user_id', $user->id));
@@ -148,7 +155,7 @@ class DashboardController extends Controller
             ->whereBetween('starts_at', [$range7Start, $range7End])
             ->selectRaw('DATE(starts_at) as d')
             ->selectRaw('COUNT(*) as c')
-            ->selectRaw('SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)) / 60 as h')
+            ->selectRaw("{$shiftHoursExpr} as h")
             ->selectRaw("SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) as scheduled")
             ->selectRaw("SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress")
             ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
@@ -173,7 +180,7 @@ class DashboardController extends Controller
             ->whereBetween('starts_at', [$range30Start, $range30End])
             ->selectRaw('DATE(starts_at) as d')
             ->selectRaw('COUNT(*) as c')
-            ->selectRaw('SUM(TIMESTAMPDIFF(MINUTE, starts_at, ends_at)) / 60 as h')
+            ->selectRaw("{$shiftHoursExpr} as h")
             ->selectRaw("SUM(CASE WHEN status = 'scheduled' THEN 1 ELSE 0 END) as scheduled")
             ->selectRaw("SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) as in_progress")
             ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
@@ -208,9 +215,7 @@ class DashboardController extends Controller
             ->whereBetween('work_date', [$range30Start->toDateString(), $today->toDateString()])
             ->selectRaw('DATE(work_date) as d')
             ->selectRaw('COUNT(*) as c')
-            ->selectRaw(
-                'SUM((TIMESTAMPDIFF(MINUTE, starts_at, ends_at) - COALESCE(break_minutes, 0)))/60 as h'
-            )
+            ->selectRaw("{$timesheetHoursExpr} as h")
             ->groupBy('d')
             ->orderBy('d')
             ->get()

@@ -63,7 +63,7 @@ class DataSubjectRequestController extends Controller
     public function create(): Response
     {
         return Inertia::render('privacy/requests/create', [
-            'staff' => User::select('id', 'name')->orderBy('name')->get(),
+            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 
@@ -106,7 +106,7 @@ class DataSubjectRequestController extends Controller
 
         return Inertia::render('privacy/requests/show', [
             'request' => $request,
-            'staff' => User::select('id', 'name')->orderBy('name')->get(),
+            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 

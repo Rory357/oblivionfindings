@@ -28,7 +28,7 @@ class FleetGeofenceService
                     'geofence_id' => $geofence->id,
                 ]);
 
-            $previous = $state->status ?? 'outside';
+            $previous = $state->status;
             $next = $inside ? 'inside' : 'outside';
 
             if ($previous !== $next) {
@@ -53,7 +53,7 @@ class FleetGeofenceService
                     $this->signals->emit([
                         'asset_id' => $asset->id,
                         'geofence_id' => $geofence->id,
-                        'signal_type' => 'geofence.exit',
+                        'signal_type' => 'geofence.breach',
                         'severity_hint' => $geofence->breach_type === 'hard' ? 'high' : 'medium',
                         'occurred_at' => $occurredAt,
                         'payload' => [

@@ -28,6 +28,15 @@ class SignalType extends Model
         'is_active' => 'boolean',
     ];
 
+    protected static function booted(): void
+    {
+        static::creating(function (self $type): void {
+            if (empty($type->name) && !empty($type->code)) {
+                $type->name = str_replace('_', ' ', $type->code);
+            }
+        });
+    }
+
     public function signals(): HasMany
     {
         return $this->hasMany(Signal::class, 'signal_type_id');

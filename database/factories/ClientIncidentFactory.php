@@ -18,7 +18,7 @@ class ClientIncidentFactory extends Factory
             'reported_by' => User::factory(),
             'type' => fake()->randomElement(['fall', 'medication_error', 'behavioural', 'injury', 'property_damage', 'other']),
             'severity' => fake()->randomElement(['low', 'medium', 'high']),
-            'status' => fake()->randomElement(['draft', 'submitted', 'reviewed', 'closed']),
+            'status' => 'draft',
             'title' => fake()->sentence(),
             'description' => fake()->paragraph(),
             'occurred_at' => fake()->dateTimeBetween('-1 month', 'now'),

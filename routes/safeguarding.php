@@ -22,9 +22,12 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:safeguarding.viewAny')->group(function () {
         Route::get('/safeguarding', [SafeguardingConcernController::class, 'index'])
             ->name('safeguarding.index');
-        Route::get('/safeguarding/{concern}', [SafeguardingConcernController::class, 'show'])
-            ->name('safeguarding.show');
     });
+
+    // Show is policy-protected in the controller and can be accessed by
+    // reporters/assignees even without global viewAny permission.
+    Route::get('/safeguarding/{concern}', [SafeguardingConcernController::class, 'show'])
+        ->name('safeguarding.show');
 
     Route::middleware('permission:safeguarding.update')->group(function () {
         Route::get('/safeguarding/{concern}/edit', [SafeguardingConcernController::class, 'edit'])

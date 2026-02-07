@@ -24,6 +24,13 @@ class ControlRoomReportController extends Controller
             '1y' => now()->subYear(),
             default => now()->subDays(30),
         };
+        $driver = DB::connection()->getDriverName();
+        $avgResolutionExpr = $driver === 'sqlite'
+            ? "AVG((strftime('%s', resolved_at) - strftime('%s', triggered_at)) / 3600.0)"
+            : 'AVG(TIMESTAMPDIFF(HOUR, triggered_at, resolved_at))';
+        $avgAckExpr = $driver === 'sqlite'
+            ? "AVG((strftime('%s', acknowledged_at) - strftime('%s', triggered_at)) / 60.0)"
+            : 'AVG(TIMESTAMPDIFF(MINUTE, triggered_at, acknowledged_at))';
 
         // Overall statistics
         $totalAlerts = ControlRoomAlert::where('triggered_at', '>=', $startDate)->count();
@@ -34,7 +41,7 @@ class ControlRoomReportController extends Controller
         // Average resolution time (in hours)
         $avgResolutionTime = ControlRoomAlert::where('triggered_at', '>=', $startDate)
             ->whereNotNull('resolved_at')
-            ->selectRaw('AVG(TIMESTAMPDIFF(HOUR, triggered_at, resolved_at)) as avg_hours')
+            ->selectRaw($avgResolutionExpr . ' as avg_hours')
             ->value('avg_hours');
 
         // Alerts by severity
@@ -88,7 +95,7 @@ class ControlRoomReportController extends Controller
         // Response time by severity (average hours to acknowledge)
         $responseTimeBySeverity = ControlRoomAlert::where('triggered_at', '>=', $startDate)
             ->whereNotNull('acknowledged_at')
-            ->select('severity', DB::raw('AVG(TIMESTAMPDIFF(MINUTE, triggered_at, acknowledged_at)) as avg_minutes'))
+            ->select('severity', DB::raw($avgAckExpr . ' as avg_minutes'))
             ->groupBy('severity')
             ->pluck('avg_minutes', 'severity')
             ->toArray();

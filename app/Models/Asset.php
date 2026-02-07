@@ -4,6 +4,7 @@ namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
@@ -14,6 +15,7 @@ use App\Models\FleetVehicleStateSnapshot;
 
 class Asset extends Model
 {
+    use HasFactory;
     use AuditableChanges;
 
     protected static function boot()

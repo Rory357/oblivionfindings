@@ -19,15 +19,20 @@ import {
     ClipboardList,
     FileText,
     Folder,
+    Gavel,
+    Landmark,
     LayoutGrid,
     Lock,
     MapPin,
     MessageSquareText,
     Package,
+    Scale,
     Settings,
     Shield,
     ShieldAlert,
+    Target,
     Users,
+    Vote,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -102,6 +107,13 @@ function buildNavigationGroups({
     const complianceGroup: NavGroup = {
         id: 'compliance',
         label: 'Compliance & Safety',
+        items: [],
+    };
+
+    // Governance group
+    const governanceGroup: NavGroup = {
+        id: 'governance',
+        label: 'Governance',
         items: [],
     };
 
@@ -268,6 +280,24 @@ function buildNavigationGroups({
         });
     }
 
+    // Governance
+    if (can?.governance?.view) {
+        governanceGroup.items.push(
+            { title: 'Dashboard', href: '/governance/dashboard', icon: Landmark },
+            { title: 'Meetings', href: '/governance/meetings', icon: CalendarDays },
+            ...(can?.governance?.meetings?.manage
+                ? [{ title: 'Admin', href: '/governance/admin/board-members', icon: Users }]
+                : []),
+            { title: 'Risks', href: '/governance/risks', icon: Scale },
+            { title: 'Resolutions', href: '/governance/resolutions', icon: Vote },
+            { title: 'Compliance', href: '/governance/compliance', icon: Shield },
+            { title: 'Strategy', href: '/governance/strategy', icon: Target },
+            { title: 'Performance', href: '/governance/performance', icon: Gavel },
+            { title: 'Budgets', href: '/governance/budgets', icon: Folder },
+            { title: 'Action Items', href: '/governance/actions', icon: ClipboardList },
+        );
+    }
+
     // System
     if (can?.reports?.viewAny) {
         systemGroup.items.push({ title: 'Reports', href: '/reports', icon: FileText });
@@ -308,6 +338,7 @@ function buildNavigationGroups({
         ...(operationsGroup.items.length > 0 ? [operationsGroup] : []),
         ...(resourcesGroup.items.length > 0 ? [resourcesGroup] : []),
         ...(complianceGroup.items.length > 0 ? [complianceGroup] : []),
+        ...(governanceGroup.items.length > 0 ? [governanceGroup] : []),
         ...(systemGroup.items.length > 0 ? [systemGroup] : []),
     ];
 }

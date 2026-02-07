@@ -13,11 +13,29 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+import { Users, UserPlus, UserMinus } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Settings', href: '/settings/profile' },
@@ -35,12 +53,27 @@ type UserItem = {
     roles: Role[];
 };
 
+type BoardMember = {
+    id: number;
+    user_id: number;
+    board_role: string;
+    term_start: string;
+    term_end: string | null;
+    is_active: boolean;
+    user: {
+        id: number;
+        name: string;
+        email: string;
+    };
+};
+
 type Props = {
     users: UserItem[];
     roles: Role[];
     permissions: Permission[];
     // userOverrides[userId][permissionId] = true|false
     userOverrides: Record<number, Record<number, boolean>>;
+    boardMembers: BoardMember[];
 };
 
 function modeFromOverride(
@@ -56,6 +89,212 @@ function formatGroupName(group: string) {
         .filter(Boolean)
         .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
         .join(' ');
+}
+
+function formatTermDate(value: string | null) {
+    if (!value) return 'Ongoing';
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    const hasTime = /[T ]\d{2}:\d{2}/.test(value);
+    return parsed.toLocaleString('en-NZ', {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        ...(hasTime
+            ? {
+                  hour: '2-digit',
+                  minute: '2-digit',
+              }
+            : {}),
+    });
+}
+
+// Board Member Management Component
+function BoardMembersSection({ 
+    boardMembers, 
+    users 
+}: { 
+    boardMembers: BoardMember[]; 
+    users: UserItem[];
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+    const form = useForm({
+        user_id: '',
+        board_role: 'member',
+        term_start: new Date().toISOString().split('T')[0],
+        term_end: new Date(new Date().setFullYear(new Date().getFullYear() + 3)).toISOString().split('T')[0],
+    });
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.post('/settings/board-members', {
+            onSuccess: () => {
+                setIsOpen(false);
+                form.reset();
+            },
+        });
+    };
+
+    const handleRemove = (id: number) => {
+        if (confirm('Remove this board member?')) {
+            form.delete(`/settings/board-members/${id}`);
+        }
+    };
+
+    // Get users who are not already board members
+    const boardMemberUserIds = new Set(boardMembers.map(bm => bm.user_id));
+    const availableUsers = users.filter(u => !boardMemberUserIds.has(u.id));
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-blue-500" />
+                    <div>
+                        <h3 className="text-sm font-semibold">Board Members</h3>
+                        <p className="text-xs text-muted-foreground">
+                            Manage governance board appointments
+                        </p>
+                    </div>
+                </div>
+                <Dialog open={isOpen} onOpenChange={setIsOpen}>
+                    <DialogTrigger asChild>
+                        <Button size="sm" disabled={availableUsers.length === 0}>
+                            <UserPlus className="w-4 h-4 mr-2" />
+                            Appoint
+                        </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Appoint Board Member</DialogTitle>
+                            <DialogDescription>
+                                Assign a user to the governance board.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form onSubmit={handleSubmit} className="space-y-4">
+                            <div>
+                                <Label>User</Label>
+                                <Select 
+                                    value={form.data.user_id} 
+                                    onValueChange={(v) => form.setData('user_id', v)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select user..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {availableUsers.map((user) => (
+                                            <SelectItem key={user.id} value={String(user.id)}>
+                                                {user.name} ({user.email})
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {form.errors.user_id && (
+                                    <p className="text-sm text-red-600 mt-1">{form.errors.user_id}</p>
+                                )}
+                            </div>
+                            <div>
+                                <Label>Board Role</Label>
+                                <Select 
+                                    value={form.data.board_role} 
+                                    onValueChange={(v) => form.setData('board_role', v)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="chair">Chair</SelectItem>
+                                        <SelectItem value="secretary">Secretary</SelectItem>
+                                        <SelectItem value="treasurer">Treasurer</SelectItem>
+                                        <SelectItem value="member">Member</SelectItem>
+                                        <SelectItem value="observer">Observer</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <Label>Term Start</Label>
+                                    <Input
+                                        type="date"
+                                        value={form.data.term_start}
+                                        onChange={(e) => form.setData('term_start', e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Term End</Label>
+                                    <Input
+                                        type="date"
+                                        value={form.data.term_end}
+                                        onChange={(e) => form.setData('term_end', e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button type="submit" disabled={form.processing}>
+                                    Appoint
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+            </div>
+
+            {boardMembers.length > 0 ? (
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>Name</TableHead>
+                            <TableHead>Role</TableHead>
+                            <TableHead>Term</TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="w-24"></TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {boardMembers.map((member) => (
+                            <TableRow key={member.id}>
+                                <TableCell>
+                                    <div>
+                                        <p className="font-medium">{member.user.name}</p>
+                                        <p className="text-xs text-muted-foreground">{member.user.email}</p>
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <Badge variant="outline" className="capitalize">
+                                        {member.board_role}
+                                    </Badge>
+                                </TableCell>
+                                <TableCell className="text-sm">
+                                    {formatTermDate(member.term_start)} -> {formatTermDate(member.term_end)}
+                                </TableCell>
+                                <TableCell>
+                                    {member.is_active ? (
+                                        <Badge className="bg-green-100 text-green-800">Active</Badge>
+                                    ) : (
+                                        <Badge className="bg-gray-100 text-gray-800">Inactive</Badge>
+                                    )}
+                                </TableCell>
+                                <TableCell>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        onClick={() => handleRemove(member.id)}
+                                        disabled={form.processing}
+                                    >
+                                        <UserMinus className="w-4 h-4 text-red-500" />
+                                    </Button>
+                                </TableCell>
+                            </TableRow>
+                        ))}
+                    </TableBody>
+                </Table>
+            ) : (
+                <div className="rounded-md border p-4 text-sm text-muted-foreground">
+                    No board members appointed yet.
+                </div>
+            )}
+        </div>
+    );
 }
 
 export default function AccessControlPage(props: Props) {
@@ -572,6 +811,14 @@ export default function AccessControlPage(props: Props) {
                             )}
                         </div>
                     </div>
+
+                    <Separator />
+
+                    {/* Board Member Management */}
+                    <BoardMembersSection 
+                        boardMembers={props.boardMembers} 
+                        users={props.users}
+                    />
                 </div>
             </SettingsLayout>
         </AppLayout>

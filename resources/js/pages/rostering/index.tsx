@@ -130,6 +130,14 @@ function rangesOverlap(aStartIso: string, aEndIso: string, bStartIso: string, bE
     return aS < bE && bS < aE;
 }
 
+function isShiftLocked(shift: ShiftLite) {
+    return shift.status === 'completed';
+}
+
+function isActionableConflictShift(shift: ShiftLite) {
+    return shift.status !== 'completed' && shift.status !== 'cancelled';
+}
+
 export default function RosteringIndex(props: Props) {
     const timeOffForm = useForm({
         user_id: props.filters.staff_id ? String(props.filters.staff_id) : 'self',
@@ -156,6 +164,17 @@ export default function RosteringIndex(props: Props) {
 
     const [resolveReassignSelection, setResolveReassignSelection] = useState<Record<number, string>>({});
     const [coverageMode, setCoverageMode] = useState<'understaffed' | 'assigned'>('understaffed');
+
+    const resolveState = useMemo(() => {
+        if (!resolveModal) return null;
+        const aLocked = isShiftLocked(resolveModal.a);
+        const bLocked = isShiftLocked(resolveModal.b);
+        return {
+            aLocked,
+            bLocked,
+            bothLocked: aLocked && bLocked,
+        };
+    }, [resolveModal]);
 
     const startDate = useMemo(() => new Date(`${props.weekStart}T00:00:00`), [props.weekStart]);
 
@@ -275,10 +294,12 @@ export default function RosteringIndex(props: Props) {
     }, [props.shifts, days]);
 
 
+    const actionableShifts = useMemo(() => props.shifts.filter(isActionableConflictShift), [props.shifts]);
+
     const timeOffConflicts = useMemo(() => {
         if (!props.timeOffs?.length) return [] as Array<{ shift: ShiftLite; timeOffId: number; label: string }>;
         const out: Array<{ shift: ShiftLite; timeOffId: number; label: string }> = [];
-        for (const sh of props.shifts) {
+        for (const sh of actionableShifts) {
             if (!sh.user_id) continue;
             for (const t of props.timeOffs) {
                 if (t.user_id !== sh.user_id) continue;
@@ -292,11 +313,11 @@ export default function RosteringIndex(props: Props) {
             }
         }
         return out;
-    }, [props.shifts, props.timeOffs]);
+    }, [actionableShifts, props.timeOffs]);
 
     const staffOverlapsDetailed = useMemo(() => {
         const byStaff = new Map<number, ShiftLite[]>();
-        for (const s of props.shifts) {
+        for (const s of actionableShifts) {
             if (!s.user_id) continue;
             if (!byStaff.has(s.user_id)) byStaff.set(s.user_id, []);
             byStaff.get(s.user_id)!.push(s);
@@ -313,11 +334,11 @@ export default function RosteringIndex(props: Props) {
             }
         }
         return out;
-    }, [props.shifts]);
+    }, [actionableShifts]);
 
     const clientOverlapsDetailed = useMemo(() => {
         const byClient = new Map<number, ShiftLite[]>();
-        for (const s of props.shifts) {
+        for (const s of actionableShifts) {
             if (!byClient.has(s.client_id)) byClient.set(s.client_id, []);
             byClient.get(s.client_id)!.push(s);
         }
@@ -332,6 +353,46 @@ export default function RosteringIndex(props: Props) {
                 }
             }
         }
+        return out;
+    }, [actionableShifts]);
+
+    const historicalLockedOverlaps = useMemo(() => {
+        const lockedShifts = props.shifts.filter(isShiftLocked);
+        const out: Array<{ kind: 'staff' | 'client'; a: ShiftLite; b: ShiftLite }> = [];
+
+        const byStaff = new Map<number, ShiftLite[]>();
+        for (const s of lockedShifts) {
+            if (!s.user_id) continue;
+            if (!byStaff.has(s.user_id)) byStaff.set(s.user_id, []);
+            byStaff.get(s.user_id)!.push(s);
+        }
+        for (const [, list] of byStaff.entries()) {
+            list.sort((x, y) => new Date(x.starts_at).getTime() - new Date(y.starts_at).getTime());
+            for (let i = 0; i < list.length - 1; i++) {
+                const a = list[i];
+                const b = list[i + 1];
+                if (rangesOverlap(a.starts_at, a.ends_at, b.starts_at, b.ends_at)) {
+                    out.push({ kind: 'staff', a, b });
+                }
+            }
+        }
+
+        const byClient = new Map<number, ShiftLite[]>();
+        for (const s of lockedShifts) {
+            if (!byClient.has(s.client_id)) byClient.set(s.client_id, []);
+            byClient.get(s.client_id)!.push(s);
+        }
+        for (const [, list] of byClient.entries()) {
+            list.sort((x, y) => new Date(x.starts_at).getTime() - new Date(y.starts_at).getTime());
+            for (let i = 0; i < list.length - 1; i++) {
+                const a = list[i];
+                const b = list[i + 1];
+                if (rangesOverlap(a.starts_at, a.ends_at, b.starts_at, b.ends_at)) {
+                    out.push({ kind: 'client', a, b });
+                }
+            }
+        }
+
         return out;
     }, [props.shifts]);
 
@@ -613,11 +674,14 @@ export default function RosteringIndex(props: Props) {
                                                         <Badge variant={clientOverlapsDetailed.length > 0 ? 'destructive' : 'outline'}>
                                                             Client overlaps: {clientOverlapsDetailed.length}
                                                         </Badge>
+                                                        <Badge variant={historicalLockedOverlaps.length > 0 ? 'secondary' : 'outline'}>
+                                                            Historical (locked): {historicalLockedOverlaps.length}
+                                                        </Badge>
                                                     </div>
                                                 </div>
 
                                                 {timeOffConflicts.length === 0 && staffOverlapsDetailed.length === 0 && clientOverlapsDetailed.length === 0 ? (
-                                                    <div className="text-sm text-muted-foreground">No conflicts detected in this roster window.</div>
+                                                    <div className="text-sm text-muted-foreground">No actionable conflicts detected in this roster window.</div>
                                                 ) : (
                                                     <div className="space-y-2">
                                                         {timeOffConflicts.slice(0, 4).map(({ shift, timeOffId, label }) => (
@@ -725,6 +789,15 @@ export default function RosteringIndex(props: Props) {
                                                         ))}
                                                     </div>
                                                 )}
+
+                                                {historicalLockedOverlaps.length > 0 ? (
+                                                    <div className="rounded-md border border-dashed p-3">
+                                                        <div className="text-sm font-medium">Historical overlaps (both shifts locked)</div>
+                                                        <div className="mt-1 text-xs text-muted-foreground">
+                                                            These are non-actionable in rostering. Reopen a shift only if an audit correction is required.
+                                                        </div>
+                                                    </div>
+                                                ) : null}
                                             </div>
                                         </CardContent>
                                     </Card>
@@ -1367,7 +1440,10 @@ export default function RosteringIndex(props: Props) {
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                                 <div className="rounded-md border p-3">
-                                    <div className="text-sm font-medium">A</div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-sm font-medium">A</div>
+                                        {resolveState?.aLocked ? <Badge variant="secondary">Locked</Badge> : null}
+                                    </div>
                                     <div className="mt-1 text-xs text-muted-foreground">
                                         {new Date(resolveModal.a.starts_at).toLocaleDateString()} {fmtTime(resolveModal.a.starts_at)}–{fmtTime(resolveModal.a.ends_at)}
                                     </div>
@@ -1380,7 +1456,10 @@ export default function RosteringIndex(props: Props) {
                                 </div>
 
                                 <div className="rounded-md border p-3">
-                                    <div className="text-sm font-medium">B</div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="text-sm font-medium">B</div>
+                                        {resolveState?.bLocked ? <Badge variant="secondary">Locked</Badge> : null}
+                                    </div>
                                     <div className="mt-1 text-xs text-muted-foreground">
                                         {new Date(resolveModal.b.starts_at).toLocaleDateString()} {fmtTime(resolveModal.b.starts_at)}–{fmtTime(resolveModal.b.ends_at)}
                                     </div>
@@ -1398,6 +1477,11 @@ export default function RosteringIndex(props: Props) {
                                     <div className="text-sm text-muted-foreground">
                                         Choose the quickest safe fix. Suggestions consider time-off + existing roster conflicts + lowest weekly hours.
                                     </div>
+                                    {resolveState?.bothLocked ? (
+                                        <div className="text-sm text-muted-foreground">
+                                            Both shifts are locked (completed). This overlap is historical and cannot be resolved from rostering.
+                                        </div>
+                                    ) : null}
 
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                                         <div className="space-y-2">
@@ -1406,7 +1490,9 @@ export default function RosteringIndex(props: Props) {
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
+                                                    disabled={!!resolveState?.bLocked}
                                                     onClick={() => {
+                                                        if (resolveState?.bLocked) return;
                                                         router.post(`/shifts/${resolveModal.b.id}/unassign`, { return_to: '/rostering' }, {
                                                             preserveScroll: true,
                                                             onSuccess: () => setResolveModal(null),
@@ -1440,8 +1526,9 @@ export default function RosteringIndex(props: Props) {
                                                     </Select>
                                                     <Button
                                                         size="sm"
-                                                        disabled={!resolveReassignSelection[resolveModal.b.id]}
+                                                        disabled={!!resolveState?.bLocked || !resolveReassignSelection[resolveModal.b.id]}
                                                         onClick={() => {
+                                                            if (resolveState?.bLocked) return;
                                                             const uid = resolveReassignSelection[resolveModal.b.id];
                                                             if (!uid) return;
                                                             router.post(`/shifts/${resolveModal.b.id}/assign`, { user_id: uid, return_to: '/rostering' }, {
@@ -1462,7 +1549,9 @@ export default function RosteringIndex(props: Props) {
                                                 <Button
                                                     size="sm"
                                                     variant="outline"
+                                                    disabled={!!resolveState?.aLocked}
                                                     onClick={() => {
+                                                        if (resolveState?.aLocked) return;
                                                         router.post(`/shifts/${resolveModal.a.id}/unassign`, { return_to: '/rostering' }, {
                                                             preserveScroll: true,
                                                             onSuccess: () => setResolveModal(null),
@@ -1496,8 +1585,9 @@ export default function RosteringIndex(props: Props) {
                                                     </Select>
                                                     <Button
                                                         size="sm"
-                                                        disabled={!resolveReassignSelection[resolveModal.a.id]}
+                                                        disabled={!!resolveState?.aLocked || !resolveReassignSelection[resolveModal.a.id]}
                                                         onClick={() => {
+                                                            if (resolveState?.aLocked) return;
                                                             const uid = resolveReassignSelection[resolveModal.a.id];
                                                             if (!uid) return;
                                                             router.post(`/shifts/${resolveModal.a.id}/assign`, { user_id: uid, return_to: '/rostering' }, {
@@ -1518,12 +1608,19 @@ export default function RosteringIndex(props: Props) {
                                     <div className="text-sm text-muted-foreground">
                                         This is a client double-booking. Resolve by opening one shift (so it becomes an open slot) and then adjust times/staffing.
                                     </div>
+                                    {resolveState?.bothLocked ? (
+                                        <div className="text-sm text-muted-foreground">
+                                            Both shifts are locked (completed). This overlap is historical and cannot be resolved from rostering.
+                                        </div>
+                                    ) : null}
                                     {props.canManageAny ? (
                                         <div className="flex flex-wrap gap-2">
                                             <Button
                                                 size="sm"
                                                 variant="outline"
+                                                disabled={!!resolveState?.aLocked}
                                                 onClick={() => {
+                                                    if (resolveState?.aLocked) return;
                                                     router.post(`/shifts/${resolveModal.a.id}/unassign`, { return_to: '/rostering' }, {
                                                         preserveScroll: true,
                                                         onSuccess: () => setResolveModal(null),
@@ -1535,7 +1632,9 @@ export default function RosteringIndex(props: Props) {
                                             <Button
                                                 size="sm"
                                                 variant="outline"
+                                                disabled={!!resolveState?.bLocked}
                                                 onClick={() => {
+                                                    if (resolveState?.bLocked) return;
                                                     router.post(`/shifts/${resolveModal.b.id}/unassign`, { return_to: '/rostering' }, {
                                                         preserveScroll: true,
                                                         onSuccess: () => setResolveModal(null),

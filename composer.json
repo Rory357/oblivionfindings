@@ -9,6 +9,7 @@
     ],
     "license": "MIT",
     "require": {
+        "barryvdh/laravel-dompdf": "^2.1",
         "endroid/qr-code": "^6.0",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/fortify": "^1.30",

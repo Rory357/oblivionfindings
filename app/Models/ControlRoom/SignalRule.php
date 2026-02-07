@@ -18,6 +18,7 @@ class SignalRule extends Model
         'is_active',
         'conditions',
         'output_severity',
+        'severity_override',
         'output_escalation_level',
         'output_tier',
         'playbook_id',
@@ -164,5 +165,10 @@ class SignalRule extends Model
     public function getOutputTier(): int
     {
         return $this->output_tier ?? 1;
+    }
+
+    public function setSeverityOverrideAttribute($value): void
+    {
+        $this->attributes['output_severity'] = $value;
     }
 }

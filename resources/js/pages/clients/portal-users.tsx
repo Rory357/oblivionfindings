@@ -8,13 +8,33 @@ import { Head, useForm } from '@inertiajs/react';
 type Props = {
     client: { id: number; first_name: string; last_name: string };
     portal_users: Array<{ id: number; name: string; email: string; relation: string }>;
+    relation_options: string[];
 };
 
-export default function ClientPortalUsers({ client, portal_users }: Props) {
-    const form = useForm({ email: '', relation: 'client' });
+export default function ClientPortalUsers({ client, portal_users, relation_options }: Props) {
+    const form = useForm({
+        email: '',
+        name: '',
+        relation: 'mother',
+        portal_role: 'next_of_kin',
+        action: 'link',
+    });
 
     const submit = (e: React.FormEvent) => {
         e.preventDefault();
+        form.setData('action', 'link');
+        form.post(`/clients/${client.id}/portal-users`, { preserveScroll: true });
+    };
+
+    const userNotFound = (form.errors.email || '').toLowerCase().includes('no user found');
+
+    const createUser = () => {
+        form.setData('action', 'create_user');
+        form.post(`/clients/${client.id}/portal-users`, { preserveScroll: true });
+    };
+
+    const saveContactOnly = () => {
+        form.setData('action', 'contact_only');
         form.post(`/clients/${client.id}/portal-users`, { preserveScroll: true });
     };
 
@@ -38,6 +58,19 @@ export default function ClientPortalUsers({ client, portal_users }: Props) {
                     <CardContent>
                         <form onSubmit={submit} className="grid grid-cols-1 gap-3 md:grid-cols-3">
                             <div className="md:col-span-2">
+                                <Label htmlFor="name">Name (for new users)</Label>
+                                <Input
+                                    id="name"
+                                    value={form.data.name}
+                                    onChange={(e) => form.setData('name', e.target.value)}
+                                    placeholder="Jane Smith"
+                                />
+                                {form.errors.name && (
+                                    <div className="mt-1 text-xs text-red-600">{form.errors.name}</div>
+                                )}
+                            </div>
+
+                            <div className="md:col-span-2">
                                 <Label htmlFor="email">Email</Label>
                                 <Input
                                     id="email"
@@ -51,6 +84,19 @@ export default function ClientPortalUsers({ client, portal_users }: Props) {
                             </div>
 
                             <div>
+                                <Label htmlFor="portal_role">Portal role</Label>
+                                <select
+                                    id="portal_role"
+                                    className="mt-2 w-full rounded-md border bg-white px-3 py-2 text-sm"
+                                    value={form.data.portal_role}
+                                    onChange={(e) => form.setData('portal_role', e.target.value)}
+                                >
+                                    <option value="client">Client</option>
+                                    <option value="next_of_kin">Next of kin</option>
+                                </select>
+                            </div>
+
+                            <div>
                                 <Label htmlFor="relation">Relation</Label>
                                 <select
                                     id="relation"
@@ -58,8 +104,11 @@ export default function ClientPortalUsers({ client, portal_users }: Props) {
                                     value={form.data.relation}
                                     onChange={(e) => form.setData('relation', e.target.value)}
                                 >
-                                    <option value="client">Client</option>
-                                    <option value="next_of_kin">Next of kin</option>
+                                    {relation_options.map((r) => (
+                                        <option key={r} value={r}>
+                                            {r.replace(/_/g, ' ')}
+                                        </option>
+                                    ))}
                                 </select>
                             </div>
 
@@ -68,6 +117,25 @@ export default function ClientPortalUsers({ client, portal_users }: Props) {
                                     Link user
                                 </Button>
                             </div>
+
+                            {userNotFound && (
+                                <div className="md:col-span-3 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm">
+                                    <div className="font-medium text-amber-900">
+                                        User not found for this email.
+                                    </div>
+                                    <div className="mt-1 text-amber-800">
+                                        Do you want to create a user for this person?
+                                    </div>
+                                    <div className="mt-3 flex flex-wrap gap-2">
+                                        <Button type="button" onClick={createUser} disabled={form.processing}>
+                                            Yes - create user and send password setup email
+                                        </Button>
+                                        <Button type="button" variant="secondary" onClick={saveContactOnly} disabled={form.processing}>
+                                            No - save as contact/display only
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
                         </form>
                     </CardContent>
                 </Card>

@@ -156,7 +156,14 @@ class SignalProcessingService
             ?? 'medium';
 
         // Determine alert type name
-        $alertType = $signalType?->name
+        $derivedRuleAlertType = null;
+        if ($rule && is_string($rule->name) && str_ends_with(strtolower($rule->name), ' rule')) {
+            $derivedRuleAlertType = preg_replace('/\s+rule$/i', '', $rule->name);
+        }
+
+        $alertType = $rule?->alert_type
+            ?? $derivedRuleAlertType
+            ?? $signalType?->name
             ?? str_replace('_', ' ', ucwords($signal->signal_type_code, '_'));
 
         // Find appropriate queue

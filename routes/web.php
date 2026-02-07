@@ -35,6 +35,8 @@ use App\Http\Controllers\QualityChecklistController;
 |
 */
 
+use App\Http\Controllers\ContactController;
+
 // Public routes
 Route::get('/', function () {
     return Inertia::render('home', [
@@ -42,9 +44,32 @@ Route::get('/', function () {
     ]);
 })->name('home');
 
-Route::get('/contact', function () {
-    return Inertia::render('Contact');
-})->name('contact');
+Route::get('/features', function () {
+    return Inertia::render('features');
+})->name('features');
+
+Route::get('/pricing', function () {
+    return Inertia::render('pricing');
+})->name('pricing');
+
+Route::get('/about', function () {
+    return Inertia::render('about');
+})->name('about');
+
+Route::get('/privacy', function () {
+    return Inertia::render('privacy');
+})->name('privacy');
+
+Route::get('/terms', function () {
+    return Inertia::render('terms');
+})->name('terms');
+
+Route::get('/smart-monitoring', function () {
+    return Inertia::render('smart-monitoring');
+})->name('smart-monitoring');
+
+Route::get('/contact', [ContactController::class, 'index'])->name('contact');
+Route::post('/contact', [ContactController::class, 'store']);
 
 // Authenticated routes
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -74,3 +99,6 @@ require __DIR__ . '/safeguarding.php';
 require __DIR__ . '/consents.php';
 require __DIR__ . '/training.php';
 require __DIR__ . '/privacy.php';
+
+// Board & Governance module
+require __DIR__ . '/governance.php';

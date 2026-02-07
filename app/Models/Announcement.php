@@ -56,6 +56,9 @@ class Announcement extends Model
         // If no roles specified, it's for everyone.
         // Otherwise, show if any of the user's role names match.
         $roleNames = $user->roles()->pluck('name')->values()->all();
+        if (empty($roleNames) && !empty($user->role)) {
+            $roleNames = [$user->role];
+        }
 
         return $query->where(function ($q) use ($roleNames) {
             $q->whereNull('audience_roles')

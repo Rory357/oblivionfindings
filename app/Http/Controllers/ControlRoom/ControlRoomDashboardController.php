@@ -98,7 +98,7 @@ class ControlRoomDashboardController extends Controller
         ];
 
         // Staff list for assignment filter
-        $staff = User::query()
+        $staff = User::staff()
             ->whereHas('roles', fn($q) => $q->whereIn('name', ['admin', 'provider_manager', 'coordinator']))
             ->orderBy('name')
             ->get(['id', 'name']);

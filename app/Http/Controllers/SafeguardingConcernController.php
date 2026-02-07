@@ -121,7 +121,6 @@ class SafeguardingConcernController extends Controller
 
         $validated['reported_by_user_id'] = auth()->id();
         $validated['reported_at'] = now();
-        $validated['organization_id'] = auth()->user()->organization_id;
         $validated['created_by'] = auth()->id();
 
         $concern = SafeguardingConcern::create($validated);

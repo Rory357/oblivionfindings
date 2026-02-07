@@ -2,11 +2,13 @@
 
 namespace App\Http\Controllers\Settings;
 
+use App\Domain\Governance\Models\BoardMember;
 use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class AccessController extends Controller
 {
@@ -15,7 +17,7 @@ class AccessController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('settings.access.manage'), 403);
 
-        $users = User::query()
+        $users = User::staff()
             ->orderBy('name')
             ->get(['id', 'name', 'email', 'role', 'approved_at'])
             ->load(['roles:id,name,label', 'permissionOverrides:id,key']);
@@ -34,11 +36,17 @@ class AccessController extends Controller
             $userOverrides[$u->id] = $pairs;
         }
 
+        // Board members
+        $boardMembers = BoardMember::with('user:id,name,email')
+            ->orderBy('board_role')
+            ->get();
+
         return inertia('settings/access', [
             'users' => $users,
             'roles' => $roles,
             'permissions' => $permissions,
             'userOverrides' => $userOverrides,
+            'boardMembers' => $boardMembers,
         ]);
     }
 
@@ -144,5 +152,110 @@ class AccessController extends Controller
             $target->permissionOverrides()->syncWithoutDetaching([$pid]);
             $target->permissionOverrides()->updateExistingPivot($pid, ['allowed' => $allowed]);
         }
+    }
+
+    // Board Member Management
+    public function storeBoardMember(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('settings.access.manage'), 403);
+
+        $data = $request->validate([
+            'user_id' => [
+                'required',
+                'integer',
+                'exists:users,id',
+                Rule::unique('board_members', 'user_id')->whereNull('deleted_at'),
+            ],
+            'board_role' => ['required', 'in:chair,secretary,treasurer,member,observer'],
+            'term_start' => ['required', 'date'],
+            'term_end' => ['nullable', 'date', 'after:term_start'],
+        ]);
+
+        $existing = BoardMember::withTrashed()
+            ->where('user_id', $data['user_id'])
+            ->first();
+
+        if ($existing) {
+            $existing->restore();
+            $existing->update([
+                'board_role' => $data['board_role'],
+                'term_start' => $data['term_start'],
+                'term_end' => $data['term_end'] ?? null,
+                'is_active' => true,
+                'is_independent' => true,
+            ]);
+        } else {
+            BoardMember::create([
+                'user_id' => $data['user_id'],
+                'board_role' => $data['board_role'],
+                'term_start' => $data['term_start'],
+                'term_end' => $data['term_end'] ?? null,
+                'is_active' => true,
+                'is_independent' => true,
+            ]);
+        }
+
+        // Auto-assign the corresponding system role for governance permissions
+        $targetUser = User::find($data['user_id']);
+        if ($targetUser) {
+            $this->assignBoardRole($targetUser, $data['board_role']);
+        }
+
+        return redirect()->back()->with('success', 'Board member appointed.');
+    }
+
+    public function destroyBoardMember(Request $request, BoardMember $boardMember)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('settings.access.manage'), 403);
+
+        $targetUser = $boardMember->user;
+
+        $boardMember->update(['is_active' => false]);
+        $boardMember->delete();
+
+        // Remove the board role from the user
+        if ($targetUser) {
+            $this->removeBoardRole($targetUser);
+        }
+
+        return redirect()->back()->with('success', 'Board member removed.');
+    }
+
+    /**
+     * Map board_role to system role name and assign it to the user.
+     */
+    private function assignBoardRole(User $user, string $boardRole): void
+    {
+        $roleMap = [
+            'chair' => 'board_chair',
+            'secretary' => 'board_secretary',
+            'treasurer' => 'board_member', // Treasurer uses board_member role
+            'member' => 'board_member',
+            'observer' => 'board_observer',
+        ];
+
+        $systemRoleName = $roleMap[$boardRole] ?? 'board_member';
+        $role = Role::where('name', $systemRoleName)->first();
+
+        if ($role) {
+            // Remove any existing board roles first
+            $this->removeBoardRole($user);
+
+            // Add the new board role
+            $user->roles()->attach($role->id);
+        }
+    }
+
+    /**
+     * Remove all board-related roles from a user.
+     */
+    private function removeBoardRole(User $user): void
+    {
+        $boardRoleNames = ['board_chair', 'board_secretary', 'board_member', 'board_observer'];
+        $boardRoleIds = Role::whereIn('name', $boardRoleNames)->pluck('id');
+
+        $user->roles()->detach($boardRoleIds);
     }
 }

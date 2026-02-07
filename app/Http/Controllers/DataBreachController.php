@@ -61,7 +61,7 @@ class DataBreachController extends Controller
     public function create(): Response
     {
         return Inertia::render('privacy/breaches/create', [
-            'staff' => User::select('id', 'name')->orderBy('name')->get(),
+            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 

@@ -17,12 +17,12 @@ class FleetDrivingMetricsService
             return;
         }
 
-        $date = $event->occurred_at?->toDateString() ?? now()->toDateString();
+        $periodDate = $event->occurred_at?->copy()->startOfDay() ?? now()->startOfDay();
         $metric = FleetDrivingMetric::firstOrCreate(
             [
                 'asset_id' => $event->asset_id,
-                'period_start' => $date,
-                'period_end' => $date,
+                'period_start' => $periodDate,
+                'period_end' => $periodDate,
             ],
             [
                 'harsh_brake_count' => 0,

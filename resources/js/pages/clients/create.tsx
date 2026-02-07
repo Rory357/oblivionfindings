@@ -1,7 +1,15 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, usePage } from '@inertiajs/react';
 
-export default function CreateClient({ sites = [], serviceContexts = [], defaultServiceContextId = null }: { sites: any[]; serviceContexts?: any[]; defaultServiceContextId?: number | null }) {
+export default function CreateClient({
+    sites = [],
+    serviceContexts = [],
+    defaultServiceContextId = null,
+}: {
+    sites: any[];
+    serviceContexts?: any[];
+    defaultServiceContextId?: number | null;
+}) {
     const { labels } = usePage().props as any;
     const clientSingular = labels?.['client.singular'] ?? 'Client';
     const clientPlural = labels?.['client.plural'] ?? 'Clients';
@@ -25,6 +33,7 @@ export default function CreateClient({ sites = [], serviceContexts = [], default
         postcode: '',
         funding_type: '',
         funding_notes: '',
+        create_client_portal_user: false,
     });
 
     function submit(e: React.FormEvent) {
@@ -220,6 +229,21 @@ export default function CreateClient({ sites = [], serviceContexts = [], default
                                     <div className="mt-1 text-xs text-red-400">{errors.email}</div>
                                 )}
                             </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-lg border p-3">
+                        <div className="text-sm font-medium">Portal Access (Client)</div>
+                        <label className="mt-3 flex items-center gap-2 text-sm">
+                            <input
+                                type="checkbox"
+                                checked={data.create_client_portal_user}
+                                onChange={(e) => setData('create_client_portal_user', e.target.checked)}
+                            />
+                            Create login account for this client
+                        </label>
+                        <div className="mt-2 text-xs text-slate-500">
+                            Uses the Contact email above. Contact email is required when this is checked.
                         </div>
                     </div>
 

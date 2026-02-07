@@ -1,472 +1,454 @@
-import Footer from '@/Components/Footer';
-import Header from '@/Components/Header';
-import { Head } from '@inertiajs/react';
+import MarketingLayout from '@/Layouts/marketing-layout';
+import { Link } from '@inertiajs/react';
+import { 
+    Activity, 
+    ArrowRight, 
+    Camera,
+    CheckCircle2, 
+    FileText, 
+    Heart,
+    LayoutDashboard, 
+    Pill, 
+    ScanEye,
+    Shield, 
+    Users 
+} from 'lucide-react';
 import React from 'react';
 
 const Home: React.FC = () => {
-    const year = new Date().getFullYear(); // still here if you need it, but Footer handles its own year
+    const features = [
+        {
+            icon: Users,
+            title: 'Resident Management',
+            description: 'Complete profiles, care plans, risk assessments and support histories in one place.',
+        },
+        {
+            icon: Activity,
+            title: 'Visit & Task Tracking',
+            description: 'Schedule, assign and track support visits with real-time status updates.',
+        },
+        {
+            icon: Pill,
+            title: 'Medication Management',
+            description: 'eMAR integration, controlled drug tracking and administration records.',
+        },
+        {
+            icon: Shield,
+            title: 'Compliance & Safeguarding',
+            description: 'Incident reporting, investigations, audits and regulatory readiness.',
+        },
+        {
+            icon: LayoutDashboard,
+            title: 'Staff & Rostering',
+            description: 'Shift scheduling, availability, credentials and competency tracking.',
+        },
+        {
+            icon: FileText,
+            title: 'Documentation',
+            description: 'Digital notes, assessments, handovers and evidence packs.',
+        },
+    ];
+
+    const benefits = [
+        'Reduce admin time by up to 40%',
+        'Audit-ready for certification',
+        'Real-time visibility across all services',
+        'Unlimited staff accounts',
+    ];
 
     return (
-        <>
-            <Head>
-                <title>Oblivion Findings · Supported Living Platform</title>
-                <meta
-                    name="description"
-                    content="Oblivion Findings helps supported living providers manage residents, visits, notes, and compliance in one simple, web-based dashboard."
-                />
-            </Head>
-
-            <div className="min-h-screen bg-slate-950 text-white">
-                {/* Gradient background */}
-                <div className="pointer-events-none fixed inset-0 -z-10 bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950" />
-
-                {/* Page container */}
-                <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-10 lg:px-8">
-                    {/* Top nav */}
-                    <Header />
-
-                    {/* Main content */}
-                    <main className="mt-10 space-y-16 sm:mt-16 sm:space-y-20">
-                        {/* Hero section */}
-                        <section className="grid gap-10 lg:grid-cols-2 lg:items-center">
-                            <div>
-                                <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-slate-800 bg-slate-900/40 px-3 py-1 text-[11px] text-slate-300">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                                    <span>
-                                        Built for supported living teams
-                                    </span>
-                                </div>
-
-                                <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl lg:text-5xl">
-                                    All your supported living{' '}
-                                    <span className="text-indigo-300">
-                                        organised in one place.
-                                    </span>
-                                </h1>
-
-                                <p className="mt-4 text-sm leading-relaxed text-slate-300 sm:text-base">
-                                    Oblivion Findings gives providers a clear,
-                                    up-to-date view of residents, visits, notes,
-                                    and compliance. Think WebCare-style
-                                    dashboards – but faster, simpler, and built
-                                    for real-world supported living workflows.
-                                </p>
-
-                                <div className="mt-6 flex flex-wrap items-center gap-3">
-                                    <button
-                                        type="button"
-                                        className="inline-flex items-center justify-center rounded-full bg-indigo-500 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-indigo-400"
-                                    >
-                                        Book a live demo
-                                    </button>
-
-                                    <button
-                                        type="button"
-                                        className="inline-flex items-center justify-center rounded-full border border-slate-700 px-4 py-2 text-xs text-slate-200 hover:bg-slate-900 sm:text-sm"
-                                    >
-                                        Watch 3-minute overview
-                                    </button>
-                                </div>
-
-                                <div className="mt-6 flex flex-wrap items-center gap-4 text-[11px] text-slate-400">
-                                    <div className="flex items-center gap-2">
-                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px]">
-                                            ✓
-                                        </span>
-                                        <span>
-                                            NDIS / supported living ready
-                                        </span>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-800 text-[10px]">
-                                            ✓
-                                        </span>
-                                        <span>
-                                            No long IT rollout – web based
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Mock dashboard illustration */}
-                            <div className="relative">
-                                <div className="absolute -top-10 -left-10 h-40 w-40 rounded-full bg-indigo-500/20 blur-3xl" />
-                                <div className="absolute -right-4 -bottom-8 h-40 w-40 rounded-full bg-emerald-500/10 blur-3xl" />
-
-                                <div className="relative rounded-3xl border border-slate-700/60 bg-slate-900/70 p-4 shadow-[0_0_40px_rgba(15,23,42,0.8)] sm:p-6">
-                                    <div className="mb-4 flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs text-slate-400">
-                                                Today
-                                            </p>
-                                            <p className="text-sm font-medium text-white">
-                                                Team dashboard
-                                            </p>
-                                        </div>
-                                        <div className="flex items-center gap-1">
-                                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-                                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
-                                            <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
-                                        </div>
-                                    </div>
-
-                                    {/* Mini stat grid */}
-                                    <div className="mb-4 grid grid-cols-2 gap-3 text-xs">
-                                        <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-3">
-                                            <p className="text-slate-400">
-                                                Active residents
-                                            </p>
-                                            <p className="mt-1 text-xl font-semibold text-white">
-                                                32
-                                            </p>
-                                            <p className="mt-1 text-[10px] text-emerald-400">
-                                                +3 this month
-                                            </p>
-                                        </div>
-                                        <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-3">
-                                            <p className="text-slate-400">
-                                                Support visits today
-                                            </p>
-                                            <p className="mt-1 text-xl font-semibold text-white">
-                                                18
-                                            </p>
-                                            <p className="mt-1 text-[10px] text-slate-400">
-                                                Across 4 locations
-                                            </p>
-                                        </div>
-                                        <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-3">
-                                            <p className="text-slate-400">
-                                                Staff on shift
-                                            </p>
-                                            <p className="mt-1 text-xl font-semibold text-white">
-                                                9
-                                            </p>
-                                            <p className="mt-1 text-[10px] text-emerald-400">
-                                                Coverage OK
-                                            </p>
-                                        </div>
-                                        <div className="rounded-2xl border border-slate-700/70 bg-slate-900/80 p-3">
-                                            <p className="text-slate-400">
-                                                Open incidents
-                                            </p>
-                                            <p className="mt-1 text-xl font-semibold text-white">
-                                                3
-                                            </p>
-                                            <p className="mt-1 text-[10px] text-amber-400">
-                                                2 overdue reviews
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Mini list */}
-                                    <div className="space-y-3 rounded-2xl border border-slate-700/70 bg-slate-900/70 p-3 text-[11px]">
-                                        <p className="mb-1 text-slate-400">
-                                            Next support visits
-                                        </p>
-
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-slate-200">
-                                                    Alex Johnson
-                                                </p>
-                                                <p className="text-slate-400">
-                                                    Medication &amp; morning
-                                                    check
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-slate-300">
-                                                    09:30
-                                                </p>
-                                                <p className="text-slate-500">
-                                                    Sarah L
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-slate-200">
-                                                    Priya Patel
-                                                </p>
-                                                <p className="text-slate-400">
-                                                    Community access
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-slate-300">
-                                                    11:00
-                                                </p>
-                                                <p className="text-slate-500">
-                                                    James M
-                                                </p>
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <div>
-                                                <p className="text-slate-200">
-                                                    Chris Taylor
-                                                </p>
-                                                <p className="text-slate-400">
-                                                    Daily living skills
-                                                </p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-slate-300">
-                                                    14:15
-                                                </p>
-                                                <p className="text-slate-500">
-                                                    Amelia B
-                                                </p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
-                        {/* Features */}
-                        <section id="features" className="space-y-6">
-                            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                                <div>
-                                    <h2 className="text-xl font-semibold text-white sm:text-2xl">
-                                        Everything you need to run supported
-                                        living
-                                    </h2>
-                                    <p className="mt-1 text-sm text-slate-300">
-                                        Forget spreadsheets and scattered notes.
-                                        Oblivion Findings pulls the pieces
-                                        together.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="grid gap-5 md:grid-cols-3">
-                                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
-                                    <p className="mb-1 text-xs font-medium text-indigo-300">
-                                        Residents &amp; care plans
-                                    </p>
-                                    <h3 className="text-sm font-semibold text-white">
-                                        A single view of each person you support
-                                    </h3>
-                                    <p className="mt-2 text-xs leading-relaxed text-slate-300">
-                                        See key information, outcomes, and risk
-                                        flags at a glance. Keep assessments and
-                                        care plans up-to-date without digging
-                                        through files.
-                                    </p>
-                                </div>
-
-                                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
-                                    <p className="mb-1 text-xs font-medium text-indigo-300">
-                                        Visits, notes &amp; tasks
-                                    </p>
-                                    <h3 className="text-sm font-semibold text-white">
-                                        Capture the day as it happens
-                                    </h3>
-                                    <p className="mt-2 text-xs leading-relaxed text-slate-300">
-                                        Log visits, notes and outcomes in real
-                                        time. Give your team clear handovers and
-                                        reduce the risk of missed actions.
-                                    </p>
-                                </div>
-
-                                <div className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
-                                    <p className="mb-1 text-xs font-medium text-indigo-300">
-                                        Compliance &amp; reporting
-                                    </p>
-                                    <h3 className="text-sm font-semibold text-white">
-                                        Be inspection-ready without the scramble
-                                    </h3>
-                                    <p className="mt-2 text-xs leading-relaxed text-slate-300">
-                                        Quickly evidence what good support looks
-                                        like. Export clean summaries for
-                                        managers, funders and regulators in a
-                                        few clicks.
-                                    </p>
-                                </div>
-                            </div>
-                        </section>
-
-                        {/* Providers / Workers */}
-                        <section
-                            id="providers"
-                            className="grid items-start gap-6 lg:grid-cols-[1.1fr_1fr]"
-                        >
-                            <div className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/70 p-5 sm:p-6">
-                                <p className="text-xs font-medium text-indigo-300">
-                                    For providers &amp; service managers
-                                </p>
-                                <h2 className="text-lg font-semibold text-white sm:text-xl">
-                                    Clarity for managers, calm for teams
-                                </h2>
-                                <p className="text-sm text-slate-300">
-                                    See what’s happening across your services in
-                                    real time: where staff are, who’s been
-                                    visited, what’s outstanding, and where risks
-                                    are emerging.
-                                </p>
-
-                                <ul className="mt-3 space-y-2 text-xs text-slate-300">
-                                    <li className="flex gap-2">
-                                        <span className="mt-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-800 text-[9px]">
-                                            ✓
-                                        </span>
-                                        <span>
-                                            Live view of visits completed, in
-                                            progress and missed
-                                        </span>
-                                    </li>
-                                    <li className="flex gap-2">
-                                        <span className="mt-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-800 text-[9px]">
-                                            ✓
-                                        </span>
-                                        <span>
-                                            Incident and escalation tracking
-                                            with clear follow-ups
-                                        </span>
-                                    </li>
-                                    <li className="flex gap-2">
-                                        <span className="mt-1 flex h-4 w-4 items-center justify-center rounded-full bg-slate-800 text-[9px]">
-                                            ✓
-                                        </span>
-                                        <span>
-                                            Simple exports for internal quality
-                                            reporting and funders
-                                        </span>
-                                    </li>
-                                </ul>
-                            </div>
-
-                            <div
-                                id="workers"
-                                className="space-y-4 rounded-3xl border border-slate-800 bg-slate-900/40 p-5 sm:p-6"
-                            >
-                                <p className="text-xs font-medium text-indigo-300">
-                                    For support workers
-                                </p>
-                                <h3 className="text-sm font-semibold text-white">
-                                    “I know exactly what my shift looks like”
-                                </h3>
-                                <p className="text-xs text-slate-300">
-                                    Workers see today’s visits, tasks and key
-                                    notes in one page – no more juggling paper
-                                    diaries and group chats.
-                                </p>
-
-                                <div className="space-y-2 rounded-2xl border border-slate-800 bg-slate-950/40 p-3 text-[11px]">
-                                    <div className="flex justify-between text-slate-300">
-                                        <span>Today’s caseload</span>
-                                        <span>Sarah L</span>
-                                    </div>
-                                    <div className="grid gap-2">
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-200">
-                                                09:30 • Alex J
-                                            </span>
-                                            <span className="text-emerald-400">
-                                                Planned
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-200">
-                                                11:00 • Priya P
-                                            </span>
-                                            <span className="text-slate-300">
-                                                In progress
-                                            </span>
-                                        </div>
-                                        <div className="flex justify-between">
-                                            <span className="text-slate-200">
-                                                14:15 • Chris T
-                                            </span>
-                                            <span className="text-slate-400">
-                                                Later
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-
-                        {/* Pricing / CTA */}
-                        <section id="pricing" className="space-y-6">
-                            <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                                <div>
-                                    <h2 className="text-xl font-semibold text-white">
-                                        Simple pricing for growing providers
-                                    </h2>
-                                    <p className="mt-1 text-sm text-slate-300">
-                                        Start small and scale as you bring more
-                                        services onto Oblivion Findings.
-                                    </p>
-                                </div>
-                            </div>
-
-                            <div className="grid gap-5 md:grid-cols-[1.1fr_1fr]">
-                                <div className="rounded-3xl border border-slate-800 bg-slate-900/70 p-5 sm:p-6">
-                                    <p className="text-xs font-medium text-indigo-300">
-                                        Core platform
-                                    </p>
-                                    <h3 className="mt-1 text-lg font-semibold text-white">
-                                        Per-resident pricing, no lock-in
-                                        contracts
-                                    </h3>
-                                    <p className="mt-2 text-sm text-slate-300">
-                                        Only pay for the residents you actively
-                                        manage in Oblivion Findings. Unlimited
-                                        staff accounts.
-                                    </p>
-
-                                    <ul className="mt-4 space-y-2 text-xs text-slate-300">
-                                        <li>
-                                            • Unlimited support worker logins
-                                        </li>
-                                        <li>
-                                            • All core modules (residents,
-                                            visits, notes, incidents)
-                                        </li>
-                                        <li>
-                                            • Email support and onboarding help
-                                        </li>
-                                    </ul>
-                                </div>
-
-                                <div className="space-y-3 rounded-3xl border border-slate-800 bg-slate-900/40 p-5 sm:p-6">
-                                    <p className="text-xs font-medium text-indigo-300">
-                                        Next step
-                                    </p>
-                                    <h3 className="text-sm font-semibold text-white">
-                                        Let’s look at your current setup
-                                    </h3>
-                                    <p className="text-xs text-slate-300">
-                                        Share how you’re currently tracking
-                                        visits, notes and incidents, and we’ll
-                                        show you how Oblivion Findings can
-                                        replace the patchwork.
-                                    </p>
-
-                                    <a
-                                        href="/contact"
-                                        className="mt-2 inline-flex items-center justify-center rounded-full bg-indigo-500 px-4 py-2 text-xs font-medium text-white shadow-sm hover:bg-indigo-400"
-                                    >
-                                        Talk to the team
-                                    </a>
-
-                                    <p className="text-[11px] text-slate-500">
-                                        No pressure sales call – just a
-                                        walkthrough with someone who understands
-                                        supported living services.
-                                    </p>
-                                </div>
-                            </div>
-                        </section>
-
-                        {/* Footer */}
-                        <Footer />
-                    </main>
+        <MarketingLayout>
+            {/* Hero Section */}
+            <section className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-muted/50 to-background px-6 py-16 sm:px-12 sm:py-24 lg:py-32">
+                {/* Background effects */}
+                <div className="pointer-events-none absolute inset-0">
+                    <div className="absolute -top-20 -right-20 h-[400px] w-[400px] rounded-full bg-primary/10 blur-3xl dark:bg-primary/10" />
+                    <div className="absolute -bottom-20 -left-20 h-[300px] w-[300px] rounded-full bg-emerald-500/10 blur-3xl dark:bg-emerald-500/10" />
                 </div>
-            </div>
-        </>
+
+                <div className="relative mx-auto max-w-4xl text-center">
+                    <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-4 py-1.5 text-sm text-primary">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                        <span>Built for New Zealand supported living providers</span>
+                    </div>
+
+                    <p className="mb-4 text-lg font-medium text-primary italic">
+                        Preserving stories. Powered by code. Fueled by care.
+                    </p>
+
+                    <h1 className="text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
+                        Everything your supported living{' '}
+                        <span className="bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">
+                            service needs to thrive
+                        </span>
+                    </h1>
+
+                    <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
+                        Oblivion Findings is a modern operations platform built specifically for 
+                        New Zealand supported living providers. Manage residents, staff, compliance, 
+                        smart monitoring and care delivery—all in one intuitive system.
+                    </p>
+
+                    <div className="mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                        <Link
+                            href="/contact"
+                            className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-8 py-4 text-base font-medium text-primary-foreground shadow-lg shadow-primary/25 transition-all hover:bg-primary/90 hover:shadow-primary/40"
+                        >
+                            Book a live demo
+                            <ArrowRight size={18} />
+                        </Link>
+
+                        <Link
+                            href="/features"
+                            className="inline-flex items-center justify-center gap-2 rounded-full border border-border bg-background px-8 py-4 text-base font-medium text-foreground transition-all hover:bg-muted"
+                        >
+                            Explore features
+                        </Link>
+                    </div>
+
+                    <div className="mt-12 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
+                        {benefits.map((benefit, index) => (
+                            <div key={index} className="flex items-center gap-2">
+                                <CheckCircle2 size={16} className="text-emerald-500" />
+                                <span>{benefit}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
+            {/* Control Room Highlight */}
+            <section className="mt-24">
+                <div className="rounded-3xl border border-border bg-gradient-to-br from-primary/5 to-background p-8 sm:p-12">
+                    <div className="grid items-center gap-10 lg:grid-cols-2">
+                        <div>
+                            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-sm text-primary">
+                                <Camera size={16} />
+                                <span>Smart Detection</span>
+                            </div>
+                            <h2 className="text-3xl font-bold text-foreground">
+                                Know what's happening.{' '}
+                                <span className="text-primary">Even when you're not there.</span>
+                            </h2>
+                            <p className="mt-4 text-lg text-muted-foreground">
+                                Our Control Room system provides intelligent monitoring with automatic 
+                                incident detection, timeline reconstruction, and real-time alerts—
+                                giving you complete situational awareness across all your locations.
+                            </p>
+                            <ul className="mt-6 space-y-3">
+                                {[
+                                    'Automatic detection of unusual activity patterns',
+                                    'Timeline reconstruction across multiple sensors',
+                                    'Smart alerts for motion and presence detection',
+                                    'Integrated with your Control Room dashboard',
+                                    'Privacy-compliant with configurable zones',
+                                ].map((item, index) => (
+                                    <li key={index} className="flex items-start gap-3">
+                                        <CheckCircle2 size={18} className="mt-0.5 shrink-0 text-emerald-500" />
+                                        <span className="text-muted-foreground">{item}</span>
+                                    </li>
+                                ))}
+                            </ul>
+                            <div className="mt-8">
+                                <Link
+                                    href="/smart-monitoring"
+                                    className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-6 py-3 text-sm font-medium text-foreground transition-all hover:bg-muted"
+                                >
+                                    Learn more about Smart Monitoring
+                                    <ArrowRight size={16} />
+                                </Link>
+                            </div>
+                        </div>
+
+                        {/* Control Room Preview - Shows alerts/detections only, no camera feeds */}
+                        <div className="relative">
+                            <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/20 to-purple-500/20 blur-2xl" />
+                            <div className="relative rounded-2xl border border-border bg-background p-4 shadow-2xl">
+                                <div className="mb-4 flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <ScanEye size={20} className="text-primary" />
+                                        <span className="font-medium text-foreground">Control Room</span>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                                        <span className="text-xs text-muted-foreground">Active</span>
+                                    </div>
+                                </div>
+                                
+                                {/* Detection Timeline */}
+                                <div className="space-y-3">
+                                    <div className="rounded-lg border border-border bg-muted/50 p-3">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                                            <span className="text-xs font-medium text-foreground">Location Status</span>
+                                            <span className="ml-auto text-[10px] text-muted-foreground">Now</span>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 text-[11px]">
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Main Entrance</span>
+                                                <span className="text-emerald-500">Normal</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Lounge</span>
+                                                <span className="text-emerald-500">Normal</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Kitchen</span>
+                                                <span className="text-amber-500">Activity</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Garden</span>
+                                                <span className="text-emerald-500">Normal</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Alert Panel */}
+                                    <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className="mt-0.5 flex h-2 w-2 shrink-0 rounded-full bg-amber-500" />
+                                            <div className="flex-1">
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-xs font-medium text-amber-600 dark:text-amber-400">
+                                                        Activity Detected
+                                                    </p>
+                                                    <span className="text-[10px] text-muted-foreground">14:32:18</span>
+                                                </div>
+                                                <p className="text-[10px] text-muted-foreground mt-1">
+                                                    Unusual motion pattern in Kitchen area during typically quiet period
+                                                </p>
+                                                <div className="mt-2 flex gap-2">
+                                                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] text-amber-600">Kitchen</span>
+                                                    <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] text-amber-600">Motion</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Timeline Reconstruction */}
+                                    <div className="rounded-lg border border-border bg-muted/50 p-3">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <div className="h-2 w-2 rounded-full bg-primary" />
+                                            <span className="text-xs font-medium text-foreground">Timeline Reconstruction</span>
+                                        </div>
+                                        <div className="space-y-2">
+                                            <div className="flex items-center gap-2 text-[11px]">
+                                                <span className="text-muted-foreground w-12">14:32</span>
+                                                <span className="text-emerald-500">●</span>
+                                                <span className="text-foreground">Entry detected</span>
+                                                <span className="ml-auto text-muted-foreground">Main Entrance</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[11px]">
+                                                <span className="text-muted-foreground w-12">14:33</span>
+                                                <span className="text-emerald-500">●</span>
+                                                <span className="text-foreground">Movement to lounge</span>
+                                                <span className="ml-auto text-muted-foreground">Hallway</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 text-[11px]">
+                                                <span className="text-muted-foreground w-12">14:35</span>
+                                                <span className="text-amber-500">●</span>
+                                                <span className="text-foreground">Activity in kitchen</span>
+                                                <span className="ml-auto text-muted-foreground">Kitchen</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* Features Grid */}
+            <section className="mt-24">
+                <div className="text-center">
+                    <h2 className="text-3xl font-bold tracking-tight text-foreground">
+                        Built for the realities of supported living
+                    </h2>
+                    <p className="mx-auto mt-4 max-w-2xl text-muted-foreground">
+                        Every feature designed with input from service managers, support workers 
+                        and compliance officers who understand what it takes to deliver great care.
+                    </p>
+                </div>
+
+                <div className="mt-12 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {features.map((feature, index) => {
+                        const Icon = feature.icon;
+                        return (
+                            <div
+                                key={index}
+                                className="group relative overflow-hidden rounded-2xl border border-border bg-card p-6 transition-all hover:border-primary/20 hover:shadow-lg hover:shadow-primary/5"
+                            >
+                                {/* Gloss overlay */}
+                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/40 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/10" />
+                                <div className="pointer-events-none absolute -inset-full top-0 block h-full w-1/2 -skew-x-12 bg-gradient-to-r from-transparent to-white/20 opacity-0 transition-all duration-700 group-hover:animate-shine" />
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-primary/20 to-primary/5 text-primary shadow-inner shadow-primary/10 transition-colors">
+                                    <Icon size={24} />
+                                </div>
+                                <h3 className="mt-4 text-lg font-semibold text-foreground">
+                                    {feature.title}
+                                </h3>
+                                <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+                                    {feature.description}
+                                </p>
+                            </div>
+                        );
+                    })}
+                </div>
+
+                <div className="mt-10 text-center">
+                    <Link
+                        href="/features"
+                        className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-6 py-3 text-sm font-medium text-foreground transition-all hover:bg-muted"
+                    >
+                        See all features
+                        <ArrowRight size={16} />
+                    </Link>
+                </div>
+            </section>
+
+            {/* Emotional Quote Section */}
+            <section className="mt-24">
+                <div className="rounded-3xl border border-border bg-gradient-to-br from-primary/10 via-primary/5 to-background p-8 sm:p-12">
+                    <div className="mx-auto max-w-3xl text-center">
+                        <div className="mb-6 inline-flex items-center justify-center">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary/20">
+                                <Heart className="h-6 w-6 text-primary" />
+                            </div>
+                        </div>
+                        <blockquote className="text-2xl font-medium text-foreground sm:text-3xl leading-relaxed">
+                            "Every person has a story worth telling. We're here to help you capture 
+                            those moments, preserve precious memories, and create a legacy that 
+                            lasts forever."
+                        </blockquote>
+                        <p className="mt-6 text-muted-foreground">
+                            More than just records and compliance—Oblivion Findings helps you honour 
+                            the lives and journeys of the people you support.
+                        </p>
+                    </div>
+                </div>
+            </section>
+
+            {/* Dashboard Preview Section */}
+            <section className="mt-24">
+                <div className="rounded-3xl border border-border bg-card p-1">
+                    <div className="rounded-[20px] bg-gradient-to-br from-muted/50 to-background p-6 sm:p-10">
+                        <div className="grid items-center gap-10 lg:grid-cols-2">
+                            <div>
+                                <h2 className="text-2xl font-bold text-foreground sm:text-3xl">
+                                    Clarity for managers.
+                                    <br />
+                                    <span className="text-primary">Simplicity for staff.</span>
+                                </h2>
+                                <p className="mt-4 text-muted-foreground">
+                                    Give your team the tools they need to focus on what matters—
+                                    delivering excellent person-centred support. No more 
+                                    paper diaries, missed handovers or hunting for information.
+                                </p>
+                                
+                                <div className="mt-8 space-y-4">
+                                    {[
+                                        'Real-time view of visits, incidents and tasks',
+                                        'Automated alerts for overdue actions',
+                                        'Mobile-friendly for staff on the move',
+                                        'Instant reports for inspections and audits',
+                                    ].map((item, index) => (
+                                        <div key={index} className="flex items-start gap-3">
+                                            <div className="mt-0.5 flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500/10">
+                                                <CheckCircle2 size={14} className="text-emerald-500" />
+                                            </div>
+                                            <span className="text-sm text-muted-foreground">{item}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Mock Dashboard */}
+                            <div className="relative">
+                                <div className="absolute -inset-4 rounded-3xl bg-gradient-to-r from-primary/10 to-emerald-500/10 blur-2xl" />
+                                <div className="relative rounded-2xl border border-border bg-background p-4 shadow-2xl">
+                                    <div className="mb-4 flex items-center gap-2">
+                                        <div className="flex gap-1.5">
+                                            <div className="h-3 w-3 rounded-full bg-rose-500/80" />
+                                            <div className="h-3 w-3 rounded-full bg-amber-500/80" />
+                                            <div className="h-3 w-3 rounded-full bg-emerald-500/80" />
+                                        </div>
+                                        <div className="flex-1 text-center text-xs text-muted-foreground">
+                                            Dashboard Preview
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="space-y-3">
+                                        <div className="grid grid-cols-2 gap-3">
+                                            <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-muted/80 to-muted/40 p-3 transition-all">
+                                                {/* Gloss overlay */}
+                                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/5" />
+                                                <div className="relative">
+                                                    <div className="text-xs text-muted-foreground">Active Residents</div>
+                                                    <div className="text-xl font-semibold text-foreground">42</div>
+                                                    <div className="text-[10px] text-emerald-500">+4 this month</div>
+                                                </div>
+                                            </div>
+                                            <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-muted/80 to-muted/40 p-3 transition-all">
+                                                {/* Gloss overlay */}
+                                                <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/5" />
+                                                <div className="relative">
+                                                    <div className="text-xs text-muted-foreground">Visits Today</div>
+                                                    <div className="text-xl font-semibold text-foreground">28</div>
+                                                    <div className="text-[10px] text-muted-foreground">Across 6 locations</div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="group relative overflow-hidden rounded-xl bg-gradient-to-br from-muted/80 to-muted/40 p-3 transition-all">
+                                            {/* Gloss overlay */}
+                                            <div className="pointer-events-none absolute inset-0 bg-gradient-to-br from-white/30 via-transparent to-transparent opacity-0 transition-opacity group-hover:opacity-100 dark:from-white/5" />
+                                            <div className="relative">
+                                                <div className="mb-2 text-xs text-muted-foreground">Recent Activity</div>
+                                                {[1, 2, 3].map((_, i) => (
+                                                    <div key={i} className="flex items-center justify-between py-1.5 text-xs">
+                                                        <span className="text-foreground">Visit completed • Alex M</span>
+                                                        <span className="text-muted-foreground">{10 + i * 5}m ago</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            {/* CTA Section */}
+            <section className="mt-24">
+                <div className="rounded-3xl bg-gradient-to-r from-primary to-primary/90 px-6 py-12 sm:px-12 sm:py-16">
+                    <div className="mx-auto max-w-3xl text-center">
+                        <h2 className="text-2xl font-bold text-primary-foreground sm:text-3xl">
+                            Ready to modernise your supported living operations?
+                        </h2>
+                        <p className="mt-4 text-primary-foreground/80">
+                            Get a personalised demo tailored to your New Zealand service.
+                        </p>
+                        <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+                            <Link
+                                href="/contact"
+                                className="inline-flex items-center justify-center gap-2 rounded-full bg-background px-8 py-4 text-base font-medium text-foreground shadow-lg transition-all hover:bg-background/90"
+                            >
+                                Schedule your demo
+                                <ArrowRight size={18} />
+                            </Link>
+                            <Link
+                                href="/pricing"
+                                className="inline-flex items-center justify-center gap-2 rounded-full border border-primary-foreground/30 bg-primary-foreground/10 px-8 py-4 text-base font-medium text-primary-foreground transition-all hover:bg-primary-foreground/20"
+                            >
+                                View pricing
+                            </Link>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </MarketingLayout>
     );
 };
 

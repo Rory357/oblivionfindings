@@ -48,7 +48,7 @@ class SignalProcessingServiceTest extends TestCase
 
         $signalType = SignalType::create([
             'code' => 'test.signal',
-            'label' => 'Test Signal',
+            'name' => 'Test Signal',
             'category' => 'fleet',
             'default_severity' => 'medium',
         ]);
@@ -80,7 +80,7 @@ class SignalProcessingServiceTest extends TestCase
 
         $signalType = SignalType::create([
             'code' => 'test.dedup',
-            'label' => 'Dedup Test',
+            'name' => 'Dedup Test',
             'category' => 'fleet',
             'default_severity' => 'medium',
         ]);
@@ -116,7 +116,7 @@ class SignalProcessingServiceTest extends TestCase
 
         $signalType = SignalType::create([
             'code' => 'fleet.speeding',
-            'label' => 'Speeding Alert',
+            'name' => 'Speeding Alert',
             'category' => 'fleet',
             'default_severity' => 'high',
         ]);
@@ -165,7 +165,7 @@ class SignalProcessingServiceTest extends TestCase
 
         $signalType = SignalType::create([
             'code' => 'maint.test',
-            'label' => 'Maint Test',
+            'name' => 'Maint Test',
             'category' => 'fleet',
             'default_severity' => 'medium',
         ]);
@@ -207,7 +207,7 @@ class SignalProcessingServiceTest extends TestCase
 
         $signalType = SignalType::create([
             'code' => 'unmatched.signal',
-            'label' => 'Unmatched Signal',
+            'name' => 'Unmatched Signal',
             'category' => 'fleet',
             'default_severity' => 'low',
         ]);
@@ -244,7 +244,7 @@ class SignalProcessingServiceTest extends TestCase
 
         $signalType = SignalType::create([
             'code' => 'batch.test',
-            'label' => 'Batch Test',
+            'name' => 'Batch Test',
             'category' => 'fleet',
             'default_severity' => 'medium',
         ]);
@@ -279,7 +279,7 @@ class SignalProcessingServiceTest extends TestCase
 
         $signalType = SignalType::create([
             'code' => 'limit.test',
-            'label' => 'Limit Test',
+            'name' => 'Limit Test',
             'category' => 'fleet',
             'default_severity' => 'medium',
         ]);
@@ -317,7 +317,7 @@ class SignalProcessingServiceTest extends TestCase
 
         $signalType = SignalType::create([
             'code' => 'device.alarm',
-            'label' => 'Device Alarm',
+            'name' => 'Device Alarm',
             'category' => 'home_facility',
             'default_severity' => 'high',
         ]);

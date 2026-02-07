@@ -32,6 +32,7 @@ const GROUP_LABELS: Record<string, string> = {
     portal: 'Portal',
     documents: 'Documents',
     medications: 'Medications',
+    governance: 'Governance',
 };
 
 function formatGroupName(group: string) {

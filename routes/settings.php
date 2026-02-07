@@ -47,6 +47,14 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:settings.access.manage')
         ->name('settings.access.approve');
 
+    // Board Member Management (integrated with access control)
+    Route::post('settings/board-members', [AccessController::class, 'storeBoardMember'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.board-members.store');
+    Route::delete('settings/board-members/{boardMember}', [AccessController::class, 'destroyBoardMember'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.board-members.destroy');
+
     // Roles (create/edit roles + attach permissions)
     Route::get('settings/roles', [RolesController::class, 'index'])
         ->middleware('permission:settings.access.manage')

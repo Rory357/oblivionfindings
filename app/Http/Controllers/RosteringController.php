@@ -87,12 +87,16 @@ class RosteringController extends Controller
 
         $timeOffs = $timeOffQuery->get();
 
-        // Conflict detection (UI-only warnings): overlaps per staff and per client.
+        // Conflict detection (UI-only warnings): actionable overlaps only.
+        // Completed shifts are immutable (locked) and cancelled shifts are non-actionable.
+        $actionableShifts = $shifts->filter(fn ($s) => !in_array($s->status, ['completed', 'cancelled'], true))->values();
+
+        // Overlaps per staff and per client.
         $staffOverlapCount = 0;
         $clientOverlapCount = 0;
 
         if ($canManageAny) {
-            $staffGroups = $shifts
+            $staffGroups = $actionableShifts
                 ->filter(fn ($s) => !empty($s->user_id))
                 ->groupBy('user_id');
 
@@ -107,7 +111,7 @@ class RosteringController extends Controller
                 }
             }
 
-            $clientGroups = $shifts->groupBy('client_id');
+            $clientGroups = $actionableShifts->groupBy('client_id');
             foreach ($clientGroups as $group) {
                 $sorted = $group->sortBy('starts_at')->values();
                 for ($i = 1; $i < $sorted->count(); $i++) {
@@ -124,7 +128,7 @@ class RosteringController extends Controller
         $timeOffConflicts = 0;
         if ($canManageAny) {
             $byUser = $timeOffs->groupBy('user_id');
-            foreach ($shifts->filter(fn($s) => !empty($s->user_id)) as $s) {
+            foreach ($actionableShifts->filter(fn($s) => !empty($s->user_id)) as $s) {
                 $blocks = $byUser->get($s->user_id);
                 if (!$blocks) continue;
                 foreach ($blocks as $b) {

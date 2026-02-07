@@ -16,7 +16,9 @@ class Device extends Model
     protected $fillable = [
         'name',
         'device_uid',
+        'identifier',
         'type',
+        'device_type',
         'vendor',
         'model',
         'site_id',
@@ -45,6 +47,29 @@ class Device extends Model
         'latitude' => 'decimal:8',
         'longitude' => 'decimal:8',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $device): void {
+            if (empty($device->device_uid)) {
+                $device->device_uid = 'dev-' . (string) \Illuminate\Support\Str::uuid();
+            }
+
+            if (empty($device->type)) {
+                $device->type = self::TYPE_SENSOR;
+            }
+        });
+    }
+
+    public function setDeviceTypeAttribute($value): void
+    {
+        $this->attributes['type'] = $value;
+    }
+
+    public function setIdentifierAttribute($value): void
+    {
+        $this->attributes['device_uid'] = $value;
+    }
 
     public function signalSource(): BelongsTo
     {

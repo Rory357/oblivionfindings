@@ -17,6 +17,17 @@
     --radius-md: calc(var(--radius) - 2px);
     --radius-sm: calc(var(--radius) - 4px);
 
+    --animate-shine: shine 1s ease-in-out;
+
+    @keyframes shine {
+        from {
+            left: -100%;
+        }
+        to {
+            left: 200%;
+        }
+    }
+
     --color-background: var(--background);
     --color-foreground: var(--foreground);
 

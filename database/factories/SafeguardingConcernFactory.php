@@ -18,7 +18,20 @@ class SafeguardingConcernFactory extends Factory
     {
         return [
             'concern_type' => fake()->randomElement(['abuse', 'neglect', 'self_neglect', 'exploitation', 'discrimination']),
-            'abuse_category' => fake()->randomElement(['physical', 'emotional', 'sexual', 'financial', 'organisational']),
+            'abuse_category' => fake()->randomElement([
+                'physical',
+                'sexual',
+                'emotional',
+                'psychological',
+                'financial',
+                'discriminatory',
+                'institutional',
+                'neglect',
+                'self-neglect',
+                'domestic_violence',
+                'modern_slavery',
+                'other',
+            ]),
             'severity' => fake()->randomElement(['low', 'medium', 'high', 'critical']),
             'description' => fake()->paragraph(),
             'occurred_at' => now()->subDays(fake()->numberBetween(0, 7)),

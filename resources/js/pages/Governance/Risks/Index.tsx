@@ -1,0 +1,257 @@
+import { Head, Link } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import AppLayout from '@/layouts/app-layout';
+import { index as risksIndex, create as createRisk, heatmap as risksHeatmap, show as showRisk } from '@/routes/governance/risks';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { AlertTriangle, TrendingUp, Shield, AlertCircle } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useState } from 'react';
+
+interface Risk {
+  id: number;
+  risk_reference: string;
+  title: string;
+  category: string;
+  residual_score: number;
+  status: string;
+  within_appetite: boolean;
+  risk_owner: { name: string };
+  treatments_count: number;
+}
+
+interface Props extends PageProps {
+  risks: {
+    data: Risk[];
+    links: Array<{ url: string | null; label: string; active: boolean }>;
+  };
+  categories: Array<{ value: string; label: string }>;
+  summary: Record<string, { total: number; critical: number; high: number; above_appetite: number }>;
+  filters: {
+    category?: string;
+    status?: string;
+    severity?: string;
+  };
+}
+
+export default function RiskIndex({ auth, risks, categories, summary, filters }: Props) {
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const getRiskColor = (score: number) => {
+    if (score >= 20) return 'bg-red-500';
+    if (score >= 15) return 'bg-orange-500';
+    if (score >= 10) return 'bg-yellow-500';
+    return 'bg-green-500';
+  };
+
+  const getRiskLevel = (score: number) => {
+    if (score >= 20) return 'Critical';
+    if (score >= 15) return 'High';
+    if (score >= 10) return 'Medium';
+    return 'Low';
+  };
+
+  const totalStats = Object.values(summary).reduce((acc, cat) => ({
+    total: acc.total + cat.total,
+    critical: acc.critical + cat.critical,
+    high: acc.high + cat.high,
+    above_appetite: acc.above_appetite + cat.above_appetite,
+  }), { total: 0, critical: 0, high: 0, above_appetite: 0 });
+
+  return (
+    <AppLayout
+      user={auth.user}
+      breadcrumbs={[
+        { title: 'Governance', href: '/governance/dashboard' },
+        { title: 'Risks', href: '/governance/risks' },
+      ]}
+    >
+      <Head title="Risk Register" />
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Risk Register</h1>
+              <p className="text-gray-500 mt-1">Enterprise risk management</p>
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" asChild>
+                <Link href={risksHeatmap.url()}>Risk Heatmap</Link>
+              </Button>
+              <Button asChild>
+                <Link href={createRisk.url()}>Add Risk</Link>
+              </Button>
+            </div>
+          </div>
+
+          {/* Summary Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Total Risks</p>
+                    <p className="text-3xl font-bold">{totalStats.total}</p>
+                  </div>
+                  <Shield className="w-8 h-8 text-gray-400" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-red-200">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-red-600">Critical</p>
+                    <p className="text-3xl font-bold text-red-600">{totalStats.critical}</p>
+                  </div>
+                  <AlertTriangle className="w-8 h-8 text-red-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-orange-200">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-orange-600">High</p>
+                    <p className="text-3xl font-bold text-orange-600">{totalStats.high}</p>
+                  </div>
+                  <AlertCircle className="w-8 h-8 text-orange-500" />
+                </div>
+              </CardContent>
+            </Card>
+            <Card className="border-purple-200">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-purple-600">Above Appetite</p>
+                    <p className="text-3xl font-bold text-purple-600">{totalStats.above_appetite}</p>
+                  </div>
+                  <TrendingUp className="w-8 h-8 text-purple-500" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Filters */}
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="flex gap-4">
+                <Input
+                  placeholder="Search risks..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="max-w-sm"
+                />
+                <Select defaultValue={filters.category || 'all'}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat.value} value={cat.value}>{cat.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select defaultValue={filters.status || 'all'}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="mitigating">Mitigating</SelectItem>
+                    <SelectItem value="accepted">Accepted</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Risk List */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Active Risks</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {risks.data.map((risk) => (
+                  <div
+                    key={risk.id}
+                    className={cn(
+                      "flex items-center justify-between p-4 rounded-lg border hover:bg-gray-50 transition-colors",
+                      !risk.within_appetite && "border-purple-200 bg-purple-50/50"
+                    )}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={cn("w-12 h-12 rounded-full flex items-center justify-center text-white font-bold", getRiskColor(risk.residual_score))}>
+                        {risk.residual_score}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Link 
+                            href={showRisk.url({ risk: risk.id })}
+                            className="font-semibold text-gray-900 hover:text-blue-600"
+                          >
+                            {risk.title}
+                          </Link>
+                          <Badge variant="outline">{risk.risk_reference}</Badge>
+                          {!risk.within_appetite && (
+                            <Badge className="bg-purple-100 text-purple-800">Above Appetite</Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-4 mt-1 text-sm text-gray-500">
+                          <span>{categories.find(c => c.value === risk.category)?.label}</span>
+                          <span>•</span>
+                          <span>Owner: {risk.risk_owner.name}</span>
+                          {risk.treatments_count > 0 && (
+                            <>
+                              <span>•</span>
+                              <span>{risk.treatments_count} treatment{risk.treatments_count > 1 ? 's' : ''}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <Badge className={cn(getRiskColor(risk.residual_score), 'text-white')}>
+                        {getRiskLevel(risk.residual_score)}
+                      </Badge>
+                      <Button variant="ghost" size="sm" asChild>
+                        <Link href={showRisk.url({ risk: risk.id })}>View →</Link>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Pagination */}
+              {risks.links.length > 3 && (
+                <div className="flex justify-center gap-2 mt-6">
+                  {risks.links.map((link, i) => (
+                    <Button
+                      key={i}
+                      variant={link.active ? 'default' : 'outline'}
+                      size="sm"
+                      disabled={!link.url}
+                      asChild={!!link.url}
+                    >
+                      {link.url ? (
+                        <Link href={link.url} dangerouslySetInnerHTML={{ __html: link.label }} />
+                      ) : (
+                        <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                      )}
+                    </Button>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+      </div>
+    </AppLayout>
+  );
+}

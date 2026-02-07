@@ -14,6 +14,7 @@ class Signal extends Model
         'signal_source_id',
         'signal_type_id',
         'signal_type_code',
+        'received_at',
         'idempotency_key',
         'site_id',
         'client_id',
@@ -37,6 +38,28 @@ class Signal extends Model
         'payload' => 'array',
         'normalized_data' => 'array',
     ];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $signal): void {
+            // Ensure required signal_type_code exists when only signal_type_id/code is provided.
+            if (empty($signal->signal_type_code) && !empty($signal->signal_type_id)) {
+                $signalType = SignalType::find($signal->signal_type_id);
+                if ($signalType) {
+                    $signal->signal_type_code = $signalType->code;
+                }
+            }
+
+            if (empty($signal->occurred_at)) {
+                $signal->occurred_at = now();
+            }
+        });
+    }
+
+    public function setReceivedAtAttribute($value): void
+    {
+        $this->attributes['occurred_at'] = $value;
+    }
 
     public function signalSource(): BelongsTo
     {

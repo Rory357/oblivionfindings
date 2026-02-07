@@ -15,13 +15,17 @@ class TimesheetController extends Controller
         $auth = $request->user();
         abort_unless($auth && ($auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny')), 403);
 
-        return redirect()->route('timesheets.index', array_filter([
-            'mode' => 'approvals',
-            'from' => $request->query('from'),
-            'to' => $request->query('to'),
-            'client_id' => $request->query('client_id'),
-            'staff_id' => $request->query('staff_id'),
-        ], fn($v) => $v !== null && $v !== ''));
+        $pending = Timesheet::query()
+            ->with(['client:id,first_name,last_name', 'staff:id,name,email'])
+            ->where('status', 'submitted')
+            ->orderByDesc('submitted_at')
+            ->paginate(25)
+            ->withQueryString();
+
+        return inertia('timesheets/approvals', [
+            'timesheets' => $pending,
+            'filters' => $request->only(['from', 'to', 'client_id', 'staff_id']),
+        ]);
     }
 
     public function bulkApprove(Request $request)
@@ -76,7 +80,7 @@ class TimesheetController extends Controller
             if ($t->status !== 'submitted') {
                 continue;
             }
-            $t->status = 'returned';
+            $t->status = 'draft';
             $t->returned_by = $auth->id;
             $t->returned_at = now();
             $t->returned_notes = $data['returned_notes'];
@@ -217,6 +221,11 @@ class TimesheetController extends Controller
         ]);
     }
 
+    public function show(Request $request, Timesheet $timesheet)
+    {
+        return $this->edit($request, $timesheet);
+    }
+
     public function store(Request $request)
     {
         $auth = $request->user();
@@ -305,7 +314,7 @@ class TimesheetController extends Controller
 
         // Only editable while draft/returned (audit safety)
         if (!in_array($timesheet->status, ['draft', 'returned'], true)) {
-            abort(403);
+            return back()->with('error', 'Only draft or returned timesheets can be edited.');
         }
 
         $data = $request->validate([
@@ -413,13 +422,19 @@ class TimesheetController extends Controller
         abort_unless($timesheet->status === 'submitted', 403);
 
         $data = $request->validate([
-            'decision_notes' => ['required', 'string', 'max:5000'],
+            'decision_notes' => ['nullable', 'string', 'max:5000'],
+            'rejection_reason' => ['nullable', 'string', 'max:5000'],
         ]);
+
+        $decisionNotes = $data['decision_notes'] ?? $data['rejection_reason'] ?? null;
+        if (!$decisionNotes) {
+            return back()->withErrors(['decision_notes' => 'Decision notes are required.']);
+        }
 
         $timesheet->status = 'rejected';
         $timesheet->approved_by = $auth->id;
         $timesheet->approved_at = now();
-        $timesheet->decision_notes = $data['decision_notes'];
+        $timesheet->decision_notes = $decisionNotes;
         $timesheet->save();
 
         $timesheet->load(['shift.client']);
@@ -441,13 +456,19 @@ class TimesheetController extends Controller
         abort_unless($timesheet->status === 'submitted', 403);
 
         $data = $request->validate([
-            'returned_notes' => ['required', 'string', 'max:5000'],
+            'returned_notes' => ['nullable', 'string', 'max:5000'],
+            'return_reason' => ['nullable', 'string', 'max:5000'],
         ]);
 
-        $timesheet->status = 'returned';
+        $returnedNotes = $data['returned_notes'] ?? $data['return_reason'] ?? null;
+        if (!$returnedNotes) {
+            return back()->withErrors(['returned_notes' => 'Returned notes are required.']);
+        }
+
+        $timesheet->status = 'draft';
         $timesheet->returned_by = $auth->id;
         $timesheet->returned_at = now();
-        $timesheet->returned_notes = $data['returned_notes'];
+        $timesheet->returned_notes = $returnedNotes;
         // clear decision
         $timesheet->approved_by = null;
         $timesheet->approved_at = null;

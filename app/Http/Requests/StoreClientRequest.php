@@ -23,7 +23,7 @@ class StoreClientRequest extends FormRequest
             'gender' => ['nullable', 'string', 'max:50'],
             'status'     => ['required', 'in:active,inactive'],
             'phone' => ['nullable', 'string', 'max:50'],
-            'email' => ['nullable', 'email', 'max:255'],
+            'email' => ['nullable', 'email', 'max:255', 'required_if:create_client_portal_user,true'],
             'address_line_1' => ['nullable', 'string', 'max:255'],
             'address_line_2' => ['nullable', 'string', 'max:255'],
             'suburb' => ['nullable', 'string', 'max:255'],
@@ -31,6 +31,10 @@ class StoreClientRequest extends FormRequest
             'postcode' => ['nullable', 'string', 'max:20'],
             'funding_type' => ['nullable', 'string', 'max:100'],
             'funding_notes' => ['nullable', 'string', 'max:2000'],
+
+            // Optional portal account for the client themselves.
+            'create_client_portal_user' => ['nullable', 'boolean'],
+
         ];
     }
 }

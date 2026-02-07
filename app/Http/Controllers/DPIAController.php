@@ -56,7 +56,7 @@ class DPIAController extends Controller
     public function create(): Response
     {
         return Inertia::render('privacy/dpia/create', [
-            'staff' => User::select('id', 'name')->orderBy('name')->get(),
+            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 
@@ -110,7 +110,7 @@ class DPIAController extends Controller
     {
         return Inertia::render('privacy/dpia/edit', [
             'dpia' => $dpia,
-            'staff' => User::select('id', 'name')->orderBy('name')->get(),
+            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 

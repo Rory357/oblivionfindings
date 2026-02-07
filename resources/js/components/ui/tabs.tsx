@@ -76,13 +76,14 @@ export function Tabs({
     scrollable = false,
     persistKey,
 }: TabsProps) {
+    const safeTabs = tabs ?? [];
     const scrollRef = useRef<HTMLDivElement>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
 
     const { mounted, getInitialIndex, saveTab } = usePersistentTab(
         persistKey,
-        tabs
+        safeTabs
     );
 
     // Check scrollability
@@ -114,7 +115,7 @@ export function Tabs({
 
     // Handle tab change with persistence
     const handleChange = (index: number) => {
-        const key = tabs[index]?.key;
+        const key = safeTabs[index]?.key;
         if (key) {
             saveTab(key);
             onValueChange?.(key);
@@ -123,7 +124,7 @@ export function Tabs({
 
     // Get selected index for controlled mode
     const selectedIndex =
-        value !== undefined ? tabs.findIndex((t) => t.key === value) : undefined;
+        value !== undefined ? safeTabs.findIndex((t) => t.key === value) : undefined;
 
     // Don't render until mounted to prevent hydration mismatch with persisted tabs
     if (persistKey && !mounted) {
@@ -145,7 +146,7 @@ export function Tabs({
             )}
             ref={scrollRef}
         >
-            {tabs.map((t) => (
+            {safeTabs.map((t) => (
                 <Tab
                     key={t.key}
                     className={({ selected }) =>
@@ -208,9 +209,9 @@ export function Tabs({
                 )}
             </div>
 
-            {tabs.some((t) => t.content) && (
+            {safeTabs.some((t) => t.content) && (
                 <Tab.Panels className={cn('mt-4', panelClassName)}>
-                    {tabs.map((t) => (
+                    {safeTabs.map((t) => (
                         <Tab.Panel key={t.key} className="outline-none">
                             {t.content}
                         </Tab.Panel>
@@ -235,6 +236,7 @@ export function VerticalTabs({
     contentClassName,
     ...props
 }: VerticalTabsProps) {
+    const safeTabs = tabs ?? [];
     const TabGroup = (
         <Tab.Group defaultIndex={0}>
             <div className="flex gap-6">
@@ -244,7 +246,7 @@ export function VerticalTabs({
                         sidebarClassName
                     )}
                 >
-                    {tabs.map((t) => (
+                    {safeTabs.map((t) => (
                         <Tab
                             key={t.key}
                             className={({ selected }) =>
@@ -263,9 +265,9 @@ export function VerticalTabs({
                     ))}
                 </Tab.List>
 
-                {tabs.some((t) => t.content) && (
+                {safeTabs.some((t) => t.content) && (
                     <Tab.Panels className={cn('flex-1', contentClassName)}>
-                        {tabs.map((t) => (
+                        {safeTabs.map((t) => (
                             <Tab.Panel key={t.key} className="outline-none">
                                 {t.content}
                             </Tab.Panel>
@@ -279,4 +281,12 @@ export function VerticalTabs({
     return TabGroup;
 }
 
+// Shadcn/ui compatible exports for components that use the standard API
+import * as TabsPrimitive from '@radix-ui/react-tabs';
+
+const TabsList = TabsPrimitive.List;
+const TabsTrigger = TabsPrimitive.Trigger;
+const TabsContent = TabsPrimitive.Content;
+
+export { TabsList, TabsTrigger, TabsContent };
 export default Tabs;

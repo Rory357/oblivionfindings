@@ -61,6 +61,27 @@ class RbacSeeder extends Seeder
             ['label' => 'Next of Kin / Guardian (Portal)']
         );
 
+        // Board/Governance roles
+        $boardChair = Role::firstOrCreate(
+            ['name' => 'board_chair'],
+            ['label' => 'Board Chair']
+        );
+
+        $boardSecretary = Role::firstOrCreate(
+            ['name' => 'board_secretary'],
+            ['label' => 'Board Secretary']
+        );
+
+        $boardMemberRole = Role::firstOrCreate(
+            ['name' => 'board_member'],
+            ['label' => 'Board Member']
+        );
+
+        $boardObserver = Role::firstOrCreate(
+            ['name' => 'board_observer'],
+            ['label' => 'Board Observer']
+        );
+
         // Remove any roles we are not using right now (but only if they are not assigned).
         // This keeps the Access Control UI role list clean.
         $activeRoleNames = [
@@ -73,6 +94,11 @@ class RbacSeeder extends Seeder
             'next_of_kin',
             'client',
             'auditor',
+            // Board/Governance roles
+            'board_chair',
+            'board_secretary',
+            'board_member',
+            'board_observer',
         ];
         Role::query()
             ->whereNotIn('name', $activeRoleNames)

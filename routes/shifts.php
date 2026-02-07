@@ -94,6 +94,9 @@ Route::middleware(['auth'])->group(function () {
         ->name('timesheets.store');
 
     // Timesheet updates
+    Route::get('/timesheets/{timesheet}', [TimesheetController::class, 'show'])
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
+        ->name('timesheets.show');
     Route::get('/timesheets/{timesheet}/edit', [TimesheetController::class, 'edit'])
         ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
         ->name('timesheets.edit');

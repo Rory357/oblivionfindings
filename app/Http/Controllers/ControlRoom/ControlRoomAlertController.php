@@ -124,7 +124,7 @@ class ControlRoomAlertController extends Controller
                 'assign' => $user->canDo('controlRoom.alerts.assign'),
                 'escalate' => $user->canDo('controlRoom.alerts.escalate'),
             ],
-            'staff' => User::query()
+            'staff' => User::staff()
                 ->whereHas('roles', fn($q) => $q->whereIn('name', ['admin', 'provider_manager', 'coordinator']))
                 ->orderBy('name')
                 ->get(['id', 'name', 'email']),
@@ -327,7 +327,7 @@ class ControlRoomAlertController extends Controller
 
         $data = $request->validate([
             'escalation_reason' => ['required', 'string', 'max:1000'],
-            'escalation_level' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'escalation_level' => ['nullable', 'integer', 'min:1'],
         ]);
 
         $newLevel = $data['escalation_level'] ?? (($alert->escalation_level ?? 0) + 1);

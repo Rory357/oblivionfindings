@@ -23,6 +23,10 @@ use App\Http\Controllers\SiteDocumentController;
  * Handles assets, inspections, maintenance, QR codes, and sites.
  */
 
+// Telemetry ingest endpoint supports token-based auth for device integrations.
+Route::post('/telemetry/ingest/{vendor}', [AssetTelemetryIngestController::class, 'store'])
+    ->name('assets.telemetry.ingest');
+
 Route::middleware(['auth'])->group(function () {
     // Sites
     Route::middleware('permission:sites.viewAny')->group(function () {
@@ -200,7 +204,8 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::middleware('permission:assets.telemetry.ingest')->group(function () {
-        Route::post('/telemetry/ingest/{vendor}', [AssetTelemetryIngestController::class, 'store'])
-            ->name('assets.telemetry.ingest');
+        // Keep a protected path for manual/internal use.
+        Route::post('/telemetry/ingest/{vendor}/staff', [AssetTelemetryIngestController::class, 'store'])
+            ->name('assets.telemetry.ingest.staff');
     });
 });

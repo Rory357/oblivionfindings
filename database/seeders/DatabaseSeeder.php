@@ -36,6 +36,9 @@ class DatabaseSeeder extends Seeder
         $this->call(FleetDemoSeeder::class);
         $this->call(FleetManagementSeeder::class);
         $this->call(ControlRoomSeeder::class);
+        $this->call(GovernancePermissionsSeeder::class);
+        $this->call(BoardMemberSeeder::class);
+        $this->call(GovernanceSeeder::class);
 
         // NOTE: RoleCatalogSeeder created a large catalogue of job-title roles.
         // We are not using those roles in the system right now, so we no longer seed them.

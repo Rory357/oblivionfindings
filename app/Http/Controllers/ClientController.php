@@ -15,6 +15,8 @@ use App\Services\NotificationService;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use App\Http\Requests\StoreClientRequest;
@@ -451,7 +453,27 @@ class ClientController extends Controller
                 $data['service_context_id'] = ServiceContext::defaultId();
             }
 
-            $client = Client::create($data);
+            $clientFields = collect($data)->except([
+                'create_client_portal_user',
+            ])->all();
+
+            $client = DB::transaction(function () use ($clientFields, $data) {
+                $client = Client::create($clientFields);
+
+                if (!empty($data['create_client_portal_user'])) {
+                    $clientEmail = trim((string) ($data['email'] ?? $client->email ?? ''));
+                    if ($clientEmail !== '') {
+                        $name = trim($client->first_name . ' ' . $client->last_name);
+                        $clientUser = $this->findOrCreatePortalUser($clientEmail, $name, 'client');
+                        $client->portalUsers()->syncWithoutDetaching([
+                            $clientUser->id => ['relation' => 'client'],
+                        ]);
+                        $this->sendPasswordSetupEmail($clientEmail);
+                    }
+                }
+
+                return $client;
+            });
 
             app(NotificationService::class)->notifyCrud($request->user(), 'created', 'client', $client, $client, [
                 'title' => "Client created: {$client->first_name} {$client->last_name}",
@@ -467,6 +489,41 @@ class ClientController extends Controller
                 ->withInput()
                 ->with('error', 'Failed to create client: ' . $e->getMessage());
         }
+    }
+
+    private function findOrCreatePortalUser(string $email, string $name, string $roleName): User
+    {
+        $user = User::where('email', $email)->first();
+
+        if (!$user) {
+            $user = User::create([
+                'name' => $name,
+                'email' => $email,
+                // Random placeholder; user sets their own password from reset email.
+                'password' => Str::password(32),
+                'role' => $roleName,
+                'approved_at' => now(),
+            ]);
+        } else {
+            if (!$user->approved_at) {
+                $user->forceFill(['approved_at' => now()])->save();
+            }
+            if (empty($user->role)) {
+                $user->forceFill(['role' => $roleName])->save();
+            }
+        }
+
+        $role = \App\Models\Role::where('name', $roleName)->first();
+        if ($role) {
+            $user->roles()->syncWithoutDetaching([$role->id]);
+        }
+
+        return $user;
+    }
+
+    private function sendPasswordSetupEmail(string $email): void
+    {
+        Password::sendResetLink(['email' => $email]);
     }
 
     public function edit(Client $client)

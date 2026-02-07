@@ -8,6 +8,7 @@ use App\Observers\ClientNoteObserver;
 use App\Observers\ShiftObserver;
 use App\Events\FleetSignalEmitted;
 use App\Services\AuditLogger;
+use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -39,6 +40,16 @@ class AppServiceProvider extends ServiceProvider
                 'severity' => $event->signal->severity_hint,
                 'occurred_at' => optional($event->signal->occurred_at)->toISOString(),
             ]);
+        });
+
+        // Treat password setup/reset as email verification if user is not verified yet.
+        Event::listen(PasswordReset::class, function (PasswordReset $event): void {
+            $user = $event->user;
+            if (!$user || $user->email_verified_at) {
+                return;
+            }
+
+            $user->forceFill(['email_verified_at' => now()])->saveQuietly();
         });
 
         $this->configureRateLimiting();

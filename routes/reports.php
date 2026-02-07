@@ -4,8 +4,11 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ReportsController;
 use App\Http\Controllers\AssetReportController;
 use App\Http\Controllers\ShiftReportsController;
+use App\Http\Controllers\ModuleReportController;
+use App\Http\Controllers\CombinedReportController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AuditExportController;
+use App\Support\ReportCatalog;
 
 /**
  * Reporting & Audit Routes
@@ -19,6 +22,18 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
         Route::get('/reports/assets', [AssetReportController::class, 'index'])->name('reports.assets');
         Route::get('/reports/shifts', [ShiftReportsController::class, 'index'])->name('reports.shifts');
+        Route::get('/reports/modules/{module}', [ModuleReportController::class, 'show'])
+            ->whereIn('module', ReportCatalog::keys())
+            ->name('reports.modules.show');
+        Route::get('/reports/modules/{module}/export', [ModuleReportController::class, 'export'])
+            ->whereIn('module', ReportCatalog::keys())
+            ->name('reports.modules.export');
+        Route::get('/reports/combined/{report}', [CombinedReportController::class, 'show'])
+            ->where('report', 'care-quality|workforce-operations|compliance-risk')
+            ->name('reports.combined.show');
+        Route::get('/reports/combined/{report}/export', [CombinedReportController::class, 'export'])
+            ->where('report', 'care-quality|workforce-operations|compliance-risk')
+            ->name('reports.combined.export');
     });
 
     // Audit logs

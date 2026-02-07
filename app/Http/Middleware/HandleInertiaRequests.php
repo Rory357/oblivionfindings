@@ -329,6 +329,46 @@ class HandleInertiaRequests extends Middleware
                     'withdraw' => $user->canDo('consents.withdraw'),
                     'export' => $user->canDo('consents.export'),
                 ],
+
+                'governance' => [
+                    'view' => $user->canDo('governance.view'),
+                    'meetings' => [
+                        'view' => $user->canDo('governance.meetings.view'),
+                        'manage' => $user->canDo('governance.meetings.manage'),
+                    ],
+                    'resolutions' => [
+                        'view' => $user->canDo('governance.resolutions.view'),
+                        'vote' => $user->canDo('governance.resolutions.vote'),
+                        'manage' => $user->canDo('governance.resolutions.manage'),
+                    ],
+                    'risks' => [
+                        'view' => $user->canDo('governance.risks.view'),
+                        'manage' => $user->canDo('governance.risks.manage'),
+                    ],
+                    'compliance' => [
+                        'view' => $user->canDo('governance.compliance.view'),
+                        'manage' => $user->canDo('governance.compliance.manage'),
+                    ],
+                    'performance' => [
+                        'view' => $user->canDo('governance.performance.view'),
+                        'manage' => $user->canDo('governance.performance.manage'),
+                    ],
+                    'strategy' => [
+                        'view' => $user->canDo('governance.strategy.view'),
+                        'manage' => $user->canDo('governance.strategy.manage'),
+                    ],
+                    'budgets' => [
+                        'view' => $user->canDo('governance.budgets.view'),
+                        'manage' => $user->canDo('governance.budgets.manage'),
+                    ],
+                    'packs' => [
+                        'view' => $user->canDo('governance.packs.view'),
+                        'manage' => $user->canDo('governance.packs.manage'),
+                    ],
+                    'actions' => [
+                        'manage' => $user->canDo('governance.actions.manage'),
+                    ],
+                ],
             ];
         });
     }
