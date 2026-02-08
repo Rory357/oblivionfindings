@@ -37,6 +37,15 @@ use App\Http\Controllers\QualityChecklistController;
 
 use App\Http\Controllers\ContactController;
 
+Route::get('/robots.txt', function () {
+    $disallowAll = ! config('app.indexing_enabled');
+    $body = $disallowAll
+        ? "User-agent: *\nDisallow: /\n"
+        : "User-agent: *\nDisallow:\n";
+
+    return response($body, 200)->header('Content-Type', 'text/plain');
+})->name('robots');
+
 // Public routes
 Route::get('/', function () {
     return Inertia::render('home', [

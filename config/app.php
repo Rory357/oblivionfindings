@@ -56,6 +56,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Search Indexing
+    |--------------------------------------------------------------------------
+    |
+    | When disabled, the application sends X-Robots-Tag headers and serves a
+    | disallowing robots.txt to prevent search engines from indexing the site.
+    |
+    */
+
+    'indexing_enabled' => (bool) env('APP_INDEXING_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |
