@@ -45,6 +45,7 @@ class SiteZoneController extends Controller
         SiteFacilityZone::create([
             ...$validated,
             'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
             'is_active' => true,
         ]);
 
@@ -54,6 +55,7 @@ class SiteZoneController extends Controller
     public function update(Request $request, Site $site, SiteFacilityZone $zone)
     {
         $this->authorize('update', $site);
+        abort_unless($zone->site_id === $site->id, 404);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -69,6 +71,7 @@ class SiteZoneController extends Controller
     public function destroy(Request $request, Site $site, SiteFacilityZone $zone)
     {
         $this->authorize('update', $site);
+        abort_unless($zone->site_id === $site->id, 404);
 
         $zone->update(['is_active' => false]);
 

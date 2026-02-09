@@ -9,6 +9,7 @@ use App\Models\SiteCredentialAuditLog;
 use App\Services\Sites\SiteCredentialEncryptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 
 class SiteCredentialController extends Controller
 {
@@ -34,8 +35,20 @@ class SiteCredentialController extends Controller
                 'requires_reauth' => $c->requires_reauth,
                 'created_at' => $c->created_at->toDateTimeString(),
                 // Never send encrypted_value in list view
-                'value_preview' => '••••••••',
+                'value_preview' => '********',
             ]);
+
+        foreach ($credentials as $credential) {
+            SiteCredentialAuditLog::create([
+                'credential_id' => $credential['id'],
+                'tenant_id' => $site->tenant_id,
+                'user_id' => $request->user()->id,
+                'action' => 'view_list',
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'created_at' => now(),
+            ]);
+        }
 
         return inertia('sites/credentials/index', [
             'site' => [
@@ -51,14 +64,17 @@ class SiteCredentialController extends Controller
 
     public function store(Request $request, Site $site)
     {
-        $this->authorize('update', $site);
+        $this->authorize('view', $site);
         $request->user()->canDo('credentials.manage') || abort(403);
 
         $validated = $request->validate([
             'label' => 'required|string|max:255',
             'credential_type' => 'required|string|max:30',
             'value' => 'required|string',
-            'vendor_id' => 'nullable|exists:site_vendors,id',
+            'vendor_id' => [
+                'nullable',
+                Rule::exists('site_vendors', 'id')->where(fn ($query) => $query->where('site_id', $site->id)),
+            ],
             'notes' => 'nullable|string',
             'requires_reauth' => 'boolean',
         ]);
@@ -67,11 +83,12 @@ class SiteCredentialController extends Controller
 
         $credential = SiteCredential::create([
             'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
             'vendor_id' => $validated['vendor_id'] ?? null,
             'label' => $validated['label'],
             'credential_type' => $validated['credential_type'],
-            'encrypted_value' => $encrypted['encrypted'],
-            'iv' => $encrypted['iv'] ?? null,
+            'encrypted_value' => $encrypted['value'],
+            'iv' => null,
             'notes' => $validated['notes'] ?? null,
             'requires_reauth' => $validated['requires_reauth'] ?? false,
             'last_rotated_at' => now(),
@@ -87,6 +104,7 @@ class SiteCredentialController extends Controller
     {
         $this->authorize('view', $site);
         $request->user()->canDo('credentials.reveal') || abort(403);
+        $this->assertCredentialBelongsToSite($site, $credential);
 
         // Check if re-authentication is required
         if ($credential->requires_reauth) {
@@ -103,6 +121,7 @@ class SiteCredentialController extends Controller
         // Audit log
         SiteCredentialAuditLog::create([
             'credential_id' => $credential->id,
+            'tenant_id' => $site->tenant_id,
             'user_id' => $request->user()->id,
             'action' => 'reveal',
             'ip_address' => $request->ip(),
@@ -110,10 +129,7 @@ class SiteCredentialController extends Controller
             'created_at' => now(),
         ]);
 
-        $value = $this->encryptionService->decrypt(
-            $credential->encrypted_value,
-            $credential->iv
-        );
+        $value = $this->encryptionService->decrypt($credential->encrypted_value);
 
         return response()->json([
             'value' => $value,
@@ -122,14 +138,18 @@ class SiteCredentialController extends Controller
 
     public function update(Request $request, Site $site, SiteCredential $credential)
     {
-        $this->authorize('update', $site);
+        $this->authorize('view', $site);
         $request->user()->canDo('credentials.manage') || abort(403);
+        $this->assertCredentialBelongsToSite($site, $credential);
 
         $validated = $request->validate([
             'label' => 'required|string|max:255',
             'credential_type' => 'required|string|max:30',
             'value' => 'nullable|string',
-            'vendor_id' => 'nullable|exists:site_vendors,id',
+            'vendor_id' => [
+                'nullable',
+                Rule::exists('site_vendors', 'id')->where(fn ($query) => $query->where('site_id', $site->id)),
+            ],
             'notes' => 'nullable|string',
             'requires_reauth' => 'boolean',
         ]);
@@ -145,14 +165,15 @@ class SiteCredentialController extends Controller
         // If value provided, re-encrypt
         if (!empty($validated['value'])) {
             $encrypted = $this->encryptionService->encrypt($validated['value']);
-            $updateData['encrypted_value'] = $encrypted['encrypted'];
-            $updateData['iv'] = $encrypted['iv'] ?? null;
+            $updateData['encrypted_value'] = $encrypted['value'];
+            $updateData['iv'] = null;
             $updateData['last_rotated_at'] = now();
             $updateData['last_rotated_by_user_id'] = $request->user()->id;
 
             // Audit rotation
             SiteCredentialAuditLog::create([
                 'credential_id' => $credential->id,
+                'tenant_id' => $site->tenant_id,
                 'user_id' => $request->user()->id,
                 'action' => 'rotate',
                 'ip_address' => $request->ip(),
@@ -163,6 +184,7 @@ class SiteCredentialController extends Controller
             // Audit edit
             SiteCredentialAuditLog::create([
                 'credential_id' => $credential->id,
+                'tenant_id' => $site->tenant_id,
                 'user_id' => $request->user()->id,
                 'action' => 'edit',
                 'ip_address' => $request->ip(),
@@ -180,12 +202,14 @@ class SiteCredentialController extends Controller
 
     public function destroy(Request $request, Site $site, SiteCredential $credential)
     {
-        $this->authorize('update', $site);
+        $this->authorize('view', $site);
         $request->user()->canDo('credentials.manage') || abort(403);
+        $this->assertCredentialBelongsToSite($site, $credential);
 
         // Audit deletion
         SiteCredentialAuditLog::create([
             'credential_id' => $credential->id,
+            'tenant_id' => $site->tenant_id,
             'user_id' => $request->user()->id,
             'action' => 'delete',
             'ip_address' => $request->ip(),
@@ -203,6 +227,7 @@ class SiteCredentialController extends Controller
     public function auditLog(Request $request, Site $site, SiteCredential $credential)
     {
         $this->authorize('view', $site);
+        $this->assertCredentialBelongsToSite($site, $credential);
 
         $logs = SiteCredentialAuditLog::where('credential_id', $credential->id)
             ->with('user:id,name')
@@ -220,5 +245,31 @@ class SiteCredentialController extends Controller
             ],
             'logs' => $logs,
         ]);
+    }
+
+    public function copy(Request $request, Site $site, SiteCredential $credential)
+    {
+        $this->authorize('view', $site);
+        $request->user()->canDo('credentials.reveal') || abort(403);
+        $this->assertCredentialBelongsToSite($site, $credential);
+
+        SiteCredentialAuditLog::create([
+            'credential_id' => $credential->id,
+            'tenant_id' => $site->tenant_id,
+            'user_id' => $request->user()->id,
+            'action' => 'copy',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'created_at' => now(),
+        ]);
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function assertCredentialBelongsToSite(Site $site, SiteCredential $credential): void
+    {
+        if ($credential->site_id !== $site->id) {
+            abort(404);
+        }
     }
 }

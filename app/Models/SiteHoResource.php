@@ -14,6 +14,7 @@ class SiteHoResource extends Model
 
     protected $fillable = [
         'site_id',
+        'tenant_id',
         'name',
         'resource_type',
         'capacity',

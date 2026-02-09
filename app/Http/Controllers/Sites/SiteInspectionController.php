@@ -54,6 +54,7 @@ class SiteInspectionController extends Controller
         $schedule = SiteInspectionSchedule::create([
             ...$validated,
             'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
             'next_due_date' => $validated['first_due_date'],
             'is_active' => true,
         ]);
@@ -61,8 +62,9 @@ class SiteInspectionController extends Controller
         // Create calendar event if requested
         if ($validated['auto_create_calendar_event'] ?? true) {
             SiteCalendarEvent::create([
-                'site_id' => $site->id,
-                'event_type' => 'inspection',
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'event_type' => 'inspection',
                 'title' => $validated['title'],
                 'description' => $validated['description'] ?? 'Scheduled inspection',
                 'start_at' => $validated['first_due_date'] . ' 09:00:00',
@@ -82,6 +84,7 @@ class SiteInspectionController extends Controller
     public function complete(Request $request, Site $site, SiteInspectionSchedule $schedule)
     {
         $this->authorize('update', $site);
+        abort_unless($schedule->site_id === $site->id, 404);
 
         $validated = $request->validate([
             'result' => 'required|in:pass,fail,partial,na',
@@ -94,6 +97,7 @@ class SiteInspectionController extends Controller
         $record = SiteInspectionRecord::create([
             'schedule_id' => $schedule->id,
             'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
             'due_date' => $schedule->next_due_date,
             'completed_at' => now(),
             'completed_by_user_id' => $request->user()->id,
@@ -117,6 +121,7 @@ class SiteInspectionController extends Controller
     public function destroy(Request $request, Site $site, SiteInspectionSchedule $schedule)
     {
         $this->authorize('update', $site);
+        abort_unless($schedule->site_id === $site->id, 404);
 
         $schedule->delete();
 

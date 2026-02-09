@@ -25,6 +25,8 @@ class SiteCalendarController extends Controller
                 'name' => $site->name,
                 'type' => $site->type,
             ],
+            'canCreate' => ($request->user()?->canDo('calendar.create') ?? false)
+                && ($request->user()?->can('update', $site) ?? false),
         ]);
     }
 
@@ -66,6 +68,7 @@ class SiteCalendarController extends Controller
         $event = SiteCalendarEvent::create([
             ...$validated,
             'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
             'created_by_user_id' => $request->user()->id,
             'status' => 'draft',
             'approval_status' => $this->requiresApproval($validated['event_type']) ? 'pending' : 'not_required',
@@ -77,6 +80,7 @@ class SiteCalendarController extends Controller
     public function update(Request $request, Site $site, SiteCalendarEvent $event)
     {
         $this->authorize('update', $site);
+        abort_unless($event->site_id === $site->id, 404);
 
         $validated = $request->validate([
             'event_type' => 'required|string|max:50',
@@ -96,6 +100,7 @@ class SiteCalendarController extends Controller
     public function destroy(Request $request, Site $site, SiteCalendarEvent $event)
     {
         $this->authorize('update', $site);
+        abort_unless($event->site_id === $site->id, 404);
 
         $event->delete();
 
@@ -124,33 +129,102 @@ class SiteCalendarController extends Controller
 
     public function global(Request $request)
     {
-        $this->authorize('calendar.view');
+        abort_unless($request->user()?->canDo('calendar.view'), 403);
 
         $start = Carbon::parse($request->input('start', now()->startOfMonth()));
         $end = Carbon::parse($request->input('end', now()->endOfMonth()));
 
         $siteIds = $request->input('site_ids');
         $eventTypes = $request->input('event_types');
+        if (!is_array($siteIds) && $siteIds !== null) {
+            $siteIds = [$siteIds];
+        }
+        if (!is_array($eventTypes) && $eventTypes !== null) {
+            $eventTypes = [$eventTypes];
+        }
+        $siteType = $request->input('site_type');
+        $status = $request->input('status');
+        $allowedSiteTypes = $this->allowedSiteTypes($request);
+
+        if ($siteType && !in_array($siteType, $allowedSiteTypes, true)) {
+            abort(403);
+        }
+
+        $siteQuery = Site::active()
+            ->select(['id', 'name', 'type'])
+            ->whereIn('type', $allowedSiteTypes);
+
+        if ($siteType) {
+            $siteQuery->where('type', $siteType);
+        }
+
+        if (is_array($siteIds) && count($siteIds) > 0) {
+            $siteQuery->whereIn('id', $siteIds);
+        }
+
+        $sites = $siteQuery->orderBy('name')->get();
+
+        $effectiveSiteIds = $sites->pluck('id')->all();
 
         $events = $this->calendarService->getEventsForRange(
-            $siteIds,
+            $effectiveSiteIds,
             $eventTypes,
             $start,
             $end,
             $request->boolean('my_events_only') ? $request->user()->id : null
         );
 
-        $sites = Site::active()
-            ->select(['id', 'name', 'type'])
-            ->orderBy('name')
-            ->get();
+        $eventTypesConfig = function_exists('settings')
+            ? settings('sites.default_event_types', [])
+            : [];
+
+        $eventTypeOptions = collect($eventTypesConfig)->map(fn ($type) => [
+            'key' => $type['key'] ?? null,
+            'label' => $type['label'] ?? ($type['key'] ?? 'Other'),
+            'color' => $type['color'] ?? '#64748b',
+        ])->filter(fn ($type) => !empty($type['key']))->values();
+
+        if ($eventTypeOptions->isEmpty()) {
+            $eventTypeOptions = collect([
+                ['key' => 'event', 'label' => 'Events', 'color' => '#6366f1'],
+                ['key' => 'maintenance', 'label' => 'Maintenance Schedule', 'color' => '#f59e0b'],
+                ['key' => 'site_visit', 'label' => 'Site Visit', 'color' => '#10b981'],
+                ['key' => 'inspection', 'label' => 'Inspection', 'color' => '#ef4444'],
+            ]);
+        }
+
+        $formattedEvents = collect($events)
+            ->map(function (array $event) {
+                $site = $event['site'] ?? [];
+                $owner = $event['owner'] ?? [];
+
+                return [
+                    'id' => $event['id'],
+                    'site_id' => $site['id'] ?? null,
+                    'site_name' => $site['name'] ?? 'Unknown Site',
+                    'site_type' => $site['type'] ?? null,
+                    'event_type' => $event['event_type'] ?? 'event',
+                    'title' => $event['title'] ?? 'Untitled',
+                    'start_at' => $event['start_at'] ?? null,
+                    'end_at' => $event['end_at'] ?? null,
+                    'status' => $event['status'] ?? 'draft',
+                    'approval_status' => $event['approval_status'] ?? 'not_required',
+                    'owner_name' => $owner['name'] ?? null,
+                ];
+            })
+            ->when($status, fn ($collection) => $collection->where('status', $status))
+            ->values()
+            ->all();
 
         return inertia('calendar/global', [
-            'events' => $events,
+            'events' => $formattedEvents,
             'sites' => $sites,
+            'eventTypes' => $eventTypeOptions,
             'filters' => [
-                'site_ids' => $siteIds ?? [],
+                'site_ids' => is_array($siteIds) ? $siteIds : [],
+                'site_type' => $siteType,
                 'event_types' => $eventTypes ?? [],
+                'status' => $status,
                 'my_events_only' => $request->boolean('my_events_only'),
             ],
         ]);
@@ -163,5 +237,23 @@ class SiteCalendarController extends Controller
             : [];
         $type = collect($eventTypes)->firstWhere('key', $eventType);
         return $type['requires_approval'] ?? false;
+    }
+
+    private function allowedSiteTypes(Request $request): array
+    {
+        $user = $request->user();
+        $map = [
+            'head_office' => 'sites.type.head_office.view',
+            'house' => 'sites.type.house.view',
+            'facility' => 'sites.type.facility.view',
+        ];
+
+        $allowed = collect($map)
+            ->filter(fn (string $permission) => $user?->canDo($permission))
+            ->keys()
+            ->values()
+            ->all();
+
+        return $allowed !== [] ? $allowed : array_keys($map);
     }
 }

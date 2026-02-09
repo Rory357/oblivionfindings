@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -89,10 +89,27 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
         emergency_plan_location: site.emergency_plan_location || '',
         medication_storage_location: site.medication_storage_location || '',
     });
-    const [rooms, setRooms] = useState<{ name: string }[]>([{ name: '' }]);
-    const [resources, setResources] = useState<{ name: string; type: string; capacity: string }[]>([{ name: '', type: 'meeting_room', capacity: '' }]);
-    const [zones, setZones] = useState<{ name: string; type: string }[]>([{ name: '', type: '' }]);
+    const [rooms, setRooms] = useState<{ id?: number; name: string }[]>(
+        typeSpecificData.rooms?.map((room) => ({ id: room.id, name: room.name })) ?? [{ name: '' }]
+    );
+    const [resources, setResources] = useState<{ id?: number; name: string; type: string; capacity: string }[]>(
+        typeSpecificData.resources?.map((resource) => ({
+            id: resource.id,
+            name: resource.name,
+            type: resource.type,
+            capacity: '',
+        })) ?? [{ name: '', type: 'meeting_room', capacity: '' }]
+    );
+    const [zones, setZones] = useState<{ id?: number; name: string; type: string }[]>(
+        typeSpecificData.zones?.map((zone) => ({ id: zone.id, name: zone.name, type: '' })) ?? [{ name: '', type: '' }]
+    );
     const [assets, setAssets] = useState<{ name: string; category: string; quantity: string }[]>([{ name: '', category: '', quantity: '1' }]);
+    const [contacts, setContacts] = useState<{ type: string; name: string; role: string; phone: string; email: string; is_primary: boolean; notes: string }[]>([
+        { type: 'general', name: '', role: '', phone: '', email: '', is_primary: false, notes: '' },
+    ]);
+    const [documents, setDocuments] = useState<{ title: string; category: string; expiry_date: string; notes: string }[]>([
+        { title: '', category: '', expiry_date: '', notes: '' },
+    ]);
     const [checklistAssignments, setChecklistAssignments] = useState<Record<number, { enabled: boolean; frequency: string; assigned_to_user_id: string }>>({});
 
     const TypeIcon = typeIcons[site.type];
@@ -129,8 +146,32 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                 case 'assets':
                     stepData = { assets: assets.filter(a => a.name.trim()) };
                     break;
+                case 'contacts':
+                    stepData = {
+                        contacts: contacts.filter((contact) => contact.name.trim()).map((contact) => ({
+                            ...contact,
+                            phone: contact.phone || null,
+                            email: contact.email || null,
+                            role: contact.role || null,
+                            notes: contact.notes || null,
+                        })),
+                    };
+                    break;
+                case 'documents':
+                    stepData = {
+                        documents: documents.filter((document) => document.title.trim()),
+                    };
+                    break;
                 case 'checklists':
-                    stepData = { assignments: checklistAssignments };
+                    stepData = {
+                        assignments: Object.entries(checklistAssignments).map(([templateId, config]) => ({
+                            template_id: Number(templateId),
+                            enabled: config.enabled,
+                            frequency: config.frequency,
+                            assigned_to_user_id: config.assigned_to_user_id || null,
+                            start_date: new Date().toISOString().slice(0, 10),
+                        })),
+                    };
                     break;
             }
 
@@ -203,6 +244,30 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
         setAssets(newAssets);
     };
     const removeAsset = (index: number) => setAssets(assets.filter((_, i) => i !== index));
+
+    const addContact = () =>
+        setContacts([
+            ...contacts,
+            { type: 'general', name: '', role: '', phone: '', email: '', is_primary: false, notes: '' },
+        ]);
+    const updateContact = (index: number, field: string, value: string | boolean) => {
+        const next = [...contacts];
+        (next[index] as any)[field] = value;
+        setContacts(next);
+    };
+    const removeContact = (index: number) => setContacts(contacts.filter((_, i) => i !== index));
+
+    const addDocument = () =>
+        setDocuments([
+            ...documents,
+            { title: '', category: '', expiry_date: '', notes: '' },
+        ]);
+    const updateDocument = (index: number, field: string, value: string) => {
+        const next = [...documents];
+        (next[index] as any)[field] = value;
+        setDocuments(next);
+    };
+    const removeDocument = (index: number) => setDocuments(documents.filter((_, i) => i !== index));
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: site.name, href: `/sites/${site.id}` }, { title: 'Onboarding', href: `/sites/${site.id}/onboarding` }]}>
@@ -519,22 +584,91 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                             </div>
                         )}
 
-                        {/* Contacts Step (placeholder) */}
+                        {/* Contacts Step */}
                         {currentStepData.key === 'contacts' && (
-                            <div className="text-center py-8">
-                                <p className="text-slate-400">Contacts and vendors can be managed from the site profile.</p>
-                                <Button asChild variant="outline" className="mt-4">
-                                    <Link href={`/sites/${site.id}/vendors`}>Manage Vendors</Link>
+                            <div className="space-y-4">
+                                <p className="text-sm text-slate-400">Add key site contacts to speed up hazard assignment and after-hours handovers.</p>
+                                {contacts.map((contact, index) => (
+                                    <div key={index} className="grid gap-2 sm:grid-cols-2 p-3 rounded-lg border border-slate-700">
+                                        <Input
+                                            value={contact.name}
+                                            onChange={(e) => updateContact(index, 'name', e.target.value)}
+                                            placeholder="Contact name"
+                                        />
+                                        <Input
+                                            value={contact.role}
+                                            onChange={(e) => updateContact(index, 'role', e.target.value)}
+                                            placeholder="Role (e.g., Site Lead)"
+                                        />
+                                        <Input
+                                            value={contact.phone}
+                                            onChange={(e) => updateContact(index, 'phone', e.target.value)}
+                                            placeholder="Phone"
+                                        />
+                                        <Input
+                                            value={contact.email}
+                                            onChange={(e) => updateContact(index, 'email', e.target.value)}
+                                            placeholder="Email"
+                                        />
+                                        <div className="sm:col-span-2 flex items-center justify-between">
+                                            <label className="flex items-center gap-2 text-sm">
+                                                <Checkbox
+                                                    checked={contact.is_primary}
+                                                    onCheckedChange={(checked) => updateContact(index, 'is_primary', checked as boolean)}
+                                                />
+                                                Primary contact
+                                            </label>
+                                            {contacts.length > 1 && (
+                                                <Button variant="ghost" size="sm" onClick={() => removeContact(index)}>
+                                                    Remove
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                <Button variant="outline" onClick={addContact}>
+                                    Add Contact
                                 </Button>
                             </div>
                         )}
 
-                        {/* Documents Step (placeholder) */}
+                        {/* Documents Step */}
                         {currentStepData.key === 'documents' && (
-                            <div className="text-center py-8">
-                                <p className="text-slate-400">Documents can be uploaded from the site profile.</p>
-                                <Button asChild variant="outline" className="mt-4">
-                                    <Link href={`/sites/${site.id}?tab=documents`}>Manage Documents</Link>
+                            <div className="space-y-4">
+                                <p className="text-sm text-slate-400">Record which key documents are required first. You can upload files from the site profile after onboarding.</p>
+                                {documents.map((document, index) => (
+                                    <div key={index} className="grid gap-2 sm:grid-cols-2 p-3 rounded-lg border border-slate-700">
+                                        <Input
+                                            value={document.title}
+                                            onChange={(e) => updateDocument(index, 'title', e.target.value)}
+                                            placeholder="Document title"
+                                        />
+                                        <Input
+                                            value={document.category}
+                                            onChange={(e) => updateDocument(index, 'category', e.target.value)}
+                                            placeholder="Category (e.g., evacuation_plan)"
+                                        />
+                                        <Input
+                                            type="date"
+                                            value={document.expiry_date}
+                                            onChange={(e) => updateDocument(index, 'expiry_date', e.target.value)}
+                                        />
+                                        <Input
+                                            value={document.notes}
+                                            onChange={(e) => updateDocument(index, 'notes', e.target.value)}
+                                            placeholder="Notes"
+                                        />
+                                        <div className="sm:col-span-2 flex justify-end">
+                                            {documents.length > 1 && (
+                                                <Button variant="ghost" size="sm" onClick={() => removeDocument(index)}>
+                                                    Remove
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                                <Button variant="outline" onClick={addDocument}>
+                                    Add Document Requirement
                                 </Button>
                             </div>
                         )}

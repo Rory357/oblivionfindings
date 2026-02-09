@@ -51,7 +51,18 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
     const [showForm, setShowForm] = useState(false);
     const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
 
-    const form = useForm({
+    const form = useForm<{
+        service_type: string;
+        company_name: string;
+        contact_name: string;
+        phone: string;
+        after_hours_phone: string;
+        email: string;
+        account_number: string;
+        notes: string;
+        preferred_contact_method: Vendor['preferred_contact_method'];
+        is_preferred: boolean;
+    }>({
         service_type: '',
         company_name: '',
         contact_name: '',
@@ -60,7 +71,7 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
         email: '',
         account_number: '',
         notes: '',
-        preferred_contact_method: 'phone' as const,
+        preferred_contact_method: 'phone',
         is_preferred: false,
     });
 
@@ -120,10 +131,15 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                         </h1>
                         <p className="text-sm text-slate-400">{site.name}</p>
                     </div>
-                    <Button onClick={() => setShowForm(true)}>
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add Vendor
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button asChild variant="secondary">
+                            <Link href={`/sites/${site.id}/credentials`}>Credentials</Link>
+                        </Button>
+                        <Button onClick={() => setShowForm(true)}>
+                            <Plus className="w-4 h-4 mr-1" />
+                            Add Vendor
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Add/Edit Form */}

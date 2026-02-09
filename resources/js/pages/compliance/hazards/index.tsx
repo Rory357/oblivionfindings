@@ -258,7 +258,7 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
                                             <div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="font-medium">{hazard.reference_number}</span>
-                                                    <span className="text-slate-400">•</span>
+                                                    <span className="text-slate-400">-</span>
                                                     <span className="text-slate-300">{hazard.site_name}</span>
                                                 </div>
                                                 <div className="text-sm text-slate-300 mt-0.5">

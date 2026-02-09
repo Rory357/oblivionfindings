@@ -65,10 +65,10 @@ export default function SiteReportsIndex({ sites }: Props) {
                                 Quality home checks, bedroom occupancy, hazard trends, and maintenance reports.
                             </p>
                             <ul className="text-sm space-y-1 text-slate-300">
-                                <li>• Hazards by severity & time-to-close</li>
-                                <li>• Checklist compliance rates</li>
-                                <li>• Bedroom occupancy reports</li>
-                                <li>• Vendor contact lists</li>
+                                <li>- Hazards by severity & time-to-close</li>
+                                <li>- Checklist compliance rates</li>
+                                <li>- Bedroom occupancy reports</li>
+                                <li>- Vendor contact lists</li>
                             </ul>
                             <Button asChild className="w-full">
                                 <Link href="/sites/reports/houses">
@@ -96,10 +96,10 @@ export default function SiteReportsIndex({ sites }: Props) {
                                 Equipment-focused safety reports, zone utilization, and facility compliance.
                             </p>
                             <ul className="text-sm space-y-1 text-slate-300">
-                                <li>• Equipment hazard register</li>
-                                <li>• Safety walkthrough compliance</li>
-                                <li>• Equipment condition summary</li>
-                                <li>• Zone utilization reports</li>
+                                <li>- Equipment hazard register</li>
+                                <li>- Safety walkthrough compliance</li>
+                                <li>- Equipment condition summary</li>
+                                <li>- Zone utilization reports</li>
                             </ul>
                             <Button asChild className="w-full">
                                 <Link href="/sites/reports/facilities">
@@ -127,10 +127,10 @@ export default function SiteReportsIndex({ sites }: Props) {
                                 Room booking utilization, safety compliance, and IT asset reports.
                             </p>
                             <ul className="text-sm space-y-1 text-slate-300">
-                                <li>• Room booking utilization</li>
-                                <li>• Safety & facilities compliance</li>
-                                <li>• IT/Network asset summary</li>
-                                <li>• Meeting room usage trends</li>
+                                <li>- Room booking utilization</li>
+                                <li>- Safety & facilities compliance</li>
+                                <li>- IT/Network asset summary</li>
+                                <li>- Meeting room usage trends</li>
                             </ul>
                             <Button asChild className="w-full">
                                 <Link href="/sites/reports/head-office">

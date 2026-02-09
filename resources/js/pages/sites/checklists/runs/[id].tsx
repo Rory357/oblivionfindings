@@ -74,6 +74,10 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
     const [overallNotes, setOverallNotes] = useState('');
 
     const progress = useMemo(() => {
+        if (items.length === 0) {
+            return 0;
+        }
+
         const completed = items.filter(item => {
             const resp = currentResponses[item.id];
             return resp?.response_value !== undefined && resp.response_value !== '';
@@ -97,15 +101,23 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
     };
 
     const form = useForm({
-        responses: Object.values(currentResponses),
-        overall_notes: overallNotes,
+        responses: [] as Response[],
+        overall_notes: '',
     });
 
     const handleSave = () => {
-        form.post(`/checklists/runs/${run.id}/responses`);
+        form.transform(() => ({
+            responses: Object.values(currentResponses),
+        }));
+        form.post(`/checklists/runs/${run.id}/responses`, {
+            preserveScroll: true,
+        });
     };
 
     const handleComplete = () => {
+        form.transform(() => ({
+            overall_notes: overallNotes,
+        }));
         form.post(`/checklists/runs/${run.id}/complete`);
     };
 

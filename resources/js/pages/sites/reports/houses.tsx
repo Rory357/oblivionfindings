@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -56,7 +56,7 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
         <AppLayout breadcrumbs={[
             { title: 'Reports', href: '/sites/reports' },
             { title: 'Houses', href: '/sites/reports/houses' },
-        ]}>>
+        ]}>
             <Head title="House Reports" />
 
             <div className="m-4 space-y-4">
@@ -77,9 +77,11 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
                             Quality home checks, occupancy, and compliance
                         </p>
                     </div>
-                    <Button variant="outline">
-                        <Download className="w-4 h-4 mr-1" />
-                        Export CSV
+                    <Button variant="outline" asChild>
+                        <Link href={`/sites/reports/export?type=houses&format=csv&date_from=${dateFrom}&date_to=${dateTo}`}>
+                            <Download className="w-4 h-4 mr-1" />
+                            Export CSV
+                        </Link>
                     </Button>
                 </div>
 
@@ -137,6 +139,14 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
                             <div>
                                 <Label className="text-xs">To</Label>
                                 <Input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                            </div>
+                            <div className="flex items-end">
+                                <Button
+                                    variant="outline"
+                                    onClick={() => router.get('/sites/reports/houses', { date_from: dateFrom, date_to: dateTo }, { preserveState: true })}
+                                >
+                                    Apply
+                                </Button>
                             </div>
                         </div>
                     </CardContent>

@@ -53,11 +53,10 @@ const frequencyLabels: Record<string, string> = {
 
 const responseTypeLabels: Record<string, string> = {
     yes_no: 'Yes / No',
+    yes_no_na: 'Yes / No / N/A',
     pass_fail: 'Pass / Fail',
-    number: 'Number',
+    numeric: 'Number',
     text: 'Text',
-    select: 'Single Select',
-    multiple: 'Multiple Select',
     photo: 'Photo Required',
 };
 
@@ -276,8 +275,9 @@ export default function EditTemplate({ template }: Props) {
                                                 </SelectTrigger>
                                                 <SelectContent>
                                                     <SelectItem value="yes_no">Yes / No</SelectItem>
+                                                    <SelectItem value="yes_no_na">Yes / No / N/A</SelectItem>
                                                     <SelectItem value="pass_fail">Pass / Fail</SelectItem>
-                                                    <SelectItem value="number">Number</SelectItem>
+                                                    <SelectItem value="numeric">Number</SelectItem>
                                                     <SelectItem value="text">Text</SelectItem>
                                                     <SelectItem value="photo">Photo Required</SelectItem>
                                                 </SelectContent>

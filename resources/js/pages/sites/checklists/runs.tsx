@@ -16,7 +16,7 @@ type Run = {
         id: number;
         name: string;
     };
-    status: 'pending' | 'in_progress' | 'completed' | 'overdue';
+    status: 'scheduled' | 'in_progress' | 'completed' | 'overdue' | 'skipped';
     scheduled_date: string;
     completed_at?: string;
     completed_by?: { id: number; name: string } | null;
@@ -32,17 +32,19 @@ type Props = {
 };
 
 const statusLabels: Record<string, string> = {
-    pending: 'Pending',
+    scheduled: 'Scheduled',
     in_progress: 'In Progress',
     completed: 'Completed',
     overdue: 'Overdue',
+    skipped: 'Skipped',
 };
 
 const statusColors: Record<string, string> = {
-    pending: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    scheduled: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
     in_progress: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
     completed: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
     overdue: 'bg-red-500/20 text-red-400 border-red-500/30',
+    skipped: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
 };
 
 export default function ChecklistRuns({ site, runs, filters }: Props) {
@@ -85,9 +87,9 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                     <Card className="bg-yellow-500/5 border-yellow-500/20">
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold text-yellow-400">
-                                {runs.data.filter(r => r.status === 'pending').length}
+                                {runs.data.filter(r => r.status === 'scheduled').length}
                             </div>
-                            <div className="text-sm text-slate-400">Pending</div>
+                            <div className="text-sm text-slate-400">Scheduled</div>
                         </CardContent>
                     </Card>
                     <Card className="bg-blue-500/5 border-blue-500/20">
@@ -146,7 +148,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                                                 {statusLabels[run.status]}
                                             </Badge>
                                             <Button asChild variant="ghost" size="sm">
-                                                <Link href={`/sites/${site.id}/checklists/runs/${run.id}`}>
+                                                <Link href={`/checklists/runs/${run.id}`}>
                                                     View
                                                 </Link>
                                             </Button>

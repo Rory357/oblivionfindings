@@ -15,6 +15,7 @@ class SiteCredential extends Model
 
     protected $fillable = [
         'site_id',
+        'tenant_id',
         'vendor_id',
         'label',
         'credential_type',

@@ -165,7 +165,7 @@ class Site extends Model
         return match ($this->type) {
             'head_office' => 'Head Office',
             'house' => 'House',
-            'facility' => 'Facility',
+            'facility' => 'Facilities',
             default => 'Site',
         };
     }

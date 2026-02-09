@@ -14,7 +14,11 @@ class SitePolicy
 
     public function view(User $user, Site $site): bool
     {
-        return $user->canDo('sites.viewAny');
+        if (!$user->canDo('sites.viewAny')) {
+            return false;
+        }
+
+        return $this->canViewType($user, $site->type);
     }
 
     public function create(User $user): bool
@@ -25,5 +29,28 @@ class SitePolicy
     public function update(User $user, Site $site): bool
     {
         return $user->canDo('sites.update');
+    }
+
+    public function delete(User $user, Site $site): bool
+    {
+        return $user->canDo('sites.archive');
+    }
+
+    private function canViewType(User $user, string $type): bool
+    {
+        $typePermissions = [
+            'head_office' => 'sites.type.head_office.view',
+            'house' => 'sites.type.house.view',
+            'facility' => 'sites.type.facility.view',
+        ];
+
+        $hasTypeScopedPermissions = collect($typePermissions)
+            ->contains(fn (string $permission) => $user->canDo($permission));
+
+        if (!$hasTypeScopedPermissions) {
+            return true;
+        }
+
+        return isset($typePermissions[$type]) && $user->canDo($typePermissions[$type]);
     }
 }

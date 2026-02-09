@@ -15,6 +15,7 @@ class SiteInspectionRecord extends Model
     protected $fillable = [
         'schedule_id',
         'site_id',
+        'tenant_id',
         'due_date',
         'completed_at',
         'completed_by_user_id',

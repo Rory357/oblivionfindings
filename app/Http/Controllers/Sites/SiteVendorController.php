@@ -40,7 +40,8 @@ class SiteVendorController extends Controller
 
     public function store(Request $request, Site $site)
     {
-        $this->authorize('update', $site);
+        $this->authorize('view', $site);
+        $request->user()->canDo('vendors.manage') || abort(403);
 
         $validated = $request->validate([
             'service_type' => 'required|string|max:50',
@@ -58,6 +59,7 @@ class SiteVendorController extends Controller
         $vendor = SiteVendor::create([
             ...$validated,
             'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
             'is_active' => true,
         ]);
 
@@ -68,7 +70,9 @@ class SiteVendorController extends Controller
 
     public function update(Request $request, Site $site, SiteVendor $vendor)
     {
-        $this->authorize('update', $site);
+        $this->authorize('view', $site);
+        $request->user()->canDo('vendors.manage') || abort(403);
+        abort_unless($vendor->site_id === $site->id, 404);
 
         $validated = $request->validate([
             'service_type' => 'required|string|max:50',
@@ -93,7 +97,9 @@ class SiteVendorController extends Controller
 
     public function destroy(Request $request, Site $site, SiteVendor $vendor)
     {
-        $this->authorize('update', $site);
+        $this->authorize('view', $site);
+        $request->user()->canDo('vendors.manage') || abort(403);
+        abort_unless($vendor->site_id === $site->id, 404);
 
         // Check if vendor has credentials
         if ($vendor->credentials()->count() > 0) {

@@ -1,0 +1,212 @@
+<?php
+
+namespace Tests\Feature;
+
+use App\Models\Role;
+use App\Models\Site;
+use App\Models\SiteChecklistAssignment;
+use App\Models\SiteChecklistResponse;
+use App\Models\SiteChecklistRun;
+use App\Models\SiteChecklistTemplate;
+use App\Models\SiteChecklistTemplateItem;
+use App\Models\SiteCredential;
+use App\Models\User;
+use App\Services\Sites\SiteCredentialEncryptionService;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
+use Tests\TestCase;
+
+class SitesModuleIntegrationTest extends TestCase
+{
+    use RefreshDatabase;
+
+    protected User $admin;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->seed(\Database\Seeders\RbacSeeder::class);
+
+        $this->admin = User::factory()->create([
+            'role' => 'admin',
+            'approved_at' => now(),
+        ]);
+
+        $adminRole = Role::query()->where('name', 'admin')->firstOrFail();
+        $this->admin->roles()->sync([$adminRole->id]);
+    }
+
+    public function test_sites_global_calendar_route_renders(): void
+    {
+        Site::factory()->create([
+            'type' => 'house',
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/sites/calendar')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('calendar/global')
+                ->has('sites')
+                ->has('events')
+                ->has('eventTypes')
+            );
+    }
+
+    public function test_checklist_run_detail_page_contract_is_valid(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+
+        $template = SiteChecklistTemplate::create([
+            'key' => 'house_quality_' . uniqid(),
+            'name' => 'House Quality Checklist',
+            'applicable_to_type' => 'house',
+            'frequency' => 'monthly',
+            'is_active' => true,
+        ]);
+
+        $item = SiteChecklistTemplateItem::create([
+            'template_id' => $template->id,
+            'sort_order' => 1,
+            'question' => 'Are exits clear?',
+            'response_type' => 'yes_no',
+            'is_required' => true,
+            'failure_creates_hazard' => true,
+        ]);
+
+        $assignment = SiteChecklistAssignment::create([
+            'site_id' => $site->id,
+            'template_id' => $template->id,
+            'frequency' => 'monthly',
+            'start_date' => now()->toDateString(),
+            'is_active' => true,
+        ]);
+
+        $run = SiteChecklistRun::create([
+            'assignment_id' => $assignment->id,
+            'site_id' => $site->id,
+            'template_id' => $template->id,
+            'scheduled_date' => now()->toDateString(),
+            'status' => 'scheduled',
+        ]);
+
+        SiteChecklistResponse::create([
+            'run_id' => $run->id,
+            'template_item_id' => $item->id,
+            'response_value' => 'yes',
+            'is_failed' => false,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/checklists/runs/{$run->id}")
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('sites/checklists/runs/[id]')
+                ->where('site.id', $site->id)
+                ->where('template.id', $template->id)
+                ->has('items', 1)
+                ->has('responses', 1)
+            );
+    }
+
+    public function test_credential_reveal_and_copy_are_audited(): void
+    {
+        $site = Site::factory()->create(['type' => 'head_office']);
+
+        $encrypted = app(SiteCredentialEncryptionService::class)->encrypt('TopSecretValue');
+
+        $credential = SiteCredential::create([
+            'site_id' => $site->id,
+            'label' => 'Alarm PIN',
+            'credential_type' => 'pin',
+            'encrypted_value' => $encrypted['value'],
+            'requires_reauth' => false,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->postJson("/sites/{$site->id}/credentials/{$credential->id}/reveal")
+            ->assertOk()
+            ->assertJson(['value' => 'TopSecretValue']);
+
+        $this->actingAs($this->admin)
+            ->postJson("/sites/{$site->id}/credentials/{$credential->id}/copy")
+            ->assertOk();
+
+        $this->assertDatabaseHas('site_credential_audit_logs', [
+            'credential_id' => $credential->id,
+            'action' => 'reveal',
+        ]);
+
+        $this->assertDatabaseHas('site_credential_audit_logs', [
+            'credential_id' => $credential->id,
+            'action' => 'copy',
+        ]);
+    }
+
+    public function test_onboarding_contacts_and_assets_steps_persist_records(): void
+    {
+        $site = Site::factory()->create(['type' => 'facility']);
+
+        $this->actingAs($this->admin)
+            ->postJson("/sites/{$site->id}/onboarding/step", [
+                'step' => 'contacts',
+                'data' => [
+                    'contacts' => [
+                        [
+                            'type' => 'site_lead',
+                            'name' => 'Jordan Lead',
+                            'role' => 'Team Lead',
+                            'phone' => '0210000000',
+                            'email' => 'lead@example.test',
+                            'is_primary' => true,
+                        ],
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->actingAs($this->admin)
+            ->postJson("/sites/{$site->id}/onboarding/step", [
+                'step' => 'assets',
+                'data' => [
+                    'assets' => [
+                        [
+                            'name' => 'Defibrillator',
+                            'category' => 'safety equipment',
+                            'quantity' => 2,
+                        ],
+                    ],
+                ],
+            ])
+            ->assertOk();
+
+        $this->assertDatabaseHas('site_contacts', [
+            'site_id' => $site->id,
+            'name' => 'Jordan Lead',
+        ]);
+
+        $this->assertDatabaseHas('assets', [
+            'site_id' => $site->id,
+            'name' => 'Defibrillator (1)',
+        ]);
+
+        $this->assertDatabaseHas('assets', [
+            'site_id' => $site->id,
+            'name' => 'Defibrillator (2)',
+        ]);
+    }
+
+    public function test_sites_report_export_returns_csv(): void
+    {
+        Site::factory()->create(['type' => 'house']);
+
+        $response = $this->actingAs($this->admin)
+            ->get('/sites/reports/export?type=houses&format=csv');
+
+        $response->assertOk();
+        $this->assertStringStartsWith('text/csv', (string) $response->headers->get('content-type'));
+        $response->assertSee('site_name', false);
+    }
+}

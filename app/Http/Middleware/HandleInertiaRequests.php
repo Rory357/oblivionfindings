@@ -139,6 +139,12 @@ class HandleInertiaRequests extends Middleware
                     'viewAny' => $user->canDo('sites.viewAny'),
                     'create' => $user->canDo('sites.create'),
                     'update' => $user->canDo('sites.update'),
+                    'archive' => $user->canDo('sites.archive'),
+                    'types' => [
+                        'headOfficeView' => $user->canDo('sites.type.head_office.view'),
+                        'houseView' => $user->canDo('sites.type.house.view'),
+                        'facilityView' => $user->canDo('sites.type.facility.view'),
+                    ],
                 ],
 
                 'staff' => [
@@ -231,6 +237,41 @@ class HandleInertiaRequests extends Middleware
 
                 'calendar' => [
                     'viewAny' => $user->canDo('calendar.viewAny'),
+                    'view' => $user->canDo('calendar.view'),
+                    'create' => $user->canDo('calendar.create'),
+                    'approve' => $user->canDo('calendar.approve'),
+                    'manageRecurring' => $user->canDo('calendar.manage_recurring'),
+                ],
+
+                'hazards' => [
+                    'view' => $user->canDo('hazards.view'),
+                    'create' => $user->canDo('hazards.create'),
+                    'assign' => $user->canDo('hazards.assign'),
+                    'close' => $user->canDo('hazards.close'),
+                    'manageTypes' => $user->canDo('hazards.manage_types'),
+                ],
+
+                'checklists' => [
+                    'view' => $user->canDo('checklists.view'),
+                    'run' => $user->canDo('checklists.run'),
+                    'schedule' => $user->canDo('checklists.schedule'),
+                    'manageTemplates' => $user->canDo('checklists.manage_templates'),
+                ],
+
+                'vendors' => [
+                    'view' => $user->canDo('vendors.view'),
+                    'manage' => $user->canDo('vendors.manage'),
+                ],
+
+                'credentials' => [
+                    'view' => $user->canDo('credentials.view'),
+                    'reveal' => $user->canDo('credentials.reveal'),
+                    'manage' => $user->canDo('credentials.manage'),
+                ],
+
+                'sitesReports' => [
+                    'view' => $user->canDo('reports.sites.view'),
+                    'export' => $user->canDo('reports.sites.export'),
                 ],
 
                 'timeline' => [
@@ -290,6 +331,9 @@ class HandleInertiaRequests extends Middleware
                     'manageTerminology' => $user->canDo('settings.terminology.manage'),
                     'manageBranding' => $user->canDo('settings.branding.manage'),
                     'manageServiceContexts' => $user->canDo('settings.service_contexts.manage'),
+                    'sitesManage' => $user->canDo('settings.sites.manage'),
+                    'templatesManage' => $user->canDo('settings.templates.manage'),
+                    'rbacManage' => $user->canDo('settings.rbac.manage'),
                 ],
 
                 'safeguarding' => [

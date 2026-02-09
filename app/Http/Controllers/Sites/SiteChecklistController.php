@@ -61,8 +61,41 @@ class SiteChecklistController extends Controller
             'completedBy:id,name',
         ]);
 
-        return inertia('sites/checklists/showRun', [
-            'run' => $run,
+        return inertia('sites/checklists/runs/[id]', [
+            'site' => [
+                'id' => $run->site->id,
+                'name' => $run->site->name,
+            ],
+            'template' => [
+                'id' => $run->template->id,
+                'name' => $run->template->name,
+            ],
+            'run' => [
+                'id' => $run->id,
+                'scheduled_date' => $run->scheduled_date?->toDateString(),
+                'status' => $run->status,
+                'completion_percentage' => (float) $run->completion_percentage,
+            ],
+            'items' => $run->template->items
+                ->sortBy('sort_order')
+                ->values()
+                ->map(fn ($item) => [
+                    'id' => $item->id,
+                    'question' => $item->question,
+                    'response_type' => $item->response_type,
+                    'response_config' => $item->response_config,
+                    'is_required' => $item->is_required,
+                    'guidance' => $item->guidance,
+                    'failure_creates_hazard' => $item->failure_creates_hazard,
+                ]),
+            'responses' => $run->responses->map(fn ($response) => [
+                'id' => $response->id,
+                'template_item_id' => $response->template_item_id,
+                'response_value' => $response->response_value,
+                'notes' => $response->notes,
+                'photo_path' => $response->photo_path,
+                'is_failed' => (bool) $response->is_failed,
+            ]),
         ]);
     }
 
@@ -82,26 +115,29 @@ class SiteChecklistController extends Controller
     {
         $this->authorize('update', $run->site);
 
-        $validated = $request->validate([
-            'template_item_id' => 'required|exists:site_checklist_template_items,id',
-            'response_value' => 'required|string',
-            'notes' => 'nullable|string',
-            'photo_path' => 'nullable|string',
-            'is_failed' => 'boolean',
+        $batchValidated = $request->validate([
+            'responses' => 'required|array|min:1',
+            'responses.*.template_item_id' => 'required|exists:site_checklist_template_items,id',
+            'responses.*.response_value' => 'nullable|string',
+            'responses.*.notes' => 'nullable|string',
+            'responses.*.photo_path' => 'nullable|string',
+            'responses.*.is_failed' => 'boolean',
         ]);
 
-        SiteChecklistResponse::updateOrCreate(
-            [
-                'run_id' => $run->id,
-                'template_item_id' => $validated['template_item_id'],
-            ],
-            [
-                'response_value' => $validated['response_value'],
-                'notes' => $validated['notes'] ?? null,
-                'photo_path' => $validated['photo_path'] ?? null,
-                'is_failed' => $validated['is_failed'] ?? false,
-            ]
-        );
+        foreach ($batchValidated['responses'] as $response) {
+            SiteChecklistResponse::updateOrCreate(
+                [
+                    'run_id' => $run->id,
+                    'template_item_id' => $response['template_item_id'],
+                ],
+                [
+                    'response_value' => $response['response_value'] ?? null,
+                    'notes' => $response['notes'] ?? null,
+                    'photo_path' => $response['photo_path'] ?? null,
+                    'is_failed' => $response['is_failed'] ?? false,
+                ]
+            );
+        }
 
         // Recalculate completion
         $run->calculateCompletion();

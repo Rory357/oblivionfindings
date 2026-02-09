@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteChecklistTemplateItem;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 
 class SiteChecklistTemplateController extends Controller
 {
@@ -105,7 +104,7 @@ class SiteChecklistTemplateController extends Controller
 
         $validated = $request->validate([
             'question' => 'required|string',
-            'response_type' => 'required|in:yes_no,pass_fail,number,text,select,multiple,photo',
+            'response_type' => 'required|in:yes_no,yes_no_na,pass_fail,numeric,text,photo',
             'response_config' => 'nullable|array',
             'is_required' => 'boolean',
             'guidance' => 'nullable|string',
@@ -128,7 +127,7 @@ class SiteChecklistTemplateController extends Controller
 
         $validated = $request->validate([
             'question' => 'required|string',
-            'response_type' => 'required|in:yes_no,pass_fail,number,text,select,multiple,photo',
+            'response_type' => 'required|in:yes_no,yes_no_na,pass_fail,numeric,text,photo',
             'response_config' => 'nullable|array',
             'is_required' => 'boolean',
             'guidance' => 'nullable|string',

@@ -14,15 +14,61 @@ import { resolveUrl } from '@/lib/utils';
 import { type NavGroup, type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import { ChevronDown } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 interface NavMainProps {
     groups: NavGroup[];
 }
 
-function NavItemComponent({ item }: { item: NavItem }) {
-    const page = usePage();
-    const isActive = page.url.startsWith(resolveUrl(item.href));
+function normalizePath(url: string): string {
+    const path = url.split('?')[0] ?? '/';
+    const trimmed = path.replace(/\/+$/, '');
+    return trimmed.length > 0 ? trimmed : '/';
+}
+
+function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
+    const current = resolveUrl(currentUrl);
+    const item = resolveUrl(itemHref);
+
+    const [currentPath, currentQuery = ''] = current.split('?');
+    const [itemPath, itemQuery = ''] = item.split('?');
+
+    const normalizedCurrentPath = normalizePath(currentPath);
+    const normalizedItemPath = normalizePath(itemPath);
+
+    if (itemQuery.length > 0) {
+        return normalizedCurrentPath === normalizedItemPath && currentQuery === itemQuery
+            ? 3000 + item.length
+            : -1;
+    }
+
+    if (normalizedCurrentPath === normalizedItemPath) {
+        return 2000 + item.length;
+    }
+
+    if (normalizedCurrentPath.startsWith(`${normalizedItemPath}/`)) {
+        return 1000 + item.length;
+    }
+
+    return -1;
+}
+
+function getActiveIndex(currentUrl: string, items: NavItem[]): number {
+    let bestIndex = -1;
+    let bestScore = -1;
+
+    items.forEach((item, index) => {
+        const score = matchScore(currentUrl, item.href);
+        if (score > bestScore) {
+            bestScore = score;
+            bestIndex = index;
+        }
+    });
+
+    return bestIndex;
+}
+
+function NavItemComponent({ item, isActive }: { item: NavItem; isActive: boolean }) {
 
     return (
         <SidebarMenuItem>
@@ -49,16 +95,15 @@ function NavGroupComponent({
 }) {
     const [isOpen, setIsOpen] = useState(defaultOpen);
     const page = usePage();
+    const activeIndex = useMemo(() => getActiveIndex(page.url, group.items), [page.url, group.items]);
 
     // Auto-expand group if it contains active item
     useEffect(() => {
-        const hasActiveItem = group.items.some((item) =>
-            page.url.startsWith(resolveUrl(item.href))
-        );
+        const hasActiveItem = activeIndex >= 0;
         if (hasActiveItem) {
             setIsOpen(true);
         }
-    }, [page.url, group.items]);
+    }, [activeIndex]);
 
     return (
         <SidebarGroup className="px-2 py-0">
@@ -75,8 +120,12 @@ function NavGroupComponent({
                 </CollapsibleTrigger>
                 <CollapsibleContent>
                     <SidebarMenu>
-                        {group.items.map((item) => (
-                            <NavItemComponent key={item.href} item={item} />
+                        {group.items.map((item, index) => (
+                            <NavItemComponent
+                                key={`${group.id}:${index}:${resolveUrl(item.href)}`}
+                                item={item}
+                                isActive={index === activeIndex}
+                            />
                         ))}
                     </SidebarMenu>
                 </CollapsibleContent>

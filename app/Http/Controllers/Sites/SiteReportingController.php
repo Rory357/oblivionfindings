@@ -4,20 +4,19 @@ namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
 use App\Models\Site;
-use App\Models\SiteHazard;
-use App\Models\SiteChecklistRun;
-use App\Models\SiteInspectionRecord;
-use App\Services\Sites\SiteHazardRiskCalculator;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Response;
 use Carbon\Carbon;
 
 class SiteReportingController extends Controller
 {
     public function index(Request $request)
     {
-        $this->authorize('reports.sites.view');
+        abort_unless($request->user()?->canDo('reports.sites.view'), 403);
+        $allowedSiteTypes = $this->allowedSiteTypes($request);
 
         $sites = Site::active()
+            ->whereIn('type', $allowedSiteTypes)
             ->select(['id', 'name', 'type', 'region'])
             ->orderBy('name')
             ->get();
@@ -29,7 +28,8 @@ class SiteReportingController extends Controller
 
     public function houses(Request $request)
     {
-        $this->authorize('reports.sites.view');
+        abort_unless($request->user()?->canDo('reports.sites.view'), 403);
+        abort_unless(in_array('house', $this->allowedSiteTypes($request), true), 403);
 
         $dateFrom = Carbon::parse($request->input('date_from', now()->subMonths(3)));
         $dateTo = Carbon::parse($request->input('date_to', now()));
@@ -65,7 +65,8 @@ class SiteReportingController extends Controller
 
     public function facilities(Request $request)
     {
-        $this->authorize('reports.sites.view');
+        abort_unless($request->user()?->canDo('reports.sites.view'), 403);
+        abort_unless(in_array('facility', $this->allowedSiteTypes($request), true), 403);
 
         $dateFrom = Carbon::parse($request->input('date_from', now()->subMonths(3)));
         $dateTo = Carbon::parse($request->input('date_to', now()));
@@ -100,7 +101,8 @@ class SiteReportingController extends Controller
 
     public function headOffice(Request $request)
     {
-        $this->authorize('reports.sites.view');
+        abort_unless($request->user()?->canDo('reports.sites.view'), 403);
+        abort_unless(in_array('head_office', $this->allowedSiteTypes($request), true), 403);
 
         $dateFrom = Carbon::parse($request->input('date_from', now()->subMonths(3)));
         $dateTo = Carbon::parse($request->input('date_to', now()));
@@ -133,15 +135,35 @@ class SiteReportingController extends Controller
 
     public function export(Request $request)
     {
-        $this->authorize('reports.sites.export');
+        abort_unless($request->user()?->canDo('reports.sites.export'), 403);
 
         $type = $request->input('type', 'houses');
         $format = $request->input('format', 'csv');
+        $dateFrom = Carbon::parse($request->input('date_from', now()->subMonths(3)));
+        $dateTo = Carbon::parse($request->input('date_to', now()));
 
-        // Generate export based on type and format
-        // This would typically use Laravel Excel or similar
+        if ($format !== 'csv') {
+            return response()->json([
+                'message' => 'Only CSV export is currently available.',
+            ], 422);
+        }
 
-        return response()->json(['message' => 'Export generated']);
+        $rows = $this->buildExportRows($type, $dateFrom, $dateTo);
+        $headers = array_keys($rows[0] ?? ['site_name' => null, 'site_type' => null, 'period_from' => null, 'period_to' => null]);
+        $filename = sprintf('sites-report-%s-%s.csv', $type, now()->format('Ymd-His'));
+
+        $csv = implode(',', $headers) . PHP_EOL;
+        foreach ($rows as $row) {
+            $csv .= implode(',', array_map(function ($value) {
+                $escaped = str_replace('"', '""', (string) $value);
+                return "\"{$escaped}\"";
+            }, $row)) . PHP_EOL;
+        }
+
+        return Response::make($csv, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
     }
 
     private function calculateChecklistCompletionRate($houses, $dateFrom, $dateTo): float
@@ -187,5 +209,64 @@ class SiteReportingController extends Controller
         }
 
         return $totalRuns > 0 ? round(($passedRuns / $totalRuns) * 100, 1) : 0;
+    }
+
+    private function buildExportRows(string $type, Carbon $dateFrom, Carbon $dateTo): array
+    {
+        $sites = Site::query()
+            ->where('type', match ($type) {
+                'facilities' => 'facility',
+                'head_office' => 'head_office',
+                default => 'house',
+            })
+            ->with([
+                'hazards' => fn ($q) => $q->whereBetween('created_at', [$dateFrom, $dateTo]),
+                'checklistRuns' => fn ($q) => $q->whereBetween('scheduled_date', [$dateFrom, $dateTo]),
+                'inspectionRecords' => fn ($q) => $q->whereBetween('due_date', [$dateFrom, $dateTo]),
+                'assets',
+            ])
+            ->orderBy('name')
+            ->get();
+
+        return $sites->map(function (Site $site) use ($dateFrom, $dateTo) {
+            $checklistRuns = $site->checklistRuns;
+            $completedChecklistRuns = $checklistRuns->where('status', 'completed')->count();
+
+            return [
+                'site_name' => $site->name,
+                'site_type' => $site->type,
+                'region' => (string) $site->region,
+                'period_from' => $dateFrom->toDateString(),
+                'period_to' => $dateTo->toDateString(),
+                'hazards_open' => $site->hazards->whereIn('status', ['open', 'in_progress'])->count(),
+                'hazards_closed' => $site->hazards->whereIn('status', ['mitigated', 'closed'])->count(),
+                'hazards_critical' => $site->hazards->where('severity', 'critical')->count(),
+                'checklist_total' => $checklistRuns->count(),
+                'checklist_completed' => $completedChecklistRuns,
+                'checklist_completion_percent' => $checklistRuns->count() > 0
+                    ? round(($completedChecklistRuns / $checklistRuns->count()) * 100, 1)
+                    : 0,
+                'inspection_records' => $site->inspectionRecords->count(),
+                'assets_count' => $site->assets->count(),
+            ];
+        })->all();
+    }
+
+    private function allowedSiteTypes(Request $request): array
+    {
+        $user = $request->user();
+        $map = [
+            'head_office' => 'sites.type.head_office.view',
+            'house' => 'sites.type.house.view',
+            'facility' => 'sites.type.facility.view',
+        ];
+
+        $allowed = collect($map)
+            ->filter(fn (string $permission) => $user?->canDo($permission))
+            ->keys()
+            ->values()
+            ->all();
+
+        return $allowed !== [] ? $allowed : array_keys($map);
     }
 }

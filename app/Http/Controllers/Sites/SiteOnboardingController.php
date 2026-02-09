@@ -9,6 +9,8 @@ use App\Models\SiteChecklistAssignment;
 use App\Models\SiteHouseRoom;
 use App\Models\SiteHoResource;
 use App\Models\SiteFacilityZone;
+use App\Models\SiteContact;
+use App\Models\Asset;
 use Illuminate\Http\Request;
 
 class SiteOnboardingController extends Controller
@@ -98,6 +100,8 @@ class SiteOnboardingController extends Controller
         // Handle type-specific saves
         match ($step) {
             'basic' => $this->saveBasicInfo($site, $data),
+            'contacts' => $this->saveContacts($site, $data),
+            'assets' => $this->saveAssets($site, $data, $request->user()?->id),
             'rooms' => $this->saveHouseRooms($site, $data),
             'resources' => $this->saveHoResources($site, $data),
             'zones' => $this->saveFacilityZones($site, $data),
@@ -160,6 +164,78 @@ class SiteOnboardingController extends Controller
         ]);
     }
 
+    private function saveContacts(Site $site, array $data): void
+    {
+        if (empty($data['contacts']) || !is_array($data['contacts'])) {
+            return;
+        }
+
+        foreach ($data['contacts'] as $contactData) {
+            if (empty(trim((string) ($contactData['name'] ?? '')))) {
+                continue;
+            }
+
+            $payload = [
+                'site_id' => $site->id,
+                'tenant_id' => $site->tenant_id,
+                'type' => $contactData['type'] ?? 'general',
+                'name' => $contactData['name'],
+                'role' => $contactData['role'] ?? null,
+                'phone' => $contactData['phone'] ?? null,
+                'email' => $contactData['email'] ?? null,
+                'is_primary' => (bool) ($contactData['is_primary'] ?? false),
+                'notes' => $contactData['notes'] ?? null,
+            ];
+
+            if (!empty($contactData['id'])) {
+                SiteContact::query()
+                    ->where('site_id', $site->id)
+                    ->where('id', $contactData['id'])
+                    ->update($payload);
+                continue;
+            }
+
+            SiteContact::create($payload);
+        }
+    }
+
+    private function saveAssets(Site $site, array $data, ?int $userId): void
+    {
+        if (empty($data['assets']) || !is_array($data['assets'])) {
+            return;
+        }
+
+        foreach ($data['assets'] as $assetData) {
+            $name = trim((string) ($assetData['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+
+            $quantity = max(1, (int) ($assetData['quantity'] ?? 1));
+            $category = trim((string) ($assetData['category'] ?? 'general'));
+
+            for ($i = 1; $i <= $quantity; $i++) {
+                $resolvedName = $quantity > 1 ? sprintf('%s (%d)', $name, $i) : $name;
+
+                Asset::updateOrCreate(
+                    [
+                        'site_id' => $site->id,
+                        'name' => $resolvedName,
+                    ],
+                    [
+                        'category' => $category !== '' ? $category : 'general',
+                        'status' => 'active',
+                        'risk_level' => 'medium',
+                        'tenant_id' => $site->tenant_id,
+                        'created_by_user_id' => $userId,
+                        'updated_by_user_id' => $userId,
+                        'notes' => 'Created during site onboarding.',
+                    ]
+                );
+            }
+        }
+    }
+
     private function saveHouseRooms(Site $site, array $data): void
     {
         if (!empty($data['rooms'])) {
@@ -172,6 +248,7 @@ class SiteOnboardingController extends Controller
                 } else {
                     SiteHouseRoom::create([
                         'site_id' => $site->id,
+                        'tenant_id' => $site->tenant_id,
                         'name' => $roomData['name'],
                         'notes' => $roomData['notes'] ?? null,
                         'is_active' => true,
@@ -190,6 +267,7 @@ class SiteOnboardingController extends Controller
                 } else {
                     SiteHoResource::create([
                         'site_id' => $site->id,
+                        'tenant_id' => $site->tenant_id,
                         ...$resourceData,
                         'is_active' => true,
                     ]);
@@ -207,6 +285,7 @@ class SiteOnboardingController extends Controller
                 } else {
                     SiteFacilityZone::create([
                         'site_id' => $site->id,
+                        'tenant_id' => $site->tenant_id,
                         ...$zoneData,
                         'is_active' => true,
                     ]);
@@ -226,6 +305,7 @@ class SiteOnboardingController extends Controller
                             'template_id' => $assignment['template_id'],
                         ],
                         [
+                            'tenant_id' => $site->tenant_id,
                             'frequency' => $assignment['frequency'],
                             'start_date' => $assignment['start_date'],
                             'assigned_to_user_id' => $assignment['assigned_to_user_id'] ?? null,

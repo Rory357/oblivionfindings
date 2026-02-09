@@ -13,6 +13,7 @@ class SiteInspectionSchedule extends Model
 
     protected $fillable = [
         'site_id',
+        'tenant_id',
         'inspection_type',
         'title',
         'description',

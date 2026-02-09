@@ -68,10 +68,12 @@ function buildNavigationGroups({
     role,
     can,
     labels,
+    activeSiteId,
 }: {
     role?: string | null;
     can?: any;
     labels: Record<string, string>;
+    activeSiteId?: number | null;
 }): NavGroup[] {
     const clientPlural = labels['client.plural'] ?? 'Clients';
     const sitePlural = labels['site.plural'] ?? 'Sites';
@@ -146,26 +148,37 @@ function buildNavigationGroups({
     }
 
     if (can?.calendar?.view) {
-        sitesGroup.items.push({ title: 'Calendars', href: '/calendar', icon: CalendarDays });
+        sitesGroup.items.push({ title: 'Calendars', href: '/sites/calendar', icon: CalendarDays });
     }
 
-    if (can?.checklists?.view) {
-        sitesGroup.items.push({ title: 'Checklists & Walkthroughs', href: '/sites/checklists', icon: ClipboardCheck });
-    }
-    if (can?.checklists?.manage) {
+    if (can?.checklists?.manageTemplates) {
         sitesGroup.items.push({ title: 'Checklist Templates', href: '/sites/checklists/templates', icon: FileQuestion });
+    } else if (can?.checklists?.view) {
+        sitesGroup.items.push({ title: 'Checklists & Walkthroughs', href: '/sites/checklists/templates', icon: ClipboardCheck });
     }
 
     if (can?.hazards?.view) {
         sitesGroup.items.push({ title: 'Hazards', href: '/compliance/hazards', icon: ShieldAlert });
     }
 
-    if (can?.vendors?.view) {
-        sitesGroup.items.push({ title: 'Vendors & Credentials', href: '/sites/vendors', icon: Truck });
+    sitesGroup.items.push({ title: 'Documents & Notes', href: '/sites', icon: FileText });
+
+    if (can?.checklists?.view) {
+        sitesGroup.items.push({ title: 'Inspections & Maintenance', href: '/sites/reports', icon: Wrench });
+    }
+
+    if (can?.vendors?.view || can?.credentials?.view) {
+        const href = activeSiteId
+            ? can?.vendors?.view
+                ? `/sites/${activeSiteId}/vendors`
+                : `/sites/${activeSiteId}/credentials`
+            : '/sites';
+
+        sitesGroup.items.push({ title: 'Vendors & Credentials', href, icon: Truck });
     }
 
     if (can?.assets?.viewAny) {
-        sitesGroup.items.push({ title: 'Site Assets', href: '/assets', icon: Package });
+        sitesGroup.items.push({ title: 'Assets', href: '/assets', icon: Package });
     }
 
     // Support Worker specific nav
@@ -387,12 +400,14 @@ function buildNavigationGroups({
 }
 
 export function AppSidebar() {
-    const { auth } = usePage<PageProps>().props;
-    const { labels } = usePage<PageProps>().props;
+    const page = usePage<PageProps & Record<string, any>>();
+    const { auth } = page.props;
+    const { labels } = page.props;
     const role = auth.user?.role ?? null;
     const can = auth?.can;
 
-    const navigationGroups = buildNavigationGroups({ role, can, labels: labels ?? {} });
+    const activeSiteId = page.props?.site?.id ?? null;
+    const navigationGroups = buildNavigationGroups({ role, can, labels: labels ?? {}, activeSiteId });
 
     return (
         <Sidebar collapsible="icon" variant="inset">

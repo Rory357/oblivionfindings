@@ -26,10 +26,10 @@ use App\Http\Controllers\Sites\{
 */
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    
-    // Global Calendar
-    Route::get('/calendar', [SiteCalendarController::class, 'global'])
-        ->name('calendar.global')
+
+    // Global Sites Calendar
+    Route::get('/sites/calendar', [SiteCalendarController::class, 'global'])
+        ->name('sites.calendar.global')
         ->middleware('permission:calendar.view');
 
     // Site-scoped routes
@@ -89,6 +89,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('permission:credentials.manage');
         Route::post('/credentials/{credential}/reveal', [SiteCredentialController::class, 'reveal'])
             ->name('sites.credentials.reveal')
+            ->middleware('permission:credentials.reveal');
+        Route::post('/credentials/{credential}/copy', [SiteCredentialController::class, 'copy'])
+            ->name('sites.credentials.copy')
             ->middleware('permission:credentials.reveal');
         Route::put('/credentials/{credential}', [SiteCredentialController::class, 'update'])
             ->name('sites.credentials.update')
@@ -174,6 +177,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/sites/reports/head-office', [SiteReportingController::class, 'headOffice'])
         ->name('sites.reports.head-office')
         ->middleware('permission:reports.sites.view');
+    Route::get('/sites/reports/export', [SiteReportingController::class, 'export'])
+        ->name('sites.reports.export')
+        ->middleware('permission:reports.sites.export');
 
     // Type-specific management
     Route::get('/sites/{site}/rooms', [SiteRoomController::class, 'index'])
@@ -213,33 +219,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:sites.update');
 });
 
-// Checklist Templates (global management) - Outside site prefix group
-Route::get('/sites/checklists/templates', [SiteChecklistTemplateController::class, 'index'])
-    ->name('sites.checklists.templates.index')
-    ->middleware('permission:checklists.view');
-Route::get('/sites/checklists/templates/create', [SiteChecklistTemplateController::class, 'create'])
-    ->name('sites.checklists.templates.create')
-    ->middleware('permission:checklists.manage');
-Route::post('/sites/checklists/templates', [SiteChecklistTemplateController::class, 'store'])
-    ->name('sites.checklists.templates.store')
-    ->middleware('permission:checklists.manage');
-Route::get('/sites/checklists/templates/{template}/edit', [SiteChecklistTemplateController::class, 'edit'])
-    ->name('sites.checklists.templates.edit')
-    ->middleware('permission:checklists.manage');
-Route::put('/sites/checklists/templates/{template}', [SiteChecklistTemplateController::class, 'update'])
-    ->name('sites.checklists.templates.update')
-    ->middleware('permission:checklists.manage');
-Route::delete('/sites/checklists/templates/{template}', [SiteChecklistTemplateController::class, 'destroy'])
-    ->name('sites.checklists.templates.destroy')
-    ->middleware('permission:checklists.manage');
+Route::middleware(['auth', 'verified'])->group(function () {
+    // Checklist Templates (global management)
+    Route::get('/sites/checklists/templates', [SiteChecklistTemplateController::class, 'index'])
+        ->name('sites.checklists.templates.index')
+        ->middleware('permission:checklists.view');
+    Route::get('/sites/checklists/templates/create', [SiteChecklistTemplateController::class, 'create'])
+        ->name('sites.checklists.templates.create')
+        ->middleware('permission:checklists.manage_templates');
+    Route::post('/sites/checklists/templates', [SiteChecklistTemplateController::class, 'store'])
+        ->name('sites.checklists.templates.store')
+        ->middleware('permission:checklists.manage_templates');
+    Route::get('/sites/checklists/templates/{template}/edit', [SiteChecklistTemplateController::class, 'edit'])
+        ->name('sites.checklists.templates.edit')
+        ->middleware('permission:checklists.manage_templates');
+    Route::put('/sites/checklists/templates/{template}', [SiteChecklistTemplateController::class, 'update'])
+        ->name('sites.checklists.templates.update')
+        ->middleware('permission:checklists.manage_templates');
+    Route::delete('/sites/checklists/templates/{template}', [SiteChecklistTemplateController::class, 'destroy'])
+        ->name('sites.checklists.templates.destroy')
+        ->middleware('permission:checklists.manage_templates');
 
-// Template Items
-Route::post('/sites/checklists/templates/{template}/items', [SiteChecklistTemplateController::class, 'storeItem'])
-    ->name('sites.checklists.templates.items.store')
-    ->middleware('permission:checklists.manage');
-Route::put('/sites/checklists/templates/items/{item}', [SiteChecklistTemplateController::class, 'updateItem'])
-    ->name('sites.checklists.templates.items.update')
-    ->middleware('permission:checklists.manage');
-Route::delete('/sites/checklists/templates/items/{item}', [SiteChecklistTemplateController::class, 'destroyItem'])
-    ->name('sites.checklists.templates.items.destroy')
-    ->middleware('permission:checklists.manage');
+    // Template Items
+    Route::post('/sites/checklists/templates/{template}/items', [SiteChecklistTemplateController::class, 'storeItem'])
+        ->name('sites.checklists.templates.items.store')
+        ->middleware('permission:checklists.manage_templates');
+    Route::put('/sites/checklists/templates/items/{item}', [SiteChecklistTemplateController::class, 'updateItem'])
+        ->name('sites.checklists.templates.items.update')
+        ->middleware('permission:checklists.manage_templates');
+    Route::delete('/sites/checklists/templates/items/{item}', [SiteChecklistTemplateController::class, 'destroyItem'])
+        ->name('sites.checklists.templates.items.destroy')
+        ->middleware('permission:checklists.manage_templates');
+});

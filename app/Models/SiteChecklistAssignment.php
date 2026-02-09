@@ -13,6 +13,7 @@ class SiteChecklistAssignment extends Model
 
     protected $fillable = [
         'site_id',
+        'tenant_id',
         'template_id',
         'frequency',
         'custom_rrule',

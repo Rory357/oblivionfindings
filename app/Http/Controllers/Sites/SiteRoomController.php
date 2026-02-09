@@ -51,6 +51,7 @@ class SiteRoomController extends Controller
     public function store(Request $request, Site $site)
     {
         $this->authorize('update', $site);
+        abort_unless($room->site_id === $site->id, 404);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -61,6 +62,7 @@ class SiteRoomController extends Controller
         $room = SiteHouseRoom::create([
             ...$validated,
             'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
             'is_active' => true,
         ]);
 
@@ -80,6 +82,7 @@ class SiteRoomController extends Controller
         // If assigning a new client, record in history
         if ($room->assigned_client_id !== $validated['assigned_client_id'] && $validated['assigned_client_id']) {
             $room->history()->create([
+                'tenant_id' => $site->tenant_id,
                 'client_id' => $validated['assigned_client_id'],
                 'assigned_from' => now(),
                 'assigned_by_user_id' => $request->user()->id,
@@ -94,6 +97,7 @@ class SiteRoomController extends Controller
     public function destroy(Request $request, Site $site, SiteHouseRoom $room)
     {
         $this->authorize('update', $site);
+        abort_unless($room->site_id === $site->id, 404);
 
         $room->update(['is_active' => false]);
 

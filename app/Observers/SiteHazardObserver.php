@@ -49,46 +49,58 @@ class SiteHazardObserver
 
     public function updated(SiteHazard $hazard): void
     {
+        $updates = [];
+
         // Log status changes
-        if ($hazard->isDirty('status')) {
+        if ($hazard->wasChanged('status')) {
             AuditLogger::log('hazard.status_changed', $hazard, [
                 'from' => $hazard->getOriginal('status'),
                 'to' => $hazard->status,
             ]);
 
             // Update timestamps
-            $hazard->status_changed_at = now();
-            $hazard->status_changed_by_user_id = auth()->id();
+            $updates['status_changed_at'] = now();
+            $updates['status_changed_by_user_id'] = auth()->id();
 
             // If closing, set closed info
             if (in_array($hazard->status, ['mitigated', 'closed'])) {
-                $hazard->closed_at = now();
-                $hazard->closed_by_user_id = auth()->id();
+                $updates['closed_at'] = now();
+                $updates['closed_by_user_id'] = auth()->id();
             }
         }
 
         // Notify on assignment
-        if ($hazard->isDirty('assigned_to_user_id') && $hazard->assigned_to_user_id) {
-            $hazard->assignedTo->notify(new HazardAssignedNotification($hazard));
-            $hazard->assigned_at = now();
+        if ($hazard->wasChanged('assigned_to_user_id') && $hazard->assigned_to_user_id) {
+            if ($hazard->assignedTo) {
+                $hazard->assignedTo->notify(new HazardAssignedNotification($hazard));
+            }
+            $updates['assigned_at'] = now();
         }
 
         // Log risk changes
-        if ($hazard->isDirty('risk_rating')) {
+        if ($hazard->wasChanged('risk_rating')) {
             AuditLogger::log('hazard.risk_changed', $hazard, [
                 'from' => $hazard->getOriginal('risk_rating'),
                 'to' => $hazard->risk_rating,
             ]);
         }
+
+        if ($updates !== []) {
+            $hazard->forceFill($updates)->saveQuietly();
+        }
     }
 
     private function autoAssignHealthSafetyOfficer(SiteHazard $hazard): void
     {
-        $hsOfficer = \App\Models\User::role('health_safety_officer')->first();
+        $hsOfficer = \App\Models\User::query()
+            ->whereHas('roles', fn ($q) => $q->where('name', 'health_safety_officer'))
+            ->first();
 
         if ($hsOfficer) {
-            $hazard->assigned_to_user_id = $hsOfficer->id;
-            $hazard->assigned_at = now();
+            $hazard->forceFill([
+                'assigned_to_user_id' => $hsOfficer->id,
+                'assigned_at' => now(),
+            ])->saveQuietly();
         }
     }
 

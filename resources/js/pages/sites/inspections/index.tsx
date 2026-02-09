@@ -215,7 +215,7 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                                         <div>
                                             <div className="font-medium">{schedule.title}</div>
                                             <div className="text-sm text-slate-400">
-                                                {schedule.inspection_type} • {frequencyLabels[schedule.frequency]}
+                                                {schedule.inspection_type} - {frequencyLabels[schedule.frequency]}
                                             </div>
                                             {schedule.assigned_to && (
                                                 <div className="text-xs text-slate-500">

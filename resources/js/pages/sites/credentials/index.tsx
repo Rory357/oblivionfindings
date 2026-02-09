@@ -122,8 +122,15 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
         }
     };
 
-    const copyToClipboard = (value: string) => {
-        navigator.clipboard.writeText(value);
+    const copyToClipboard = async (value: string, credentialId: number) => {
+        await navigator.clipboard.writeText(value);
+
+        await fetch(`/sites/${site.id}/credentials/${credentialId}/copy`, {
+            method: 'POST',
+            headers: {
+                'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
+            },
+        });
     };
 
     return (
@@ -139,12 +146,17 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                         </h1>
                         <p className="text-sm text-slate-400">{site.name}</p>
                     </div>
-                    {canManage && (
-                        <Button onClick={() => setShowForm(true)}>
-                            <Plus className="w-4 h-4 mr-1" />
-                            Add Credential
+                    <div className="flex gap-2">
+                        <Button asChild variant="secondary">
+                            <Link href={`/sites/${site.id}/vendors`}>Vendors</Link>
                         </Button>
-                    )}
+                        {canManage && (
+                            <Button onClick={() => setShowForm(true)}>
+                                <Plus className="w-4 h-4 mr-1" />
+                                Add Credential
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
                 {/* Add/Edit Form */}
@@ -290,7 +302,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        onClick={() => copyToClipboard(revealedValue)}
+                                                        onClick={() => copyToClipboard(revealedValue, cred.id)}
                                                     >
                                                         <Copy className="w-4 h-4" />
                                                     </Button>

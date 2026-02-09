@@ -13,6 +13,7 @@ class SiteVendor extends Model
 
     protected $fillable = [
         'site_id',
+        'tenant_id',
         'service_type',
         'company_name',
         'contact_name',

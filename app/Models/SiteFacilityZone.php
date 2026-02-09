@@ -12,6 +12,7 @@ class SiteFacilityZone extends Model
 
     protected $fillable = [
         'site_id',
+        'tenant_id',
         'name',
         'description',
         'zone_type',

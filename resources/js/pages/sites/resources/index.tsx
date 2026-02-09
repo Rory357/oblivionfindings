@@ -98,7 +98,7 @@ export default function SiteResources({ site, resources }: Props) {
             { title: 'Sites', href: '/sites' },
             { title: site.name, href: `/sites/${site.id}` },
             { title: 'Resources', href: `#` },
-        ]}>>
+        ]}>
             <Head title={`${site.name} - Resources`} />
 
             <div className="m-4 max-w-4xl mx-auto space-y-4">

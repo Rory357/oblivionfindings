@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Sites;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteHazard;
-use App\Services\AuditLogger;
 use App\Services\Sites\SiteHazardRiskCalculator;
 use Illuminate\Http\Request;
 
@@ -99,12 +98,24 @@ class SiteHazardController extends Controller
             'photo_paths' => 'nullable|array',
             'immediate_action_applied' => 'boolean',
             'immediate_action_taken' => 'nullable|string',
+            'assigned_to_user_id' => 'nullable|exists:users,id',
+            'due_date' => 'nullable|date',
         ]);
+
+        $assignedToUserId = $validated['assigned_to_user_id'] ?? null;
+        if (in_array($validated['severity'], ['high', 'critical'], true) && !$assignedToUserId) {
+            $assignedToUserId = \App\Models\User::query()
+                ->whereHas('roles', fn ($q) => $q->where('name', 'health_safety_officer'))
+                ->value('id');
+        }
 
         $hazard = SiteHazard::create([
             ...$validated,
             'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
             'reported_by_user_id' => $request->user()->id,
+            'assigned_to_user_id' => $assignedToUserId,
+            'assigned_at' => $assignedToUserId ? now() : null,
             'status' => 'open',
         ]);
 
@@ -165,27 +176,78 @@ class SiteHazardController extends Controller
 
     public function globalIndex(Request $request)
     {
-        $this->authorize('hazards.view');
+        abort_unless($request->user()?->canDo('hazards.view'), 403);
+
+        $allowedSiteTypes = $this->allowedSiteTypes($request);
 
         $query = SiteHazard::query()
             ->with(['site:id,name,type', 'assignedTo:id,name'])
+            ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
             ->when($request->site_id, fn($q) => $q->where('site_id', $request->site_id))
+            ->when($request->site_type, fn($q) => $q->whereHas('site', fn ($sq) => $sq->where('type', $request->site_type)))
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->severity, fn($q) => $q->where('severity', $request->severity))
             ->when($request->risk_rating, fn($q) => $q->where('risk_rating', $request->risk_rating))
+            ->when($request->assignee_id, fn($q) => $q->where('assigned_to_user_id', $request->assignee_id))
+            ->when($request->due_state === 'overdue', fn($q) => $q->whereDate('due_date', '<', now()->toDateString())->whereIn('status', ['open', 'in_progress']))
+            ->when($request->due_state === 'due_soon', fn($q) => $q->whereBetween('due_date', [now()->toDateString(), now()->addDays(7)->toDateString()])->whereIn('status', ['open', 'in_progress']))
             ->when($request->assigned_to_me, fn($q) => $q->where('assigned_to_user_id', $request->user()->id));
 
-        $hazards = $query->orderByDesc('created_at')->paginate(25);
+        $hazards = $query
+            ->orderByDesc('created_at')
+            ->limit(500)
+            ->get()
+            ->map(fn (SiteHazard $hazard) => [
+                'id' => $hazard->id,
+                'reference_number' => $hazard->reference_number,
+                'site_id' => $hazard->site_id,
+                'site_name' => $hazard->site?->name,
+                'site_type' => $hazard->site?->type,
+                'hazard_type' => $hazard->hazard_type,
+                'severity' => $hazard->severity,
+                'likelihood' => $hazard->likelihood,
+                'risk_rating' => $hazard->risk_rating,
+                'description' => $hazard->description,
+                'status' => $hazard->status,
+                'assigned_to_name' => $hazard->assignedTo?->name,
+                'due_date' => $hazard->due_date?->toDateString(),
+                'created_at' => $hazard->created_at?->toDateTimeString(),
+            ]);
 
-        $sites = Site::active()->select(['id', 'name', 'type'])->orderBy('name')->get();
+        $sites = Site::active()
+            ->whereIn('type', $allowedSiteTypes)
+            ->select(['id', 'name', 'type'])
+            ->orderBy('name')
+            ->get();
 
         return inertia('compliance/hazards/index', [
             'hazards' => $hazards,
             'sites' => $sites,
-            'filters' => $request->only(['site_id', 'status', 'severity', 'risk_rating', 'assigned_to_me']),
-            'severityOptions' => SiteHazardRiskCalculator::severities(),
+            'filters' => $request->only(['site_id', 'site_type', 'status', 'severity', 'risk_rating', 'assigned_to_me', 'assignee_id', 'due_state']),
+            'severityOptions' => collect(SiteHazardRiskCalculator::severities())->map(fn ($severity) => [
+                'key' => $severity,
+                'label' => ucfirst($severity),
+            ])->values(),
             'likelihoodOptions' => SiteHazardRiskCalculator::likelihoods(),
             'riskRatings' => SiteHazardRiskCalculator::riskRatings(),
         ]);
+    }
+
+    private function allowedSiteTypes(Request $request): array
+    {
+        $user = $request->user();
+        $map = [
+            'head_office' => 'sites.type.head_office.view',
+            'house' => 'sites.type.house.view',
+            'facility' => 'sites.type.facility.view',
+        ];
+
+        $allowed = collect($map)
+            ->filter(fn (string $permission) => $user?->canDo($permission))
+            ->keys()
+            ->values()
+            ->all();
+
+        return $allowed !== [] ? $allowed : array_keys($map);
     }
 }

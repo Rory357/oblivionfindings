@@ -12,6 +12,7 @@ class SiteChecklistResponse extends Model
 
     protected $fillable = [
         'run_id',
+        'tenant_id',
         'template_item_id',
         'response_value',
         'notes',

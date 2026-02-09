@@ -140,9 +140,12 @@ function bytes(n?: number | null): string {
     return `${mb.toFixed(1)} MB`;
 }
 
-export default function SiteShow({ site, clients, assets, contacts, documents, checklist, typeSpecificData, can_edit, can }: Props) {
+export default function SiteShow({ site, clients, assets, contacts, documents, checklist, typeSpecificData, can_edit, can: assetCan }: Props) {
     const TypeIcon = typeIcons[site.type];
     const percent = Math.round((checklist.filter((c) => c.done).length / Math.max(1, checklist.length)) * 100);
+    const page = usePage<any>();
+    const canGlobal = page.props?.auth?.can;
+    const canSeeVendorsCredentials = !!(canGlobal?.vendors?.view || canGlobal?.credentials?.view);
 
     // Checklist for onboarding
     const isOnboardingComplete = !!site.onboarding_completed_at;
@@ -156,7 +159,7 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                 <div className="flex flex-col gap-4">
                     <PageHeader
                         title={site.name}
-                        subtitle={site.address || '—'}
+                        description={site.address || '—'}
                         actions={
                             <div className="flex items-center gap-2">
                                 <Badge variant="outline" className={typeColors[site.type]}>
@@ -338,6 +341,12 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             <ShieldAlert className="w-4 h-4" />
                             Hazards
                         </TabsTrigger>
+                        {canSeeVendorsCredentials && (
+                            <TabsTrigger value="vendors-credentials" className="flex items-center gap-1">
+                                <Truck className="w-4 h-4" />
+                                Vendors & Credentials
+                            </TabsTrigger>
+                        )}
                         <TabsTrigger value="type-specific" className="flex items-center gap-1">
                             {site.type === 'house' && <BedDouble className="w-4 h-4" />}
                             {site.type === 'head_office' && <DoorOpen className="w-4 h-4" />}
@@ -496,7 +505,7 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between">
                                 <CardTitle>Assets at this site</CardTitle>
-                                {can?.createAsset && (
+                                {assetCan?.createAsset && (
                                     <Button asChild variant="secondary" size="sm">
                                         <Link href={`/assets/create?site_id=${site.id}`}>Add Asset</Link>
                                     </Button>
@@ -625,6 +634,34 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             </CardContent>
                         </Card>
                     </TabsContent>
+
+                    {/* Vendors & Credentials Tab */}
+                    {canSeeVendorsCredentials && (
+                        <TabsContent value="vendors-credentials">
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <CardTitle>Vendors & Credentials</CardTitle>
+                                    <div className="flex gap-2">
+                                        {canGlobal?.vendors?.view && (
+                                            <Button asChild>
+                                                <Link href={`/sites/${site.id}/vendors`}>Open Vendors</Link>
+                                            </Button>
+                                        )}
+                                        {canGlobal?.credentials?.view && (
+                                            <Button asChild variant="secondary">
+                                                <Link href={`/sites/${site.id}/credentials`}>Open Credentials</Link>
+                                            </Button>
+                                        )}
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-sm text-slate-300">
+                                        Manage the site&apos;s service vendors and store access credentials securely.
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    )}
 
                     {/* Type-Specific Tab */}
                     <TabsContent value="type-specific">

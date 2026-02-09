@@ -21,8 +21,14 @@ class SiteController extends Controller
         $region = $request->input('region');
         $risk = $request->input('risk');
         $managerId = $request->input('manager_id');
+        $allowedTypes = $this->allowedSiteTypes($request);
+
+        if ($type && !in_array($type, $allowedTypes, true)) {
+            abort(403);
+        }
 
         $sites = Site::query()
+            ->whereIn('type', $allowedTypes)
             ->when(in_array($status, ['active', 'inactive']), fn($q) => $q->where('is_active', $status === 'active'))
             ->when($type && in_array($type, ['head_office', 'house', 'facility']), fn($q) => $q->where('type', $type))
             ->when($region, fn($q) => $q->where('region', $region))
@@ -71,7 +77,7 @@ class SiteController extends Controller
                 'types' => [
                     ['value' => 'head_office', 'label' => 'Head Office'],
                     ['value' => 'house', 'label' => 'House'],
-                    ['value' => 'facility', 'label' => 'Facility'],
+                    ['value' => 'facility', 'label' => 'Facilities'],
                 ],
                 'risks' => [
                     ['value' => 'high_risk', 'label' => 'High Risk'],
@@ -378,4 +384,21 @@ class SiteController extends Controller
             ->with('success', 'Site updated.');
     }
 
+    private function allowedSiteTypes(Request $request): array
+    {
+        $user = $request->user();
+        $map = [
+            'head_office' => 'sites.type.head_office.view',
+            'house' => 'sites.type.house.view',
+            'facility' => 'sites.type.facility.view',
+        ];
+
+        $allowed = collect($map)
+            ->filter(fn (string $permission) => $user?->canDo($permission))
+            ->keys()
+            ->values()
+            ->all();
+
+        return $allowed !== [] ? $allowed : array_keys($map);
+    }
 }

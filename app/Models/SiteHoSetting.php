@@ -14,6 +14,7 @@ class SiteHoSetting extends Model
 
     protected $fillable = [
         'site_id',
+        'tenant_id',
         'visitor_sign_in_process',
         'after_hours_procedures',
         'it_network_details',

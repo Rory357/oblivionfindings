@@ -23,6 +23,7 @@ class SiteCalendarService
             ->when($eventTypes, fn($q) => $q->whereIn('event_type', $eventTypes))
             ->when($userId, fn($q) => $q->where(function($sq) use ($userId) {
                 $sq->where('owner_user_id', $userId)
+                   ->orWhereJsonContains('attendee_user_ids', $userId)
                    ->orWhereJsonContains('attendee_user_ids', (string) $userId);
             }))
             ->whereNull('recurrence_parent_id')

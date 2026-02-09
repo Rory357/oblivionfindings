@@ -5,7 +5,7 @@ namespace App\Services\Sites;
 class SiteHazardRiskCalculator
 {
     /**
-     * Risk matrix: Severity × Likelihood = Risk Rating
+     * Risk matrix: Severity x Likelihood = Risk Rating
      */
     private const MATRIX = [
         'low' => [
@@ -89,3 +89,4 @@ class SiteHazardRiskCalculator
         return ['low', 'medium', 'high', 'extreme'];
     }
 }
+

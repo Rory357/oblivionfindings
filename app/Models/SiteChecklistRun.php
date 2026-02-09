@@ -16,6 +16,7 @@ class SiteChecklistRun extends Model
     protected $fillable = [
         'assignment_id',
         'site_id',
+        'tenant_id',
         'template_id',
         'scheduled_date',
         'started_at',

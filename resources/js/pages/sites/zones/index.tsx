@@ -73,7 +73,7 @@ export default function SiteZones({ site, zones }: Props) {
             { title: 'Sites', href: '/sites' },
             { title: site.name, href: `/sites/${site.id}` },
             { title: 'Zones', href: `#` },
-        ]}>>
+        ]}>
             <Head title={`${site.name} - Zones`} />
 
             <div className="m-4 max-w-4xl mx-auto space-y-4">

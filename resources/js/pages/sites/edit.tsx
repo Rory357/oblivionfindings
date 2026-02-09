@@ -59,7 +59,7 @@ type PageProps = {
 const siteTypes = [
     { value: 'head_office', label: 'Head Office', icon: Building2, description: 'Administrative headquarters with meeting rooms' },
     { value: 'house', label: 'House', icon: Home, description: 'Residential home with client bedrooms' },
-    { value: 'facility', label: 'Facility', icon: Warehouse, description: 'Workshop, café, or day programme space' },
+    { value: 'facility', label: 'Facilities', icon: Warehouse, description: 'Workshop, cafe, or day programme space' },
 ];
 
 export default function EditSite() {

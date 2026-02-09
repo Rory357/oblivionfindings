@@ -13,6 +13,7 @@ class SiteHouseRoom extends Model
 
     protected $fillable = [
         'site_id',
+        'tenant_id',
         'name',
         'notes',
         'assigned_client_id',

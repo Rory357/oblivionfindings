@@ -3,7 +3,6 @@ import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -40,8 +39,9 @@ type Props = {
     filters: {
         site_ids?: number[];
         site_type?: string;
-        event_type?: string;
+        event_types?: string[];
         status?: string;
+        my_events_only?: boolean;
     };
     eventTypes: Array<{ key: string; label: string; color: string }>;
 };
@@ -49,13 +49,13 @@ type Props = {
 const typeColors: Record<string, string> = {
     head_office: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
     house: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
-    facility: 'bg-amber-500/10 text-amber-400 border-emerald-500/30',
+    facility: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
 };
 
 export default function GlobalCalendar({ sites, events, filters, eventTypes }: Props) {
     const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
     const [siteFilter, setSiteFilter] = useState<string>(filters.site_type || 'all');
-    const [typeFilter, setTypeFilter] = useState<string>(filters.event_type || 'all');
+    const [typeFilter, setTypeFilter] = useState<string>((filters.event_types?.[0]) || 'all');
     const [statusFilter, setStatusFilter] = useState<string>(filters.status || 'all');
 
     const filteredEvents = useMemo(() => {
@@ -78,7 +78,7 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Calendar', href: '/calendar' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Calendar', href: '/sites/calendar' }]}>
             <Head title="Global Calendar" />
 
             <div className="m-4 space-y-4">
@@ -150,7 +150,9 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                                     <SelectContent>
                                         <SelectItem value="all">All Status</SelectItem>
                                         <SelectItem value="draft">Draft</SelectItem>
-                                        <SelectItem value="confirmed">Confirmed</SelectItem>
+                                        <SelectItem value="pending">Pending</SelectItem>
+                                        <SelectItem value="approved">Approved</SelectItem>
+                                        <SelectItem value="completed">Completed</SelectItem>
                                         <SelectItem value="cancelled">Cancelled</SelectItem>
                                     </SelectContent>
                                 </Select>
@@ -205,7 +207,7 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                                             <div>
                                                 <div className="font-medium">{event.title}</div>
                                                 <div className="text-sm text-slate-400">
-                                                    {event.site_name} • {getEventTypeLabel(event.event_type)}
+                                                    {event.site_name} - {getEventTypeLabel(event.event_type)}
                                                 </div>
                                                 <div className="text-xs text-slate-500">
                                                     {new Date(event.start_at).toLocaleString()}
@@ -216,7 +218,7 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                                         <div className="flex items-center gap-2">
                                             <Badge variant="outline" className={typeColors[event.site_type]}>
                                                 {event.site_type === 'head_office' ? 'Head Office' : 
-                                                 event.site_type === 'house' ? 'House' : 'Facility'}
+                                                 event.site_type === 'house' ? 'House' : 'Facilities'}
                                             </Badge>
                                             <Badge variant="outline">{event.status}</Badge>
                                             <Button asChild variant="ghost" size="sm">

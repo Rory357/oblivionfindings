@@ -81,9 +81,9 @@ class SiteCredentialEncryptionService
         $length = strlen($value);
         
         return match ($type) {
-            'password', 'pin' => str_repeat('•', min($length, 8)),
-            'key', 'combo' => str_repeat('•', 4) . '-' . str_repeat('•', 4),
-            default => str_repeat('•', min($length, 8)),
+            'password', 'pin' => str_repeat('*', min($length, 8)),
+            'key', 'combo' => str_repeat('*', 4) . '-' . str_repeat('*', 4),
+            default => str_repeat('*', min($length, 8)),
         };
     }
 }

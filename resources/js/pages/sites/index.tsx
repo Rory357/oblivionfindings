@@ -55,7 +55,7 @@ const typeIcons = {
 const typeLabels = {
     head_office: 'Head Office',
     house: 'House',
-    facility: 'Facility',
+    facility: 'Facilities',
 };
 
 const typeColors = {
@@ -295,6 +295,11 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                                                     {can?.hazards?.create && (
                                                         <Button variant="ghost" size="sm" asChild>
                                                             <Link href={`/sites/${s.id}/hazards?action=add`}>Log Hazard</Link>
+                                                        </Button>
+                                                    )}
+                                                    {can?.checklists?.run && (
+                                                        <Button variant="ghost" size="sm" asChild>
+                                                            <Link href={`/sites/${s.id}/checklists/runs`}>Run Checklist</Link>
                                                         </Button>
                                                     )}
                                                     {can?.sites?.update && (

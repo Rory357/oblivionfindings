@@ -97,6 +97,11 @@ class RbacSeeder extends Seeder
             ['label' => 'Board Observer']
         );
 
+        $boardTrustee = Role::firstOrCreate(
+            ['name' => 'board_trustee'],
+            ['label' => 'Board Trustee (Read only)']
+        );
+
         // Remove any roles we are not using right now (but only if they are not assigned).
         // This keeps the Access Control UI role list clean.
         $activeRoleNames = [
@@ -117,6 +122,7 @@ class RbacSeeder extends Seeder
             'board_secretary',
             'board_member',
             'board_observer',
+            'board_trustee',
         ];
         Role::query()
             ->whereNotIn('name', $activeRoleNames)
@@ -366,6 +372,7 @@ class RbacSeeder extends Seeder
             // Settings
             ['key' => 'settings.sites.manage', 'description' => 'Manage site settings'],
             ['key' => 'settings.templates.manage', 'description' => 'Manage templates'],
+            ['key' => 'settings.rbac.manage', 'description' => 'Manage RBAC settings'],
         ];
 
         foreach ($permissions as $perm) {
@@ -867,6 +874,16 @@ class RbacSeeder extends Seeder
                 'credentials.view',
                 'credentials.reveal',
                 'reports.sites.view',
+            ])->pluck('id')
+        );
+
+        // Board Trustee (read-only reports and audit)
+        $boardTrustee->permissions()->sync(
+            Permission::whereIn('key', [
+                'reports.viewAny',
+                'audit.viewAny',
+                'reports.sites.view',
+                'reports.sites.export',
             ])->pluck('id')
         );
 

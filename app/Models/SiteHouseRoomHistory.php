@@ -12,6 +12,7 @@ class SiteHouseRoomHistory extends Model
 
     protected $fillable = [
         'room_id',
+        'tenant_id',
         'client_id',
         'assigned_from',
         'assigned_until',

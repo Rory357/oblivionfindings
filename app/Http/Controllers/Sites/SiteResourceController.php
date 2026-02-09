@@ -50,6 +50,7 @@ class SiteResourceController extends Controller
         SiteHoResource::create([
             ...$validated,
             'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
             'is_active' => true,
             'is_bookable' => true,
         ]);
@@ -60,6 +61,7 @@ class SiteResourceController extends Controller
     public function update(Request $request, Site $site, SiteHoResource $resource)
     {
         $this->authorize('update', $site);
+        abort_unless($resource->site_id === $site->id, 404);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',
@@ -77,6 +79,7 @@ class SiteResourceController extends Controller
     public function destroy(Request $request, Site $site, SiteHoResource $resource)
     {
         $this->authorize('update', $site);
+        abort_unless($resource->site_id === $site->id, 404);
 
         $resource->update(['is_active' => false]);
 

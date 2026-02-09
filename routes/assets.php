@@ -47,8 +47,12 @@ Route::middleware(['auth'])->group(function () {
     });
 
     Route::middleware('permission:sites.update')->group(function () {
-        Route::get('/sites/{site}/edit', [SiteController::class, 'edit'])->name('sites.edit');
-        Route::put('/sites/{site}', [SiteController::class, 'update'])->name('sites.update');
+        Route::get('/sites/{site}/edit', [SiteController::class, 'edit'])
+            ->whereNumber('site')
+            ->name('sites.edit');
+        Route::put('/sites/{site}', [SiteController::class, 'update'])
+            ->whereNumber('site')
+            ->name('sites.update');
 
         // Site contacts
         Route::post('/sites/{site}/contacts', [SiteContactController::class, 'store'])

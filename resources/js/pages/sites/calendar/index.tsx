@@ -1,9 +1,20 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Calendar as CalendarIcon, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type FormEvent } from 'react';
 
 type Site = {
     id: number;
@@ -23,16 +34,56 @@ type Event = {
 
 type Props = {
     site: Site;
+    canCreate: boolean;
 };
 
-export default function SiteCalendar({ site }: Props) {
+function toLocalDateTimeInputValue(date: Date): string {
+    const adjusted = new Date(date.getTime() - (date.getTimezoneOffset() * 60_000));
+    return adjusted.toISOString().slice(0, 16);
+}
+
+function defaultStartAt(): string {
+    const nextHour = new Date();
+    nextHour.setMinutes(0, 0, 0);
+    nextHour.setHours(nextHour.getHours() + 1);
+    return toLocalDateTimeInputValue(nextHour);
+}
+
+function defaultEndAt(): string {
+    const inTwoHours = new Date();
+    inTwoHours.setMinutes(0, 0, 0);
+    inTwoHours.setHours(inTwoHours.getHours() + 2);
+    return toLocalDateTimeInputValue(inTwoHours);
+}
+
+export default function SiteCalendar({ site, canCreate }: Props) {
+    const page = usePage();
     const [currentDate, setCurrentDate] = useState(new Date());
     const [events, setEvents] = useState<Event[]>([]);
     const [loading, setLoading] = useState(true);
+    const [createOpen, setCreateOpen] = useState(false);
+
+    const form = useForm({
+        event_type: 'event',
+        title: '',
+        description: '',
+        start_at: defaultStartAt(),
+        end_at: defaultEndAt(),
+    });
 
     useEffect(() => {
         fetchEvents();
     }, [currentDate]);
+
+    useEffect(() => {
+        if (!canCreate) return;
+
+        const [, queryString = ''] = page.url.split('?');
+        const params = new URLSearchParams(queryString);
+        if (params.get('action') === 'add') {
+            setCreateOpen(true);
+        }
+    }, [page.url, canCreate]);
 
     const fetchEvents = async () => {
         setLoading(true);
@@ -57,6 +108,50 @@ export default function SiteCalendar({ site }: Props) {
 
     const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
     const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+    const openCreateDialog = () => setCreateOpen(true);
+
+    const resetCreateForm = () => {
+        form.reset();
+        form.clearErrors();
+        form.setData({
+            event_type: 'event',
+            title: '',
+            description: '',
+            start_at: defaultStartAt(),
+            end_at: defaultEndAt(),
+        });
+    };
+
+    const stripAddActionFromUrl = () => {
+        if (typeof window === 'undefined') return;
+
+        const url = new URL(window.location.href);
+        if (url.searchParams.get('action') !== 'add') return;
+
+        url.searchParams.delete('action');
+        const nextUrl = `${url.pathname}${url.search ? `?${url.searchParams.toString()}` : ''}`;
+        window.history.replaceState({}, '', nextUrl);
+    };
+
+    const handleCreateOpenChange = (open: boolean) => {
+        setCreateOpen(open);
+        if (!open) {
+            stripAddActionFromUrl();
+        }
+    };
+
+    const handleCreateSubmit = (e: FormEvent) => {
+        e.preventDefault();
+
+        form.post(`/sites/${site.id}/calendar/events`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                handleCreateOpenChange(false);
+                resetCreateForm();
+                fetchEvents();
+            },
+        });
+    };
 
     const getEventsForDay = (day: number) => {
         const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
@@ -84,12 +179,12 @@ export default function SiteCalendar({ site }: Props) {
                         <Button variant="outline" size="sm" onClick={nextMonth}>
                             <ChevronRight className="w-4 h-4" />
                         </Button>
-                        <Button asChild className="ml-4">
-                            <Link href={`/sites/${site.id}/calendar?action=add`}>
+                        {canCreate && (
+                            <Button className="ml-4" onClick={openCreateDialog}>
                                 <Plus className="w-4 h-4 mr-1" />
                                 Add Event
-                            </Link>
-                        </Button>
+                            </Button>
+                        )}
                     </div>
                 </div>
 
@@ -173,6 +268,97 @@ export default function SiteCalendar({ site }: Props) {
                     </div>
                 )}
             </div>
+
+            <Dialog open={createOpen} onOpenChange={handleCreateOpenChange}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Add Event</DialogTitle>
+                        <DialogDescription>
+                            Create a calendar event for {site.name}.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    <form onSubmit={handleCreateSubmit} className="space-y-4">
+                        <div>
+                            <Label htmlFor="event_title">Title</Label>
+                            <Input
+                                id="event_title"
+                                value={form.data.title}
+                                onChange={(e) => form.setData('title', e.target.value)}
+                                placeholder="Event title"
+                                required
+                            />
+                            {form.errors.title && <p className="text-sm text-red-500 mt-1">{form.errors.title}</p>}
+                        </div>
+
+                        <div>
+                            <Label htmlFor="event_type">Event Type</Label>
+                            <select
+                                id="event_type"
+                                value={form.data.event_type}
+                                onChange={(e) => form.setData('event_type', e.target.value)}
+                                className="border-input bg-background w-full rounded-md border px-3 py-2 text-sm"
+                            >
+                                <option value="event">Event</option>
+                                <option value="maintenance">Maintenance</option>
+                                <option value="inspection">Inspection</option>
+                                <option value="site_visit">Site Visit</option>
+                                <option value="contractor">Contractor</option>
+                            </select>
+                            {form.errors.event_type && <p className="text-sm text-red-500 mt-1">{form.errors.event_type}</p>}
+                        </div>
+
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div>
+                                <Label htmlFor="event_start_at">Start</Label>
+                                <Input
+                                    id="event_start_at"
+                                    type="datetime-local"
+                                    value={form.data.start_at}
+                                    onChange={(e) => form.setData('start_at', e.target.value)}
+                                    required
+                                />
+                                {form.errors.start_at && <p className="text-sm text-red-500 mt-1">{form.errors.start_at}</p>}
+                            </div>
+                            <div>
+                                <Label htmlFor="event_end_at">End</Label>
+                                <Input
+                                    id="event_end_at"
+                                    type="datetime-local"
+                                    value={form.data.end_at}
+                                    onChange={(e) => form.setData('end_at', e.target.value)}
+                                />
+                                {form.errors.end_at && <p className="text-sm text-red-500 mt-1">{form.errors.end_at}</p>}
+                            </div>
+                        </div>
+
+                        <div>
+                            <Label htmlFor="event_description">Description</Label>
+                            <Textarea
+                                id="event_description"
+                                rows={3}
+                                value={form.data.description}
+                                onChange={(e) => form.setData('description', e.target.value)}
+                                placeholder="Optional details"
+                            />
+                            {form.errors.description && <p className="text-sm text-red-500 mt-1">{form.errors.description}</p>}
+                        </div>
+
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => handleCreateOpenChange(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button type="submit" disabled={form.processing}>
+                                {form.processing ? 'Saving...' : 'Create Event'}
+                            </Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }
