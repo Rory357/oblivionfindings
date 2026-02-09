@@ -4,8 +4,14 @@ namespace App\Providers;
 
 use App\Models\ClientNote;
 use App\Models\Shift;
+use App\Models\Site;
+use App\Models\SiteHazard;
+use App\Models\SiteChecklistRun;
 use App\Observers\ClientNoteObserver;
 use App\Observers\ShiftObserver;
+use App\Observers\SiteObserver;
+use App\Observers\SiteHazardObserver;
+use App\Observers\SiteChecklistRunObserver;
 use App\Events\FleetSignalEmitted;
 use App\Services\AuditLogger;
 use Illuminate\Auth\Events\PasswordReset;
@@ -32,6 +38,9 @@ class AppServiceProvider extends ServiceProvider
     {
         Shift::observe(ShiftObserver::class);
         ClientNote::observe(ClientNoteObserver::class);
+        Site::observe(SiteObserver::class);
+        SiteHazard::observe(SiteHazardObserver::class);
+        SiteChecklistRun::observe(SiteChecklistRunObserver::class);
 
         Event::listen(FleetSignalEmitted::class, function (FleetSignalEmitted $event) {
             AuditLogger::log('fleet.signal.emitted', $event->signal->asset, [

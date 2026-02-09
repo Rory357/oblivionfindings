@@ -16,16 +16,27 @@ class SiteController extends Controller
     {
         $this->authorize('viewAny', Site::class);
 
-        $status = $request->string('status')->toString();
-        $status = in_array($status, ['active', 'inactive'], true) ? $status : 'all';
+        $type = $request->input('type');
+        $status = $request->input('status', 'all');
+        $region = $request->input('region');
+        $risk = $request->input('risk');
+        $managerId = $request->input('manager_id');
 
         $sites = Site::query()
-            ->when($status === 'active', fn($q) => $q->where('is_active', true))
-            ->when($status === 'inactive', fn($q) => $q->where('is_active', false))
+            ->when(in_array($status, ['active', 'inactive']), fn($q) => $q->where('is_active', $status === 'active'))
+            ->when($type && in_array($type, ['head_office', 'house', 'facility']), fn($q) => $q->where('type', $type))
+            ->when($region, fn($q) => $q->where('region', $region))
+            ->when($risk === 'high_risk', fn($q) => $q->where('is_high_risk', true))
+            ->when($risk === 'high_needs', fn($q) => $q->where('is_high_needs', true))
+            ->when($risk === 'both', fn($q) => $q->where('is_high_risk', true)->where('is_high_needs', true))
+            ->when($managerId, fn($q) => $q->where('primary_contact_user_id', $managerId))
+            ->with('primaryContact:id,name')
             ->orderBy('name')
             ->get([
                 'id',
                 'name',
+                'type',
+                'region',
                 'address_line_1',
                 'address_line_2',
                 'suburb',
@@ -33,12 +44,40 @@ class SiteController extends Controller
                 'postcode',
                 'country',
                 'is_active',
+                'is_high_risk',
+                'is_high_needs',
+                'primary_contact_user_id',
             ]);
+
+        // Get filter options
+        $regions = Site::distinct()->pluck('region')->filter()->values();
+        $managers = \App\Models\User::whereHas('sitesAsPrimaryContact')
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
 
         return inertia('sites/index', [
             'sites' => $sites,
             'filters' => [
+                'type' => $type,
                 'status' => $status,
+                'region' => $region,
+                'risk' => $risk,
+                'manager_id' => $managerId,
+            ],
+            'filterOptions' => [
+                'regions' => $regions,
+                'managers' => $managers,
+                'types' => [
+                    ['value' => 'head_office', 'label' => 'Head Office'],
+                    ['value' => 'house', 'label' => 'House'],
+                    ['value' => 'facility', 'label' => 'Facility'],
+                ],
+                'risks' => [
+                    ['value' => 'high_risk', 'label' => 'High Risk'],
+                    ['value' => 'high_needs', 'label' => 'High Needs'],
+                    ['value' => 'both', 'label' => 'Both'],
+                ],
             ],
         ]);
     }
@@ -51,6 +90,10 @@ class SiteController extends Controller
             'clients:id,first_name,last_name,status,site_id',
             'contacts',
             'documents.uploadedBy:id,name,email',
+            'primaryContact:id,name',
+            'houseRooms' => fn($q) => $q->active()->orderBy('sort_order'),
+            'hoResources' => fn($q) => $q->active()->orderBy('name'),
+            'facilityZones' => fn($q) => $q->active()->orderBy('name'),
         ]);
 
         $user = $request->user();
@@ -75,26 +118,28 @@ class SiteController extends Controller
                 'updated_at',
             ]);
 
+        // Build setup completeness checklist based on ACTUAL data
+        // (not onboarding progress - that tracks wizard completion separately)
         $checklist = [
             [
                 'key' => 'contact_phone',
                 'label' => 'Primary contact phone recorded',
-                'done' => (bool) $site->phone,
+                'done' => filled($site->phone),
             ],
             [
                 'key' => 'after_hours',
                 'label' => 'After-hours phone recorded',
-                'done' => (bool) $site->after_hours_phone,
+                'done' => filled($site->after_hours_phone),
             ],
             [
                 'key' => 'emergency_plan_location',
                 'label' => 'Emergency plan location recorded',
-                'done' => (bool) $site->emergency_plan_location,
+                'done' => filled($site->emergency_plan_location),
             ],
             [
                 'key' => 'med_storage',
                 'label' => 'Medication storage location recorded',
-                'done' => (bool) $site->medication_storage_location,
+                'done' => filled($site->medication_storage_location),
             ],
             [
                 'key' => 'has_emergency_contact',
@@ -107,11 +152,64 @@ class SiteController extends Controller
                 'done' => $site->documents->count() > 0,
             ],
         ];
+        
+        // Add type-specific checklist items
+        if ($site->type === 'house') {
+            $checklist[] = [
+                'key' => 'has_rooms',
+                'label' => 'At least one bedroom configured',
+                'done' => $site->houseRooms()->count() > 0,
+            ];
+        } elseif ($site->type === 'head_office') {
+            $checklist[] = [
+                'key' => 'has_resources',
+                'label' => 'At least one room/resource configured',
+                'done' => $site->hoResources()->count() > 0,
+            ];
+        } elseif ($site->type === 'facility') {
+            $checklist[] = [
+                'key' => 'has_zones',
+                'label' => 'At least one zone configured',
+                'done' => $site->facilityZones()->count() > 0,
+            ];
+        }
+
+        // Type-specific data
+        $typeSpecificData = match ($site->type) {
+            'house' => [
+                'rooms' => $site->houseRooms->map(fn($r) => [
+                    'id' => $r->id,
+                    'name' => $r->name,
+                    'assigned_client' => $r->assignedClient ? [
+                        'id' => $r->assignedClient->id,
+                        'name' => $r->assignedClient->first_name . ' ' . $r->assignedClient->last_name,
+                    ] : null,
+                ]),
+            ],
+            'head_office' => [
+                'resources' => $site->hoResources->map(fn($r) => [
+                    'id' => $r->id,
+                    'name' => $r->name,
+                    'type' => $r->resource_type,
+                    'capacity' => $r->capacity,
+                ]),
+            ],
+            'facility' => [
+                'zones' => $site->facilityZones->map(fn($z) => [
+                    'id' => $z->id,
+                    'name' => $z->name,
+                    'type' => $z->zone_type,
+                ]),
+            ],
+            default => [],
+        };
 
         return inertia('sites/show', [
             'site' => [
                 'id' => $site->id,
                 'name' => $site->name,
+                'type' => $site->type,
+                'display_type' => $site->display_type,
                 'phone' => $site->phone,
                 'email' => $site->email,
                 'manager_name' => $site->manager_name,
@@ -122,7 +220,22 @@ class SiteController extends Controller
                 'notes' => $site->notes,
                 'is_active' => (bool) $site->is_active,
                 'address' => $site->address,
+                'region' => $site->region,
+                'latitude' => $site->latitude,
+                'longitude' => $site->longitude,
+                'access_instructions' => $site->access_instructions,
+                'is_high_risk' => (bool) $site->is_high_risk,
+                'is_high_needs' => (bool) $site->is_high_needs,
+                'risk_notes' => $site->risk_notes,
+                'risk_review_date' => $site->risk_review_date?->toDateString(),
+                'primary_contact' => $site->primaryContact ? [
+                    'id' => $site->primaryContact->id,
+                    'name' => $site->primaryContact->name,
+                ] : null,
+                'onboarding_completed_at' => $site->onboarding_completed_at?->toDateTimeString(),
+                'onboarding_progress' => $site->onboarding_progress,
             ],
+            'typeSpecificData' => $typeSpecificData,
             'clients' => $site->clients->sortBy([['first_name', 'asc'], ['last_name', 'asc']])->values()->map(fn($c) => [
                 'id' => $c->id,
                 'first_name' => $c->first_name,
@@ -184,14 +297,20 @@ class SiteController extends Controller
     {
         $this->authorize('create', Site::class);
 
-        return inertia('sites/create');
+        $users = \App\Models\User::select(['id', 'name'])->orderBy('name')->get();
+
+        return inertia('sites/create', [
+            'users' => $users,
+        ]);
     }
 
     public function store(StoreSiteRequest $request)
     {
         $this->authorize('create', Site::class);
 
-        $site = Site::create($request->validated());
+        $validated = $request->validated();
+        
+        $site = Site::create($validated);
 
         app(NotificationService::class)->notifyCrud($request->user(), "created", "site", $site, null, [
             "title" => "Site created: {$site->name}",
@@ -207,26 +326,39 @@ class SiteController extends Controller
     {
         $this->authorize('update', $site);
 
+        $users = \App\Models\User::select(['id', 'name'])->orderBy('name')->get();
+
         return inertia('sites/edit', [
-            'site' => $site->only([
-                'id',
-                'name',
-                'phone',
-                'email',
-                'manager_name',
-                'manager_phone',
-                'after_hours_phone',
-                'emergency_plan_location',
-                'medication_storage_location',
-                'notes',
-                'address_line_1',
-                'address_line_2',
-                'suburb',
-                'city',
-                'postcode',
-                'country',
-                'is_active',
-            ]),
+            'site' => [
+                'id' => $site->id,
+                'name' => $site->name,
+                'type' => $site->type,
+                'phone' => $site->phone,
+                'email' => $site->email,
+                'manager_name' => $site->manager_name,
+                'manager_phone' => $site->manager_phone,
+                'after_hours_phone' => $site->after_hours_phone,
+                'emergency_plan_location' => $site->emergency_plan_location,
+                'medication_storage_location' => $site->medication_storage_location,
+                'notes' => $site->notes,
+                'address_line_1' => $site->address_line_1,
+                'address_line_2' => $site->address_line_2,
+                'suburb' => $site->suburb,
+                'city' => $site->city,
+                'postcode' => $site->postcode,
+                'country' => $site->country,
+                'region' => $site->region,
+                'latitude' => $site->latitude,
+                'longitude' => $site->longitude,
+                'access_instructions' => $site->access_instructions,
+                'is_active' => $site->is_active,
+                'is_high_risk' => $site->is_high_risk,
+                'is_high_needs' => $site->is_high_needs,
+                'risk_notes' => $site->risk_notes,
+                'risk_review_date' => $site->risk_review_date?->toDateString(),
+                'primary_contact_user_id' => $site->primary_contact_user_id,
+            ],
+            'users' => $users,
         ]);
     }
 

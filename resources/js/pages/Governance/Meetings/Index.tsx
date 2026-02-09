@@ -161,7 +161,7 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
                       )}
                       <Button variant="ghost" size="sm" asChild>
                         <Link href={showMeeting.url({ meeting: meeting.id })}>
-                          View ->
+                          View &rarr;
                         </Link>
                       </Button>
                     </div>

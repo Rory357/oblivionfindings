@@ -9,6 +9,10 @@ use App\Jobs\PruneAssetTelemetry;
 use App\Jobs\ProcessControlRoomSignals;
 use App\Jobs\CheckControlRoomSlaBreaches;
 use App\Jobs\AutoEscalateControlRoomQueues;
+use App\Jobs\SendEventReminderJob;
+use App\Jobs\ChecklistDueJob;
+use App\Jobs\InspectionDueJob;
+use App\Jobs\HazardOverdueJob;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -73,3 +77,29 @@ app(Schedule::class)
     ->job(new AutoEscalateControlRoomQueues())
     ->timezone('Pacific/Auckland')
     ->everyTenMinutes();
+
+// Sites Module Scheduled Jobs
+
+// Event reminders: check every 5 minutes for upcoming events
+app(Schedule::class)
+    ->job(new SendEventReminderJob())
+    ->timezone('Pacific/Auckland')
+    ->everyFiveMinutes();
+
+// Checklist due reminders and overdue checks: daily at 08:00
+app(Schedule::class)
+    ->job(new ChecklistDueJob())
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:00');
+
+// Inspection due reminders: daily at 08:30
+app(Schedule::class)
+    ->job(new InspectionDueJob())
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:30');
+
+// Hazard overdue checks and escalations: daily at 09:00
+app(Schedule::class)
+    ->job(new HazardOverdueJob())
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('09:00');

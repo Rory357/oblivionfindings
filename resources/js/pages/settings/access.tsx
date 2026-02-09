@@ -265,7 +265,7 @@ function BoardMembersSection({
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-sm">
-                                    {formatTermDate(member.term_start)} -> {formatTermDate(member.term_end)}
+                                    {formatTermDate(member.term_start)} &rarr; {formatTermDate(member.term_end)}
                                 </TableCell>
                                 <TableCell>
                                     {member.is_active ? (

@@ -51,6 +51,21 @@ class RbacSeeder extends Seeder
             ['label' => 'Auditor (Read only)']
         );
 
+        $teamLead = Role::firstOrCreate(
+            ['name' => 'team_lead'],
+            ['label' => 'Team Lead']
+        );
+
+        $healthSafetyOfficer = Role::firstOrCreate(
+            ['name' => 'health_safety_officer'],
+            ['label' => 'Health & Safety Officer']
+        );
+
+        $maintenanceCoordinator = Role::firstOrCreate(
+            ['name' => 'maintenance_coordinator'],
+            ['label' => 'Maintenance Coordinator']
+        );
+
         $clientRole = Role::firstOrCreate(
             ['name' => 'client'],
             ['label' => 'Client (Portal)']
@@ -91,9 +106,12 @@ class RbacSeeder extends Seeder
             'support_worker',
             'finance',
             'hr',
+            'auditor',
+            'team_lead',
+            'health_safety_officer',
+            'maintenance_coordinator',
             'next_of_kin',
             'client',
-            'auditor',
             // Board/Governance roles
             'board_chair',
             'board_secretary',
@@ -302,6 +320,52 @@ class RbacSeeder extends Seeder
             ['key' => 'privacy.manageLegalHolds', 'description' => 'Manage legal holds on data'],
             ['key' => 'privacy.reportBreaches', 'description' => 'Report and manage data breaches'],
             ['key' => 'privacy.conductDPIA', 'description' => 'Conduct Data Protection Impact Assessments'],
+
+            // Sites - Type Scoping
+            ['key' => 'sites.type.head_office.view', 'description' => 'View Head Office sites'],
+            ['key' => 'sites.type.house.view', 'description' => 'View House sites'],
+            ['key' => 'sites.type.facility.view', 'description' => 'View Facility sites'],
+            ['key' => 'sites.archive', 'description' => 'Archive/soft-delete sites'],
+
+            // Calendar
+            ['key' => 'calendar.view', 'description' => 'View calendars'],
+            ['key' => 'calendar.create', 'description' => 'Create calendar events'],
+            ['key' => 'calendar.approve', 'description' => 'Approve calendar events'],
+            ['key' => 'calendar.manage_recurring', 'description' => 'Manage recurring events'],
+
+            // Hazards
+            ['key' => 'hazards.view', 'description' => 'View hazards'],
+            ['key' => 'hazards.create', 'description' => 'Log new hazards'],
+            ['key' => 'hazards.assign', 'description' => 'Assign hazards to H&S officer'],
+            ['key' => 'hazards.close', 'description' => 'Close/resolve hazards'],
+            ['key' => 'hazards.manage_types', 'description' => 'Manage hazard type catalog'],
+
+            // Checklists
+            ['key' => 'checklists.view', 'description' => 'View checklists'],
+            ['key' => 'checklists.run', 'description' => 'Run/complete checklist'],
+            ['key' => 'checklists.schedule', 'description' => 'Schedule checklist runs'],
+            ['key' => 'checklists.manage_templates', 'description' => 'Manage checklist templates'],
+
+            // Assets (Site Register context)
+            ['key' => 'assets.view_register', 'description' => 'View site asset register'],
+            ['key' => 'assets.manage_register', 'description' => 'Manage site asset register'],
+
+            // Vendors
+            ['key' => 'vendors.view', 'description' => 'View vendors'],
+            ['key' => 'vendors.manage', 'description' => 'Manage vendors'],
+
+            // Credentials (Vault)
+            ['key' => 'credentials.view', 'description' => 'View credential list'],
+            ['key' => 'credentials.reveal', 'description' => 'Reveal credential values'],
+            ['key' => 'credentials.manage', 'description' => 'Manage credentials'],
+
+            // Reports - Sites
+            ['key' => 'reports.sites.view', 'description' => 'View site reports'],
+            ['key' => 'reports.sites.export', 'description' => 'Export site reports'],
+
+            // Settings
+            ['key' => 'settings.sites.manage', 'description' => 'Manage site settings'],
+            ['key' => 'settings.templates.manage', 'description' => 'Manage templates'],
         ];
 
         foreach ($permissions as $perm) {
@@ -739,6 +803,70 @@ class RbacSeeder extends Seeder
                 'rag.ask.self',
                 'incidents.view.portal',
                 'incidents.attachments.view.portal',
+            ])->pluck('id')
+        );
+
+        // Team Lead
+        $teamLead->permissions()->sync(
+            Permission::whereIn('key', [
+                'sites.viewAny',
+                'sites.update',
+                'calendar.view',
+                'calendar.create',
+                'calendar.approve',
+                'hazards.view',
+                'hazards.create',
+                'hazards.assign',
+                'checklists.view',
+                'checklists.run',
+                'checklists.schedule',
+                'vendors.view',
+                'credentials.view',
+                'reports.sites.view',
+            ])->pluck('id')
+        );
+
+        // Health & Safety Officer
+        $healthSafetyOfficer->permissions()->sync(
+            Permission::whereIn('key', [
+                'sites.viewAny',
+                'sites.type.head_office.view',
+                'sites.type.house.view',
+                'sites.type.facility.view',
+                'calendar.view',
+                'hazards.view',
+                'hazards.create',
+                'hazards.assign',
+                'hazards.close',
+                'checklists.view',
+                'checklists.run',
+                'checklists.manage_templates',
+                'vendors.view',
+                'credentials.view',
+                'reports.sites.view',
+            ])->pluck('id')
+        );
+
+        // Maintenance Coordinator
+        $maintenanceCoordinator->permissions()->sync(
+            Permission::whereIn('key', [
+                'sites.viewAny',
+                'sites.type.head_office.view',
+                'sites.type.house.view',
+                'sites.type.facility.view',
+                'calendar.view',
+                'calendar.create',
+                'hazards.view',
+                'checklists.view',
+                'checklists.run',
+                'checklists.schedule',
+                'assets.view_register',
+                'assets.manage_register',
+                'vendors.view',
+                'vendors.manage',
+                'credentials.view',
+                'credentials.reveal',
+                'reports.sites.view',
             ])->pluck('id')
         );
 

@@ -142,7 +142,7 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
                         </div>
                       </div>
                       <Button variant="ghost" size="sm" asChild>
-                        <Link href={showAction.url({ action: item.id })}>View -></Link>
+                        <Link href={showAction.url({ action: item.id })}>View &rarr;</Link>
                       </Button>
                     </div>
                   );

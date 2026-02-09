@@ -116,6 +116,14 @@ class User extends Authenticatable
         return $this->belongsToMany(\App\Models\Client::class)->withTimestamps();
     }
 
+    /**
+     * Sites where this user is the primary contact/manager.
+     */
+    public function sitesAsPrimaryContact()
+    {
+        return $this->hasMany(\App\Models\Site::class, 'primary_contact_user_id');
+    }
+
     // Client portal access (client + next_of_kin)
     public function portalClients()
     {

@@ -159,7 +159,7 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
                     </div>
                     <Button variant="ghost" size="sm" asChild>
                       <Link href={showResolution.url({ resolution: resolution.id })}>
-                        View ->
+                        View &rarr;
                       </Link>
                     </Button>
                   </div>

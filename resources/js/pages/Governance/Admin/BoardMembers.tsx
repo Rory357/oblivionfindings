@@ -160,7 +160,7 @@ export default function ManageBoardMembers({ auth, boardMembers, availableUsers 
                       </TableCell>
                       <TableCell>
                         <span className="text-sm">
-                          {member.term_start} -> {member.term_end || 'Ongoing'}
+                          {member.term_start} &rarr; {member.term_end || 'Ongoing'}
                         </span>
                       </TableCell>
                       <TableCell>

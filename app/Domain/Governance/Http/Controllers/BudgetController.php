@@ -27,7 +27,7 @@ class BudgetController extends Controller
 
     public function show(Request $request, Budget $budget)
     {
-        $budget->load(['lineItems', 'varianceNotes', 'auditLogs']);
+        $budget->load(['lineItems', 'adjustments', 'approvalResolution']);
 
         return Inertia::render('Governance/Budgets/Show', [
             'budget' => $budget,
@@ -43,7 +43,12 @@ class BudgetController extends Controller
             'board_approved' => ['boolean'],
         ]);
 
-        $data['status'] = $data['board_approved'] ?? false ? 'approved' : 'draft';
+        $isApproved = $data['board_approved'] ?? false;
+        $data['status'] = $isApproved ? 'approved' : 'drafting';
+        $data['created_by'] = $request->user()->id;
+        if ($isApproved) {
+            $data['approved_by_board_at'] = now();
+        }
 
         $budget = Budget::create($data);
 
@@ -55,7 +60,7 @@ class BudgetController extends Controller
     {
         $data = $request->validate([
             'total_budget' => ['sometimes', 'numeric', 'min:0'],
-            'status' => ['sometimes', 'string', 'in:draft,proposed,approved,adjusted'],
+            'status' => ['sometimes', 'string', 'in:drafting,proposed,under_review,approved,rejected'],
         ]);
 
         $budget->update($data);
@@ -65,7 +70,7 @@ class BudgetController extends Controller
 
     public function propose(Request $request, Budget $budget)
     {
-        $budget->update(['status' => 'proposed']);
+        $budget->propose($request->user()->id);
 
         return redirect()->back()->with('success', 'Budget proposed to board.');
     }

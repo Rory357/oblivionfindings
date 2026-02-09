@@ -15,11 +15,15 @@ import { type NavItem, type NavGroup } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
+    Building2,
     CalendarDays,
+    ClipboardCheck,
     ClipboardList,
+    FileQuestion,
     FileText,
     Folder,
     Gavel,
+    Home,
     Landmark,
     LayoutGrid,
     Lock,
@@ -31,8 +35,11 @@ import {
     Shield,
     ShieldAlert,
     Target,
+    Truck,
     Users,
     Vote,
+    Warehouse,
+    Wrench,
 } from 'lucide-react';
 import AppLogo from './app-logo';
 
@@ -124,6 +131,43 @@ function buildNavigationGroups({
         items: [],
     };
 
+    // Sites/Locations group (for all authenticated users with access)
+    const sitesGroup: NavGroup = {
+        id: 'sites',
+        label: 'Sites / Locations',
+        items: [],
+    };
+
+    if (can?.sites?.viewAny) {
+        sitesGroup.items.push({ title: 'All Sites', href: '/sites', icon: MapPin });
+        sitesGroup.items.push({ title: 'Head Office', href: '/sites?type=head_office', icon: Building2 });
+        sitesGroup.items.push({ title: 'Houses', href: '/sites?type=house', icon: Home });
+        sitesGroup.items.push({ title: 'Facilities', href: '/sites?type=facility', icon: Warehouse });
+    }
+
+    if (can?.calendar?.view) {
+        sitesGroup.items.push({ title: 'Calendars', href: '/calendar', icon: CalendarDays });
+    }
+
+    if (can?.checklists?.view) {
+        sitesGroup.items.push({ title: 'Checklists & Walkthroughs', href: '/sites/checklists', icon: ClipboardCheck });
+    }
+    if (can?.checklists?.manage) {
+        sitesGroup.items.push({ title: 'Checklist Templates', href: '/sites/checklists/templates', icon: FileQuestion });
+    }
+
+    if (can?.hazards?.view) {
+        sitesGroup.items.push({ title: 'Hazards', href: '/compliance/hazards', icon: ShieldAlert });
+    }
+
+    if (can?.vendors?.view) {
+        sitesGroup.items.push({ title: 'Vendors & Credentials', href: '/sites/vendors', icon: Truck });
+    }
+
+    if (can?.assets?.viewAny) {
+        sitesGroup.items.push({ title: 'Site Assets', href: '/assets', icon: Package });
+    }
+
     // Support Worker specific nav
     if (role === 'support_worker') {
         operationsGroup.items.push(
@@ -176,6 +220,7 @@ function buildNavigationGroups({
 
         return [
             mainGroup,
+            ...(sitesGroup.items.length > 0 ? [sitesGroup] : []),
             ...(operationsGroup.items.length > 0 ? [operationsGroup] : []),
             ...(resourcesGroup.items.length > 0 ? [resourcesGroup] : []),
             ...(complianceGroup.items.length > 0 ? [complianceGroup] : []),
@@ -183,9 +228,6 @@ function buildNavigationGroups({
     }
 
     // Provider/Manager/Admin nav - Operations
-    if (can?.sites?.viewAny) {
-        operationsGroup.items.push({ title: sitePlural, href: '/sites', icon: MapPin });
-    }
     if (can?.clients?.viewAny) {
         operationsGroup.items.push({ title: clientPlural, href: '/clients', icon: Users });
     }
@@ -335,6 +377,7 @@ function buildNavigationGroups({
 
     return [
         mainGroup,
+        ...(sitesGroup.items.length > 0 ? [sitesGroup] : []),
         ...(operationsGroup.items.length > 0 ? [operationsGroup] : []),
         ...(resourcesGroup.items.length > 0 ? [resourcesGroup] : []),
         ...(complianceGroup.items.length > 0 ? [complianceGroup] : []),

@@ -94,6 +94,7 @@ require __DIR__ . '/clients.php';
 require __DIR__ . '/staff.php';
 require __DIR__ . '/incidents.php';
 require __DIR__ . '/assets.php';
+require __DIR__ . '/sites.php';
 require __DIR__ . '/fleet.php';
 require __DIR__ . '/control-room.php';
 require __DIR__ . '/shifts.php';
