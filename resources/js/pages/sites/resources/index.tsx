@@ -125,7 +125,7 @@ export default function SiteResources({ site, resources }: Props) {
 
                 {/* Stats */}
                 <div className="grid gap-4 sm:grid-cols-3">
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{resources.length}</div>
                             <div className="text-sm text-slate-400">Total Resources</div>
@@ -171,7 +171,7 @@ export default function SiteResources({ site, resources }: Props) {
                                         <select
                                             value={form.data.resource_type}
                                             onChange={(e) => form.setData('resource_type', e.target.value as any)}
-                                            className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2"
+                                            className="w-full rounded-md border bg-background px-3 py-2"
                                             required
                                         >
                                             <option value="boardroom">Boardroom</option>
@@ -231,7 +231,7 @@ export default function SiteResources({ site, resources }: Props) {
                         ) : (
                             <div className="grid gap-3 sm:grid-cols-2">
                                 {activeResources.map(resource => (
-                                    <Card key={resource.id} className="bg-slate-800/30">
+                                    <Card key={resource.id} className="hover:bg-muted/50 transition-colors">
                                         <CardContent className="p-4">
                                             <div className="flex items-start justify-between">
                                                 <div>
@@ -256,7 +256,7 @@ export default function SiteResources({ site, resources }: Props) {
                                                     {resource.amenities && resource.amenities.length > 0 && (
                                                         <div className="flex flex-wrap gap-1 mt-2">
                                                             {resource.amenities.map((amenity, i) => (
-                                                                <span key={i} className="text-xs bg-slate-700 px-2 py-0.5 rounded">
+                                                                <span key={i} className="text-xs bg-muted px-2 py-0.5 rounded">
                                                                     {amenity}
                                                                 </span>
                                                             ))}

@@ -150,7 +150,7 @@ export default function EditTemplate({ template }: Props) {
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <Label>Template Key</Label>
-                                    <Input value={template.key} disabled className="bg-slate-800" />
+                                    <Input value={template.key} disabled className="bg-muted" />
                                     <p className="text-xs text-slate-400 mt-1">Key cannot be changed</p>
                                 </div>
                                 <div>
@@ -248,7 +248,7 @@ export default function EditTemplate({ template }: Props) {
                     <CardContent>
                         {/* Add/Edit Item Form */}
                         {showAddItem && (
-                            <form onSubmit={editingItem ? handleUpdateItem : handleAddItem} className="mb-6 p-4 rounded-lg border border-slate-700 bg-slate-800/30">
+                            <form onSubmit={editingItem ? handleUpdateItem : handleAddItem} className="mb-6 p-4 rounded-lg border bg-muted/30">
                                 <h4 className="font-medium mb-4">
                                     {editingItem ? 'Edit Item' : 'Add New Item'}
                                 </h4>
@@ -340,7 +340,7 @@ export default function EditTemplate({ template }: Props) {
                                     .map((item, index) => (
                                         <div
                                             key={item.id}
-                                            className="flex items-start gap-3 p-3 rounded-lg border border-slate-700 hover:bg-slate-800/50"
+                                            className="flex items-start gap-3 p-3 rounded-lg border hover:bg-muted/50"
                                         >
                                             <div className="mt-1 text-slate-500">
                                                 <GripVertical className="w-4 h-4" />

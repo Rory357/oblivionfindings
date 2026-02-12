@@ -241,11 +241,53 @@ class RiskRegisterController extends Controller
         return redirect()->back()->with('success', 'Event linked to risk.');
     }
 
+    public function edit(RiskRegisterEntry $risk)
+    {
+        return Inertia::render('Governance/Risks/Edit', [
+            'risk' => $risk,
+        ]);
+    }
+
     public function heatmap()
     {
         return Inertia::render('Governance/Risks/Heatmap', [
             'heatmap' => $this->riskService->generateHeatmapData(),
             'trend' => $this->riskService->getTrendAnalysis(),
+        ]);
+    }
+
+    public function trends()
+    {
+        $snapshots = \App\Domain\Governance\Models\RiskHeatmapSnapshot::orderByDesc('snapshot_date')
+            ->limit(12)
+            ->get();
+
+        return Inertia::render('Governance/Risks/Trends', [
+            'snapshots' => $snapshots,
+        ]);
+    }
+
+    public function committeeView(string $committee)
+    {
+        $validCommittees = ['audit_risk', 'people', 'finance'];
+        if (!in_array($committee, $validCommittees)) {
+            abort(404);
+        }
+
+        $categoryMap = [
+            'audit_risk' => ['financial', 'legal_compliance', 'it_cyber'],
+            'people' => ['workforce', 'client_safety'],
+            'finance' => ['financial', 'operational'],
+        ];
+
+        $risks = RiskRegisterEntry::active()
+            ->whereIn('category', $categoryMap[$committee])
+            ->orderByDesc('residual_score')
+            ->get();
+
+        return Inertia::render('Governance/Risks/Committee', [
+            'committee' => $committee,
+            'risks' => $risks,
         ]);
     }
 

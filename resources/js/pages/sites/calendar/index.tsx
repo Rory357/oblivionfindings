@@ -211,7 +211,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                                     <div
                                         key={day}
                                         className={`min-h-[100px] border rounded-lg p-2 ${
-                                            isToday ? 'bg-indigo-500/10 border-indigo-500/30' : 'border-slate-700'
+                                            isToday ? 'bg-indigo-500/10 border-indigo-500/30' : 'border'
                                         }`}
                                     >
                                         <div className={`text-sm font-medium mb-1 ${isToday ? 'text-indigo-400' : ''}`}>

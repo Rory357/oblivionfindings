@@ -211,7 +211,7 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                         ) : (
                             <div className="space-y-2">
                                 {schedules.map((schedule) => (
-                                    <div key={schedule.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                                    <div key={schedule.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50">
                                         <div>
                                             <div className="font-medium">{schedule.title}</div>
                                             <div className="text-sm text-slate-400">
@@ -250,7 +250,7 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                         ) : (
                             <div className="space-y-2">
                                 {records.data.slice(0, 10).map((record) => (
-                                    <div key={record.id} className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg">
+                                    <div key={record.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50">
                                         <div>
                                             <div className="font-medium">{record.due_date}</div>
                                             {record.findings && (

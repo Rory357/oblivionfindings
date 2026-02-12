@@ -211,7 +211,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
                       <div>
                         <Label>Assign To</Label>
                         <Select
-                          value={treatmentForm.assigned_to}
+                          value={treatmentForm.assigned_to || undefined}
                           onValueChange={(v) => setTreatmentForm({ ...treatmentForm, assigned_to: v })}
                         >
                           <SelectTrigger>

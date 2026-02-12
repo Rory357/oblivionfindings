@@ -65,6 +65,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('sites.checklists.index');
         Route::get('/checklists/runs', [SiteChecklistController::class, 'runs'])
             ->name('sites.checklists.runs');
+        Route::post('/checklists/assign', [SiteChecklistController::class, 'assignChecklist'])
+            ->name('sites.checklists.assign')
+            ->middleware('permission:checklists.schedule');
+        Route::delete('/checklists/assignments/{assignment}', [SiteChecklistController::class, 'removeAssignment'])
+            ->name('sites.checklists.removeAssignment')
+            ->middleware('permission:checklists.schedule');
+        Route::post('/checklists/assignments/{assignment}/run', [SiteChecklistController::class, 'createRun'])
+            ->name('sites.checklists.createRun')
+            ->middleware('permission:checklists.run');
 
         // Vendors
         Route::get('/vendors', [SiteVendorController::class, 'index'])
@@ -179,6 +188,21 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:reports.sites.view');
     Route::get('/sites/reports/export', [SiteReportingController::class, 'export'])
         ->name('sites.reports.export')
+        ->middleware('permission:reports.sites.export');
+    Route::get('/sites/reports/site/{site}', [SiteReportingController::class, 'perSiteDetail'])
+        ->name('sites.reports.site-detail')
+        ->middleware('permission:reports.sites.view');
+    Route::get('/sites/reports/overdue-actions', [SiteReportingController::class, 'overdueCorrectiveActions'])
+        ->name('sites.reports.overdue-actions')
+        ->middleware('permission:reports.sites.view');
+    Route::get('/sites/reports/checklist-trends', [SiteReportingController::class, 'checklistTrends'])
+        ->name('sites.reports.checklist-trends')
+        ->middleware('permission:reports.sites.view');
+    Route::get('/sites/reports/asset-condition', [SiteReportingController::class, 'assetConditionReport'])
+        ->name('sites.reports.asset-condition')
+        ->middleware('permission:reports.sites.view');
+    Route::get('/sites/reports/vendor-export', [SiteReportingController::class, 'vendorContactsExport'])
+        ->name('sites.reports.vendor-export')
         ->middleware('permission:reports.sites.export');
 
     // Type-specific management

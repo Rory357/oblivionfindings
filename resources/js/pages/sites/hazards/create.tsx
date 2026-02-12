@@ -190,7 +190,7 @@ export default function CreateHazard() {
                             </div>
 
                             {/* Risk Rating Display */}
-                            <div className="p-4 rounded-lg border border-slate-700 bg-slate-800/50">
+                            <div className="p-4 rounded-lg border bg-muted/30">
                                 <div className="text-sm text-slate-400 mb-2">Calculated Risk Rating</div>
                                 <div className="flex items-center gap-3">
                                     <Badge 

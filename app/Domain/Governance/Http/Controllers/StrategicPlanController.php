@@ -114,4 +114,35 @@ class StrategicPlanController extends Controller
 
         return redirect()->back()->with('success', 'Strategic plan approved.');
     }
+
+    public function edit(StrategicPlan $plan)
+    {
+        $plan->load('goals');
+
+        return Inertia::render('Governance/Strategy/Edit', [
+            'plan' => $plan,
+        ]);
+    }
+
+    public function createVersion(Request $request, StrategicPlan $plan)
+    {
+        $validated = $request->validate([
+            'version_notes' => 'required|string|max:500',
+        ]);
+
+        $newPlan = $plan->createNewVersion($validated['version_notes'], auth()->id());
+
+        return redirect()->route('governance.strategy.show', $newPlan)
+            ->with('success', 'New version created (v' . $newPlan->version_number . ').');
+    }
+
+    public function changes(StrategicPlan $plan)
+    {
+        $changeData = $plan->getChangesSinceLastSnapshot();
+
+        return Inertia::render('Governance/Strategy/Changes', [
+            'plan' => $plan->load('goals'),
+            'changes' => $changeData,
+        ]);
+    }
 }

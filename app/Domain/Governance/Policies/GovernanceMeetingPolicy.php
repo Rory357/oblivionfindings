@@ -70,6 +70,15 @@ class GovernanceMeetingPolicy
         return $user->hasRole('admin', 'board_chair');
     }
 
+    public function generatePack(User $user, GovernanceMeeting $meeting): bool
+    {
+        if ($meeting->status === 'archived') {
+            return false;
+        }
+
+        return $user->hasRole('admin', 'board_chair', 'board_secretary');
+    }
+
     public function distributePack(User $user, GovernanceMeeting $meeting): bool
     {
         if (!$meeting->canDistributePack()) {

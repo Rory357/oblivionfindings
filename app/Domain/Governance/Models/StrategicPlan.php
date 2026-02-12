@@ -131,4 +131,67 @@ class StrategicPlan extends Model
 
         return $newPlan;
     }
+
+    /**
+     * Capture a snapshot of current goals/progress for "what changed" comparison.
+     */
+    public function captureSnapshot(): void
+    {
+        $snapshot = $this->goals->map(fn($g) => [
+            'id' => $g->id,
+            'title' => $g->title,
+            'pillar' => $g->pillar ?? null,
+            'progress_pct' => $g->progress_pct,
+            'status' => $g->status ?? null,
+        ])->toArray();
+
+        $this->update(['last_snapshot' => $snapshot]);
+    }
+
+    /**
+     * Get what changed since the last captured snapshot.
+     */
+    public function getChangesSinceLastSnapshot(): array
+    {
+        if (empty($this->last_snapshot)) {
+            return ['has_snapshot' => false, 'changes' => []];
+        }
+
+        $previous = collect($this->last_snapshot)->keyBy('id');
+        $current = $this->goals->fresh();
+        $changes = [];
+
+        foreach ($current as $goal) {
+            $old = $previous->get($goal->id);
+            if (!$old) {
+                $changes[] = ['type' => 'added', 'goal' => $goal->title, 'detail' => 'New goal added'];
+                continue;
+            }
+
+            $diffs = [];
+            if (($old['progress_pct'] ?? 0) != $goal->progress_pct) {
+                $diffs[] = "Progress: {$old['progress_pct']}% → {$goal->progress_pct}%";
+            }
+            if (($old['status'] ?? null) !== ($goal->status ?? null)) {
+                $diffs[] = "Status: {$old['status']} → {$goal->status}";
+            }
+            if (!empty($diffs)) {
+                $changes[] = [
+                    'type' => 'updated',
+                    'goal' => $goal->title,
+                    'detail' => implode('; ', $diffs),
+                ];
+            }
+        }
+
+        // Check for removed goals
+        $currentIds = $current->pluck('id')->toArray();
+        foreach ($previous as $id => $old) {
+            if (!in_array($id, $currentIds)) {
+                $changes[] = ['type' => 'removed', 'goal' => $old['title'], 'detail' => 'Goal removed'];
+            }
+        }
+
+        return ['has_snapshot' => true, 'changes' => $changes];
+    }
 }

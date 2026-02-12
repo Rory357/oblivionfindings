@@ -74,6 +74,11 @@ class MeetingMinute extends Model
         return $this->status === 'signed';
     }
 
+    public function isArchived(): bool
+    {
+        return $this->status === 'archived';
+    }
+
     public function canEdit(): bool
     {
         return in_array($this->status, ['draft', 'reviewed']);
@@ -91,5 +96,53 @@ class MeetingMinute extends Model
                 ]
             ])
         ]);
+    }
+
+    /**
+     * State machine: Draft -> Reviewed -> Approved -> Signed -> Archived
+     */
+    public function advanceStatus(string $newStatus, int $userId): bool
+    {
+        $validTransitions = [
+            'draft' => ['reviewed'],
+            'reviewed' => ['draft', 'approved'],
+            'approved' => ['signed'],
+            'signed' => ['archived'],
+        ];
+
+        $allowed = $validTransitions[$this->status] ?? [];
+        if (!in_array($newStatus, $allowed)) {
+            return false;
+        }
+
+        $updates = ['status' => $newStatus];
+
+        match($newStatus) {
+            'reviewed' => $updates = array_merge($updates, [
+                'reviewed_by' => $userId,
+                'reviewed_at' => now(),
+            ]),
+            'signed' => $updates = array_merge($updates, [
+                'signed_by' => $userId,
+                'signed_at' => now(),
+            ]),
+            'archived' => $updates = array_merge($updates, [
+                'archived_at' => now(),
+            ]),
+            default => null,
+        };
+
+        $this->update($updates);
+        return true;
+    }
+
+    public function sign(int $userId): bool
+    {
+        return $this->advanceStatus('signed', $userId);
+    }
+
+    public function archive(): bool
+    {
+        return $this->advanceStatus('archived', auth()->id() ?? 0);
     }
 }

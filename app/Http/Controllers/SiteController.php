@@ -292,6 +292,18 @@ class SiteController extends Controller
                 'updated_at' => $a->updated_at?->toDateTimeString(),
             ]),
             'checklist' => $checklist,
+            'vendors' => \App\Models\SiteVendor::where('site_id', $site->id)
+                ->where('is_active', true)
+                ->orderBy('service_type')
+                ->get()
+                ->map(fn($v) => [
+                    'id' => $v->id,
+                    'company_name' => $v->company_name,
+                    'service_type' => $v->service_type,
+                    'phone' => $v->phone,
+                    'is_preferred' => (bool) $v->is_preferred,
+                ]),
+            'credentialCount' => \App\Models\SiteCredential::where('site_id', $site->id)->count(),
             'can_edit' => (bool) ($user && $user->canDo('sites.update') && $user->can('update', $site)),
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),

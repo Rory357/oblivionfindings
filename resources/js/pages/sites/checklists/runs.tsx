@@ -1,9 +1,9 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ClipboardCheck, Calendar, User, ArrowLeft, Filter } from 'lucide-react';
+import { ClipboardCheck, Calendar, User, ArrowLeft, Filter, PlayCircle, Eye, RotateCw } from 'lucide-react';
 
 type Site = {
     id: number;
@@ -78,7 +78,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
 
                 {/* Stats */}
                 <div className="grid gap-4 sm:grid-cols-4">
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{runs.data.length}</div>
                             <div className="text-sm text-slate-400">Total Runs</div>
@@ -126,7 +126,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                                 {runs.data.map((run) => (
                                     <div
                                         key={run.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border border-slate-700 hover:bg-slate-800/50"
+                                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50"
                                     >
                                         <div>
                                             <div className="font-medium">{run.template.name}</div>
@@ -147,11 +147,32 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                                             <Badge className={statusColors[run.status]}>
                                                 {statusLabels[run.status]}
                                             </Badge>
-                                            <Button asChild variant="ghost" size="sm">
-                                                <Link href={`/checklists/runs/${run.id}`}>
-                                                    View
-                                                </Link>
-                                            </Button>
+                                            {(run.status === 'scheduled' || run.status === 'overdue') && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    onClick={() => router.post(`/checklists/runs/${run.id}/start`)}
+                                                >
+                                                    <PlayCircle className="w-4 h-4 mr-1" />
+                                                    Start
+                                                </Button>
+                                            )}
+                                            {run.status === 'in_progress' && (
+                                                <Button asChild variant="outline" size="sm">
+                                                    <Link href={`/checklists/runs/${run.id}`}>
+                                                        <RotateCw className="w-4 h-4 mr-1" />
+                                                        Continue
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                            {(run.status === 'completed' || run.status === 'skipped') && (
+                                                <Button asChild variant="ghost" size="sm">
+                                                    <Link href={`/checklists/runs/${run.id}`}>
+                                                        <Eye className="w-4 h-4 mr-1" />
+                                                        View
+                                                    </Link>
+                                                </Button>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

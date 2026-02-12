@@ -51,12 +51,15 @@ class GovernanceMeetingController extends Controller
         ]);
 
         $quorum = $meeting->calculateQuorum();
+        $boardMembers = BoardMember::with('user')->active()->get();
 
         return Inertia::render('Governance/Meetings/Show', [
             'meeting' => $meeting,
             'quorum' => $quorum,
+            'boardMembers' => $boardMembers,
             'canEdit' => $meeting->isEditable() && auth()->user()->can('update', $meeting),
             'canManageMinutes' => auth()->user()->can('manageMinutes', $meeting),
+            'canApproveMinutes' => auth()->user()->can('approveMinutes', $meeting),
         ]);
     }
 
@@ -249,10 +252,37 @@ class GovernanceMeetingController extends Controller
         return redirect()->back()->with('success', 'Attendance recorded.');
     }
 
+    public function lockMeeting(GovernanceMeeting $meeting)
+    {
+        if ($meeting->isLocked()) {
+            return redirect()->back()->with('error', 'Meeting is already locked.');
+        }
+
+        $meeting->lock(auth()->id());
+
+        return redirect()->back()->with('success', 'Meeting locked. No further edits allowed.');
+    }
+
+    public function signMinutes(GovernanceMeeting $meeting)
+    {
+        $minutes = $meeting->minutes;
+        if (!$minutes) {
+            return redirect()->back()->with('error', 'No minutes found for this meeting.');
+        }
+
+        if (!$minutes->isApproved()) {
+            return redirect()->back()->with('error', 'Minutes must be approved before signing.');
+        }
+
+        $minutes->sign(auth()->id());
+
+        return redirect()->back()->with('success', 'Minutes signed successfully.');
+    }
+
     protected function reorderAgendaItems(GovernanceMeeting $meeting): void
     {
         $items = $meeting->agendaItems()->orderBy('order')->get();
-        
+
         foreach ($items as $index => $item) {
             $item->update(['order' => $index + 1]);
         }

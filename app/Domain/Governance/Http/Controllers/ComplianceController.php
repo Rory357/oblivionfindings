@@ -164,6 +164,36 @@ class ComplianceController extends Controller
         ]);
     }
 
+    public function edit(ComplianceObligation $obligation)
+    {
+        return Inertia::render('Governance/Compliance/Edit', [
+            'obligation' => $obligation,
+        ]);
+    }
+
+    public function storeNotifiableIncident(Request $request)
+    {
+        $validated = $request->validate([
+            'incident_type' => 'required|in:death,serious_harm,serious_injury,health_safety,privacy_breach',
+            'notification_authority' => 'required|in:worksafe,health_nz,privacy_commissioner,charities_services',
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
+            'severity' => 'required|in:critical,high,medium',
+            'occurred_at' => 'required|date',
+            'discovered_at' => 'nullable|date',
+            'related_incident_id' => 'nullable|integer',
+        ]);
+
+        $incident = \App\Domain\Governance\Models\NotifiableIncident::create([
+            ...$validated,
+            'status' => 'pending',
+            'submitted_by' => auth()->id(),
+        ]);
+
+        return redirect()->route('governance.compliance.index')
+            ->with('success', 'Notifiable incident recorded. Ensure timely notification to ' . $validated['notification_authority'] . '.');
+    }
+
     protected function getFrameworks(): array
     {
         return [

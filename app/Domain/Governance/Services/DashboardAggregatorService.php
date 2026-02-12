@@ -20,27 +20,41 @@ class DashboardAggregatorService
     {
         $range = $this->getDateRange($periodType, $start, $end);
         
+        $widgets = [];
+        $widgetMethods = [
+            'top_risks' => fn() => $this->getTopRisks(),
+            'voided_risks' => fn() => $this->getVoidedRisks($range),
+            'risk_changes' => fn() => $this->getRiskChanges($range),
+            'client_safety' => fn() => $this->getClientSafetyMetrics($range),
+            'operational_safety' => fn() => $this->getOperationalSafetyMetrics($range),
+            'privacy_data' => fn() => $this->getPrivacyMetrics($range),
+            'workforce' => fn() => $this->getWorkforceMetrics($range),
+            'financial' => fn() => $this->getFinancialMetrics($range),
+            'it_cyber' => fn() => $this->getItCyberMetrics($range),
+            'fleet_assets' => fn() => $this->getFleetAssetMetrics($range),
+            'compliance_calendar' => fn() => $this->getComplianceCalendar(),
+            'decisions_required' => fn() => $this->getDecisionsRequired(),
+            'control_room' => fn() => $this->getControlRoomMetrics($range),
+            'incidents' => fn() => $this->getIncidentMetrics($range),
+            'safeguarding' => fn() => $this->getSafeguardingMetrics($range),
+        ];
+
+        foreach ($widgetMethods as $key => $callback) {
+            try {
+                $widgets[$key] = $callback();
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning("Dashboard widget '{$key}' failed: " . $e->getMessage());
+                $widgets[$key] = ['status' => 'unavailable', 'error' => $e->getMessage()];
+            }
+        }
+
         $data = [
             'period' => [
                 'type' => $periodType,
                 'start' => $range['start']->toDateString(),
                 'end' => $range['end']->toDateString(),
             ],
-            'widgets' => [
-                'top_risks' => $this->getTopRisks(),
-                'risk_changes' => $this->getRiskChanges($range),
-                'client_safety' => $this->getClientSafetyMetrics($range),
-                'operational_safety' => $this->getOperationalSafetyMetrics($range),
-                'privacy_data' => $this->getPrivacyMetrics($range),
-                'workforce' => $this->getWorkforceMetrics($range),
-                'financial' => $this->getFinancialMetrics($range),
-                'it_cyber' => $this->getItCyberMetrics($range),
-                'compliance_calendar' => $this->getComplianceCalendar(),
-                'decisions_required' => $this->getDecisionsRequired(),
-                'control_room' => $this->getControlRoomMetrics($range),
-                'incidents' => $this->getIncidentMetrics($range),
-                'safeguarding' => $this->getSafeguardingMetrics($range),
-            ],
+            'widgets' => $widgets,
             'captured_at' => now()->toIso8601String(),
         ];
 
@@ -369,6 +383,63 @@ class DashboardAggregatorService
             'open_concerns' => $open,
             'investigations_opened' => $investigations,
             'status' => $critical > 0 ? 'critical' : ($open > 5 ? 'warning' : 'good'),
+        ];
+    }
+
+    public function getVoidedRisks(array $range): array
+    {
+        $voided = \App\Domain\Governance\Models\RiskRegisterEntry::where('status', 'voided')
+            ->whereBetween('closed_at', [$range['start'], $range['end']])
+            ->orderByDesc('closed_at')
+            ->limit(10)
+            ->get();
+
+        return [
+            'count' => $voided->count(),
+            'items' => $voided->map(fn($r) => [
+                'id' => $r->id,
+                'reference' => $r->risk_reference,
+                'title' => $r->title,
+                'category' => $r->category,
+                'closure_rationale' => $r->closure_rationale,
+                'closed_at' => $r->closed_at?->toDateString(),
+                'closed_by' => $r->closedBy?->name,
+            ])->toArray(),
+        ];
+    }
+
+    public function getFleetAssetMetrics(array $range): array
+    {
+        if (!Schema::hasTable('assets')) {
+            return ['total_assets' => 0, 'overdue_inspections' => 0, 'status' => 'unknown'];
+        }
+
+        $totalAssets = DB::table('assets')->where('status', 'active')->count();
+
+        $overdueInspections = DB::table('assets')
+            ->where('status', 'active')
+            ->whereNotNull('next_inspection_date')
+            ->where('next_inspection_date', '<', now())
+            ->count();
+
+        $recentIncidents = 0;
+        if (Schema::hasTable('asset_incidents')) {
+            $recentIncidents = DB::table('asset_incidents')
+                ->whereBetween('occurred_at', [$range['start'], $range['end']])
+                ->count();
+        }
+
+        $fleetCount = 0;
+        if (Schema::hasTable('vehicles')) {
+            $fleetCount = DB::table('vehicles')->where('status', 'active')->count();
+        }
+
+        return [
+            'total_assets' => $totalAssets,
+            'fleet_vehicles' => $fleetCount,
+            'overdue_inspections' => $overdueInspections,
+            'asset_incidents' => $recentIncidents,
+            'status' => $overdueInspections > 5 ? 'warning' : 'good',
         ];
     }
 

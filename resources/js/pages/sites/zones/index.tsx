@@ -100,7 +100,7 @@ export default function SiteZones({ site, zones }: Props) {
 
                 {/* Stats */}
                 <div className="grid gap-4 sm:grid-cols-2">
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{zones.length}</div>
                             <div className="text-sm text-slate-400">Total Zones</div>
@@ -173,7 +173,7 @@ export default function SiteZones({ site, zones }: Props) {
                         ) : (
                             <div className="grid gap-3 sm:grid-cols-2">
                                 {activeZones.map(zone => (
-                                    <Card key={zone.id} className="bg-slate-800/30">
+                                    <Card key={zone.id} className="hover:bg-muted/50 transition-colors">
                                         <CardContent className="p-4">
                                             <div className="flex items-start justify-between">
                                                 <div>

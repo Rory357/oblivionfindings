@@ -1,4 +1,4 @@
-import { NavFooter } from '@/components/nav-footer';
+﻿import { NavFooter } from '@/components/nav-footer';
 import { NavMain } from '@/components/nav-main';
 import { NavUser } from '@/components/nav-user';
 import {
@@ -161,10 +161,10 @@ function buildNavigationGroups({
         sitesGroup.items.push({ title: 'Hazards', href: '/compliance/hazards', icon: ShieldAlert });
     }
 
-    sitesGroup.items.push({ title: 'Documents & Notes', href: '/sites', icon: FileText });
+    sitesGroup.items.push({ title: 'Documents & Notes', href: '/sites?tab=documents', icon: FileText });
 
     if (can?.checklists?.view) {
-        sitesGroup.items.push({ title: 'Inspections & Maintenance', href: '/sites/reports', icon: Wrench });
+        sitesGroup.items.push({ title: 'Inspections & Maintenance', href: '/sites?tab=inspections', icon: Wrench });
     }
 
     if (can?.vendors?.view || can?.credentials?.view) {

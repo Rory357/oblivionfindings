@@ -148,7 +148,7 @@ export default function SiteHazards({ site, hazards, filters, severityOptions }:
                         hazards.data.map((hazard) => {
                             const StatusIcon = statusIcons[hazard.status];
                             return (
-                                <Card key={hazard.id} className="hover:border-indigo-500/30 transition-colors">
+                                <Card key={hazard.id} className="hover:bg-muted/50 transition-colors">
                                     <CardContent className="p-4">
                                         <div className="flex items-start justify-between gap-4">
                                             <div className="flex-1">

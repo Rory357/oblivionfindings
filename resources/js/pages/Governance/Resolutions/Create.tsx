@@ -27,12 +27,13 @@ export default function CreateResolution({ auth, meetings, selectedMeetingId }: 
     description: '',
     type: 'ordinary',
     voting_deadline: '',
-    meeting_id: selectedMeetingId ? String(selectedMeetingId) : '',
+    meeting_id: selectedMeetingId ? String(selectedMeetingId) : 'none',
   });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    post(storeResolution.url());
+    const submitData = { ...data, meeting_id: data.meeting_id === 'none' ? '' : data.meeting_id };
+    post(storeResolution.url(), { data: submitData });
   };
 
   return (
@@ -112,7 +113,7 @@ export default function CreateResolution({ auth, meetings, selectedMeetingId }: 
                       <SelectValue placeholder="No linked meeting" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">No linked meeting</SelectItem>
+                      <SelectItem value="none">No linked meeting</SelectItem>
                       {meetings.map((meeting) => (
                         <SelectItem key={meeting.id} value={String(meeting.id)}>
                           {meeting.title} ({new Date(meeting.scheduled_at).toLocaleDateString()})

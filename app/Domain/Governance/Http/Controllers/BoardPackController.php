@@ -2,12 +2,12 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
-use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Services\BoardPackBuilderService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
@@ -31,34 +31,88 @@ class BoardPackController extends Controller
 
     public function generate(Request $request, GovernanceMeeting $meeting)
     {
-        $this->authorize('update', $meeting);
+        $this->authorize('generatePack', $meeting);
+
+        // If a pack already exists, regenerate it instead
+        $existingPack = $meeting->boardPack;
+        if ($existingPack) {
+            return $this->regenerateForMeeting($request, $meeting, $existingPack);
+        }
 
         $runInline = app()->environment('local')
             || config('queue.default') === 'sync'
             || $request->boolean('sync');
 
-        if ($runInline) {
-            $pack = $this->packService->build($meeting);
+        try {
+            if ($runInline) {
+                $pack = $this->packService->build($meeting);
+                if ($request->expectsJson()) {
+                    return response()->json([
+                        'status' => 'generated',
+                        'pack_id' => $pack->id,
+                    ]);
+                }
+
+                return redirect()->route('governance.packs.show', $pack)
+                    ->with('success', 'Board pack generated.');
+            }
+
+            // Dispatch async job for generation
+            \App\Domain\Governance\Jobs\GenerateBoardPack::dispatch($meeting->id);
+
+            if ($request->expectsJson()) {
+                return response()->json(['status' => 'queued']);
+            }
+
+            return redirect()->route('governance.meetings.show', $meeting)
+                ->with('success', 'Board pack generation started. You will be notified when complete.');
+        } catch (\Throwable $e) {
+            Log::error('Board pack generation failed', [
+                'meeting_id' => $meeting->id,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Board pack generation failed: ' . $e->getMessage(),
+                ], 500);
+            }
+
+            return redirect()->back()->with('error', 'Board pack generation failed: ' . $e->getMessage());
+        }
+    }
+
+    protected function regenerateForMeeting(Request $request, GovernanceMeeting $meeting, BoardPack $existingPack)
+    {
+        try {
+            $newPack = $this->packService->regenerate($existingPack);
+
             if ($request->expectsJson()) {
                 return response()->json([
                     'status' => 'generated',
-                    'pack_id' => $pack->id,
+                    'pack_id' => $newPack->id,
                 ]);
             }
 
-            return redirect()->route('governance.packs.show', $pack)
-                ->with('success', 'Board pack generated.');
+            return redirect()->route('governance.packs.show', $newPack)
+                ->with('success', 'Board pack regenerated.');
+        } catch (\Throwable $e) {
+            Log::error('Board pack regeneration failed', [
+                'meeting_id' => $meeting->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'Board pack regeneration failed: ' . $e->getMessage(),
+                ], 500);
+            }
+
+            return redirect()->back()->with('error', 'Board pack regeneration failed: ' . $e->getMessage());
         }
-
-        // Dispatch async job for generation
-        \App\Domain\Governance\Jobs\GenerateBoardPack::dispatch($meeting->id);
-
-        if ($request->expectsJson()) {
-            return response()->json(['status' => 'queued']);
-        }
-
-        return redirect()->route('governance.meetings.show', $meeting)
-            ->with('success', 'Board pack generation started. You will be notified when complete.');
     }
 
     public function distribute(Request $request, BoardPack $pack)

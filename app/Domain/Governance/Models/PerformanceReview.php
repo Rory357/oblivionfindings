@@ -64,6 +64,28 @@ class PerformanceReview extends Model
         return $this->hasMany(PerformanceKpi::class);
     }
 
+    public function feedback(): HasMany
+    {
+        return $this->hasMany(PerformanceFeedback::class);
+    }
+
+    public function getFeedbackSummary(): array
+    {
+        $feedback = $this->feedback()->whereNotNull('submitted_at')->get();
+        if ($feedback->isEmpty()) {
+            return ['count' => 0, 'avg_rating' => null, 'by_role' => []];
+        }
+
+        return [
+            'count' => $feedback->count(),
+            'avg_rating' => round($feedback->map->getAverageRating()->filter()->avg(), 2),
+            'by_role' => $feedback->groupBy('reviewer_role')->map(fn($group) => [
+                'count' => $group->count(),
+                'avg_rating' => round($group->map->getAverageRating()->filter()->avg(), 2),
+            ])->toArray(),
+        ];
+    }
+
     public function scopeByReviewee($query, int $userId)
     {
         return $query->where('reviewee_id', $userId);

@@ -74,7 +74,7 @@ export default function CredentialAudit({ site, credential, logs }: Props) {
                         ) : (
                             <div className="space-y-2">
                                 {logs.data.map((log) => (
-                                    <div key={log.id} className="flex items-center justify-between rounded-lg border border-slate-700 p-3">
+                                    <div key={log.id} className="flex items-center justify-between rounded-lg border p-3 hover:bg-muted/50">
                                         <div>
                                             <div className="flex items-center gap-2">
                                                 <Badge variant="outline">{log.action}</Badge>

@@ -262,7 +262,7 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                                     <div className="capitalize">{hazard.likelihood.replace('_', ' ')}</div>
                                 </div>
                             </div>
-                            <div className="pt-3 border-t border-slate-700">
+                            <div className="pt-3 border-t">
                                 <div className="text-sm text-slate-400">Risk Rating</div>
                                 <Badge 
                                     variant="outline" 

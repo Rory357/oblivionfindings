@@ -5,7 +5,6 @@ namespace App\Domain\Governance\Services;
 use App\Domain\Governance\Models\BoardPack;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Models\User;
-use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Facades\Storage;
 
 class BoardPackBuilderService
@@ -32,19 +31,22 @@ class BoardPackBuilderService
         // Generate document manifest
         $manifest = $this->buildDocumentManifest($meeting);
 
-        // Generate PDF
-        $pdf = $this->generatePdf($meeting, $snapshot, $manifest);
+        // Build content data
+        $content = $this->buildPackContent($meeting, $snapshot, $manifest);
+
+        // Try PDF generation if library is available, otherwise store as JSON
+        $fileData = $this->generateFile($meeting, $content);
 
         // Create board pack record
         $pack = BoardPack::create([
             'governance_meeting_id' => $meeting->id,
             'dashboard_snapshot_id' => $snapshot->id,
-            'document_manifest' => $manifest,
+            'document_manifest' => array_merge($manifest, ['content' => $content]),
             'generated_at' => now(),
             'generated_by' => auth()->id() ?? $meeting->created_by,
-            'file_path' => $pdf['path'],
-            'file_size' => $pdf['size'],
-            'checksum' => $pdf['checksum'],
+            'file_path' => $fileData['path'] ?? null,
+            'file_size' => $fileData['size'] ?? null,
+            'checksum' => $fileData['checksum'] ?? $this->generateContentChecksum($content),
             'watermark_text' => 'CONFIDENTIAL - BOARD ONLY',
         ]);
 
@@ -94,52 +96,9 @@ class BoardPackBuilderService
     }
 
     /**
-     * Generate the PDF board pack
+     * Build pack content sections
      */
-    protected function generatePdf(GovernanceMeeting $meeting, $snapshot, array $manifest): array
-    {
-        if (!class_exists(Pdf::class)) {
-            throw new \RuntimeException('PDF generation library not installed. Run: composer require barryvdh/laravel-dompdf');
-        }
-
-        // Build PDF content
-        $content = $this->buildPdfContent($meeting, $snapshot, $manifest);
-        $watermark = 'CONFIDENTIAL - BOARD ONLY';
-
-        // Generate filename
-        $filename = sprintf(
-            'board-pack-%s-%s.pdf',
-            $meeting->scheduled_at->format('Y-m-d'),
-            str_replace(' ', '-', strtolower($meeting->title))
-        );
-
-        $path = 'board-packs/' . $filename;
-
-        // Create PDF (using Laravel PDF facade)
-        $pdf = Pdf::loadView('governance.board-pack.pdf', [
-            'meeting' => $meeting,
-            'snapshot' => $snapshot,
-            'manifest' => $manifest,
-            'content' => $content,
-            'generated_at' => now(),
-            'watermark' => $watermark,
-        ]);
-        $pdf->setPaper('a4', 'portrait');
-
-        // Save to storage
-        Storage::put($path, $pdf->output());
-
-        return [
-            'path' => $path,
-            'size' => Storage::size($path),
-            'checksum' => hash_file('sha256', Storage::path($path)),
-        ];
-    }
-
-    /**
-     * Build PDF content sections
-     */
-    protected function buildPdfContent(GovernanceMeeting $meeting, $snapshot, array $manifest): array
+    protected function buildPackContent(GovernanceMeeting $meeting, $snapshot, array $manifest): array
     {
         return [
             'cover' => [
@@ -157,6 +116,81 @@ class BoardPackBuilderService
             'dashboard' => $snapshot->snapshot_data['widgets'] ?? [],
             'risk_report' => $this->riskService->generateBoardReport(),
         ];
+    }
+
+    /**
+     * Generate file output - PDF if library available, JSON fallback
+     */
+    protected function generateFile(GovernanceMeeting $meeting, array $content): array
+    {
+        // Try PDF generation if dompdf is available
+        if (class_exists(\Barryvdh\DomPDF\Facade\Pdf::class)) {
+            return $this->generatePdf($meeting, $content);
+        }
+
+        // Fallback: store as JSON file
+        return $this->generateJsonPack($meeting, $content);
+    }
+
+    /**
+     * Generate a JSON-based board pack file
+     */
+    protected function generateJsonPack(GovernanceMeeting $meeting, array $content): array
+    {
+        $filename = sprintf(
+            'board-pack-%s-%s.json',
+            $meeting->scheduled_at->format('Y-m-d'),
+            \Illuminate\Support\Str::slug($meeting->title)
+        );
+
+        $path = 'board-packs/' . $filename;
+        $jsonContent = json_encode($content, JSON_PRETTY_PRINT);
+
+        Storage::put($path, $jsonContent);
+
+        return [
+            'path' => $path,
+            'size' => Storage::size($path),
+            'checksum' => hash('sha256', $jsonContent),
+        ];
+    }
+
+    /**
+     * Generate PDF board pack (requires barryvdh/laravel-dompdf)
+     */
+    protected function generatePdf(GovernanceMeeting $meeting, array $content): array
+    {
+        $filename = sprintf(
+            'board-pack-%s-%s.pdf',
+            $meeting->scheduled_at->format('Y-m-d'),
+            \Illuminate\Support\Str::slug($meeting->title)
+        );
+
+        $path = 'board-packs/' . $filename;
+
+        $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('governance.board-pack.pdf', [
+            'meeting' => $meeting,
+            'content' => $content,
+            'generated_at' => now(),
+            'watermark' => 'CONFIDENTIAL - BOARD ONLY',
+        ]);
+        $pdf->setPaper('a4', 'portrait');
+
+        Storage::put($path, $pdf->output());
+
+        return [
+            'path' => $path,
+            'size' => Storage::size($path),
+            'checksum' => hash_file('sha256', Storage::path($path)),
+        ];
+    }
+
+    /**
+     * Generate a checksum for content data
+     */
+    protected function generateContentChecksum(array $content): string
+    {
+        return hash('sha256', json_encode($content));
     }
 
     /**
@@ -181,9 +215,9 @@ class BoardPackBuilderService
     public function distribute(BoardPack $pack, ?array $boardMemberIds = null): void
     {
         $meeting = $pack->meeting;
-        
+
         // Get all board members or specified ones
-        $recipients = $boardMemberIds 
+        $recipients = $boardMemberIds
             ? \App\Domain\Governance\Models\BoardMember::whereIn('id', $boardMemberIds)->get()
             : \App\Domain\Governance\Models\BoardMember::active()->get();
 
@@ -192,7 +226,9 @@ class BoardPackBuilderService
 
         // Send notifications
         foreach ($recipients as $member) {
-            \App\Domain\Governance\Jobs\SendBoardPackNotification::dispatch($pack, $member);
+            if (class_exists(\App\Domain\Governance\Jobs\SendBoardPackNotification::class)) {
+                \App\Domain\Governance\Jobs\SendBoardPackNotification::dispatch($pack, $member);
+            }
         }
 
         // Update meeting status
@@ -204,22 +240,50 @@ class BoardPackBuilderService
      */
     public function regenerate(BoardPack $pack): BoardPack
     {
+        $meeting = $pack->meeting;
+
         // Delete old file
         if ($pack->file_path && Storage::exists($pack->file_path)) {
             Storage::delete($pack->file_path);
         }
 
-        // Delete old snapshot
-        $pack->snapshot->delete();
+        // Delete old snapshot if it exists
+        if ($pack->snapshot) {
+            $pack->snapshot->delete();
+        }
 
-        // Build new pack
-        return $this->build($pack->meeting);
+        // Capture fresh snapshot
+        $snapshot = $this->dashboardService->captureSnapshot('month');
+
+        // Generate document manifest
+        $manifest = $this->buildDocumentManifest($meeting);
+
+        // Build content data
+        $content = $this->buildPackContent($meeting, $snapshot, $manifest);
+
+        // Generate file
+        $fileData = $this->generateFile($meeting, $content);
+
+        // Update existing pack record instead of creating new one
+        $pack->update([
+            'dashboard_snapshot_id' => $snapshot->id,
+            'document_manifest' => array_merge($manifest, ['content' => $content]),
+            'generated_at' => now(),
+            'generated_by' => auth()->id() ?? $meeting->created_by,
+            'file_path' => $fileData['path'] ?? null,
+            'file_size' => $fileData['size'] ?? null,
+            'checksum' => $fileData['checksum'] ?? $this->generateContentChecksum($content),
+            'distributed_at' => null,
+            'distributed_to' => null,
+        ]);
+
+        return $pack->fresh();
     }
 
     /**
      * Get pack download URL
      */
-    public function getDownloadUrl(BoardPack $pack, BoardMember $boardMember): ?string
+    public function getDownloadUrl(BoardPack $pack, \App\Domain\Governance\Models\BoardMember $boardMember): ?string
     {
         // Verify board member is authorized
         if (!in_array($boardMember->id, $pack->distributed_to ?? [])) {
@@ -262,7 +326,7 @@ class BoardPackBuilderService
     protected function estimatePageCount(array $manifest): int
     {
         $pages = 2; // Cover + agenda
-        
+
         foreach ($manifest as $item) {
             $pages += match($item['id']) {
                 'dashboard' => 3,

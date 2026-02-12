@@ -108,6 +108,14 @@ type TypeSpecificData = {
     zones?: Array<{ id: number; name: string; type?: string }>;
 };
 
+type VendorLite = {
+    id: number;
+    company_name: string;
+    service_type: string;
+    phone?: string | null;
+    is_preferred: boolean;
+};
+
 type Props = {
     site: Site;
     clients: ClientLite[];
@@ -116,6 +124,8 @@ type Props = {
     assets: AssetLite[];
     checklist: ChecklistItem[];
     typeSpecificData: TypeSpecificData;
+    vendors?: VendorLite[];
+    credentialCount?: number;
     can_edit: boolean;
     can?: { createAsset?: boolean };
 };
@@ -140,7 +150,7 @@ function bytes(n?: number | null): string {
     return `${mb.toFixed(1)} MB`;
 }
 
-export default function SiteShow({ site, clients, assets, contacts, documents, checklist, typeSpecificData, can_edit, can: assetCan }: Props) {
+export default function SiteShow({ site, clients, assets, contacts, documents, checklist, typeSpecificData, vendors = [], credentialCount = 0, can_edit, can: assetCan }: Props) {
     const TypeIcon = typeIcons[site.type];
     const percent = Math.round((checklist.filter((c) => c.done).length / Math.max(1, checklist.length)) * 100);
     const page = usePage<any>();
@@ -247,7 +257,7 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                         <div className="space-y-4">
                             {/* Progress bar */}
                             <div className="w-full">
-                                <div className="h-2.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                                <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
                                     <div 
                                         className={`h-full rounded-full transition-all duration-500 ${
                                             percent === 100 
@@ -275,7 +285,7 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                         <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
                                             item.done 
                                                 ? 'bg-emerald-500/20 text-emerald-400' 
-                                                : 'bg-slate-800 text-slate-600'
+                                                : 'bg-muted text-muted-foreground'
                                         }`}>
                                             {item.done ? (
                                                 <CheckCircle2 className="w-3.5 h-3.5" />
@@ -291,7 +301,7 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             </div>
                             
                             {/* Summary */}
-                            <div className="pt-3 border-t border-slate-700/50 flex items-center justify-between text-xs text-slate-400">
+                            <div className="pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
                                 <span>
                                     {checklist.filter((c) => c.done).length} of {checklist.length} items completed
                                 </span>
@@ -429,7 +439,7 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                     </div>
                                     {(site.is_high_risk || site.is_high_needs) && (
                                         <>
-                                            <div className="pt-2 border-t border-slate-700">
+                                            <div className="pt-2 border-t">
                                                 <div className="text-amber-400 font-medium flex items-center gap-1">
                                                     <AlertTriangle className="w-4 h-4" />
                                                     Risk Information
@@ -482,7 +492,7 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                             </thead>
                                             <tbody>
                                                 {clients.map((c) => (
-                                                    <tr key={c.id} className="border-b last:border-b-0">
+                                                    <tr key={c.id} className="border-b last:border-b-0 hover:bg-muted/50">
                                                         <td className="px-4 py-3 font-medium">{`${c.first_name} ${c.last_name}`.trim()}</td>
                                                         <td className="px-4 py-3 text-slate-300">{c.status}</td>
                                                         <td className="px-4 py-3 text-right">
@@ -528,7 +538,7 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                             </thead>
                                             <tbody>
                                                 {assets.map((a) => (
-                                                    <tr key={a.id} className="border-b last:border-b-0">
+                                                    <tr key={a.id} className="border-b last:border-b-0 hover:bg-muted/50">
                                                         <td className="px-4 py-3">
                                                             <div className="font-medium">{a.name}</div>
                                                             <div className="text-xs text-slate-400">
@@ -638,28 +648,62 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                     {/* Vendors & Credentials Tab */}
                     {canSeeVendorsCredentials && (
                         <TabsContent value="vendors-credentials">
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between">
-                                    <CardTitle>Vendors & Credentials</CardTitle>
-                                    <div className="flex gap-2">
+                            <div className="space-y-4">
+                                <Card>
+                                    <CardHeader className="flex flex-row items-center justify-between">
+                                        <CardTitle className="text-base">Vendors ({vendors.length})</CardTitle>
                                         {canGlobal?.vendors?.view && (
-                                            <Button asChild>
-                                                <Link href={`/sites/${site.id}/vendors`}>Open Vendors</Link>
+                                            <Button asChild size="sm">
+                                                <Link href={`/sites/${site.id}/vendors`}>Manage Vendors</Link>
                                             </Button>
                                         )}
+                                    </CardHeader>
+                                    <CardContent>
+                                        {vendors.length === 0 ? (
+                                            <p className="text-sm text-slate-400">No vendors registered for this site.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {vendors.map((v) => (
+                                                    <div key={v.id} className="flex items-center justify-between p-2 rounded-lg border">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium text-sm">{v.company_name}</span>
+                                                                {v.is_preferred && (
+                                                                    <Badge variant="outline" className="border-yellow-500/30 text-yellow-400 text-xs">Preferred</Badge>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-xs text-slate-400">{v.service_type}</div>
+                                                        </div>
+                                                        {v.phone && (
+                                                            <a href={`tel:${v.phone}`} className="text-sm text-indigo-400 hover:text-indigo-300">{v.phone}</a>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+
+                                <Card>
+                                    <CardHeader className="flex flex-row items-center justify-between">
+                                        <CardTitle className="text-base">Credentials ({credentialCount})</CardTitle>
                                         {canGlobal?.credentials?.view && (
-                                            <Button asChild variant="secondary">
-                                                <Link href={`/sites/${site.id}/credentials`}>Open Credentials</Link>
+                                            <Button asChild size="sm" variant="secondary">
+                                                <Link href={`/sites/${site.id}/credentials`}>Manage Credentials</Link>
                                             </Button>
                                         )}
-                                    </div>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="text-sm text-slate-300">
-                                        Manage the site&apos;s service vendors and store access credentials securely.
-                                    </div>
-                                </CardContent>
-                            </Card>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {credentialCount === 0 ? (
+                                            <p className="text-sm text-slate-400">No credentials stored for this site.</p>
+                                        ) : (
+                                            <p className="text-sm text-slate-300">
+                                                {credentialCount} credential{credentialCount !== 1 ? 's' : ''} securely stored. Open the Credentials Vault to view or manage them.
+                                            </p>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
                         </TabsContent>
                     )}
 
@@ -853,7 +897,7 @@ function DocumentsTab({ site, documents, can_edit }: { site: Site; documents: Do
                                 </thead>
                                 <tbody>
                                     {documents.map((d) => (
-                                        <tr key={d.id} className="border-b last:border-b-0">
+                                        <tr key={d.id} className="border-b last:border-b-0 hover:bg-muted/50">
                                             <td className="px-4 py-3 font-medium">{d.title || d.original_name}</td>
                                             <td className="px-4 py-3 text-slate-300">{d.category || '—'}</td>
                                             <td className="px-4 py-3 text-right">

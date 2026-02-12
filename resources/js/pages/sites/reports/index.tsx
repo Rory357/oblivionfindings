@@ -48,7 +48,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                 {/* Report Packs */}
                 <div className="grid gap-4 sm:grid-cols-3">
                     {/* Houses Report Pack */}
-                    <Card className="hover:bg-slate-800/30 transition-colors">
+                    <Card className="hover:bg-muted/50 transition-colors">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -79,7 +79,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                     </Card>
 
                     {/* Facilities Report Pack */}
-                    <Card className="hover:bg-slate-800/30 transition-colors">
+                    <Card className="hover:bg-muted/50 transition-colors">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
@@ -110,7 +110,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                     </Card>
 
                     {/* Head Office Report Pack */}
-                    <Card className="hover:bg-slate-800/30 transition-colors">
+                    <Card className="hover:bg-muted/50 transition-colors">
                         <CardHeader>
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">

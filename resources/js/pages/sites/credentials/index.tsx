@@ -1,12 +1,23 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Lock, Eye, EyeOff, Copy, Plus, X, History } from 'lucide-react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Lock, Eye, EyeOff, Copy, Plus, X, History, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
     Dialog,
@@ -47,6 +58,13 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
     const [selectedCredential, setSelectedCredential] = useState<Credential | null>(null);
     const [password, setPassword] = useState('');
     const [revealing, setRevealing] = useState(false);
+    const [search, setSearch] = useState('');
+
+    const filteredCredentials = credentials.filter(
+        (c) =>
+            c.label.toLowerCase().includes(search.toLowerCase()) ||
+            c.credential_type.toLowerCase().includes(search.toLowerCase()),
+    );
 
     const form = useForm({
         label: '',
@@ -143,6 +161,9 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                         <h1 className="text-lg font-semibold flex items-center gap-2">
                             <Lock className="w-5 h-5" />
                             Credentials Vault
+                            <Badge variant="outline" className="ml-1 text-xs">
+                                {credentials.length} credential{credentials.length !== 1 ? 's' : ''}
+                            </Badge>
                         </h1>
                         <p className="text-sm text-slate-400">{site.name}</p>
                     </div>
@@ -158,6 +179,19 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                         )}
                     </div>
                 </div>
+
+                {/* Search Bar */}
+                {credentials.length > 0 && (
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search by label or type..."
+                            className="pl-10"
+                        />
+                    </div>
+                )}
 
                 {/* Add/Edit Form */}
                 {showForm && (
@@ -262,19 +296,33 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                 {/* Credentials List */}
                 {credentials.length === 0 ? (
                     <Card>
-                        <CardContent className="py-8 text-center text-slate-400">
+                        <CardContent className="py-12 text-center text-slate-400">
                             <Lock className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                            <p>No credentials stored for this site</p>
+                            <p className="text-lg font-medium mb-1">No credentials stored</p>
+                            <p className="text-sm">Add credentials to securely store access codes, passwords, and keys for this site.</p>
+                            {canManage && (
+                                <Button onClick={() => setShowForm(true)} className="mt-4">
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    Add Your First Credential
+                                </Button>
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : filteredCredentials.length === 0 ? (
+                    <Card>
+                        <CardContent className="py-8 text-center text-slate-400">
+                            <Search className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                            <p>No credentials match &quot;{search}&quot;</p>
                         </CardContent>
                     </Card>
                 ) : (
                     <div className="space-y-2">
-                        {credentials.map((cred) => (
+                        {filteredCredentials.map((cred) => (
                             <Card key={cred.id}>
                                 <CardContent className="p-4">
                                     <div className="flex items-center justify-between">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2">
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-medium">{cred.label}</span>
                                                 <Badge variant="outline">{cred.credential_type}</Badge>
                                                 {cred.requires_reauth && (
@@ -293,10 +341,10 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                                                 </div>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 shrink-0">
                                             {revealedValue && selectedCredential?.id === cred.id ? (
                                                 <>
-                                                    <code className="bg-slate-800 px-2 py-1 rounded text-sm">
+                                                    <code className="bg-muted px-2 py-1 rounded text-sm">
                                                         {revealedValue}
                                                     </code>
                                                     <Button
@@ -316,7 +364,7 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                                                 </>
                                             ) : (
                                                 <>
-                                                    <code className="bg-slate-800 px-2 py-1 rounded text-sm text-slate-500">
+                                                    <code className="bg-muted px-2 py-1 rounded text-sm text-slate-500">
                                                         {cred.value_preview}
                                                     </code>
                                                     {canReveal && (
@@ -351,6 +399,30 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                                                             <History className="w-4 h-4" />
                                                         </Link>
                                                     </Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Delete Credential</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    Permanently delete &quot;{cred.label}&quot;? This action cannot be undone and the credential value will be lost.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction
+                                                                    className="bg-red-600 hover:bg-red-700"
+                                                                    onClick={() => router.delete(`/sites/${site.id}/credentials/${cred.id}`)}
+                                                                >
+                                                                    Delete
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
                                                 </>
                                             )}
                                         </div>

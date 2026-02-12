@@ -107,7 +107,7 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
 
                 {/* Stats */}
                 <div className="grid gap-4 sm:grid-cols-3">
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{rooms.length}</div>
                             <div className="text-sm text-slate-400">Total Bedrooms</div>
@@ -152,7 +152,7 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                                     <select
                                         value={form.data.assigned_client_id}
                                         onChange={(e) => form.setData('assigned_client_id', e.target.value)}
-                                        className="w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2"
+                                        className="w-full rounded-md border bg-background px-3 py-2"
                                     >
                                         <option value="">-- Unassigned --</option>
                                         {clients.map(client => (
@@ -193,7 +193,7 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                         ) : (
                             <div className="grid gap-3 sm:grid-cols-2">
                                 {activeRooms.map(room => (
-                                    <Card key={room.id} className="bg-slate-800/30">
+                                    <Card key={room.id} className="hover:bg-muted/50 transition-colors">
                                         <CardContent className="p-4">
                                             <div className="flex items-start justify-between">
                                                 <div>

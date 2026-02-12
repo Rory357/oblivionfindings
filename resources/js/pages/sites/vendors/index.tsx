@@ -1,12 +1,23 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Truck, Phone, Mail, Star, Plus, X } from 'lucide-react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Truck, Phone, Mail, Star, Plus, X, Search, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
     Select,
@@ -50,6 +61,7 @@ type Props = {
 export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
     const [showForm, setShowForm] = useState(false);
     const [editingVendor, setEditingVendor] = useState<Vendor | null>(null);
+    const [search, setSearch] = useState('');
 
     const form = useForm<{
         service_type: string;
@@ -111,8 +123,15 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
         }
     };
 
+    // Filter vendors by search
+    const filteredVendors = vendors.filter(
+        (v) =>
+            v.company_name.toLowerCase().includes(search.toLowerCase()) ||
+            v.service_type.toLowerCase().includes(search.toLowerCase()),
+    );
+
     // Group vendors by service type
-    const groupedVendors = vendors.reduce((acc, vendor) => {
+    const groupedVendors = filteredVendors.reduce((acc, vendor) => {
         if (!acc[vendor.service_type]) acc[vendor.service_type] = [];
         acc[vendor.service_type].push(vendor);
         return acc;
@@ -141,6 +160,19 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                         </Button>
                     </div>
                 </div>
+
+                {/* Search Bar */}
+                {vendors.length > 0 && (
+                    <div className="relative">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Input
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            placeholder="Search by company name or service type..."
+                            className="pl-10"
+                        />
+                    </div>
+                )}
 
                 {/* Add/Edit Form */}
                 {showForm && (
@@ -256,22 +288,37 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                 {/* Vendors List */}
                 {vendors.length === 0 ? (
                     <Card>
-                        <CardContent className="py-8 text-center text-slate-400">
+                        <CardContent className="py-12 text-center text-slate-400">
                             <Truck className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                            <p>No vendors registered for this site</p>
+                            <p className="text-lg font-medium mb-1">No vendors registered</p>
+                            <p className="text-sm">Add your first vendor to keep track of service providers for this site.</p>
+                            <Button onClick={() => setShowForm(true)} className="mt-4">
+                                <Plus className="w-4 h-4 mr-1" />
+                                Add Your First Vendor
+                            </Button>
+                        </CardContent>
+                    </Card>
+                ) : filteredVendors.length === 0 ? (
+                    <Card>
+                        <CardContent className="py-8 text-center text-slate-400">
+                            <Search className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                            <p>No vendors match &quot;{search}&quot;</p>
                         </CardContent>
                     </Card>
                 ) : (
                     Object.entries(groupedVendors).map(([serviceType, serviceVendors]) => (
                         <div key={serviceType}>
-                            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide mb-2">{serviceType}</h2>
+                            <h2 className="text-sm font-medium text-slate-400 uppercase tracking-wide mb-2">
+                                {serviceType}
+                                <span className="ml-2 text-xs text-slate-500">({serviceVendors.length})</span>
+                            </h2>
                             <div className="space-y-2">
                                 {serviceVendors.map((vendor) => (
                                     <Card key={vendor.id} className={!vendor.is_active ? 'opacity-60' : ''}>
                                         <CardContent className="p-4">
                                             <div className="flex items-start justify-between">
-                                                <div>
-                                                    <div className="flex items-center gap-2">
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
                                                         <span className="font-medium">{vendor.company_name}</span>
                                                         {vendor.is_preferred && (
                                                             <Badge variant="outline" className="border-yellow-500/30 text-yellow-400">
@@ -311,10 +358,41 @@ export default function SiteVendors({ site, vendors, serviceTypes }: Props) {
                                                             Account: {vendor.account_number}
                                                         </div>
                                                     )}
+                                                    {vendor.notes && (
+                                                        <div className="text-sm text-slate-400 mt-2 whitespace-pre-wrap border-t border-slate-700/50 pt-2">
+                                                            {vendor.notes}
+                                                        </div>
+                                                    )}
                                                 </div>
-                                                <Button variant="ghost" size="sm" onClick={() => startEdit(vendor)}>
-                                                    Edit
-                                                </Button>
+                                                <div className="flex items-center gap-1 ml-2 shrink-0">
+                                                    <Button variant="ghost" size="sm" onClick={() => startEdit(vendor)}>
+                                                        Edit
+                                                    </Button>
+                                                    <AlertDialog>
+                                                        <AlertDialogTrigger asChild>
+                                                            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                                                                <Trash2 className="w-4 h-4" />
+                                                            </Button>
+                                                        </AlertDialogTrigger>
+                                                        <AlertDialogContent>
+                                                            <AlertDialogHeader>
+                                                                <AlertDialogTitle>Delete Vendor</AlertDialogTitle>
+                                                                <AlertDialogDescription>
+                                                                    Delete &quot;{vendor.company_name}&quot;? This cannot be undone. Vendors with linked credentials cannot be deleted.
+                                                                </AlertDialogDescription>
+                                                            </AlertDialogHeader>
+                                                            <AlertDialogFooter>
+                                                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                                <AlertDialogAction
+                                                                    className="bg-red-600 hover:bg-red-700"
+                                                                    onClick={() => router.delete(`/sites/${site.id}/vendors/${vendor.id}`)}
+                                                                >
+                                                                    Delete
+                                                                </AlertDialogAction>
+                                                            </AlertDialogFooter>
+                                                        </AlertDialogContent>
+                                                    </AlertDialog>
+                                                </div>
                                             </div>
                                         </CardContent>
                                     </Card>

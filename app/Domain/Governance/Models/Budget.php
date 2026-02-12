@@ -143,4 +143,49 @@ class Budget extends Model
         $this->total_budget = $this->getTotalAllocated();
         $this->save();
     }
+
+    /**
+     * Check if a budget adjustment requires a board resolution based on threshold.
+     * Default threshold: adjustments exceeding 5% of total budget require board approval.
+     */
+    public function requiresBoardApproval(float $adjustmentAmount, float $thresholdPct = 5.0): bool
+    {
+        if ($this->total_budget == 0) {
+            return true;
+        }
+        $pct = abs($adjustmentAmount) / $this->total_budget * 100;
+        return $pct >= $thresholdPct;
+    }
+
+    /**
+     * Create a budget adjustment and optionally trigger a resolution if threshold exceeded.
+     */
+    public function requestAdjustment(float $amount, string $reason, int $userId, float $thresholdPct = 5.0): BudgetAdjustment
+    {
+        $needsApproval = $this->requiresBoardApproval($amount, $thresholdPct);
+
+        $adjustment = $this->adjustments()->create([
+            'amount' => $amount,
+            'reason' => $reason,
+            'requested_by' => $userId,
+            'status' => $needsApproval ? 'pending_board_approval' : 'approved',
+        ]);
+
+        if ($needsApproval) {
+            // Create a resolution for board approval
+            Resolution::create([
+                'title' => "Budget Adjustment: " . number_format(abs($amount), 2) . " - {$reason}",
+                'decision_type' => 'budget_approval',
+                'context' => "A budget adjustment of \$" . number_format($amount, 2) . " has been requested for: {$reason}. This exceeds the {$thresholdPct}% threshold and requires board approval.",
+                'recommendation' => $amount > 0 ? 'Approve the additional allocation' : 'Approve the budget reduction',
+                'cost_impact' => ['amount' => $amount, 'currency' => 'NZD', 'description' => $reason],
+                'voting_threshold' => 'simple_majority',
+                'status' => 'draft',
+                'proposed_by' => $userId,
+                'proposed_at' => now(),
+            ]);
+        }
+
+        return $adjustment;
+    }
 }

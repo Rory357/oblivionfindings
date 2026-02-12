@@ -77,19 +77,19 @@ export default function HeadOfficeReports({ offices, stats, dateRange }: Props) 
 
                 {/* Stats */}
                 <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_offices}</div>
                             <div className="text-sm text-slate-400">Offices</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_rooms}</div>
                             <div className="text-sm text-slate-400">Rooms</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.room_bookings}</div>
                             <div className="text-sm text-slate-400">Bookings</div>
@@ -150,7 +150,7 @@ export default function HeadOfficeReports({ offices, stats, dateRange }: Props) 
                                 const completionRate = totalRuns > 0 ? Math.round((completedRuns / totalRuns) * 100) : 0;
 
                                 return (
-                                    <div key={office.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-700 hover:bg-slate-800/50">
+                                    <div key={office.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50">
                                         <div>
                                             <div className="font-medium">{office.name}</div>
                                             <div className="text-sm text-slate-400 flex items-center gap-3">

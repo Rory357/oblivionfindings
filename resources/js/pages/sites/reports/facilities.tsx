@@ -77,19 +77,19 @@ export default function FacilityReports({ facilities, stats, dateRange }: Props)
 
                 {/* Stats */}
                 <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_facilities}</div>
                             <div className="text-sm text-slate-400">Facilities</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_zones}</div>
                             <div className="text-sm text-slate-400">Zones</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_assets}</div>
                             <div className="text-sm text-slate-400">Assets</div>
@@ -157,7 +157,7 @@ export default function FacilityReports({ facilities, stats, dateRange }: Props)
                                 const completionRate = totalRuns > 0 ? Math.round((completedRuns / totalRuns) * 100) : 0;
 
                                 return (
-                                    <div key={facility.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-700 hover:bg-slate-800/50">
+                                    <div key={facility.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50">
                                         <div>
                                             <div className="font-medium">{facility.name}</div>
                                             <div className="text-sm text-slate-400 flex items-center gap-3">

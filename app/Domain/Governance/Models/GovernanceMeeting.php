@@ -135,7 +135,7 @@ class GovernanceMeeting extends Model
 
     public function isEditable(): bool
     {
-        return in_array($this->status, ['scheduled', 'agenda_draft', 'agenda_final']);
+        return !$this->isLocked() && in_array($this->status, ['scheduled', 'agenda_draft', 'agenda_final']);
     }
 
     public function canDistributePack(): bool
@@ -143,12 +143,25 @@ class GovernanceMeeting extends Model
         return in_array($this->status, ['agenda_final', 'in_progress']);
     }
 
+    public function isLocked(): bool
+    {
+        return $this->locked_at !== null;
+    }
+
+    public function lock(int $userId): void
+    {
+        $this->update([
+            'locked_at' => now(),
+            'locked_by' => $userId,
+        ]);
+    }
+
     public function calculateQuorum(): array
     {
         $present = $this->attendances()->where('status', 'present')->count();
         $total = BoardMember::active()->count();
         $required = ceil($total * ($this->quorum_required / 100));
-        
+
         return [
             'present' => $present,
             'required' => $required,
@@ -160,5 +173,26 @@ class GovernanceMeeting extends Model
     {
         $quorum = $this->calculateQuorum();
         $this->update(['quorum_met' => $quorum['met']]);
+    }
+
+    public function advanceStatus(string $newStatus): bool
+    {
+        $validTransitions = [
+            'scheduled' => ['agenda_draft', 'cancelled'],
+            'agenda_draft' => ['agenda_final', 'cancelled'],
+            'agenda_final' => ['in_progress', 'cancelled'],
+            'in_progress' => ['minutes_draft'],
+            'minutes_draft' => ['minutes_approved'],
+            'minutes_approved' => ['archived'],
+        ];
+
+        $allowed = $validTransitions[$this->status] ?? [];
+
+        if (!in_array($newStatus, $allowed)) {
+            return false;
+        }
+
+        $this->update(['status' => $newStatus]);
+        return true;
     }
 }

@@ -61,7 +61,7 @@ export default function CreatePerformance({ auth, boardMembers }: Props) {
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <Label htmlFor="reviewee_id">Reviewee</Label>
-                  <Select value={data.reviewee_id} onValueChange={(v) => setData('reviewee_id', v)}>
+                  <Select value={data.reviewee_id || undefined} onValueChange={(v) => setData('reviewee_id', v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select a board member" />
                     </SelectTrigger>

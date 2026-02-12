@@ -1,0 +1,236 @@
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link } from '@inertiajs/react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
+import { ArrowLeft, AlertTriangle, CheckCircle2, Clock, Shield, Key, ClipboardList, Search } from 'lucide-react';
+
+type Site = {
+    id: number;
+    name: string;
+    type: string;
+    region?: string;
+    address?: string;
+};
+
+type AuditEntry = {
+    id: number;
+    auditable_type: string;
+    auditable_id: number;
+    event: string;
+    created_at: string;
+};
+
+type Props = {
+    site: Site;
+    hazardStats: {
+        open: number;
+        closed: number;
+        overdue: number;
+        avg_time_to_close: number | null;
+    };
+    checklistStats: {
+        total_runs: number;
+        completed_runs: number;
+        overdue_runs: number;
+        completion_rate: number;
+    };
+    inspectionStats: {
+        scheduled: number;
+        completed: number;
+        overdue: number;
+    };
+    credentialStats: {
+        total: number;
+        requiring_reauth: number;
+    };
+    recentAuditEntries: AuditEntry[];
+};
+
+export default function SiteDetailReport({
+    site,
+    hazardStats,
+    checklistStats,
+    inspectionStats,
+    credentialStats,
+    recentAuditEntries,
+}: Props) {
+    return (
+        <AppLayout breadcrumbs={[
+            { title: 'Reports', href: '/sites/reports' },
+            { title: site.name, href: `/sites/reports/site/${site.id}` },
+        ]}>
+            <Head title={`Site Report - ${site.name}`} />
+
+            <div className="m-4 space-y-4">
+                {/* Header */}
+                <div>
+                    <Button asChild variant="ghost" size="sm" className="mb-2">
+                        <Link href="/sites/reports">
+                            <ArrowLeft className="w-4 h-4 mr-1" />
+                            Back
+                        </Link>
+                    </Button>
+                    <h1 className="text-lg font-semibold flex items-center gap-2">
+                        <Search className="w-5 h-5" />
+                        Site Detail Report: {site.name}
+                    </h1>
+                    <p className="text-sm text-slate-400">
+                        {site.type === 'house' ? 'House' : site.type === 'facility' ? 'Facility' : 'Head Office'}
+                        {site.region ? ` - ${site.region}` : ''}
+                    </p>
+                </div>
+
+                {/* Hazard Stats */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <AlertTriangle className="w-4 h-4 text-amber-400" />
+                            Hazards
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-4 sm:grid-cols-4">
+                            <div className="text-center p-3 rounded-lg border">
+                                <div className="text-2xl font-bold text-amber-400">{hazardStats.open}</div>
+                                <div className="text-sm text-slate-400">Open</div>
+                            </div>
+                            <div className="text-center p-3 rounded-lg border">
+                                <div className="text-2xl font-bold text-emerald-400">{hazardStats.closed}</div>
+                                <div className="text-sm text-slate-400">Closed</div>
+                            </div>
+                            <div className="text-center p-3 rounded-lg border">
+                                <div className="text-2xl font-bold text-red-400">{hazardStats.overdue}</div>
+                                <div className="text-sm text-slate-400">Overdue</div>
+                            </div>
+                            <div className="text-center p-3 rounded-lg border">
+                                <div className="text-2xl font-bold">
+                                    {hazardStats.avg_time_to_close !== null ? `${hazardStats.avg_time_to_close}d` : 'N/A'}
+                                </div>
+                                <div className="text-sm text-slate-400">Avg Time to Close</div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Checklist Stats */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base flex items-center gap-2">
+                            <ClipboardList className="w-4 h-4 text-blue-400" />
+                            Checklists
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-4 sm:grid-cols-4">
+                            <div className="text-center p-3 rounded-lg border">
+                                <div className="text-2xl font-bold">{checklistStats.total_runs}</div>
+                                <div className="text-sm text-slate-400">Total Runs</div>
+                            </div>
+                            <div className="text-center p-3 rounded-lg border">
+                                <div className="text-2xl font-bold text-emerald-400">{checklistStats.completed_runs}</div>
+                                <div className="text-sm text-slate-400">Completed</div>
+                            </div>
+                            <div className="text-center p-3 rounded-lg border">
+                                <div className="text-2xl font-bold text-red-400">{checklistStats.overdue_runs}</div>
+                                <div className="text-sm text-slate-400">Overdue</div>
+                            </div>
+                            <div className="text-center p-3 rounded-lg border">
+                                <div className="text-2xl font-bold text-blue-400">{checklistStats.completion_rate}%</div>
+                                <div className="text-sm text-slate-400">Completion Rate</div>
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Inspection & Credential Stats */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Shield className="w-4 h-4 text-purple-400" />
+                                Inspections
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-4 sm:grid-cols-3">
+                                <div className="text-center p-3 rounded-lg border">
+                                    <div className="text-2xl font-bold">{inspectionStats.scheduled}</div>
+                                    <div className="text-sm text-slate-400">Scheduled</div>
+                                </div>
+                                <div className="text-center p-3 rounded-lg border">
+                                    <div className="text-2xl font-bold text-emerald-400">{inspectionStats.completed}</div>
+                                    <div className="text-sm text-slate-400">Completed</div>
+                                </div>
+                                <div className="text-center p-3 rounded-lg border">
+                                    <div className="text-2xl font-bold text-red-400">{inspectionStats.overdue}</div>
+                                    <div className="text-sm text-slate-400">Overdue</div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Key className="w-4 h-4 text-orange-400" />
+                                Credentials
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="text-center p-3 rounded-lg border">
+                                    <div className="text-2xl font-bold">{credentialStats.total}</div>
+                                    <div className="text-sm text-slate-400">Total</div>
+                                </div>
+                                <div className="text-center p-3 rounded-lg border">
+                                    <div className="text-2xl font-bold text-orange-400">{credentialStats.requiring_reauth}</div>
+                                    <div className="text-sm text-slate-400">Requiring Reauth</div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Recent Audit Entries */}
+                {recentAuditEntries.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Clock className="w-4 h-4 text-slate-400" />
+                                Recent Audit Log
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead>Event</TableHead>
+                                        <TableHead>Date</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {recentAuditEntries.map((entry) => (
+                                        <TableRow key={entry.id}>
+                                            <TableCell>
+                                                <Badge variant="outline">
+                                                    {entry.auditable_type?.split('\\').pop()}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell>{entry.event}</TableCell>
+                                            <TableCell className="text-slate-400">
+                                                {new Date(entry.created_at).toLocaleDateString()}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
+        </AppLayout>
+    );
+}

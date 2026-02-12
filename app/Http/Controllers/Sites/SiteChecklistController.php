@@ -7,6 +7,7 @@ use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistResponse;
+use App\Models\SiteChecklistTemplate;
 use Illuminate\Http\Request;
 
 class SiteChecklistController extends Controller
@@ -20,6 +21,18 @@ class SiteChecklistController extends Controller
             ->where('is_active', true)
             ->get();
 
+        $templates = SiteChecklistTemplate::active()
+            ->forType($site->type)
+            ->withCount('items')
+            ->get()
+            ->map(fn ($t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'description' => $t->description,
+                'frequency' => $t->frequency,
+                'items_count' => $t->items_count,
+            ]);
+
         return inertia('sites/checklists/index', [
             'site' => [
                 'id' => $site->id,
@@ -27,6 +40,7 @@ class SiteChecklistController extends Controller
                 'type' => $site->type,
             ],
             'assignments' => $assignments,
+            'templates' => $templates,
         ]);
     }
 
@@ -166,5 +180,69 @@ class SiteChecklistController extends Controller
         return redirect()
             ->route('sites.checklists.index', $run->site_id)
             ->with('success', 'Checklist completed.');
+    }
+
+    public function assignChecklist(Request $request, Site $site)
+    {
+        $this->authorize('update', $site);
+
+        $validated = $request->validate([
+            'template_id' => 'required|exists:site_checklist_templates,id',
+            'frequency' => 'required|in:once,daily,weekly,fortnightly,monthly,quarterly',
+        ]);
+
+        $assignment = SiteChecklistAssignment::create([
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'template_id' => $validated['template_id'],
+            'frequency' => $validated['frequency'],
+            'start_date' => now()->toDateString(),
+            'is_active' => true,
+        ]);
+
+        // Create the initial scheduled run
+        SiteChecklistRun::create([
+            'assignment_id' => $assignment->id,
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'template_id' => $validated['template_id'],
+            'scheduled_date' => now()->toDateString(),
+            'status' => 'scheduled',
+        ]);
+
+        return redirect()
+            ->route('sites.checklists.index', $site->id)
+            ->with('success', 'Checklist assigned successfully.');
+    }
+
+    public function removeAssignment(Request $request, Site $site, SiteChecklistAssignment $assignment)
+    {
+        $this->authorize('update', $site);
+
+        // Deactivate instead of hard-delete to preserve run history
+        $assignment->update(['is_active' => false]);
+
+        return redirect()
+            ->route('sites.checklists.index', $site->id)
+            ->with('success', 'Checklist assignment removed.');
+    }
+
+    public function createRun(Request $request, Site $site, SiteChecklistAssignment $assignment)
+    {
+        $this->authorize('update', $site);
+
+        $run = SiteChecklistRun::create([
+            'assignment_id' => $assignment->id,
+            'site_id' => $site->id,
+            'tenant_id' => $site->tenant_id,
+            'template_id' => $assignment->template_id,
+            'scheduled_date' => now()->toDateString(),
+            'status' => 'in_progress',
+            'started_at' => now(),
+        ]);
+
+        return redirect()
+            ->route('sites.checklists.showRun', $run->id)
+            ->with('success', 'New checklist run started.');
     }
 }

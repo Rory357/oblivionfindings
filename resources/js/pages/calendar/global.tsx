@@ -197,7 +197,7 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                                 {filteredEvents.map(event => (
                                     <div
                                         key={event.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border border-slate-700 hover:bg-slate-800/50"
+                                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50"
                                     >
                                         <div className="flex items-center gap-3">
                                             <div
@@ -233,7 +233,7 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                         ) : (
                             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                                 {filteredEvents.map(event => (
-                                    <Card key={event.id} className="bg-slate-800/30">
+                                    <Card key={event.id} className="hover:bg-muted/50 transition-colors">
                                         <CardContent className="p-4">
                                             <div
                                                 className="w-full h-1 rounded-full mb-3"

@@ -18,9 +18,13 @@ class Resolution extends Model
         'resolution_reference',
         'governance_meeting_id',
         'title',
+        'decision_type',
         'context',
         'options',
         'recommendation',
+        'cost_impact',
+        'risk_impact',
+        'attachments',
         'voting_threshold',
         'quorum_required',
         'status',
@@ -30,6 +34,8 @@ class Resolution extends Model
         'outcome',
         'vote_summary',
         'outcome_notes',
+        'follow_up_actions',
+        'auto_generate_actions',
         'proposed_by',
         'proposed_at',
     ];
@@ -37,6 +43,11 @@ class Resolution extends Model
     protected $casts = [
         'options' => 'array',
         'vote_summary' => 'array',
+        'cost_impact' => 'array',
+        'risk_impact' => 'array',
+        'attachments' => 'array',
+        'follow_up_actions' => 'array',
+        'auto_generate_actions' => 'boolean',
         'opened_at' => 'datetime',
         'closed_at' => 'datetime',
         'deadline' => 'datetime',
@@ -120,12 +131,40 @@ class Resolution extends Model
     public function closeVoting(): void
     {
         $summary = $this->calculateVoteSummary();
+        $outcome = $this->determineOutcome($summary);
+
         $this->update([
             'status' => 'closed',
             'closed_at' => now(),
             'vote_summary' => $summary,
-            'outcome' => $this->determineOutcome($summary),
+            'outcome' => $outcome,
         ]);
+
+        // Auto-generate action items from follow_up_actions if resolution carried
+        if ($outcome === 'carried' && $this->auto_generate_actions && !empty($this->follow_up_actions)) {
+            $this->generateActionItems();
+        }
+    }
+
+    public function generateActionItems(): void
+    {
+        foreach ($this->follow_up_actions ?? [] as $action) {
+            ActionItem::create([
+                'governance_meeting_id' => $this->governance_meeting_id,
+                'resolution_id' => $this->id,
+                'title' => $action['title'] ?? 'Follow-up from ' . $this->resolution_reference,
+                'description' => $action['description'] ?? null,
+                'assigned_to' => $action['assigned_to'] ?? null,
+                'due_date' => isset($action['due_date']) ? \Carbon\Carbon::parse($action['due_date']) : now()->addWeeks(2),
+                'priority' => $action['priority'] ?? 'medium',
+                'status' => 'open',
+            ]);
+        }
+    }
+
+    public function actionItems(): HasMany
+    {
+        return $this->hasMany(ActionItem::class);
     }
 
     public function markImplemented(?string $notes = null): void

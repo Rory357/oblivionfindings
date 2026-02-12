@@ -1,14 +1,48 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ClipboardCheck, Calendar } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { ClipboardCheck, Calendar, Plus, PlayCircle, Trash2 } from 'lucide-react';
+import { useState } from 'react';
+import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+    AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 
 type Site = {
     id: number;
     name: string;
     type: string;
+};
+
+type Template = {
+    id: number;
+    name: string;
+    description?: string;
+    frequency: string;
+    items_count: number;
 };
 
 type Assignment = {
@@ -21,11 +55,13 @@ type Assignment = {
     frequency: string;
     assignedTo?: { id: number; name: string } | null;
     next_due?: string;
+    is_active: boolean;
 };
 
 type Props = {
     site: Site;
     assignments: Assignment[];
+    templates: Template[];
 };
 
 const frequencyLabels: Record<string, string> = {
@@ -37,7 +73,36 @@ const frequencyLabels: Record<string, string> = {
     quarterly: 'Quarterly',
 };
 
-export default function SiteChecklists({ site, assignments }: Props) {
+export default function SiteChecklists({ site, assignments, templates }: Props) {
+    const [assignOpen, setAssignOpen] = useState(false);
+
+    const form = useForm({
+        template_id: '',
+        frequency: 'monthly',
+    });
+
+    const handleAssign = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.post(`/sites/${site.id}/checklists/assign`, {
+            onSuccess: () => {
+                setAssignOpen(false);
+                form.reset();
+            },
+        });
+    };
+
+    const removeAssignment = (id: number) => {
+        router.delete(`/sites/${site.id}/checklists/assignments/${id}`);
+    };
+
+    const startRun = (assignmentId: number) => {
+        router.post(`/sites/${site.id}/checklists/assignments/${assignmentId}/run`);
+    };
+
+    // Templates not yet assigned
+    const assignedTemplateIds = assignments.map(a => a.template.id);
+    const availableTemplates = templates.filter(t => !assignedTemplateIds.includes(t.id));
+
     return (
         <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: site.name, href: `/sites/${site.id}` }, { title: 'Checklists', href: `/sites/${site.id}/checklists` }]}>
             <Head title={`${site.name} - Checklists`} />
@@ -51,10 +116,81 @@ export default function SiteChecklists({ site, assignments }: Props) {
                         </h1>
                         <p className="text-sm text-slate-400">{site.name}</p>
                     </div>
-                    <Button asChild>
-                        <Link href={`/sites/${site.id}/checklists/runs`}>View Runs</Link>
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button variant="secondary" asChild>
+                            <Link href={`/sites/${site.id}/checklists/runs`}>View Runs</Link>
+                        </Button>
+                        <Button onClick={() => setAssignOpen(true)}>
+                            <Plus className="w-4 h-4 mr-1" />
+                            Assign Checklist
+                        </Button>
+                    </div>
                 </div>
+
+                {/* Assign Dialog */}
+                <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Assign Checklist Template</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={handleAssign} className="space-y-4">
+                            <div>
+                                <Label>Template *</Label>
+                                {availableTemplates.length === 0 ? (
+                                    <p className="text-sm text-slate-400 mt-1">
+                                        All available templates are already assigned.{' '}
+                                        <Link href="/sites/checklists/templates/create" className="text-indigo-400 hover:underline">
+                                            Create a new template
+                                        </Link>
+                                    </p>
+                                ) : (
+                                    <Select
+                                        value={form.data.template_id || undefined}
+                                        onValueChange={(v) => form.setData('template_id', v)}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select a template..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {availableTemplates.map((t) => (
+                                                <SelectItem key={t.id} value={String(t.id)}>
+                                                    {t.name} ({t.items_count} items)
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+                            </div>
+                            <div>
+                                <Label>Frequency *</Label>
+                                <Select
+                                    value={form.data.frequency}
+                                    onValueChange={(v) => form.setData('frequency', v)}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="once">One-time</SelectItem>
+                                        <SelectItem value="daily">Daily</SelectItem>
+                                        <SelectItem value="weekly">Weekly</SelectItem>
+                                        <SelectItem value="fortnightly">Fortnightly</SelectItem>
+                                        <SelectItem value="monthly">Monthly</SelectItem>
+                                        <SelectItem value="quarterly">Quarterly</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="flex gap-2 pt-2">
+                                <Button type="submit" disabled={form.processing || !form.data.template_id}>
+                                    Assign
+                                </Button>
+                                <Button type="button" variant="outline" onClick={() => setAssignOpen(false)}>
+                                    Cancel
+                                </Button>
+                            </div>
+                        </form>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Active Assignments */}
                 <div className="space-y-3">
@@ -63,7 +199,12 @@ export default function SiteChecklists({ site, assignments }: Props) {
                             <CardContent className="py-8 text-center text-slate-400">
                                 <ClipboardCheck className="w-12 h-12 mx-auto mb-3 opacity-50" />
                                 <p>No checklists scheduled for this site</p>
-                                <p className="text-sm mt-1">Complete onboarding to set up checklists</p>
+                                <p className="text-sm mt-1">
+                                    Click "Assign Checklist" to add one, or{' '}
+                                    <Link href="/sites/checklists/templates" className="text-indigo-400 hover:underline">
+                                        manage templates
+                                    </Link>
+                                </p>
                             </CardContent>
                         </Card>
                     ) : (
@@ -90,6 +231,40 @@ export default function SiteChecklists({ site, assignments }: Props) {
                                                     </span>
                                                 )}
                                             </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => startRun(assignment.id)}
+                                            >
+                                                <PlayCircle className="w-4 h-4 mr-1" />
+                                                Start Run
+                                            </Button>
+                                            <AlertDialog>
+                                                <AlertDialogTrigger asChild>
+                                                    <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300">
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </AlertDialogTrigger>
+                                                <AlertDialogContent>
+                                                    <AlertDialogHeader>
+                                                        <AlertDialogTitle>Remove Assignment</AlertDialogTitle>
+                                                        <AlertDialogDescription>
+                                                            Remove "{assignment.template.name}" from this site? Existing runs will be preserved.
+                                                        </AlertDialogDescription>
+                                                    </AlertDialogHeader>
+                                                    <AlertDialogFooter>
+                                                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                                        <AlertDialogAction
+                                                            className="bg-red-600 hover:bg-red-700"
+                                                            onClick={() => removeAssignment(assignment.id)}
+                                                        >
+                                                            Remove
+                                                        </AlertDialogAction>
+                                                    </AlertDialogFooter>
+                                                </AlertDialogContent>
+                                            </AlertDialog>
                                         </div>
                                     </div>
                                 </CardContent>

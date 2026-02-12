@@ -296,7 +296,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                             >
                                 <CardContent className="p-4">
                                     <div className="flex items-start gap-3">
-                                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-slate-800 flex items-center justify-center text-sm text-slate-400">
+                                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-sm text-muted-foreground">
                                             {index + 1}
                                         </div>
                                         <div className="flex-1 space-y-3">

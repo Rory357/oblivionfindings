@@ -138,6 +138,35 @@ class PerformanceReviewController extends Controller
         return redirect()->back()->with('success', 'Assessment submitted.');
     }
 
+    public function edit(PerformanceReview $review)
+    {
+        $review->load(['reviewee', 'goals', 'kpis']);
+
+        return Inertia::render('Governance/Performance/Edit', [
+            'review' => $review,
+        ]);
+    }
+
+    public function submitFeedback(Request $request, PerformanceReview $review)
+    {
+        $validated = $request->validate([
+            'reviewer_role' => 'required|in:board_member,peer,direct_report,self',
+            'ratings' => 'nullable|array',
+            'strengths' => 'nullable|string',
+            'areas_for_improvement' => 'nullable|string',
+            'comments' => 'nullable|string',
+            'is_anonymous' => 'boolean',
+        ]);
+
+        $review->feedback()->create([
+            ...$validated,
+            'reviewer_id' => auth()->id(),
+            'submitted_at' => now(),
+        ]);
+
+        return redirect()->back()->with('success', 'Feedback submitted.');
+    }
+
     protected function getReviewCycles(): array
     {
         $year = now()->year;

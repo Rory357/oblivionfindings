@@ -116,7 +116,7 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
 
                 {/* Stats */}
                 <div className="grid gap-4 sm:grid-cols-4">
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{filteredHazards.length}</div>
                             <div className="text-sm text-slate-400">Total Hazards</div>
@@ -248,7 +248,7 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
                                         className={`flex items-center justify-between p-3 rounded-lg border ${
                                             hazard.status === 'open' && hazard.severity === 'critical'
                                                 ? 'border-red-500/30 bg-red-500/5'
-                                                : 'border-slate-700 hover:bg-slate-800/50'
+                                                : 'hover:bg-muted/50'
                                         }`}
                                     >
                                         <div className="flex items-start gap-3">

@@ -87,19 +87,19 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
 
                 {/* Stats */}
                 <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_houses}</div>
                             <div className="text-sm text-slate-400">Houses</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_bedrooms}</div>
                             <div className="text-sm text-slate-400">Bedrooms</div>
                         </CardContent>
                     </Card>
-                    <Card className="bg-slate-800/30">
+                    <Card>
                         <CardContent className="p-4">
                             <div className="text-2xl font-bold">{stats.total_clients}</div>
                             <div className="text-sm text-slate-400">Clients</div>
@@ -167,7 +167,7 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
                                 const completionRate = totalRuns > 0 ? Math.round((completedRuns / totalRuns) * 100) : 0;
 
                                 return (
-                                    <div key={house.id} className="flex items-center justify-between p-3 rounded-lg border border-slate-700 hover:bg-slate-800/50">
+                                    <div key={house.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50">
                                         <div>
                                             <div className="font-medium">{house.name}</div>
                                             <div className="text-sm text-slate-400 flex items-center gap-3">

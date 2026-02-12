@@ -26,7 +26,21 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     Route::get('/dashboard/data', [DashboardController::class, 'data'])
         ->name('dashboard.data')
         ->middleware('permission:governance.view');
-    
+
+    Route::get('/dashboard/widget/{widget}', [DashboardController::class, 'widget'])
+        ->name('dashboard.widget')
+        ->middleware('permission:governance.view');
+
+    // Reports & Exports
+    Route::middleware('permission:governance.view')->group(function () {
+        Route::get('/reports/board-monthly', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'boardMonthly'])->name('reports.board-monthly');
+        Route::get('/reports/committee/{committee}', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'committeeReport'])->name('reports.committee');
+        Route::get('/reports/compliance-status', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'complianceStatus'])->name('reports.compliance-status');
+        Route::get('/reports/risk-narrative', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'riskNarrative'])->name('reports.risk-narrative');
+        Route::post('/reports/evidence-pack', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'evidencePack'])->name('reports.evidence-pack');
+        Route::get('/reports/export/{type}', [\App\Domain\Governance\Http\Controllers\ReportController::class, 'export'])->name('reports.export');
+    });
+
     // Meetings
     Route::middleware('permission:governance.meetings.view')->group(function () {
         Route::get('/meetings', [GovernanceMeetingController::class, 'index'])->name('meetings.index');
@@ -51,6 +65,10 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
             
             // Attendance
             Route::post('/meetings/{meeting}/attendance', [GovernanceMeetingController::class, 'recordAttendance'])->name('meetings.attendance.record');
+
+            // Meeting status transitions
+            Route::post('/meetings/{meeting}/lock', [GovernanceMeetingController::class, 'lockMeeting'])->name('meetings.lock');
+            Route::post('/meetings/{meeting}/sign-minutes', [GovernanceMeetingController::class, 'signMinutes'])->name('meetings.minutes.sign');
         });
     });
     
@@ -100,6 +118,10 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::get('/risks/heatmap', [RiskRegisterController::class, 'heatmap'])->name('risks.heatmap');
         Route::get('/risks/{risk}', [RiskRegisterController::class, 'show'])->name('risks.show');
         
+        Route::get('/risks/{risk}/edit', [RiskRegisterController::class, 'edit'])->name('risks.edit');
+        Route::get('/risks/trends', [RiskRegisterController::class, 'trends'])->name('risks.trends');
+        Route::get('/risks/committee/{committee}', [RiskRegisterController::class, 'committeeView'])->name('risks.committee');
+
         Route::middleware('permission:governance.risks.manage')->group(function () {
             Route::post('/risks', [RiskRegisterController::class, 'store'])->name('risks.store');
             Route::put('/risks/{risk}', [RiskRegisterController::class, 'update'])->name('risks.update');
@@ -117,9 +139,12 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::get('/compliance/calendar', [ComplianceController::class, 'calendar'])->name('compliance.calendar');
         Route::get('/compliance/{obligation}', [ComplianceController::class, 'show'])->name('compliance.show');
         
+        Route::get('/compliance/{obligation}/edit', [ComplianceController::class, 'edit'])->name('compliance.edit');
+
         Route::middleware('permission:governance.compliance.manage')->group(function () {
             Route::post('/compliance', [ComplianceController::class, 'store'])->name('compliance.store');
             Route::put('/compliance/{obligation}', [ComplianceController::class, 'update'])->name('compliance.update');
+            Route::post('/compliance/notifiable-incident', [ComplianceController::class, 'storeNotifiableIncident'])->name('compliance.notifiable-incident.store');
             Route::post('/compliance/{obligation}/complete', [ComplianceController::class, 'complete'])->name('compliance.complete');
             Route::post('/compliance/{obligation}/evidence', [ComplianceController::class, 'uploadEvidence'])->name('compliance.evidence.upload');
         });
@@ -131,11 +156,14 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::get('/performance/create', [PerformanceReviewController::class, 'create'])->name('performance.create');
         Route::get('/performance/{review}', [PerformanceReviewController::class, 'show'])->name('performance.show');
         
+        Route::get('/performance/{review}/edit', [PerformanceReviewController::class, 'edit'])->name('performance.edit');
+
         Route::middleware('permission:governance.performance.manage')->group(function () {
             Route::post('/performance', [PerformanceReviewController::class, 'store'])->name('performance.store');
             Route::put('/performance/{review}', [PerformanceReviewController::class, 'update'])->name('performance.update');
             Route::post('/performance/{review}/goals', [PerformanceReviewController::class, 'addGoal'])->name('performance.goals.add');
             Route::post('/performance/{review}/assess', [PerformanceReviewController::class, 'submitAssessment'])->name('performance.assess');
+            Route::post('/performance/{review}/feedback', [PerformanceReviewController::class, 'submitFeedback'])->name('performance.feedback');
         });
     });
     
@@ -145,9 +173,13 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::get('/strategy/create', [StrategicPlanController::class, 'create'])->name('strategy.create');
         Route::get('/strategy/{plan}', [StrategicPlanController::class, 'show'])->name('strategy.show');
         
+        Route::get('/strategy/{plan}/edit', [StrategicPlanController::class, 'edit'])->name('strategy.edit');
+        Route::get('/strategy/{plan}/changes', [StrategicPlanController::class, 'changes'])->name('strategy.changes');
+
         Route::middleware('permission:governance.strategy.manage')->group(function () {
             Route::post('/strategy', [StrategicPlanController::class, 'store'])->name('strategy.store');
             Route::put('/strategy/{plan}', [StrategicPlanController::class, 'update'])->name('strategy.update');
+            Route::post('/strategy/{plan}/version', [StrategicPlanController::class, 'createVersion'])->name('strategy.version');
             Route::post('/strategy/{plan}/goals', [StrategicPlanController::class, 'addGoal'])->name('strategy.goals.add');
             Route::post('/strategy/{plan}/approve', [StrategicPlanController::class, 'approve'])->name('strategy.approve');
         });
@@ -159,10 +191,23 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
 
         Route::middleware('permission:governance.budgets.manage')->group(function () {
             Route::get('/budgets/create', [BudgetController::class, 'create'])->name('budgets.create');
+            Route::get('/budgets/{budget}/edit', [BudgetController::class, 'edit'])->name('budgets.edit');
             Route::post('/budgets', [BudgetController::class, 'store'])->name('budgets.store');
             Route::put('/budgets/{budget}', [BudgetController::class, 'update'])->name('budgets.update');
             Route::post('/budgets/{budget}/propose', [BudgetController::class, 'propose'])->name('budgets.propose');
             Route::post('/budgets/{budget}/adjust', [BudgetController::class, 'requestAdjustment'])->name('budgets.adjust');
+
+            // Line items
+            Route::post('/budgets/{budget}/line-items', [BudgetController::class, 'storeLineItem'])->name('budgets.line-items.store');
+            Route::put('/budgets/{budget}/line-items/{lineItem}', [BudgetController::class, 'updateLineItem'])->name('budgets.line-items.update');
+            Route::delete('/budgets/{budget}/line-items/{lineItem}', [BudgetController::class, 'destroyLineItem'])->name('budgets.line-items.destroy');
+
+            // Adjustments
+            Route::post('/budgets/{budget}/adjustments/{adjustment}/approve', [BudgetController::class, 'approveAdjustment'])->name('budgets.adjustments.approve');
+            Route::post('/budgets/{budget}/adjustments/{adjustment}/reject', [BudgetController::class, 'rejectAdjustment'])->name('budgets.adjustments.reject');
+
+            // Record actuals
+            Route::post('/budgets/{budget}/record-actuals', [BudgetController::class, 'recordActuals'])->name('budgets.record-actuals');
         });
 
         Route::get('/budgets/{budget}', [BudgetController::class, 'show'])->name('budgets.show');

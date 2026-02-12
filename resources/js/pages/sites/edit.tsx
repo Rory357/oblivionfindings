@@ -136,7 +136,7 @@ export default function EditSite() {
                                             className={`cursor-pointer rounded-lg border p-4 transition-colors ${
                                                 isSelected
                                                     ? 'border-indigo-500 bg-indigo-500/10'
-                                                    : 'border-slate-700 hover:border-slate-600'
+                                                    : 'border hover:border-indigo-500/50'
                                             }`}
                                         >
                                             <div className="flex items-center gap-2 mb-2">

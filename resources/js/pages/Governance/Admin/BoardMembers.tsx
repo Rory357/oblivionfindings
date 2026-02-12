@@ -71,7 +71,7 @@ export default function ManageBoardMembers({ auth, boardMembers, availableUsers 
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>
                   <Label>Select User</Label>
-                  <Select value={data.user_id} onValueChange={(v) => setData('user_id', v)}>
+                  <Select value={data.user_id || undefined} onValueChange={(v) => setData('user_id', v)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Choose staff member..." />
                     </SelectTrigger>

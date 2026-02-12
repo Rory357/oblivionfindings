@@ -132,7 +132,7 @@ export default function MeetingCreate({ auth, boardMembers, committees }: Props)
                   <div className="space-y-2">
                     <Label htmlFor="chair_id">Chair</Label>
                     <Select
-                      value={data.chair_id}
+                      value={data.chair_id || undefined}
                       onValueChange={(value) => setData('chair_id', value)}
                     >
                       <SelectTrigger>
@@ -150,7 +150,7 @@ export default function MeetingCreate({ auth, boardMembers, committees }: Props)
                   <div className="space-y-2">
                     <Label htmlFor="secretary_id">Secretary</Label>
                     <Select
-                      value={data.secretary_id}
+                      value={data.secretary_id || undefined}
                       onValueChange={(value) => setData('secretary_id', value)}
                     >
                       <SelectTrigger>

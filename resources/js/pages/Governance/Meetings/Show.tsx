@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { generate as generatePackRoute, show as showPack } from '@/routes/governance/packs';
@@ -8,20 +8,44 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { 
-  Calendar, 
-  Clock, 
-  MapPin, 
-  Users, 
-  FileText, 
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Calendar,
+  Clock,
+  MapPin,
+  Users,
+  FileText,
   CheckCircle,
   AlertCircle,
   FileDown,
-  Vote
+  Vote,
+  Plus,
+  Pencil,
+  Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useState, FormEvent } from 'react';
 import axios from 'axios';
+
+interface BoardMemberItem {
+  id: number;
+  user: { id: number; name: string };
+}
 
 interface Meeting {
   id: number;
@@ -38,7 +62,7 @@ interface Meeting {
   pack_distributed_at: string | null;
   chair: { user: { name: string }; id: number } | null;
   secretary: { user: { name: string }; id: number } | null;
-  agendaItems: Array<{
+  agenda_items: Array<{
     id: number;
     order: number;
     title: string;
@@ -59,8 +83,9 @@ interface Meeting {
     id: number;
     status: string;
     version_number: number;
+    content_blocks: Array<{ heading: string; content: string }>;
   } | null;
-  boardPack: {
+  board_pack: {
     id: number;
     generated_at: string;
     distributed_at: string | null;
@@ -75,6 +100,7 @@ interface Meeting {
 
 interface Props extends PageProps {
   meeting: Meeting;
+  boardMembers: BoardMemberItem[];
   quorum: {
     present: number;
     required: number;
@@ -82,15 +108,71 @@ interface Props extends PageProps {
   };
   canEdit: boolean;
   canManageMinutes: boolean;
+  canApproveMinutes: boolean;
 }
 
-export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageMinutes }: Props) {
+export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEdit, canManageMinutes, canApproveMinutes }: Props) {
   const [generatingPack, setGeneratingPack] = useState(false);
   const [packMessage, setPackMessage] = useState<string | null>(null);
+  const [agendaDialogOpen, setAgendaDialogOpen] = useState(false);
+  const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
+  const [minutesDialogOpen, setMinutesDialogOpen] = useState(false);
 
-  const agendaItems = meeting.agendaItems ?? [];
+  const agendaItems = meeting.agenda_items ?? [];
   const attendances = meeting.attendances ?? [];
   const resolutions = meeting.resolutions ?? [];
+  const allBoardMembers = boardMembers ?? [];
+
+  // Agenda Item Form
+  const agendaForm = useForm({
+    title: '',
+    description: '',
+    presenter_id: '',
+    duration_minutes: '15',
+    item_type: 'standard',
+    is_confidential: false,
+  });
+
+  // Attendance Form - track status for each board member
+  const [attendanceRecords, setAttendanceRecords] = useState<Record<number, { status: string; apology_reason: string }>>(() => {
+    const initial: Record<number, { status: string; apology_reason: string }> = {};
+    for (const member of allBoardMembers) {
+      const existing = attendances.find(a => a.board_member_id === member.id);
+      initial[member.id] = {
+        status: existing?.status || 'present',
+        apology_reason: existing?.apology_reason || '',
+      };
+    }
+    return initial;
+  });
+  const [attendanceSubmitting, setAttendanceSubmitting] = useState(false);
+
+  // Minutes Form - structured blocks
+  const defaultBlocks = [
+    { heading: 'Welcome & Apologies', content: '' },
+    { heading: 'Minutes of Previous Meeting', content: '' },
+    { heading: 'Matters Arising', content: '' },
+    { heading: 'General Business', content: '' },
+    { heading: 'Next Meeting', content: '' },
+  ];
+  const [minutesBlocks, setMinutesBlocks] = useState<Array<{ heading: string; content: string }>>(
+    meeting.minutes?.content_blocks && Array.isArray(meeting.minutes.content_blocks)
+      ? meeting.minutes.content_blocks
+      : defaultBlocks
+  );
+  const [minutesSubmitting, setMinutesSubmitting] = useState(false);
+
+  const updateMinutesBlock = (index: number, field: 'heading' | 'content', value: string) => {
+    setMinutesBlocks(prev => prev.map((block, i) => i === index ? { ...block, [field]: value } : block));
+  };
+
+  const addMinutesBlock = () => {
+    setMinutesBlocks(prev => [...prev, { heading: '', content: '' }]);
+  };
+
+  const removeMinutesBlock = (index: number) => {
+    setMinutesBlocks(prev => prev.filter((_, i) => i !== index));
+  };
 
   const getStatusColor = (status: string) => {
     return {
@@ -129,6 +211,66 @@ export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageM
     } finally {
       setGeneratingPack(false);
     }
+  };
+
+  const submitAgendaItem = (e: FormEvent) => {
+    e.preventDefault();
+    agendaForm.post(`/governance/meetings/${meeting.id}/agenda`, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setAgendaDialogOpen(false);
+        agendaForm.reset();
+      },
+    });
+  };
+
+  const submitAttendance = async () => {
+    setAttendanceSubmitting(true);
+    const attendance = Object.entries(attendanceRecords).map(([id, record]) => ({
+      board_member_id: Number(id),
+      status: record.status,
+      apology_reason: record.apology_reason || null,
+    }));
+
+    router.post(`/governance/meetings/${meeting.id}/attendance`, { attendance }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setAttendanceDialogOpen(false);
+        setAttendanceSubmitting(false);
+      },
+      onError: () => {
+        setAttendanceSubmitting(false);
+      },
+    });
+  };
+
+  const submitMinutes = (e: FormEvent) => {
+    e.preventDefault();
+    setMinutesSubmitting(true);
+    const method = meeting.minutes ? 'put' : 'post';
+
+    router[method](`/governance/meetings/${meeting.id}/minutes`, { content_blocks: minutesBlocks }, {
+      preserveScroll: true,
+      onSuccess: () => {
+        setMinutesDialogOpen(false);
+        setMinutesSubmitting(false);
+      },
+      onError: () => {
+        setMinutesSubmitting(false);
+      },
+    });
+  };
+
+  const submitForApproval = () => {
+    router.post(`/governance/meetings/${meeting.id}/minutes/approve`, {}, {
+      preserveScroll: true,
+    });
+  };
+
+  const removeAgendaItem = (itemId: number) => {
+    router.delete(`/governance/meetings/${meeting.id}/agenda/${itemId}`, {
+      preserveScroll: true,
+    });
   };
 
   const formatDate = (dateString: string) => {
@@ -177,6 +319,12 @@ export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageM
                   <Clock className="w-4 h-4" />
                   {formatTime(meeting.scheduled_at)} ({meeting.duration_minutes} mins)
                 </span>
+                {meeting.location && (
+                  <span className="flex items-center gap-1">
+                    <MapPin className="w-4 h-4" />
+                    {meeting.location}
+                  </span>
+                )}
               </div>
             </div>
             <div className="flex gap-2">
@@ -185,9 +333,9 @@ export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageM
                   <Link href={`/governance/meetings/${meeting.id}/edit`}>Edit</Link>
                 </Button>
               )}
-              {meeting.boardPack ? (
+              {meeting.board_pack ? (
                 <Button asChild>
-                  <Link href={showPack.url({ pack: meeting.boardPack.id })}>
+                  <Link href={showPack.url({ pack: meeting.board_pack.id })}>
                     <FileDown className="w-4 h-4 mr-2" />
                     View Pack
                   </Link>
@@ -236,7 +384,7 @@ export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageM
               <CardContent className="pt-6">
                 <p className="text-sm text-gray-500">Board Pack</p>
                 <p className="font-semibold">
-                  {meeting.boardPack?.distributed_at ? 'Distributed' : meeting.boardPack ? 'Generated' : 'Not generated'}
+                  {meeting.board_pack?.distributed_at ? 'Distributed' : meeting.board_pack ? 'Generated' : 'Not generated'}
                 </p>
               </CardContent>
             </Card>
@@ -251,6 +399,7 @@ export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageM
               <TabsTrigger value="resolutions">Resolutions</TabsTrigger>
             </TabsList>
 
+            {/* ========== AGENDA TAB ========== */}
             <TabsContent value="agenda">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
@@ -259,11 +408,110 @@ export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageM
                     <CardDescription>{agendaItems.length} items</CardDescription>
                   </div>
                   {canEdit && (
-                    <Button size="sm">Add Item</Button>
+                    <Dialog open={agendaDialogOpen} onOpenChange={setAgendaDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Item
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-lg" aria-describedby={undefined}>
+                        <DialogHeader>
+                          <DialogTitle>Add Agenda Item</DialogTitle>
+                        </DialogHeader>
+                        <form onSubmit={submitAgendaItem} className="space-y-4">
+                          <div>
+                            <Label htmlFor="agenda-title">Title</Label>
+                            <Input
+                              id="agenda-title"
+                              value={agendaForm.data.title}
+                              onChange={e => agendaForm.setData('title', e.target.value)}
+                              required
+                            />
+                            {agendaForm.errors.title && <p className="text-sm text-red-500 mt-1">{agendaForm.errors.title}</p>}
+                          </div>
+                          <div>
+                            <Label htmlFor="agenda-description">Description</Label>
+                            <Textarea
+                              id="agenda-description"
+                              value={agendaForm.data.description}
+                              onChange={e => agendaForm.setData('description', e.target.value)}
+                              rows={3}
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label>Item Type</Label>
+                              <Select
+                                value={agendaForm.data.item_type}
+                                onValueChange={v => agendaForm.setData('item_type', v)}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="standard">Standard</SelectItem>
+                                  <SelectItem value="decision">Decision Required</SelectItem>
+                                  <SelectItem value="consent">Consent</SelectItem>
+                                  <SelectItem value="for_info">For Information</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <div>
+                              <Label htmlFor="agenda-duration">Duration (mins)</Label>
+                              <Input
+                                id="agenda-duration"
+                                type="number"
+                                min={5}
+                                max={120}
+                                value={agendaForm.data.duration_minutes}
+                                onChange={e => agendaForm.setData('duration_minutes', e.target.value)}
+                                required
+                              />
+                            </div>
+                          </div>
+                          <div>
+                            <Label>Presenter</Label>
+                            <Select
+                              value={agendaForm.data.presenter_id || undefined}
+                              onValueChange={v => agendaForm.setData('presenter_id', v)}
+                            >
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select presenter (optional)" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {allBoardMembers.map(m => (
+                                  <SelectItem key={m.user.id} value={String(m.user.id)}>{m.user.name}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Checkbox
+                              id="agenda-confidential"
+                              checked={agendaForm.data.is_confidential}
+                              onCheckedChange={v => agendaForm.setData('is_confidential', !!v)}
+                            />
+                            <Label htmlFor="agenda-confidential">Confidential item</Label>
+                          </div>
+                          <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setAgendaDialogOpen(false)}>
+                              Cancel
+                            </Button>
+                            <Button type="submit" disabled={agendaForm.processing}>
+                              {agendaForm.processing ? 'Adding...' : 'Add Item'}
+                            </Button>
+                          </div>
+                        </form>
+                      </DialogContent>
+                    </Dialog>
                   )}
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
+                    {agendaItems.length === 0 && (
+                      <p className="text-gray-500 text-center py-8">No agenda items yet. Add items to build the meeting agenda.</p>
+                    )}
                     {agendaItems.map((item) => (
                       <div
                         key={item.id}
@@ -294,6 +542,36 @@ export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageM
                             <span>{item.duration_minutes} minutes</span>
                           </div>
                         </div>
+                        {canEdit && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="text-red-500 hover:text-red-700"
+                              >
+                                Remove
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Remove Agenda Item</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to remove "{item.title}" from the agenda? This action cannot be undone.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction
+                                  onClick={() => removeAgendaItem(item.id)}
+                                  className="bg-red-600 hover:bg-red-700"
+                                >
+                                  Remove
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -301,16 +579,76 @@ export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageM
               </Card>
             </TabsContent>
 
+            {/* ========== ATTENDANCE TAB ========== */}
             <TabsContent value="attendance">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Attendance Record</CardTitle>
                   {canEdit && (
-                    <Button size="sm">Record Attendance</Button>
+                    <Dialog open={attendanceDialogOpen} onOpenChange={setAttendanceDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button size="sm">
+                          <Users className="w-4 h-4 mr-1" />
+                          Record Attendance
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+                        <DialogHeader>
+                          <DialogTitle>Record Attendance</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3">
+                          {allBoardMembers.map(member => (
+                            <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg border">
+                              <span className="font-medium flex-1 min-w-0 truncate">{member.user.name}</span>
+                              <Select
+                                value={attendanceRecords[member.id]?.status || 'present'}
+                                onValueChange={v => setAttendanceRecords(prev => ({
+                                  ...prev,
+                                  [member.id]: { ...prev[member.id], status: v },
+                                }))}
+                              >
+                                <SelectTrigger className="w-32">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="present">Present</SelectItem>
+                                  <SelectItem value="apology">Apology</SelectItem>
+                                  <SelectItem value="no_show">No Show</SelectItem>
+                                  <SelectItem value="late">Late</SelectItem>
+                                </SelectContent>
+                              </Select>
+                              {attendanceRecords[member.id]?.status === 'apology' && (
+                                <Input
+                                  placeholder="Reason"
+                                  className="w-40"
+                                  value={attendanceRecords[member.id]?.apology_reason || ''}
+                                  onChange={e => setAttendanceRecords(prev => ({
+                                    ...prev,
+                                    [member.id]: { ...prev[member.id], apology_reason: e.target.value },
+                                  }))}
+                                />
+                              )}
+                            </div>
+                          ))}
+                          {allBoardMembers.length === 0 && (
+                            <p className="text-gray-500 text-center py-4">No active board members found.</p>
+                          )}
+                        </div>
+                        <div className="flex justify-end gap-2 mt-4">
+                          <Button variant="outline" onClick={() => setAttendanceDialogOpen(false)}>Cancel</Button>
+                          <Button onClick={submitAttendance} disabled={attendanceSubmitting}>
+                            {attendanceSubmitting ? 'Saving...' : 'Save Attendance'}
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
                   )}
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
+                    {attendances.length === 0 && (
+                      <p className="text-gray-500 text-center py-8">No attendance recorded yet.</p>
+                    )}
                     {attendances.map((attendance) => (
                       <div
                         key={attendance.id}
@@ -322,8 +660,9 @@ export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageM
                             attendance.status === 'present' && 'bg-green-100 text-green-800',
                             attendance.status === 'apology' && 'bg-yellow-100 text-yellow-800',
                             attendance.status === 'no_show' && 'bg-red-100 text-red-800',
+                            attendance.status === 'late' && 'bg-blue-100 text-blue-800',
                           )}>
-                            {attendance.status}
+                            {attendance.status.replace('_', ' ')}
                           </Badge>
                           {attendance.apology_reason && (
                             <span className="text-sm text-gray-500">({attendance.apology_reason})</span>
@@ -336,54 +675,161 @@ export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageM
               </Card>
             </TabsContent>
 
+            {/* ========== MINUTES TAB ========== */}
             <TabsContent value="minutes">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <div>
                     <CardTitle>Meeting Minutes</CardTitle>
                     <CardDescription>
-                      {meeting.minutes ? `Version ${meeting.minutes.version_number}` : 'No minutes recorded'}
+                      {meeting.minutes ? `Version ${meeting.minutes.version_number} - ${meeting.minutes.status}` : 'No minutes recorded'}
                     </CardDescription>
                   </div>
-                  {canManageMinutes && (
-                    <div className="flex gap-2">
-                      {meeting.minutes ? (
-                        <>
-                          <Button variant="outline" size="sm">Edit</Button>
-                          {meeting.minutes.status === 'draft' && (
-                            <Button size="sm">Submit for Approval</Button>
-                          )}
-                        </>
-                      ) : (
-                        <Button size="sm">Create Minutes</Button>
-                      )}
-                    </div>
-                  )}
+                  <div className="flex gap-2">
+                    {canManageMinutes && (
+                      <>
+                        <Dialog open={minutesDialogOpen} onOpenChange={setMinutesDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" variant={meeting.minutes ? 'outline' : 'default'}>
+                              {meeting.minutes ? (
+                                <><Pencil className="w-4 h-4 mr-1" /> Edit</>
+                              ) : (
+                                <><Plus className="w-4 h-4 mr-1" /> Create Minutes</>
+                              )}
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
+                            <DialogHeader>
+                              <DialogTitle>{meeting.minutes ? 'Edit Minutes' : 'Create Minutes'}</DialogTitle>
+                            </DialogHeader>
+                            <form onSubmit={submitMinutes} className="space-y-4">
+                              <div className="space-y-4">
+                                {minutesBlocks.map((block, idx) => (
+                                  <div key={idx} className="rounded-lg border p-4 space-y-2">
+                                    <div className="flex items-center justify-between gap-2">
+                                      <Input
+                                        value={block.heading}
+                                        onChange={e => updateMinutesBlock(idx, 'heading', e.target.value)}
+                                        placeholder="Section heading"
+                                        className="font-semibold"
+                                      />
+                                      {minutesBlocks.length > 1 && (
+                                        <Button
+                                          type="button"
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-red-500 hover:text-red-700 shrink-0"
+                                          onClick={() => removeMinutesBlock(idx)}
+                                        >
+                                          Remove
+                                        </Button>
+                                      )}
+                                    </div>
+                                    <Textarea
+                                      value={block.content}
+                                      onChange={e => updateMinutesBlock(idx, 'content', e.target.value)}
+                                      placeholder="Enter minutes for this section..."
+                                      rows={4}
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="w-full"
+                                onClick={addMinutesBlock}
+                              >
+                                <Plus className="w-4 h-4 mr-1" />
+                                Add Section
+                              </Button>
+                              <div className="flex justify-end gap-2 pt-2">
+                                <Button type="button" variant="outline" onClick={() => setMinutesDialogOpen(false)}>
+                                  Cancel
+                                </Button>
+                                <Button type="submit" disabled={minutesSubmitting}>
+                                  {minutesSubmitting ? 'Saving...' : meeting.minutes ? 'Update Minutes' : 'Create Minutes'}
+                                </Button>
+                              </div>
+                            </form>
+                          </DialogContent>
+                        </Dialog>
+                        {meeting.minutes && meeting.minutes.status === 'draft' && canApproveMinutes && (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <Button size="sm">
+                                <Send className="w-4 h-4 mr-1" />
+                                Approve Minutes
+                              </Button>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Submit Minutes for Approval</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Are you sure you want to submit these minutes for approval? This will notify the Chair for review and sign-off.
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={submitForApproval}>
+                                  Submit for Approval
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </>
+                    )}
+                  </div>
                 </CardHeader>
                 <CardContent>
                   {meeting.minutes ? (
-                    <div className="prose max-w-none">
-                      <p>Minutes status: <Badge>{meeting.minutes.status}</Badge></p>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <span className="text-sm text-gray-500">Status:</span>
+                        <Badge className={cn(
+                          meeting.minutes.status === 'draft' && 'bg-yellow-100 text-yellow-800',
+                          meeting.minutes.status === 'approved' && 'bg-green-100 text-green-800',
+                        )}>
+                          {meeting.minutes.status}
+                        </Badge>
+                      </div>
+                      {meeting.minutes.content_blocks && Array.isArray(meeting.minutes.content_blocks) && (
+                        <div className="prose max-w-none">
+                          {meeting.minutes.content_blocks.map((block: { heading: string; content: string }, idx: number) => (
+                            <div key={idx} className="mb-4">
+                              <h3 className="font-semibold text-gray-900">{block.heading}</h3>
+                              <p className="text-gray-700 whitespace-pre-wrap">{block.content || <span className="text-gray-400 italic">No content yet</span>}</p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <p className="text-gray-500">No minutes have been recorded for this meeting yet.</p>
+                    <p className="text-gray-500 text-center py-8">No minutes have been recorded for this meeting yet.</p>
                   )}
                 </CardContent>
               </Card>
             </TabsContent>
 
+            {/* ========== RESOLUTIONS TAB ========== */}
             <TabsContent value="resolutions">
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between">
                   <CardTitle>Resolutions</CardTitle>
                   <Button size="sm" asChild>
                     <Link href={createResolution.url({ query: { meeting_id: meeting.id } })}>
+                      <Plus className="w-4 h-4 mr-1" />
                       Add Resolution
                     </Link>
                   </Button>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
+                    {resolutions.length === 0 && (
+                      <p className="text-gray-500 text-center py-8">No resolutions for this meeting.</p>
+                    )}
                     {resolutions.map((resolution) => (
                       <div
                         key={resolution.id}
@@ -397,7 +843,7 @@ export default function MeetingShow({ auth, meeting, quorum, canEdit, canManageM
                           <Badge>{resolution.status}</Badge>
                           <Button variant="ghost" size="sm" asChild>
                             <Link href={showResolution.url({ resolution: resolution.id })}>
-                              View →
+                              View &rarr;
                             </Link>
                           </Button>
                         </div>

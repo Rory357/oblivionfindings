@@ -138,7 +138,7 @@ export default function CreateTemplate() {
                                 </Label>
                             </div>
 
-                            <div className="flex justify-end gap-3 pt-4 border-t border-slate-700">
+                            <div className="flex justify-end gap-3 pt-4 border-t">
                                 <Button asChild variant="outline">
                                     <Link href="/sites/checklists/templates">Cancel</Link>
                                 </Button>

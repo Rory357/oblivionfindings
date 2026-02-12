@@ -347,7 +347,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                             <div className="space-y-4">
                                 <p className="text-sm text-slate-400">Add bookable rooms and resources for this head office.</p>
                                 {resources.map((resource, index) => (
-                                    <div key={index} className="grid gap-2 sm:grid-cols-3 p-3 rounded-lg border border-slate-700">
+                                    <div key={index} className="grid gap-2 sm:grid-cols-3 p-3 rounded-lg border border">
                                         <Input
                                             value={resource.name}
                                             onChange={(e) => updateResource(index, 'name', e.target.value)}
@@ -423,7 +423,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                             <div className="space-y-4">
                                 <p className="text-sm text-slate-400">Add initial assets and equipment for this site.</p>
                                 {assets.map((asset, index) => (
-                                    <div key={index} className="grid gap-2 sm:grid-cols-3 p-3 rounded-lg border border-slate-700">
+                                    <div key={index} className="grid gap-2 sm:grid-cols-3 p-3 rounded-lg border border">
                                         <Input
                                             value={asset.name}
                                             onChange={(e) => updateAsset(index, 'name', e.target.value)}
@@ -461,7 +461,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                             <div className="space-y-4">
                                 <p className="text-sm text-slate-400">Set up recurring checklists for this site.</p>
                                 {checklistTemplates.map((template) => (
-                                    <div key={template.id} className="p-3 rounded-lg border border-slate-700">
+                                    <div key={template.id} className="p-3 rounded-lg border border">
                                         <div className="flex items-center gap-2 mb-2">
                                             <Checkbox
                                                 checked={checklistAssignments[template.id]?.enabled}
@@ -560,7 +560,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                                         />
                                     </div>
                                 </div>
-                                <div className="pt-4 border-t border-slate-700">
+                                <div className="pt-4 border-t border">
                                     <h4 className="text-sm font-medium mb-3">Safety Information</h4>
                                     <div className="space-y-3">
                                         <div>
@@ -589,7 +589,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                             <div className="space-y-4">
                                 <p className="text-sm text-slate-400">Add key site contacts to speed up hazard assignment and after-hours handovers.</p>
                                 {contacts.map((contact, index) => (
-                                    <div key={index} className="grid gap-2 sm:grid-cols-2 p-3 rounded-lg border border-slate-700">
+                                    <div key={index} className="grid gap-2 sm:grid-cols-2 p-3 rounded-lg border border">
                                         <Input
                                             value={contact.name}
                                             onChange={(e) => updateContact(index, 'name', e.target.value)}
@@ -637,7 +637,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                             <div className="space-y-4">
                                 <p className="text-sm text-slate-400">Record which key documents are required first. You can upload files from the site profile after onboarding.</p>
                                 {documents.map((document, index) => (
-                                    <div key={index} className="grid gap-2 sm:grid-cols-2 p-3 rounded-lg border border-slate-700">
+                                    <div key={index} className="grid gap-2 sm:grid-cols-2 p-3 rounded-lg border border">
                                         <Input
                                             value={document.title}
                                             onChange={(e) => updateDocument(index, 'title', e.target.value)}
@@ -674,7 +674,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                         )}
 
                         {/* Navigation */}
-                        <div className="flex justify-between mt-6 pt-6 border-t border-slate-700">
+                        <div className="flex justify-between mt-6 pt-6 border-t border">
                             <Button
                                 variant="outline"
                                 onClick={handleBack}
