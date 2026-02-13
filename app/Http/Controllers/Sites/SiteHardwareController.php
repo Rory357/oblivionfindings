@@ -7,7 +7,10 @@ use App\Models\Site;
 use App\Models\LocationHardware;
 use App\Models\SiteRoom;
 use App\Models\Integration\IntegrationSiteConfig;
+use App\Models\Integration\IntegrationSiteSecret;
+use App\Models\Integration\IntegrationTenantSecret;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Crypt;
 use Inertia\Inertia;
 
 class SiteHardwareController extends Controller
@@ -17,7 +20,7 @@ class SiteHardwareController extends Controller
         $this->authorize('view', $site);
 
         $hardware = LocationHardware::where('site_id', $site->id)
-            ->with('room:id,name')
+            ->with(['room:id,name', 'linkedAsset:id,name,asset_tag'])
             ->orderBy('category')
             ->orderBy('name')
             ->get();
@@ -36,6 +39,57 @@ class SiteHardwareController extends Controller
             ->get();
 
         $user = $request->user();
+        $tenantId = $user?->tenant_id ?? $user?->organization_id ?? $site->tenant_id ?? 1;
+
+        $unifiSecret = IntegrationTenantSecret::query()
+            ->forTenant($tenantId)
+            ->where('provider', 'unifi')
+            ->first();
+
+        $unifiConfig = IntegrationSiteConfig::query()
+            ->forTenant($tenantId)
+            ->forProvider('unifi')
+            ->where('site_id', $site->id)
+            ->first();
+
+        $accessSecret = IntegrationSiteSecret::query()
+            ->forTenant($tenantId)
+            ->where('site_id', $site->id)
+            ->where('provider', 'unifi')
+            ->where('capability', 'access_api')
+            ->first();
+
+        $accessSecretLast4 = null;
+        if ($accessSecret?->secret_encrypted) {
+            try {
+                $accessSecretLast4 = substr(Crypt::decryptString($accessSecret->secret_encrypted), -4);
+            } catch (\Throwable) {
+                $accessSecretLast4 = null;
+            }
+        }
+
+
+        $secretConfig = is_array($unifiSecret?->config) ? $unifiSecret->config : [];
+        $discoveredSites = collect($secretConfig['discovered_sites'] ?? [])
+            ->map(fn (array $site) => [
+                'external_id' => (string) ($site['external_id'] ?? ''),
+                'name' => $site['name'] ?? 'Unknown',
+                'meta' => $site['meta'] ?? [],
+            ])
+            ->filter(fn (array $site) => $site['external_id'] !== '')
+            ->values()
+            ->all();
+        $discoveredHosts = collect($secretConfig['discovered_hosts'] ?? [])
+            ->map(fn (array $host) => [
+                'host_id' => (string) ($host['host_id'] ?? ''),
+                'name' => $host['name'] ?? 'Unknown',
+                'model' => $host['model'] ?? null,
+                'role' => $host['role'] ?? null,
+                'controllers' => $host['controllers'] ?? [],
+            ])
+            ->filter(fn (array $host) => $host['host_id'] !== '')
+            ->values()
+            ->all();
 
         return inertia('sites/hardware/index', [
             'site' => [
@@ -48,9 +102,39 @@ class SiteHardwareController extends Controller
             'integrations' => $integrations,
             'assets' => $assets,
             'categories' => LocationHardware::categories(),
+            'unifi' => [
+                'tenantSecret' => $unifiSecret ? [
+                    'status' => $unifiSecret->status,
+                    'secret_last4' => $unifiSecret->secret_last4,
+                    'last_tested_at' => $unifiSecret->last_tested_at?->toDateTimeString(),
+                    'last_synced_at' => $unifiSecret->last_synced_at?->toDateTimeString(),
+                    'sites_synced_at' => $secretConfig['sites_synced_at'] ?? null,
+                    'last_error' => $unifiSecret->last_error,
+                ] : null,
+                'discoveredSites' => $discoveredSites,
+                'discoveredHosts' => $discoveredHosts,
+                'siteConfig' => $unifiConfig ? [
+                    'id' => $unifiConfig->id,
+                    'provider' => $unifiConfig->provider,
+                    'status' => $unifiConfig->status,
+                    'mapped_external_site_id' => $unifiConfig->mapped_external_site_id,
+                    'mapped_external_site_name' => $unifiConfig->mapped_external_site_name,
+                    'is_active' => (bool) $unifiConfig->is_active,
+                    'overrides' => $unifiConfig->overrides ?? [],
+                ] : null,
+                'accessSecret' => $accessSecret ? [
+                    'id' => $accessSecret->id,
+                    'base_url' => $accessSecret->base_url,
+                    'is_enabled' => (bool) $accessSecret->is_enabled,
+                    'secret_last4' => $accessSecretLast4,
+                    'last_tested_at' => $accessSecret->last_tested_at?->toDateTimeString(),
+                    'last_error' => $accessSecret->last_error,
+                ] : null,
+            ],
             'can' => [
-                'manage_hardware' => $user->canDo('sites.manage'),
-                'manage_integrations' => $user->canDo('sites.manage'),
+                'manage_hardware' => $user?->canDo('siteHardware.manage') ?? false,
+                'manage_site_integrations' => $user?->canDo('integrations.manage_site_secrets') ?? false,
+                'manage_tenant_integrations' => $user?->canDo('integrations.manage_tenant_secrets') ?? false,
             ],
         ]);
     }
@@ -164,9 +248,10 @@ class SiteHardwareController extends Controller
                 ]);
 
                 $maxSort = SiteRoom::where('site_id', $site->id)->max('sort_order') ?? 0;
+                $tenantId = $site->tenant_id ?? $request->user()?->tenant_id ?? $request->user()?->organization_id ?? 1;
 
                 SiteRoom::create([
-                    'tenant_id' => $request->user()->tenant_id,
+                    'tenant_id' => $tenantId,
                     'site_id' => $site->id,
                     'name' => $request->input('name'),
                     'sort_order' => $maxSort + 1,

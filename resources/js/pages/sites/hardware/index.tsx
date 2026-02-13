@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
     Dialog,
     DialogContent,
@@ -48,8 +49,11 @@ import {
     Settings,
     MonitorSmartphone,
     Server,
+    CheckCircle,
+    XCircle,
+    ShieldAlert,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -72,6 +76,19 @@ type HardwareItem = {
     room?: { id: number; name: string } | null;
     linked_asset?: { id: number; name: string; asset_tag?: string } | null;
     notes?: string;
+    external_ref?: {
+        provider_entity_id?: string | null;
+        provider_type?: string | null;
+        model?: string | null;
+        firmware?: string | null;
+        ip?: string | null;
+    } | null;
+    meta?: {
+        provider_type?: string | null;
+        model_long?: string | null;
+        experience_score?: number | string | null;
+        uptime?: number | null;
+    } | null;
 };
 
 type IntegrationConfig = {
@@ -81,9 +98,67 @@ type IntegrationConfig = {
     mapped_external_site_id?: string;
     mapped_external_site_name?: string;
     is_active: boolean;
+    overrides?: {
+        protect_host_id?: string | null;
+        protect_host_name?: string | null;
+        access_host_id?: string | null;
+        access_host_name?: string | null;
+    };
+};
+
+type DiscoveredSite = {
+    external_id: string;
+    name: string;
+    meta?: {
+        device_count?: number | null;
+        health_status?: string | null;
+        main_device_name?: string | null;
+        main_device_model?: string | null;
+        main_device_role?: string | null;
+    };
+};
+
+type DiscoveredHost = {
+    host_id: string;
+    name: string;
+    model?: string | null;
+    role?: string | null;
+    controllers?: string[] | null;
+};
+
+type UnifiTenantSecret = {
+    status: 'connected' | 'disconnected' | 'error';
+    secret_last4?: string;
+    last_tested_at?: string;
+    last_synced_at?: string;
+    sites_synced_at?: string;
+    last_error?: string | null;
+} | null;
+
+type UnifiAccessSecret = {
+    id: number;
+    base_url?: string | null;
+    is_enabled?: boolean;
+    secret_last4?: string | null;
+    last_tested_at?: string;
+    last_error?: string | null;
+} | null;
+
+type UnifiIntegration = {
+    tenantSecret: UnifiTenantSecret;
+    discoveredSites: DiscoveredSite[];
+    discoveredHosts?: DiscoveredHost[];
+    siteConfig: IntegrationConfig | null;
+    accessSecret?: UnifiAccessSecret;
 };
 
 type AssetLite = { id: number; name: string; asset_tag?: string };
+
+type Permissions = {
+    manage_hardware?: boolean;
+    manage_site_integrations?: boolean;
+    manage_tenant_integrations?: boolean;
+};
 
 type Props = {
     site: Site;
@@ -92,6 +167,8 @@ type Props = {
     integrations: IntegrationConfig[];
     assets: AssetLite[];
     categories: Record<string, string>;
+    unifi: UnifiIntegration;
+    can: Permissions;
 };
 
 // ---------------------------------------------------------------------------
@@ -131,6 +208,62 @@ const statusDotColor: Record<HardwareItem['status'], string> = {
     retired: 'bg-slate-500 opacity-50',
 };
 
+const connectionStatusConfig: Record<string, { label: string; className: string; icon: typeof CheckCircle }> = {
+    connected: {
+        label: 'Connected',
+        className: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+        icon: CheckCircle,
+    },
+    disconnected: {
+        label: 'Disconnected',
+        className: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+        icon: XCircle,
+    },
+    error: {
+        label: 'Error',
+        className: 'bg-red-500/20 text-red-400 border-red-500/30',
+        icon: ShieldAlert,
+    },
+};
+
+function formatUnifiSiteLabel(site: DiscoveredSite): {
+    primary: string;
+    secondary?: string;
+    displayName: string;
+} {
+    const siteName = site.name?.trim() || 'Unnamed UniFi site';
+    const mainName = site.meta?.main_device_name?.trim() || '';
+    const deviceCount = site.meta?.device_count;
+    const primary = mainName || siteName;
+    const secondaryParts: string[] = [];
+    if (mainName && siteName && mainName !== siteName) {
+        secondaryParts.push(`Site: ${siteName}`);
+    }
+    if (deviceCount !== undefined && deviceCount !== null) {
+        secondaryParts.push(`${deviceCount} device${deviceCount === 1 ? '' : 's'}`);
+    }
+    const secondary = secondaryParts.join(' • ');
+    const displayName = mainName && siteName && mainName !== siteName ? `${mainName} — ${siteName}` : primary;
+    return { primary, secondary, displayName };
+}
+
+function formatUnifiHostLabel(host: DiscoveredHost): {
+    primary: string;
+    secondary?: string;
+    displayName: string;
+} {
+    const hostName = host.name?.trim() || 'Unnamed Console';
+    const model = host.model?.trim() || '';
+    const role = host.role?.trim() || '';
+    const primary = hostName;
+    const secondaryParts: string[] = [];
+    if (model) secondaryParts.push(model);
+    if (role) secondaryParts.push(role.toUpperCase());
+    const secondary = secondaryParts.join(' • ');
+    const displayName = model && hostName !== model ? `${hostName} — ${model}` : hostName;
+    return { primary, secondary, displayName };
+}
+
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
@@ -142,11 +275,14 @@ export default function SiteHardware({
     integrations,
     assets,
     categories,
+    unifi,
+    can,
 }: Props) {
     // --- state -----------------------------------------------------------------
     const [search, setSearch] = useState('');
     const [filterStatus, setFilterStatus] = useState<string>('all');
     const [filterCategory, setFilterCategory] = useState<string>('all');
+    const [filterProvider, setFilterProvider] = useState<string>('all');
 
     const [showAddDialog, setShowAddDialog] = useState(false);
     const [editingItem, setEditingItem] = useState<HardwareItem | null>(null);
@@ -157,8 +293,14 @@ export default function SiteHardware({
     const [showAddRoom, setShowAddRoom] = useState(false);
     const [editingRoomId, setEditingRoomId] = useState<number | null>(null);
     const [editingRoomName, setEditingRoomName] = useState('');
+    const [addingRoom, setAddingRoom] = useState(false);
+    const [savingRoomId, setSavingRoomId] = useState<number | null>(null);
 
     const [syncingProvider, setSyncingProvider] = useState<string | null>(null);
+    const [syncingSites, setSyncingSites] = useState(false);
+    const [testingConnection, setTestingConnection] = useState(false);
+    const [assigningDeviceId, setAssigningDeviceId] = useState<number | null>(null);
+    const [syncingAccessEvents, setSyncingAccessEvents] = useState(false);
 
     // --- forms -----------------------------------------------------------------
     const hwForm = useForm<{
@@ -186,7 +328,74 @@ export default function SiteHardware({
     const assignRoomForm = useForm<{ room_id: string }>({ room_id: '' });
     const linkAssetForm = useForm<{ linked_asset_id: string }>({ linked_asset_id: '' });
 
+    const mapForm = useForm<{
+        mapped_external_site_id: string;
+        mapped_external_site_name: string;
+        is_active: boolean;
+        protect_host_id: string;
+        protect_host_name: string;
+        access_host_id: string;
+        access_host_name: string;
+    }>({
+        mapped_external_site_id: unifi?.siteConfig?.mapped_external_site_id ?? '',
+        mapped_external_site_name: unifi?.siteConfig?.mapped_external_site_name ?? '',
+        is_active: unifi?.siteConfig?.is_active ?? true,
+        protect_host_id: unifi?.siteConfig?.overrides?.protect_host_id ?? '',
+        protect_host_name: unifi?.siteConfig?.overrides?.protect_host_name ?? '',
+        access_host_id: unifi?.siteConfig?.overrides?.access_host_id ?? '',
+        access_host_name: unifi?.siteConfig?.overrides?.access_host_name ?? '',
+    });
+
+    const accessSecret = unifi?.accessSecret ?? null;
+    const accessForm = useForm<{ base_url: string; secret: string; is_enabled: boolean }>({
+        base_url: accessSecret?.base_url ?? '',
+        secret: '',
+        is_enabled: accessSecret?.is_enabled ?? true,
+    });
+
     // --- derived ---------------------------------------------------------------
+    const unifiSecret = unifi?.tenantSecret ?? null;
+    const unifiConfig = unifi?.siteConfig ?? null;
+    const unifiStatus = unifiSecret ? (connectionStatusConfig[unifiSecret.status] ?? connectionStatusConfig.disconnected) : null;
+    const [discoveredSites, setDiscoveredSites] = useState<DiscoveredSite[]>(unifi?.discoveredSites ?? []);
+    const [discoveredHosts, setDiscoveredHosts] = useState<DiscoveredHost[]>(unifi?.discoveredHosts ?? []);
+    const mappedSiteLabel = useMemo(() => {
+        if (!unifiConfig?.mapped_external_site_id) return null;
+        const match = discoveredSites.find((s) => s.external_id === unifiConfig.mapped_external_site_id);
+        if (match) return formatUnifiSiteLabel(match).displayName;
+        return unifiConfig.mapped_external_site_name ?? null;
+    }, [discoveredSites, unifiConfig?.mapped_external_site_id, unifiConfig?.mapped_external_site_name]);
+
+    const protectHosts = useMemo(
+        () =>
+            discoveredHosts.filter((host) => {
+                const role = host.role?.toLowerCase();
+                const controllers = (host.controllers ?? []).map((c) => c.toLowerCase());
+                return (
+                    role === 'protect' ||
+                    role === 'nvr' ||
+                    role === 'nas' ||
+                    controllers.includes('protect')
+                );
+            }),
+        [discoveredHosts],
+    );
+
+    const accessHosts = useMemo(
+        () =>
+            discoveredHosts.filter((host) => {
+                const role = host.role?.toLowerCase();
+                const controllers = (host.controllers ?? []).map((c) => c.toLowerCase());
+                const isAccess = role === 'access' || controllers.includes('access');
+                if (!isAccess) return false;
+                if (role === 'protect' || role === 'nvr' || role === 'nas') {
+                    return controllers.includes('access');
+                }
+                return true;
+            }),
+        [discoveredHosts],
+    );
+
     const stats = useMemo(() => {
         const total = hardware.length;
         const online = hardware.filter((h) => h.status === 'online').length;
@@ -195,10 +404,21 @@ export default function SiteHardware({
         return { total, online, offline, unassigned };
     }, [hardware]);
 
+    const unifiDevices = useMemo(
+        () => hardware.filter((h) => h.provider === 'unifi'),
+        [hardware],
+    );
+
+    const providerOptions = useMemo(() => {
+        const providers = Array.from(new Set(hardware.map((h) => h.provider))).filter(Boolean);
+        return providers.sort((a, b) => a.localeCompare(b));
+    }, [hardware]);
+
     const filteredHardware = useMemo(() => {
         return hardware.filter((h) => {
             if (filterStatus !== 'all' && h.status !== filterStatus) return false;
             if (filterCategory !== 'all' && h.category !== filterCategory) return false;
+            if (filterProvider !== 'all' && h.provider !== filterProvider) return false;
             if (search) {
                 const q = search.toLowerCase();
                 const haystack = [h.name, h.asset_tag, h.serial, h.mac, h.provider, h.category, h.room?.name]
@@ -209,9 +429,53 @@ export default function SiteHardware({
             }
             return true;
         });
-    }, [hardware, search, filterStatus, filterCategory]);
+    }, [hardware, search, filterStatus, filterCategory, filterProvider]);
 
     const categoryKeys = Object.keys(categories);
+    const canManageHardware = !!can?.manage_hardware;
+    const canManageSiteIntegrations = !!can?.manage_site_integrations;
+    const canManageTenantIntegrations = !!can?.manage_tenant_integrations;
+    const canManageIntegrations = canManageSiteIntegrations || canManageTenantIntegrations;
+
+    const [deviceRoomDraft, setDeviceRoomDraft] = useState<Record<number, string>>(
+        () => unifiDevices.reduce<Record<number, string>>((acc, d) => ({
+            ...acc,
+            [d.id]: d.room?.id ? String(d.room.id) : 'unassigned',
+        }), {}),
+    );
+
+    useEffect(() => {
+        setDiscoveredSites(unifi?.discoveredSites ?? []);
+    }, [unifi?.discoveredSites]);
+
+    useEffect(() => {
+        setDiscoveredHosts(unifi?.discoveredHosts ?? []);
+    }, [unifi?.discoveredHosts]);
+
+    useEffect(() => {
+        if (!mapForm.data.mapped_external_site_id && discoveredSites.length === 1) {
+            const onlySite = discoveredSites[0];
+            const label = formatUnifiSiteLabel(onlySite);
+            mapForm.setData({
+                ...mapForm.data,
+                mapped_external_site_id: onlySite.external_id,
+                mapped_external_site_name: label.displayName,
+                is_active: true,
+            });
+        }
+    }, [discoveredSites]);
+
+    useEffect(() => {
+        setDeviceRoomDraft((prev) => {
+            const next = { ...prev };
+            unifiDevices.forEach((d) => {
+                if (!(d.id in next)) {
+                    next[d.id] = d.room?.id ? String(d.room.id) : 'unassigned';
+                }
+            });
+            return next;
+        });
+    }, [unifiDevices]);
 
     // --- handlers --------------------------------------------------------------
     function openAdd() {
@@ -273,13 +537,19 @@ export default function SiteHardware({
     // Rooms
     function submitRoom(e: React.FormEvent) {
         e.preventDefault();
-        roomForm.post(`/sites/${site.id}/rooms`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                roomForm.reset();
-                setShowAddRoom(false);
+        setAddingRoom(true);
+        router.post(
+            `/sites/${site.id}/hardware/rooms`,
+            { action: 'add', name: roomForm.data.name },
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    roomForm.reset();
+                    setShowAddRoom(false);
+                },
+                onFinish: () => setAddingRoom(false),
             },
-        });
+        );
     }
 
     function startEditRoom(room: Room) {
@@ -288,21 +558,31 @@ export default function SiteHardware({
     }
 
     function submitEditRoom(roomId: number) {
-        router.put(
-            `/sites/${site.id}/rooms/${roomId}`,
-            { name: editingRoomName },
+        setSavingRoomId(roomId);
+        router.post(
+            `/sites/${site.id}/hardware/rooms`,
+            { action: 'rename', room_id: roomId, name: editingRoomName },
             {
                 preserveScroll: true,
                 onSuccess: () => {
                     setEditingRoomId(null);
                     setEditingRoomName('');
                 },
+                onFinish: () => setSavingRoomId(null),
             },
         );
     }
 
     function deleteRoom(roomId: number) {
-        router.delete(`/sites/${site.id}/rooms/${roomId}`, { preserveScroll: true });
+        setSavingRoomId(roomId);
+        router.post(
+            `/sites/${site.id}/hardware/rooms`,
+            { action: 'delete', room_id: roomId },
+            {
+                preserveScroll: true,
+                onFinish: () => setSavingRoomId(null),
+            },
+        );
     }
 
     // Assign room
@@ -350,6 +630,113 @@ export default function SiteHardware({
         });
     }
 
+    function syncUnifiSites() {
+        setSyncingSites(true);
+        router.post(`/sites/${site.id}/integrations/unifi/sync-sites`, {}, {
+            preserveScroll: true,
+            onFinish: () => {
+                setSyncingSites(false);
+                refreshDiscoveredSites();
+            },
+        });
+    }
+
+    function testUnifiConnection() {
+        setTestingConnection(true);
+        router.post(`/sites/${site.id}/integrations/unifi/test`, {}, {
+            preserveScroll: true,
+            onFinish: () => setTestingConnection(false),
+        });
+    }
+
+    function submitUnifiMapping(e: React.FormEvent) {
+        e.preventDefault();
+        mapForm.post(`/sites/${site.id}/integrations/unifi`, {
+            preserveScroll: true,
+        });
+    }
+
+    async function refreshDiscoveredSites() {
+        try {
+            const response = await fetch(`/sites/${site.id}/integrations`, {
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json' },
+            });
+
+            if (!response.ok) return;
+            const payload = await response.json();
+            const tenantSecrets = Array.isArray(payload?.tenantSecrets) ? payload.tenantSecrets : [];
+            const unifiSecret = tenantSecrets.find((secret: { provider?: string }) => secret.provider === 'unifi');
+            const sites = unifiSecret?.config?.discovered_sites ?? [];
+            const hosts = unifiSecret?.config?.discovered_hosts ?? [];
+            if (Array.isArray(sites)) {
+                setDiscoveredSites(sites);
+            }
+            if (Array.isArray(hosts)) {
+                setDiscoveredHosts(hosts);
+            }
+        } catch {
+            // ignore fetch errors; UI will still allow manual entry
+        }
+    }
+
+    useEffect(() => {
+        if (!unifiSecret || discoveredSites.length > 0) return;
+        refreshDiscoveredSites();
+    }, [unifiSecret, discoveredSites.length]);
+
+    function clearUnifiMapping() {
+        router.post(
+            `/sites/${site.id}/integrations/unifi`,
+            {
+                mapped_external_site_id: null,
+                mapped_external_site_name: null,
+                protect_host_id: null,
+                protect_host_name: null,
+                access_host_id: null,
+                access_host_name: null,
+                is_active: false,
+            },
+            {
+                preserveScroll: true,
+            },
+        );
+    }
+
+    function saveAccessSecret(e: React.FormEvent) {
+        e.preventDefault();
+        accessForm.put(`/sites/${site.id}/integrations/unifi/secrets/access_api`, {
+            preserveScroll: true,
+            onSuccess: () => accessForm.reset('secret'),
+        });
+    }
+
+    function syncAccessEvents() {
+        setSyncingAccessEvents(true);
+        router.post(
+            `/sites/${site.id}/integrations/unifi/pull-events`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setSyncingAccessEvents(false),
+            },
+        );
+    }
+
+    function saveUnifiRoom(deviceId: number) {
+        const raw = deviceRoomDraft[deviceId];
+        const roomId = !raw || raw === 'unassigned' ? null : Number(raw);
+        setAssigningDeviceId(deviceId);
+        router.post(
+            `/sites/${site.id}/hardware/${deviceId}/assign-room`,
+            { room_id: roomId },
+            {
+                preserveScroll: true,
+                onFinish: () => setAssigningDeviceId(null),
+            },
+        );
+    }
+
     // --- helpers ---------------------------------------------------------------
     function hwCountInRoom(roomId: number) {
         return hardware.filter((h) => h.room?.id === roomId).length;
@@ -368,6 +755,14 @@ export default function SiteHardware({
         } catch {
             return dateStr;
         }
+    }
+
+    function resolveDeviceType(item: HardwareItem): string | null {
+        return item.meta?.provider_type || item.external_ref?.provider_type || null;
+    }
+
+    function resolveDeviceModel(item: HardwareItem): string | null {
+        return item.meta?.model_long || item.external_ref?.model || null;
     }
 
     // --- render ----------------------------------------------------------------
@@ -457,6 +852,360 @@ export default function SiteHardware({
                     </Card>
                 </div>
 
+                {/* ------------------------------------------------------------------ */}
+                {/* UniFi Integration                                                  */}
+                {/* ------------------------------------------------------------------ */}
+
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle className="flex items-center gap-2">
+                            <Wifi className="w-5 h-5" />
+                            UniFi Integration
+                        </CardTitle>
+                        {unifiStatus && (
+                            <Badge variant="outline" className={unifiStatus.className}>
+                                <unifiStatus.icon className="w-3.5 h-3.5 mr-1" />
+                                {unifiStatus.label}
+                            </Badge>
+                        )}
+                    </CardHeader>
+                    <CardContent className="grid gap-4 lg:grid-cols-2">
+                        <div className="rounded-lg border p-4 space-y-3">
+                            <div className="text-sm font-medium">API Key</div>
+                            {!unifiSecret ? (
+                                <div className="text-sm text-slate-400">
+                                    No UniFi API key configured for this tenant.
+                                </div>
+                            ) : (
+                                <>
+                                    <div className="flex flex-wrap items-center gap-2 text-sm">
+                                        <span>
+                                            Key ending in{' '}
+                                            <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                                                •••{unifiSecret.secret_last4}
+                                            </code>
+                                        </span>
+                                        {unifiStatus && (
+                                            <Badge variant="outline" className={unifiStatus.className}>
+                                                <unifiStatus.icon className="w-3 h-3 mr-1" />
+                                                {unifiStatus.label}
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <div className="text-xs text-slate-400 space-y-1">
+                                        <div>Last tested: {formatDate(unifiSecret.last_tested_at) || '—'}</div>
+                                        <div>Last site sync: {formatDate(unifiSecret.sites_synced_at) || '—'}</div>
+                                        <div>Last device sync: {formatDate(unifiSecret.last_synced_at) || '—'}</div>
+                                    </div>
+                                    {unifiSecret.last_error && (
+                                        <div className="text-xs text-red-400">{unifiSecret.last_error}</div>
+                                    )}
+                                </>
+                            )}
+
+                            <div className="flex flex-wrap gap-2">
+                                {!unifiSecret ? (
+                                    <Button asChild size="sm" variant="outline">
+                                        <a href="/settings/integrations/unifi">Configure API Key</a>
+                                    </Button>
+                                ) : (
+                                    <>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={testUnifiConnection}
+                                            disabled={!canManageIntegrations || testingConnection}
+                                        >
+                                            {testingConnection ? 'Testing...' : 'Test Connection'}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={syncUnifiSites}
+                                            disabled={!canManageIntegrations || syncingSites}
+                                        >
+                                            <RefreshCw
+                                                className={`w-4 h-4 mr-1 ${syncingSites ? 'animate-spin' : ''}`}
+                                            />
+                                            {syncingSites ? 'Syncing...' : 'Sync UniFi Locations'}
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+
+                            {unifiSecret && canManageIntegrations && (
+                                <div className="mt-4 space-y-3 border-t border-slate-800 pt-4">
+                                    <div className="text-sm font-medium">Access Console API (Entry/Exit)</div>
+                                    <div className="text-xs text-slate-400">
+                                        Configure the local UniFi Access controller URL (typically https://&lt;console-ip&gt;:12445) and API key.
+                                    </div>
+
+                                    {accessSecret && (
+                                        <div className="text-xs text-slate-400 space-y-1">
+                                            {accessSecret.secret_last4 && (
+                                                <div>
+                                                    Key ending in{' '}
+                                                    <code className="rounded bg-muted px-1.5 py-0.5 text-xs">
+                                                        •••{accessSecret.secret_last4}
+                                                    </code>
+                                                </div>
+                                            )}
+                                            <div>Last sync: {formatDate(accessSecret.last_tested_at) || '—'}</div>
+                                            {accessSecret.last_error && (
+                                                <div className="text-xs text-red-400">{accessSecret.last_error}</div>
+                                            )}
+                                        </div>
+                                    )}
+
+                                    <form onSubmit={saveAccessSecret} className="grid gap-3 md:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label>Access Controller URL</Label>
+                                            <Input
+                                                value={accessForm.data.base_url}
+                                                onChange={(e) => accessForm.setData('base_url', e.target.value)}
+                                                placeholder="https://192.168.1.10:12445"
+                                            />
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Access API Key</Label>
+                                            <Input
+                                                type="password"
+                                                value={accessForm.data.secret}
+                                                onChange={(e) => accessForm.setData('secret', e.target.value)}
+                                                placeholder="Paste UniFi Access API key"
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2 flex flex-wrap gap-2">
+                                            <Button type="submit" size="sm" disabled={accessForm.processing || !accessForm.data.secret}>
+                                                {accessForm.processing ? 'Saving...' : 'Save Access API Key'}
+                                            </Button>
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={syncAccessEvents}
+                                                disabled={!unifiSecret || !accessSecret?.base_url || syncingAccessEvents}
+                                            >
+                                                <RefreshCw className={`w-4 h-4 mr-1 ${syncingAccessEvents ? 'animate-spin' : ''}`} />
+                                                {syncingAccessEvents ? 'Syncing...' : 'Sync Access Events'}
+                                            </Button>
+                                        </div>
+                                    </form>
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="rounded-lg border p-4 space-y-3">
+                            <div className="text-sm font-medium">Location Mapping</div>
+                            {!unifiSecret ? (
+                                <div className="text-sm text-slate-400">
+                                    Add an API key to map this location to a UniFi site.
+                                </div>
+                            ) : (
+                                <>
+                                    {unifiConfig?.mapped_external_site_id ? (
+                                        <div className="text-sm text-slate-300">
+                                            Mapped to{' '}
+                                            <span className="font-medium">
+                                                {mappedSiteLabel || 'Unnamed UniFi site'}
+                                            </span>
+                                            <div className="text-xs text-slate-500 font-mono">
+                                                ID: {unifiConfig.mapped_external_site_id}
+                                            </div>
+                                            {unifiConfig?.overrides?.protect_host_id && (
+                                                <div className="mt-2 text-xs text-slate-400">
+                                                    Protect Console:{' '}
+                                                    <span className="font-medium">
+                                                        {unifiConfig.overrides.protect_host_name || 'Unnamed console'}
+                                                    </span>
+                                                    <div className="text-[11px] text-slate-500 font-mono">
+                                                        ID: {unifiConfig.overrides.protect_host_id}
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {unifiConfig?.overrides?.access_host_id && (
+                                                <div className="mt-2 text-xs text-slate-400">
+                                                    Access Console:{' '}
+                                                    <span className="font-medium">
+                                                        {unifiConfig.overrides.access_host_name || 'Unnamed console'}
+                                                    </span>
+                                                    <div className="text-[11px] text-slate-500 font-mono">
+                                                        ID: {unifiConfig.overrides.access_host_id}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ) : (
+                                        <div className="text-sm text-slate-400">
+                                            No UniFi site mapped to this location yet.
+                                        </div>
+                                    )}
+
+                                    {canManageIntegrations && (
+                                        <form onSubmit={submitUnifiMapping} className="space-y-3">
+                                            <div className="space-y-2">
+                                                <Label>Gateway (Network Site)</Label>
+                                                {discoveredSites.length > 0 ? (
+                                                    <Select
+                                                        value={mapForm.data.mapped_external_site_id || undefined}
+                                                        onValueChange={(v) => {
+                                                            const selected = discoveredSites.find((s) => s.external_id === v);
+                                                            const label = selected ? formatUnifiSiteLabel(selected) : null;
+                                                            mapForm.setData({
+                                                                ...mapForm.data,
+                                                                mapped_external_site_id: v,
+                                                                mapped_external_site_name: label?.displayName ?? selected?.name ?? '',
+                                                                is_active: true,
+                                                            });
+                                                        }}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select gateway site" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {discoveredSites.map((s) => {
+                                                                const label = formatUnifiSiteLabel(s);
+                                                                return (
+                                                                    <SelectItem key={s.external_id} value={s.external_id} textValue={label.displayName}>
+                                                                        <div className="flex flex-col">
+                                                                            <span className="font-medium">{label.primary}</span>
+                                                                            {label.secondary && <span className="text-xs text-muted-foreground">{label.secondary}</span>}
+                                                                        </div>
+                                                                    </SelectItem>
+                                                                );
+                                                            })}
+                                                        </SelectContent>
+                                                    </Select>
+                                                ) : (
+                                                    <Input
+                                                        value={mapForm.data.mapped_external_site_id}
+                                                        onChange={(e) => mapForm.setData('mapped_external_site_id', e.target.value)}
+                                                        placeholder="Enter UniFi site ID"
+                                                    />
+                                                )}
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label>Protect Console (NVR/NAS)</Label>
+                                                {protectHosts.length > 0 ? (
+                                                    <Select
+                                                        value={mapForm.data.protect_host_id || undefined}
+                                                        onValueChange={(v) => {
+                                                            const selected = protectHosts.find((h) => h.host_id === v);
+                                                            const label = selected ? formatUnifiHostLabel(selected) : null;
+                                                            mapForm.setData({
+                                                                ...mapForm.data,
+                                                                protect_host_id: v,
+                                                                protect_host_name: label?.displayName ?? selected?.name ?? '',
+                                                            });
+                                                        }}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select Protect console" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {protectHosts.map((h) => {
+                                                                const label = formatUnifiHostLabel(h);
+                                                                return (
+                                                                    <SelectItem key={h.host_id} value={h.host_id} textValue={label.displayName}>
+                                                                        <div className="flex flex-col">
+                                                                            <span className="font-medium">{label.primary}</span>
+                                                                            {label.secondary && <span className="text-xs text-muted-foreground">{label.secondary}</span>}
+                                                                        </div>
+                                                                    </SelectItem>
+                                                                );
+                                                            })}
+                                                        </SelectContent>
+                                                    </Select>
+                                                ) : (
+                                                    <Input
+                                                        value={mapForm.data.protect_host_id}
+                                                        onChange={(e) => mapForm.setData('protect_host_id', e.target.value)}
+                                                        placeholder="Enter Protect console host ID"
+                                                    />
+                                                )}
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label>Access Console (Entry/Exit)</Label>
+                                                {accessHosts.length > 0 ? (
+                                                    <Select
+                                                        value={mapForm.data.access_host_id || undefined}
+                                                        onValueChange={(v) => {
+                                                            const selected = accessHosts.find((h) => h.host_id === v);
+                                                            const label = selected ? formatUnifiHostLabel(selected) : null;
+                                                            mapForm.setData({
+                                                                ...mapForm.data,
+                                                                access_host_id: v,
+                                                                access_host_name: label?.displayName ?? selected?.name ?? '',
+                                                            });
+                                                        }}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select Access console" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {accessHosts.map((h) => {
+                                                                const label = formatUnifiHostLabel(h);
+                                                                return (
+                                                                    <SelectItem key={h.host_id} value={h.host_id} textValue={label.displayName}>
+                                                                        <div className="flex flex-col">
+                                                                            <span className="font-medium">{label.primary}</span>
+                                                                            {label.secondary && <span className="text-xs text-muted-foreground">{label.secondary}</span>}
+                                                                        </div>
+                                                                    </SelectItem>
+                                                                );
+                                                            })}
+                                                        </SelectContent>
+                                                    </Select>
+                                                ) : (
+                                                    <Input
+                                                        value={mapForm.data.access_host_id}
+                                                        onChange={(e) => mapForm.setData('access_host_id', e.target.value)}
+                                                        placeholder="Enter Access console host ID"
+                                                    />
+                                                )}
+                                            </div>
+
+                                            <div className="space-y-2">
+                                                <Label>UniFi Location Name (optional)</Label>
+                                                <Input
+                                                    value={mapForm.data.mapped_external_site_name}
+                                                    onChange={(e) => mapForm.setData('mapped_external_site_name', e.target.value)}
+                                                    placeholder="e.g., Head Office"
+                                                />
+                                            </div>
+                                            <div className="flex flex-wrap gap-2">
+                                                <Button type="submit" size="sm" disabled={mapForm.processing}>
+                                                    {mapForm.processing ? 'Saving...' : 'Save Mapping'}
+                                                </Button>
+                                                {unifiConfig?.mapped_external_site_id && (
+                                                    <Button type="button" size="sm" variant="ghost" onClick={clearUnifiMapping}>
+                                                        Clear Mapping
+                                                    </Button>
+                                                )}
+                                                <Button
+                                                    type="button"
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => syncDevices('unifi')}
+                                                    disabled={!canManageHardware || !unifiConfig?.mapped_external_site_id || syncingProvider === 'unifi'}
+                                                >
+                                                    <RefreshCw
+                                                        className={`w-4 h-4 mr-1 ${syncingProvider === 'unifi' ? 'animate-spin' : ''}`}
+                                                    />
+                                                    {syncingProvider === 'unifi' ? 'Syncing...' : 'Sync Devices'}
+                                                </Button>
+                                            </div>
+                                        </form>
+                                    )}
+                                </>
+                            )}
+                        </div>
+
+                    </CardContent>
+                </Card>
+
                 {/* Search / Filter bar */}
                 {hardware.length > 0 && (
                     <div className="flex flex-col gap-3 sm:flex-row">
@@ -481,6 +1230,21 @@ export default function SiteHardware({
                                 <SelectItem value="retired">Retired</SelectItem>
                             </SelectContent>
                         </Select>
+                        {providerOptions.length > 0 && (
+                            <Select value={filterProvider} onValueChange={setFilterProvider}>
+                                <SelectTrigger className="w-full sm:w-44">
+                                    <SelectValue placeholder="Source" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Sources</SelectItem>
+                                    {providerOptions.map((provider) => (
+                                        <SelectItem key={provider} value={provider}>
+                                            {provider}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        )}
                         {categoryKeys.length > 0 && (
                             <Select value={filterCategory} onValueChange={setFilterCategory}>
                                 <SelectTrigger className="w-full sm:w-44">
@@ -529,14 +1293,16 @@ export default function SiteHardware({
                             </div>
                         ) : (
                             <div className="space-y-2">
-                                {filteredHardware.map((item) => {
-                                    const sc = statusConfig[item.status];
-                                    const StatusIcon = sc.icon;
-                                    return (
-                                        <div
-                                            key={item.id}
-                                            className="rounded-xl border p-4 hover:bg-muted/50 transition-colors"
-                                        >
+                                                {filteredHardware.map((item) => {
+                                                    const sc = statusConfig[item.status];
+                                                    const StatusIcon = sc.icon;
+                                                    const model = resolveDeviceModel(item);
+                                                    const type = resolveDeviceType(item);
+                                                    return (
+                                                        <div
+                                                            key={item.id}
+                                                            className="rounded-xl border p-4 hover:bg-muted/50 transition-colors"
+                                                        >
                                             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-2 flex-wrap">
@@ -566,6 +1332,11 @@ export default function SiteHardware({
                                                                 {item.room.name}
                                                             </span>
                                                         )}
+                                                        {(model || type) && (
+                                                            <span className="text-xs text-slate-500">
+                                                                {[type, model].filter(Boolean).join(' • ')}
+                                                            </span>
+                                                        )}
                                                         {item.linked_asset && (
                                                             <span className="flex items-center gap-1">
                                                                 <Link2 className="w-3.5 h-3.5" />
@@ -585,6 +1356,9 @@ export default function SiteHardware({
                                                         )}
                                                         {item.asset_tag && (
                                                             <span className="font-mono text-xs">Tag: {item.asset_tag}</span>
+                                                        )}
+                                                        {item.external_ref?.ip && (
+                                                            <span className="text-xs text-slate-500">IP: {item.external_ref.ip}</span>
                                                         )}
                                                     </div>
 
@@ -660,6 +1434,139 @@ export default function SiteHardware({
                 </Card>
 
                 {/* ------------------------------------------------------------------ */}
+                {/* UniFi Devices & Room Assignment                                    */}
+                {/* ------------------------------------------------------------------ */}
+
+                {(unifiDevices.length > 0 || unifiConfig?.mapped_external_site_id) && (
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle className="text-base flex items-center gap-2">
+                                <Wifi className="w-4 h-4" />
+                                UniFi Devices & Room Assignment
+                            </CardTitle>
+                            <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="text-slate-300">
+                                    {unifiDevices.length} device{unifiDevices.length !== 1 ? 's' : ''}
+                                </Badge>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => syncDevices('unifi')}
+                                    disabled={!canManageHardware || !unifiConfig?.mapped_external_site_id || syncingProvider === 'unifi'}
+                                >
+                                    <RefreshCw className={`w-4 h-4 mr-1 ${syncingProvider === 'unifi' ? 'animate-spin' : ''}`} />
+                                    {syncingProvider === 'unifi' ? 'Syncing...' : 'Sync Devices'}
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            {unifiDevices.length === 0 ? (
+                                <div className="text-center py-8 text-slate-400">
+                                    <Wifi className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                                    <p>No UniFi devices synced yet for this site.</p>
+                                    <p className="text-sm mt-1">Map a UniFi location and run Sync Devices.</p>
+                                </div>
+                            ) : rooms.length === 0 ? (
+                                <div className="text-center py-8 text-slate-400">
+                                    <DoorOpen className="w-10 h-10 mx-auto mb-3 opacity-50" />
+                                    <p>No rooms configured yet.</p>
+                                    <p className="text-sm mt-1">Add rooms below to assign UniFi hardware.</p>
+                                </div>
+                            ) : (
+                                <div className="rounded-md border">
+                                    <Table>
+                                        <TableHeader>
+                                            <TableRow>
+                                                <TableHead>Device</TableHead>
+                                                <TableHead>Category</TableHead>
+                                                <TableHead>Status</TableHead>
+                                                <TableHead>Room</TableHead>
+                                                <TableHead>Last Seen</TableHead>
+                                                <TableHead>Action</TableHead>
+                                            </TableRow>
+                                        </TableHeader>
+                                        <TableBody>
+                                            {unifiDevices.map((device) => {
+                                                const sc = statusConfig[device.status];
+                                                const StatusIcon = sc.icon;
+                                                const model = resolveDeviceModel(device);
+                                                const type = resolveDeviceType(device);
+                                                const displayName = device.name && device.name !== 'Unknown Device'
+                                                    ? device.name
+                                                    : model || type || 'UniFi Device';
+                                                return (
+                                                    <TableRow key={device.id}>
+                                                        <TableCell>
+                                                            <div className="font-medium">{displayName}</div>
+                                                            <div className="text-xs text-slate-500">
+                                                                {[
+                                                                    type ? `Type ${type}` : null,
+                                                                    model ? `Model ${model}` : null,
+                                                                    device.external_ref?.firmware ? `FW ${device.external_ref.firmware}` : null,
+                                                                    device.external_ref?.ip ? `IP ${device.external_ref.ip}` : null,
+                                                                ]
+                                                                    .filter(Boolean)
+                                                                    .join(' • ') || '—'}
+                                                            </div>
+                                                            <div className="text-xs text-slate-500 mt-1">
+                                                                {[device.mac ? `MAC ${device.mac}` : null, device.serial ? `S/N ${device.serial}` : null, device.external_ref?.provider_entity_id ? `ID ${device.external_ref.provider_entity_id}` : null]
+                                                                    .filter(Boolean)
+                                                                    .join(' • ') || '—'}
+                                                            </div>
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            {categories[device.category] || device.category}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Badge variant="outline" className={`text-xs ${sc.className}`}>
+                                                                <StatusIcon className="w-3 h-3 mr-1" />
+                                                                {sc.label}
+                                                            </Badge>
+                                                        </TableCell>
+                                                        <TableCell className="min-w-[200px]">
+                                                            <Select
+                                                                value={deviceRoomDraft[device.id] || 'unassigned'}
+                                                                onValueChange={(v) => setDeviceRoomDraft((prev) => ({ ...prev, [device.id]: v }))}
+                                                                disabled={!canManageHardware}
+                                                            >
+                                                                <SelectTrigger>
+                                                                    <SelectValue placeholder="Select room" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                                                                    {rooms.map((room) => (
+                                                                        <SelectItem key={room.id} value={room.id.toString()}>
+                                                                            {room.name}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+                                                        </TableCell>
+                                                        <TableCell className="text-sm text-slate-400">
+                                                            {formatDate(device.last_seen_at) || '—'}
+                                                        </TableCell>
+                                                        <TableCell>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => saveUnifiRoom(device.id)}
+                                                                disabled={!canManageHardware || assigningDeviceId === device.id}
+                                                            >
+                                                                {assigningDeviceId === device.id ? 'Saving...' : 'Save Room'}
+                                                            </Button>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                );
+                                            })}
+                                        </TableBody>
+                                    </Table>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* ------------------------------------------------------------------ */}
                 {/* Section 2 - Rooms                                                  */}
                 {/* ------------------------------------------------------------------ */}
 
@@ -692,8 +1599,8 @@ export default function SiteHardware({
                                         required
                                     />
                                 </div>
-                                <Button type="submit" disabled={roomForm.processing}>
-                                    Add
+                                <Button type="submit" disabled={addingRoom}>
+                                    {addingRoom ? 'Adding...' : 'Add'}
                                 </Button>
                                 <Button
                                     type="button"
@@ -748,8 +1655,8 @@ export default function SiteHardware({
                                                             }
                                                         }}
                                                     />
-                                                    <Button size="sm" onClick={() => submitEditRoom(room.id)}>
-                                                        Save
+                                                    <Button size="sm" onClick={() => submitEditRoom(room.id)} disabled={savingRoomId === room.id}>
+                                                        {savingRoomId === room.id ? 'Saving...' : 'Save'}
                                                     </Button>
                                                     <Button
                                                         size="sm"
@@ -801,9 +1708,10 @@ export default function SiteHardware({
                                                                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                                                                     <AlertDialogAction
                                                                         className="bg-red-600 hover:bg-red-700"
-                                                                        onClick={() => deleteRoom(room.id)}
-                                                                    >
-                                                                        Delete
+                                                                    onClick={() => deleteRoom(room.id)}
+                                                                    disabled={savingRoomId === room.id}
+                                                                >
+                                                                        {savingRoomId === room.id ? 'Deleting...' : 'Delete'}
                                                                     </AlertDialogAction>
                                                                 </AlertDialogFooter>
                                                             </AlertDialogContent>

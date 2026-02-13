@@ -30,7 +30,12 @@ type TenantSecret = {
 type DiscoveredSite = {
     external_id: string;
     name: string;
-    meta?: { device_count?: number | null };
+    meta?: {
+        device_count?: number | null;
+        main_device_name?: string | null;
+        main_device_model?: string | null;
+        main_device_role?: string | null;
+    };
 };
 
 type SiteConfig = {
@@ -114,6 +119,27 @@ function fmt(value?: string | null): string {
     if (!value) return '---';
     const d = new Date(value);
     return Number.isNaN(d.getTime()) ? value : d.toLocaleString();
+}
+
+function formatUnifiSiteLabel(site: DiscoveredSite): {
+    primary: string;
+    secondary?: string;
+    displayName: string;
+} {
+    const siteName = site.name?.trim() || 'Unnamed UniFi site';
+    const mainName = site.meta?.main_device_name?.trim() || '';
+    const deviceCount = site.meta?.device_count;
+    const primary = mainName || siteName;
+    const secondaryParts: string[] = [];
+    if (mainName && siteName && mainName !== siteName) {
+        secondaryParts.push(`Site: ${siteName}`);
+    }
+    if (deviceCount !== undefined && deviceCount !== null) {
+        secondaryParts.push(`${deviceCount} device${deviceCount === 1 ? '' : 's'}`);
+    }
+    const secondary = secondaryParts.join(' • ');
+    const displayName = mainName && siteName && mainName !== siteName ? `${mainName} — ${siteName}` : primary;
+    return { primary, secondary, displayName };
 }
 
 export default function UnifiIntegration({
@@ -286,10 +312,23 @@ export default function UnifiIntegration({
                                             {discoveredSites.length > 0 ? (
                                                 <Select value={mapForm.data.external_site_id || undefined} onValueChange={(v) => {
                                                     const d = discoveredSites.find((s) => s.external_id === v);
-                                                    mapForm.setData({ ...mapForm.data, external_site_id: v, external_site_name: d?.name ?? '' });
+                                                    const label = d ? formatUnifiSiteLabel(d) : null;
+                                                    mapForm.setData({ ...mapForm.data, external_site_id: v, external_site_name: label?.displayName ?? d?.name ?? '' });
                                                 }}>
                                                     <SelectTrigger><SelectValue placeholder="Select UniFi location" /></SelectTrigger>
-                                                    <SelectContent>{discoveredSites.map((d) => <SelectItem key={d.external_id} value={d.external_id}>{d.name}{d.meta?.device_count !== undefined && d.meta?.device_count !== null ? ` (${d.meta.device_count} devices)` : ''}</SelectItem>)}</SelectContent>
+                                                    <SelectContent>
+                                                        {discoveredSites.map((d) => {
+                                                            const label = formatUnifiSiteLabel(d);
+                                                            return (
+                                                                <SelectItem key={d.external_id} value={d.external_id} textValue={label.displayName}>
+                                                                    <div className="flex flex-col">
+                                                                        <span className="font-medium">{label.primary}</span>
+                                                                        {label.secondary && <span className="text-xs text-muted-foreground">{label.secondary}</span>}
+                                                                    </div>
+                                                                </SelectItem>
+                                                            );
+                                                        })}
+                                                    </SelectContent>
                                                 </Select>
                                             ) : (
                                                 <Input value={mapForm.data.external_site_id} onChange={(e) => mapForm.setData('external_site_id', e.target.value)} placeholder="Enter UniFi site ID" />

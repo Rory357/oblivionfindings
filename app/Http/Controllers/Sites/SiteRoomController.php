@@ -51,7 +51,6 @@ class SiteRoomController extends Controller
     public function store(Request $request, Site $site)
     {
         $this->authorize('update', $site);
-        abort_unless($room->site_id === $site->id, 404);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',

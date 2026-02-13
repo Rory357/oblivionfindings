@@ -319,11 +319,20 @@ class UnifiSettingsController extends Controller
         try {
             $adapter = $registry->resolve(self::PROVIDER);
             $sites = $adapter->discoverSites($secret);
+            $hosts = [];
+            if (method_exists($adapter, 'discoverHosts')) {
+                try {
+                    $hosts = $adapter->discoverHosts($secret);
+                } catch (\Throwable $e) {
+                    $hosts = [];
+                }
+            }
 
             $config = $this->mergeSecretConfig(
                 $secret->config,
                 [
                     'discovered_sites' => array_values($sites),
+                    'discovered_hosts' => array_values($hosts),
                     'sites_synced_at' => now()->toISOString(),
                 ]
             );
@@ -575,6 +584,7 @@ class UnifiSettingsController extends Controller
 
         $preserved = [
             'discovered_sites' => $existing['discovered_sites'] ?? [],
+            'discovered_hosts' => $existing['discovered_hosts'] ?? [],
             'sites_synced_at' => $existing['sites_synced_at'] ?? null,
         ];
 

@@ -8,6 +8,7 @@ use App\Models\Integration\IntegrationSiteConfig;
 use App\Models\Integration\IntegrationSiteSecret;
 use App\Models\Integration\IntegrationSyncLog;
 use App\Models\Integration\IntegrationTenantSecret;
+use App\Models\TimelineEvent;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Crypt;
@@ -26,8 +27,27 @@ class SiteIntegrationController extends Controller
             ->get();
 
         $tenantSecrets = IntegrationTenantSecret::where('tenant_id', $tenantId)
-            ->select(['id', 'tenant_id', 'provider', 'secret_last4', 'status', 'last_tested_at', 'last_synced_at', 'last_error'])
-            ->get();
+            ->get()
+            ->map(function (IntegrationTenantSecret $secret) {
+                $config = is_array($secret->config) ? $secret->config : [];
+
+                return [
+                    'id' => $secret->id,
+                    'tenant_id' => $secret->tenant_id,
+                    'provider' => $secret->provider,
+                    'secret_last4' => $secret->secret_last4,
+                    'status' => $secret->status,
+                    'last_tested_at' => $secret->last_tested_at,
+                    'last_synced_at' => $secret->last_synced_at,
+                    'last_error' => $secret->last_error,
+                    'config' => [
+                        'discovered_sites' => $config['discovered_sites'] ?? [],
+                        'discovered_hosts' => $config['discovered_hosts'] ?? [],
+                        'sites_synced_at' => $config['sites_synced_at'] ?? null,
+                    ],
+                ];
+            })
+            ->values();
 
         return response()->json([
             'configs' => $configs,
@@ -44,8 +64,32 @@ class SiteIntegrationController extends Controller
         $validated = $request->validate([
             'mapped_external_site_id' => 'nullable|string|max:255',
             'mapped_external_site_name' => 'nullable|string|max:255',
+            'protect_host_id' => 'nullable|string|max:255',
+            'protect_host_name' => 'nullable|string|max:255',
+            'access_host_id' => 'nullable|string|max:255',
+            'access_host_name' => 'nullable|string|max:255',
             'is_active' => 'boolean',
         ]);
+
+        $mappedId = $validated['mapped_external_site_id'] ?? null;
+        $isActive = $validated['is_active'] ?? !empty($mappedId);
+        $status = $mappedId ? IntegrationSiteConfig::STATUS_HYBRID : IntegrationSiteConfig::STATUS_TENANT_ONLY;
+
+        $existingConfig = IntegrationSiteConfig::where('site_id', $site->id)
+            ->where('provider', $provider)
+            ->first();
+
+        $existingOverrides = is_array($existingConfig?->overrides) ? $existingConfig->overrides : [];
+        $overrideUpdates = [];
+        if ($request->has('protect_host_id') || $request->has('protect_host_name')) {
+            $overrideUpdates['protect_host_id'] = $validated['protect_host_id'] ?? null;
+            $overrideUpdates['protect_host_name'] = $validated['protect_host_name'] ?? null;
+        }
+        if ($request->has('access_host_id') || $request->has('access_host_name')) {
+            $overrideUpdates['access_host_id'] = $validated['access_host_id'] ?? null;
+            $overrideUpdates['access_host_name'] = $validated['access_host_name'] ?? null;
+        }
+        $overrides = array_merge($existingOverrides, $overrideUpdates);
 
         IntegrationSiteConfig::updateOrCreate(
             [
@@ -54,13 +98,92 @@ class SiteIntegrationController extends Controller
             ],
             [
                 'tenant_id' => $tenantId,
-                'mapped_external_site_id' => $validated['mapped_external_site_id'] ?? null,
+                'mapped_external_site_id' => $mappedId,
                 'mapped_external_site_name' => $validated['mapped_external_site_name'] ?? null,
-                'is_active' => $validated['is_active'] ?? true,
+                'status' => $status,
+                'is_active' => $isActive,
+                'overrides' => $overrides,
             ]
         );
 
         return redirect()->back()->with('success', 'Integration configured successfully.');
+    }
+
+    public function syncSites(Request $request, Site $site, string $provider, IntegrationAdapterRegistry $registry)
+    {
+        $this->authorize('update', $site);
+        $tenantId = $this->resolveTenantId($request->user(), $site);
+
+        $tenantSecret = IntegrationTenantSecret::where('tenant_id', $tenantId)
+            ->where('provider', $provider)
+            ->first();
+
+        if (!$tenantSecret) {
+            return redirect()->back()->with('error', 'No tenant credentials found for this integration.');
+        }
+
+        if (!$registry->has($provider)) {
+            return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
+        }
+
+        $syncLog = IntegrationSyncLog::create([
+            'tenant_id' => $tenantId,
+            'provider' => $provider,
+            'site_id' => $site->id,
+            'action' => 'discover_sites',
+            'status' => IntegrationSyncLog::STATUS_STARTED,
+            'started_at' => now(),
+        ]);
+
+        try {
+            $sites = $registry->resolve($provider)->discoverSites($tenantSecret);
+            $hosts = [];
+            $adapter = $registry->resolve($provider);
+            if (method_exists($adapter, 'discoverHosts')) {
+                try {
+                    $hosts = $adapter->discoverHosts($tenantSecret);
+                } catch (\Throwable $e) {
+                    $hosts = [];
+                }
+            }
+
+            $config = $this->mergeSecretConfig(
+                $tenantSecret->config,
+                [
+                    'discovered_sites' => array_values($sites),
+                    'discovered_hosts' => array_values($hosts),
+                    'sites_synced_at' => now()->toISOString(),
+                ]
+            );
+
+            $tenantSecret->update([
+                'config' => $config,
+                'last_synced_at' => now(),
+                'last_error' => null,
+            ]);
+
+            $syncLog->update([
+                'items_processed' => count($sites),
+                'items_created' => count($sites),
+            ]);
+
+            if (count($sites) > 0) {
+                $syncLog->markCompleted(IntegrationSyncLog::STATUS_SUCCESS);
+                return redirect()->back()->with('success', 'Integration sites synced successfully.');
+            }
+
+            $syncLog->markCompleted(IntegrationSyncLog::STATUS_PARTIAL, 'No sites returned by provider API.');
+            return redirect()->back()->with('warning', 'No sites returned by provider API.');
+        } catch (\Throwable $e) {
+            $syncLog->markCompleted(IntegrationSyncLog::STATUS_FAILED, $e->getMessage());
+
+            $tenantSecret->update([
+                'status' => IntegrationTenantSecret::STATUS_ERROR,
+                'last_error' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()->with('error', 'Failed to sync sites: ' . $e->getMessage());
+        }
     }
 
     public function testConnection(Request $request, Site $site, string $provider, IntegrationAdapterRegistry $registry)
@@ -174,6 +297,119 @@ class SiteIntegrationController extends Controller
         }
     }
 
+    public function pullEvents(Request $request, Site $site, string $provider, IntegrationAdapterRegistry $registry)
+    {
+        $this->authorize('update', $site);
+        $tenantId = $this->resolveTenantId($request->user(), $site);
+
+        if (!$registry->has($provider)) {
+            return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
+        }
+
+        $siteConfig = IntegrationSiteConfig::firstOrCreate(
+            [
+                'site_id' => $site->id,
+                'provider' => $provider,
+            ],
+            [
+                'tenant_id' => $tenantId,
+                'status' => IntegrationSiteConfig::STATUS_TENANT_ONLY,
+                'is_active' => true,
+            ]
+        );
+
+        $tenantSecret = IntegrationTenantSecret::query()
+            ->forTenant($tenantId)
+            ->where('provider', $provider)
+            ->connected()
+            ->first();
+
+        if (!$tenantSecret) {
+            return redirect()->back()->with('error', 'Tenant credentials are not connected for this integration.');
+        }
+
+        $accessSecret = IntegrationSiteSecret::query()
+            ->where('tenant_id', $tenantId)
+            ->where('site_id', $site->id)
+            ->where('provider', $provider)
+            ->where('capability', 'access_api')
+            ->first();
+
+        if (!$accessSecret || !$accessSecret->is_enabled || empty($accessSecret->base_url)) {
+            return redirect()->back()->with('error', 'Access API credentials are missing for this location.');
+        }
+
+        $since = null;
+        if ($request->filled('since')) {
+            try {
+                $since = \Carbon\Carbon::parse($request->input('since'));
+            } catch (\Throwable) {
+                $since = null;
+            }
+        } elseif ($accessSecret->last_tested_at) {
+            $since = $accessSecret->last_tested_at->copy()->subMinutes(5);
+        } else {
+            $since = now()->subDays(2);
+        }
+
+        try {
+            $events = $registry->resolve($provider)->pullEvents($siteConfig, $tenantSecret, $since);
+            $created = 0;
+            $updated = 0;
+
+            foreach ($events as $event) {
+                $sourceId = $event['source_event_id'] ?? null;
+                if (!$sourceId) {
+                    continue;
+                }
+
+                $model = TimelineEvent::updateOrCreate(
+                    [
+                        'source_type' => 'unifi_access',
+                        'source_id' => $sourceId,
+                    ],
+                    [
+                        'occurred_at' => $event['occurred_at'] ?? now(),
+                        'type' => 'unifi_access',
+                        'actor_user_id' => $request->user()?->id,
+                        'site_id' => $site->id,
+                        'subject' => $event['summary'] ?? 'UniFi Access event',
+                        'body' => $event['summary'] ?? null,
+                        'meta' => [
+                            'event_type' => $event['event_type'] ?? null,
+                            'door' => $event['door_name'] ?? null,
+                            'user' => $event['user_name'] ?? null,
+                            'direction' => $event['direction'] ?? null,
+                            'provider' => $provider,
+                        ],
+                        'visibility' => 'internal',
+                        'created_by' => $request->user()?->id,
+                    ]
+                );
+
+                if ($model->wasRecentlyCreated) {
+                    $created++;
+                } else {
+                    $updated++;
+                }
+            }
+
+            $accessSecret->update([
+                'last_tested_at' => now(),
+                'last_error' => null,
+            ]);
+
+            return redirect()->back()->with('success', "Access events synced. Added {$created}, updated {$updated}.");
+        } catch (\Throwable $e) {
+            $accessSecret->update([
+                'last_tested_at' => now(),
+                'last_error' => $e->getMessage(),
+            ]);
+
+            return redirect()->back()->with('error', 'Access event sync failed: ' . $e->getMessage());
+        }
+    }
+
     public function updateSecret(Request $request, Site $site, string $provider, string $capability)
     {
         $this->authorize('update', $site);
@@ -226,5 +462,18 @@ class SiteIntegrationController extends Controller
         $tenantId = $user->tenant_id ?? $user->organization_id ?? $site?->tenant_id ?? 1;
 
         return (int) $tenantId;
+    }
+
+    private function mergeSecretConfig(?array $existingConfig, array $newConfig): array
+    {
+        $existing = is_array($existingConfig) ? $existingConfig : [];
+
+        $preserved = [
+            'discovered_sites' => $existing['discovered_sites'] ?? [],
+            'discovered_hosts' => $existing['discovered_hosts'] ?? [],
+            'sites_synced_at' => $existing['sites_synced_at'] ?? null,
+        ];
+
+        return array_merge($preserved, $existing, $newConfig);
     }
 }

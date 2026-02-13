@@ -163,9 +163,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/integrations/{provider}/test', [SiteIntegrationController::class, 'testConnection'])
             ->name('sites.integrations.test')
             ->middleware('permission:integrations.manage_site_secrets');
+        Route::post('/integrations/{provider}/sync-sites', [SiteIntegrationController::class, 'syncSites'])
+            ->name('sites.integrations.syncSites')
+            ->middleware('permission:integrations.manage_site_secrets');
         Route::post('/integrations/{provider}/sync-devices', [SiteIntegrationController::class, 'syncDevices'])
             ->name('sites.integrations.syncDevices')
             ->middleware('permission:siteHardware.manage');
+        Route::post('/integrations/{provider}/pull-events', [SiteIntegrationController::class, 'pullEvents'])
+            ->name('sites.integrations.pullEvents')
+            ->middleware('permission:integrations.manage_site_secrets');
         Route::put('/integrations/{provider}/secrets/{capability}', [SiteIntegrationController::class, 'updateSecret'])
             ->name('sites.integrations.updateSecret')
             ->middleware('permission:integrations.manage_site_secrets');
