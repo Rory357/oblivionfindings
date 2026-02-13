@@ -29,7 +29,7 @@ class IntegrationHubController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('integrations.view'), 403);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveTenantId($user);
 
         // Load existing integrations and tenant secrets for this tenant
         $existingIntegrations = Integration::query()
@@ -62,5 +62,12 @@ class IntegrationHubController extends Controller
                 'manage' => $user->canDo('integrations.manage_tenant_secrets'),
             ],
         ]);
+    }
+
+    private function resolveTenantId($user): int
+    {
+        $tenantId = $user->tenant_id ?? $user->organization_id ?? 1;
+
+        return (int) $tenantId;
     }
 }

@@ -27,7 +27,7 @@ class UnifiSettingsController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveTenantId($user);
 
         // Tenant secret (never expose encrypted values)
         $tenantSecret = IntegrationTenantSecret::query()
@@ -161,7 +161,7 @@ class UnifiSettingsController extends Controller
             'api_key' => ['required', 'string'],
         ]);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveTenantId($user);
 
         IntegrationTenantSecret::updateOrCreate(
             [
@@ -200,7 +200,7 @@ class UnifiSettingsController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveTenantId($user);
 
         $secret = IntegrationTenantSecret::query()
             ->forTenant($tenantId)
@@ -271,7 +271,7 @@ class UnifiSettingsController extends Controller
             'api_key' => ['required', 'string'],
         ]);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveTenantId($user);
 
         $secret = IntegrationTenantSecret::query()
             ->forTenant($tenantId)
@@ -297,7 +297,7 @@ class UnifiSettingsController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveTenantId($user);
 
         $secret = IntegrationTenantSecret::query()
             ->forTenant($tenantId)
@@ -372,7 +372,7 @@ class UnifiSettingsController extends Controller
             'external_site_name' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveTenantId($user);
 
         $site = Site::query()
             ->where('tenant_id', $tenantId)
@@ -402,9 +402,10 @@ class UnifiSettingsController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        $tenantId = $this->resolveTenantId($user);
 
         abort_unless(
-            $siteConfig->tenant_id === $user->tenant_id && $siteConfig->provider === self::PROVIDER,
+            $siteConfig->tenant_id === $tenantId && $siteConfig->provider === self::PROVIDER,
             404
         );
 
@@ -425,7 +426,7 @@ class UnifiSettingsController extends Controller
             'site_config_id' => ['required', 'integer', 'exists:integration_site_configs,id'],
         ]);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveTenantId($user);
 
         $siteConfig = IntegrationSiteConfig::query()
             ->forTenant($tenantId)
@@ -505,8 +506,9 @@ class UnifiSettingsController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('integrations.manage_tenant_secrets'), 403);
+        $tenantId = $this->resolveTenantId($user);
 
-        abort_unless($hardware->tenant_id === $user->tenant_id && $hardware->provider === self::PROVIDER, 404);
+        abort_unless($hardware->tenant_id === $tenantId && $hardware->provider === self::PROVIDER, 404);
 
         $validated = $request->validate([
             'room_id' => ['nullable', 'integer', 'exists:site_rooms,id'],
@@ -516,7 +518,7 @@ class UnifiSettingsController extends Controller
 
         if ($roomId !== null) {
             $room = SiteRoom::query()
-                ->where('tenant_id', $user->tenant_id)
+                ->where('tenant_id', $tenantId)
                 ->where('site_id', $hardware->site_id)
                 ->find($roomId);
 
@@ -547,7 +549,7 @@ class UnifiSettingsController extends Controller
             'config.quiet_hours_end' => ['nullable', 'date_format:H:i'],
         ]);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveTenantId($user);
 
         $secret = IntegrationTenantSecret::query()
             ->forTenant($tenantId)
@@ -577,5 +579,12 @@ class UnifiSettingsController extends Controller
         ];
 
         return array_merge($preserved, $existing, $newConfig);
+    }
+
+    private function resolveTenantId($user): int
+    {
+        $tenantId = $user->tenant_id ?? $user->organization_id ?? 1;
+
+        return (int) $tenantId;
     }
 }

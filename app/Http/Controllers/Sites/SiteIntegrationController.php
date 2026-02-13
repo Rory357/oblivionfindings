@@ -17,6 +17,7 @@ class SiteIntegrationController extends Controller
     public function index(Request $request, Site $site)
     {
         $this->authorize('view', $site);
+        $tenantId = $this->resolveTenantId($request->user(), $site);
 
         $configs = IntegrationSiteConfig::where('site_id', $site->id)->get();
 
@@ -24,7 +25,7 @@ class SiteIntegrationController extends Controller
             ->select(['id', 'tenant_id', 'site_id', 'provider', 'capability', 'base_url', 'is_enabled', 'last_tested_at', 'last_error'])
             ->get();
 
-        $tenantSecrets = IntegrationTenantSecret::where('tenant_id', $request->user()->tenant_id)
+        $tenantSecrets = IntegrationTenantSecret::where('tenant_id', $tenantId)
             ->select(['id', 'tenant_id', 'provider', 'secret_last4', 'status', 'last_tested_at', 'last_synced_at', 'last_error'])
             ->get();
 
@@ -38,6 +39,7 @@ class SiteIntegrationController extends Controller
     public function configure(Request $request, Site $site, string $provider)
     {
         $this->authorize('update', $site);
+        $tenantId = $this->resolveTenantId($request->user(), $site);
 
         $validated = $request->validate([
             'mapped_external_site_id' => 'nullable|string|max:255',
@@ -51,7 +53,7 @@ class SiteIntegrationController extends Controller
                 'provider' => $provider,
             ],
             [
-                'tenant_id' => $request->user()->tenant_id,
+                'tenant_id' => $tenantId,
                 'mapped_external_site_id' => $validated['mapped_external_site_id'] ?? null,
                 'mapped_external_site_name' => $validated['mapped_external_site_name'] ?? null,
                 'is_active' => $validated['is_active'] ?? true,
@@ -64,8 +66,9 @@ class SiteIntegrationController extends Controller
     public function testConnection(Request $request, Site $site, string $provider, IntegrationAdapterRegistry $registry)
     {
         $this->authorize('view', $site);
+        $tenantId = $this->resolveTenantId($request->user(), $site);
 
-        $tenantSecret = IntegrationTenantSecret::where('tenant_id', $request->user()->tenant_id)
+        $tenantSecret = IntegrationTenantSecret::where('tenant_id', $tenantId)
             ->where('provider', $provider)
             ->first();
 
@@ -102,7 +105,7 @@ class SiteIntegrationController extends Controller
             return redirect()->back()->with('error', 'No adapter registered for this integration provider.');
         }
 
-        $tenantId = $request->user()->tenant_id;
+        $tenantId = $this->resolveTenantId($request->user(), $site);
 
         $siteConfig = IntegrationSiteConfig::query()
             ->forTenant($tenantId)
@@ -174,6 +177,7 @@ class SiteIntegrationController extends Controller
     public function updateSecret(Request $request, Site $site, string $provider, string $capability)
     {
         $this->authorize('update', $site);
+        $tenantId = $this->resolveTenantId($request->user(), $site);
 
         $validated = $request->validate([
             'base_url' => 'nullable|string|max:500',
@@ -188,7 +192,7 @@ class SiteIntegrationController extends Controller
                 'capability' => $capability,
             ],
             [
-                'tenant_id' => $request->user()->tenant_id,
+                'tenant_id' => $tenantId,
                 'base_url' => $validated['base_url'] ?? null,
                 'secret_encrypted' => Crypt::encryptString($validated['secret']),
                 'is_enabled' => $validated['is_enabled'] ?? true,
@@ -215,5 +219,12 @@ class SiteIntegrationController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Integration overrides updated successfully.');
+    }
+
+    private function resolveTenantId($user, ?Site $site = null): int
+    {
+        $tenantId = $user->tenant_id ?? $user->organization_id ?? $site?->tenant_id ?? 1;
+
+        return (int) $tenantId;
     }
 }
