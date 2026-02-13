@@ -335,6 +335,45 @@ function buildNavigationGroups({
         });
     }
 
+    // HR
+    const hrGroup: NavGroup = {
+        id: 'hr',
+        label: 'HR',
+        items: [],
+    };
+
+    // My HR is always visible to any authenticated user
+    hrGroup.items.push({ title: 'My HR', href: '/hr/my', icon: Home });
+    hrGroup.items.push({ title: 'My Training', href: '/hr/my/training', icon: Target });
+
+    const hasAnyHr = can?.hr?.recruitment?.view || can?.hr?.employees?.viewAny || can?.hr?.compliance?.view
+        || can?.hr?.leave?.viewAny || can?.hr?.performance?.view || can?.hr?.reports?.view
+        || can?.hr?.policies?.view;
+
+    if (hasAnyHr) {
+        if (can?.hr?.recruitment?.view) {
+            hrGroup.items.push({ title: 'Recruitment', href: '/hr/recruitment', icon: Users });
+        }
+        if (can?.hr?.employees?.viewAny) {
+            hrGroup.items.push({ title: 'People', href: '/hr/people', icon: Users });
+        }
+        if (can?.hr?.compliance?.view) {
+            hrGroup.items.push({ title: 'Compliance', href: '/hr/compliance', icon: Shield });
+        }
+        if (can?.hr?.leave?.viewAny) {
+            hrGroup.items.push({ title: 'Leave & Rosters', href: '/hr/leave', icon: CalendarDays });
+        }
+        if (can?.hr?.performance?.view) {
+            hrGroup.items.push({ title: 'Performance', href: '/hr/performance', icon: ClipboardCheck });
+        }
+        if (can?.hr?.policies?.view) {
+            hrGroup.items.push({ title: 'Policies', href: '/hr/policies', icon: FileText });
+        }
+        if (can?.hr?.reports?.view) {
+            hrGroup.items.push({ title: 'Reports', href: '/hr/reports', icon: FileText });
+        }
+    }
+
     // Governance
     if (can?.governance?.view) {
         governanceGroup.items.push(
@@ -379,13 +418,6 @@ function buildNavigationGroups({
             icon: ShieldAlert,
         });
     }
-    if (can?.unifi?.manage) {
-        systemGroup.items.push({
-            title: 'UniFi',
-            href: '/integrations/unifi',
-            icon: Settings,
-        });
-    }
     systemGroup.items.push({ title: 'Settings', href: '/settings', icon: Settings });
 
     return [
@@ -394,6 +426,7 @@ function buildNavigationGroups({
         ...(operationsGroup.items.length > 0 ? [operationsGroup] : []),
         ...(resourcesGroup.items.length > 0 ? [resourcesGroup] : []),
         ...(complianceGroup.items.length > 0 ? [complianceGroup] : []),
+        ...(hrGroup.items.length > 0 ? [hrGroup] : []),
         ...(governanceGroup.items.length > 0 ? [governanceGroup] : []),
         ...(systemGroup.items.length > 0 ? [systemGroup] : []),
     ];

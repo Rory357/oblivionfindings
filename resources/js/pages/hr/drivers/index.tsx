@@ -1,0 +1,218 @@
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { type BreadcrumbItem } from '@/types';
+
+interface DriverRecord {
+    id: number;
+    user: { id: number; name: string };
+    licence_class: string;
+    licence_number: string;
+    licence_expiry: string;
+    status: 'approved' | 'pending' | 'suspended' | 'expired';
+    approved_at: string | null;
+    suspended_at: string | null;
+}
+
+interface Props {
+    records: {
+        data: DriverRecord[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+    summary: {
+        total: number;
+        approved: number;
+        pending: number;
+        suspended: number;
+        expired: number;
+    };
+    filters: { status: string | null; q: string };
+    can: { manage: boolean };
+}
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'HR', href: '/hr' },
+    { title: 'Driver Eligibility', href: '/hr/drivers' },
+];
+
+const statusConfig: Record<string, { className: string; label: string }> = {
+    approved: {
+        className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+        label: 'Approved',
+    },
+    pending: {
+        className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
+        label: 'Pending',
+    },
+    suspended: {
+        className: 'border-red-500/30 text-red-400 bg-red-500/10',
+        label: 'Suspended',
+    },
+    expired: {
+        className: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
+        label: 'Expired',
+    },
+};
+
+export default function DriversIndex({ records, summary, filters, can }: Props) {
+    function applyFilter(key: string, value: string | null) {
+        router.get('/hr/drivers', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
+    }
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Driver Eligibility" />
+            <div className="flex flex-col gap-6 p-6">
+                <div className="flex items-center justify-between">
+                    <h1 className="text-2xl font-bold">Driver Eligibility Register</h1>
+                </div>
+
+                {/* Summary Cards */}
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Total</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-2xl font-bold">{summary.total}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Approved</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-2xl font-bold text-emerald-500">{summary.approved}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Pending</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-2xl font-bold text-yellow-500">{summary.pending}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Suspended</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-2xl font-bold text-red-500">{summary.suspended}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Expired</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-2xl font-bold text-slate-400">{summary.expired}</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Filters */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <Input
+                        placeholder="Search by name or licence..."
+                        defaultValue={filters.q}
+                        className="w-64"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') applyFilter('q', (e.target as HTMLInputElement).value);
+                        }}
+                    />
+                    <Select value={filters.status || '__none__'} onValueChange={(v) => applyFilter('status', v === '__none__' ? null : v)}>
+                        <SelectTrigger className="w-40">
+                            <SelectValue placeholder="All Status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="__none__">All Status</SelectItem>
+                            <SelectItem value="approved">Approved</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="suspended">Suspended</SelectItem>
+                            <SelectItem value="expired">Expired</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Table */}
+                <Card>
+                    <CardContent className="p-0">
+                        <table className="w-full text-sm">
+                            <thead className="border-b bg-muted/50">
+                                <tr>
+                                    <th className="px-4 py-3 text-left font-medium">Name</th>
+                                    <th className="px-4 py-3 text-left font-medium">Licence Class</th>
+                                    <th className="px-4 py-3 text-left font-medium">Licence Number</th>
+                                    <th className="px-4 py-3 text-left font-medium">Expiry</th>
+                                    <th className="px-4 py-3 text-left font-medium">Status</th>
+                                    <th className="px-4 py-3 text-left font-medium">Approved</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {records.data.map((record) => {
+                                    const config = statusConfig[record.status] || statusConfig.pending;
+                                    return (
+                                        <tr key={record.id} className="hover:bg-muted/30">
+                                            <td className="px-4 py-3 font-medium">{record.user.name}</td>
+                                            <td className="px-4 py-3">{record.licence_class}</td>
+                                            <td className="px-4 py-3 text-muted-foreground">{record.licence_number}</td>
+                                            <td className="px-4 py-3 text-muted-foreground">{record.licence_expiry}</td>
+                                            <td className="px-4 py-3">
+                                                <Badge variant="outline" className={config.className}>
+                                                    {config.label}
+                                                </Badge>
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {record.approved_at || '\u2014'}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {records.data.length === 0 && (
+                                    <tr>
+                                        <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                                            No driver eligibility records found.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </CardContent>
+                </Card>
+
+                {/* Pagination */}
+                {records.last_page > 1 && (
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                            Showing {(records.current_page - 1) * records.per_page + 1} to{' '}
+                            {Math.min(records.current_page * records.per_page, records.total)} of{' '}
+                            {records.total} results
+                        </p>
+                        <div className="flex items-center gap-1">
+                            {records.links.map((link, i) => (
+                                <Button
+                                    key={i}
+                                    variant={link.active ? 'default' : 'outline'}
+                                    size="sm"
+                                    disabled={!link.url}
+                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                >
+                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </div>
+        </AppLayout>
+    );
+}

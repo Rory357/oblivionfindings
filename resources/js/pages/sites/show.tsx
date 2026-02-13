@@ -23,6 +23,7 @@ import {
     ShieldAlert,
     Truck,
     Package,
+    Cpu,
     BedDouble,
     DoorOpen,
     LayoutGrid,
@@ -126,6 +127,8 @@ type Props = {
     typeSpecificData: TypeSpecificData;
     vendors?: VendorLite[];
     credentialCount?: number;
+    hardwareCount?: number;
+    integrationStatus?: Array<{ provider: string; status: string }>;
     can_edit: boolean;
     can?: { createAsset?: boolean };
 };
@@ -150,7 +153,7 @@ function bytes(n?: number | null): string {
     return `${mb.toFixed(1)} MB`;
 }
 
-export default function SiteShow({ site, clients, assets, contacts, documents, checklist, typeSpecificData, vendors = [], credentialCount = 0, can_edit, can: assetCan }: Props) {
+export default function SiteShow({ site, clients, assets, contacts, documents, checklist, typeSpecificData, vendors = [], credentialCount = 0, hardwareCount = 0, integrationStatus = [], can_edit, can: assetCan }: Props) {
     const TypeIcon = typeIcons[site.type];
     const percent = Math.round((checklist.filter((c) => c.done).length / Math.max(1, checklist.length)) * 100);
     const page = usePage<any>();
@@ -357,6 +360,13 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                 Vendors & Credentials
                             </TabsTrigger>
                         )}
+                        <TabsTrigger value="hardware" className="flex items-center gap-1">
+                            <Cpu className="w-4 h-4" />
+                            Hardware
+                            {hardwareCount > 0 && (
+                                <Badge variant="outline" className="ml-1 text-xs px-1.5 py-0">{hardwareCount}</Badge>
+                            )}
+                        </TabsTrigger>
                         <TabsTrigger value="type-specific" className="flex items-center gap-1">
                             {site.type === 'house' && <BedDouble className="w-4 h-4" />}
                             {site.type === 'head_office' && <DoorOpen className="w-4 h-4" />}
@@ -706,6 +716,53 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             </div>
                         </TabsContent>
                     )}
+
+                    {/* Hardware Tab */}
+                    <TabsContent value="hardware">
+                        <Card>
+                            <CardContent className="p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h3 className="font-medium flex items-center gap-2">
+                                            <Cpu className="w-4 h-4" />
+                                            Location Hardware & Configuration
+                                        </h3>
+                                        <p className="text-sm text-slate-400 mt-1">
+                                            {hardwareCount} device{hardwareCount !== 1 ? 's' : ''} registered
+                                            {integrationStatus.length > 0 && (
+                                                <> · {integrationStatus.length} integration{integrationStatus.length !== 1 ? 's' : ''} active</>
+                                            )}
+                                        </p>
+                                    </div>
+                                    <Button asChild>
+                                        <Link href={`/sites/${site.id}/hardware`}>
+                                            Manage Hardware
+                                        </Link>
+                                    </Button>
+                                </div>
+                                {integrationStatus.length > 0 && (
+                                    <div className="flex gap-2 mb-4">
+                                        {integrationStatus.map((i) => (
+                                            <Badge key={i.provider} variant="outline" className={
+                                                i.status === 'hybrid' ? 'border-emerald-500/30 text-emerald-400' :
+                                                i.status === 'tenant_only' ? 'border-blue-500/30 text-blue-400' :
+                                                'border-slate-500/30 text-slate-400'
+                                            }>
+                                                {i.provider.charAt(0).toUpperCase() + i.provider.slice(1)}: {i.status.replace('_', ' ')}
+                                            </Badge>
+                                        ))}
+                                    </div>
+                                )}
+                                {hardwareCount === 0 && integrationStatus.length === 0 && (
+                                    <div className="text-center py-8 text-slate-400">
+                                        <Cpu className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                        <p>No hardware registered for this site</p>
+                                        <p className="text-sm mt-1">Add devices manually or connect an integration to auto-discover hardware</p>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
 
                     {/* Type-Specific Tab */}
                     <TabsContent value="type-specific">

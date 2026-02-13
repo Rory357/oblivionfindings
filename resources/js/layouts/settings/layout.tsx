@@ -92,6 +92,13 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
             icon: null,
         });
     }
+    if (can?.integrations?.view) {
+        extraItems.push({
+            title: 'Integrations',
+            href: '/settings/integrations',
+            icon: null,
+        });
+    }
 
     const allItems = [...sidebarNavItems, ...extraItems];
 

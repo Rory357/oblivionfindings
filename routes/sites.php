@@ -8,6 +8,8 @@ use App\Http\Controllers\Sites\{
     SiteChecklistTemplateController,
     SiteVendorController,
     SiteCredentialController,
+    SiteHardwareController,
+    SiteIntegrationController,
     SiteInspectionController,
     SiteOnboardingController,
     SiteReportingController,
@@ -124,6 +126,52 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/inspections/{schedule}', [SiteInspectionController::class, 'destroy'])
             ->name('sites.inspections.destroy')
             ->middleware('permission:checklists.schedule');
+
+        // Hardware
+        Route::get('/hardware', [SiteHardwareController::class, 'index'])
+            ->name('sites.hardware.index')
+            ->middleware('permission:siteHardware.view');
+        Route::post('/hardware', [SiteHardwareController::class, 'store'])
+            ->name('sites.hardware.store')
+            ->middleware('permission:siteHardware.manage');
+        Route::put('/hardware/{hardware}', [SiteHardwareController::class, 'update'])
+            ->name('sites.hardware.update')
+            ->middleware('permission:siteHardware.manage');
+        Route::delete('/hardware/{hardware}', [SiteHardwareController::class, 'destroy'])
+            ->name('sites.hardware.destroy')
+            ->middleware('permission:siteHardware.manage');
+        Route::post('/hardware/{hardware}/assign-room', [SiteHardwareController::class, 'assignRoom'])
+            ->name('sites.hardware.assignRoom')
+            ->middleware('permission:siteHardware.manage');
+        Route::post('/hardware/{hardware}/link-asset', [SiteHardwareController::class, 'linkAsset'])
+            ->name('sites.hardware.linkAsset')
+            ->middleware('permission:siteHardware.manage');
+        Route::post('/hardware/refresh-status', [SiteHardwareController::class, 'refreshStatus'])
+            ->name('sites.hardware.refreshStatus')
+            ->middleware('permission:siteHardware.manage');
+        Route::post('/hardware/rooms', [SiteHardwareController::class, 'manageRooms'])
+            ->name('sites.hardware.manageRooms')
+            ->middleware('permission:siteHardware.manage');
+
+        // Site Integrations
+        Route::get('/integrations', [SiteIntegrationController::class, 'index'])
+            ->name('sites.integrations.index')
+            ->middleware('permission:siteHardware.view');
+        Route::post('/integrations/{provider}', [SiteIntegrationController::class, 'configure'])
+            ->name('sites.integrations.configure')
+            ->middleware('permission:integrations.manage_site_secrets');
+        Route::post('/integrations/{provider}/test', [SiteIntegrationController::class, 'testConnection'])
+            ->name('sites.integrations.test')
+            ->middleware('permission:integrations.manage_site_secrets');
+        Route::post('/integrations/{provider}/sync-devices', [SiteIntegrationController::class, 'syncDevices'])
+            ->name('sites.integrations.syncDevices')
+            ->middleware('permission:siteHardware.manage');
+        Route::put('/integrations/{provider}/secrets/{capability}', [SiteIntegrationController::class, 'updateSecret'])
+            ->name('sites.integrations.updateSecret')
+            ->middleware('permission:integrations.manage_site_secrets');
+        Route::put('/integrations/{provider}/overrides', [SiteIntegrationController::class, 'updateOverrides'])
+            ->name('sites.integrations.updateOverrides')
+            ->middleware('permission:integrations.manage_site_secrets');
 
         // Onboarding
         Route::get('/onboarding', [SiteOnboardingController::class, 'wizard'])

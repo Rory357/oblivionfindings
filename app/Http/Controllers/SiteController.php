@@ -304,6 +304,16 @@ class SiteController extends Controller
                     'is_preferred' => (bool) $v->is_preferred,
                 ]),
             'credentialCount' => \App\Models\SiteCredential::where('site_id', $site->id)->count(),
+            'hardwareCount' => \App\Models\LocationHardware::where('site_id', $site->id)->count(),
+            'integrationStatus' => \App\Models\Integration\IntegrationSiteConfig::where('site_id', $site->id)
+                ->where('is_active', true)
+                ->get()
+                ->map(fn($c) => [
+                    'provider' => $c->provider,
+                    'status' => $c->status,
+                ])
+                ->values()
+                ->all(),
             'can_edit' => (bool) ($user && $user->canDo('sites.update') && $user->can('update', $site)),
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),

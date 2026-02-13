@@ -1,0 +1,63 @@
+<?php
+
+namespace App\Domain\Hr\Models;
+
+use App\Models\Concerns\AuditableChanges;
+use App\Models\Site;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
+class HrApplication extends Model
+{
+    use HasFactory, AuditableChanges;
+
+    protected $fillable = [
+        'tenant_id',
+        'candidate_id',
+        'position_title',
+        'position_role',
+        'target_site_id',
+        'cv_storage_path',
+        'cv_original_name',
+        'cover_letter',
+        'answers',
+        'status',
+        'rejection_reason',
+    ];
+
+    protected $casts = [
+        'answers' => 'array',
+    ];
+
+    /* ------------------------------------------------------------------ */
+    /*  Relationships                                                      */
+    /* ------------------------------------------------------------------ */
+
+    public function candidate(): BelongsTo
+    {
+        return $this->belongsTo(HrCandidate::class, 'candidate_id');
+    }
+
+    public function targetSite(): BelongsTo
+    {
+        return $this->belongsTo(Site::class, 'target_site_id');
+    }
+
+    public function interviews(): HasMany
+    {
+        return $this->hasMany(HrInterview::class, 'application_id');
+    }
+
+    public function referenceChecks(): HasMany
+    {
+        return $this->hasMany(HrReferenceCheck::class, 'application_id');
+    }
+
+    public function offer(): HasOne
+    {
+        return $this->hasOne(HrOffer::class, 'application_id');
+    }
+}

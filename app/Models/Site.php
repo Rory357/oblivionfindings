@@ -145,6 +145,26 @@ class Site extends Model
         return $this->hasMany(SiteInspectionRecord::class);
     }
 
+    public function siteRooms(): HasMany
+    {
+        return $this->hasMany(SiteRoom::class);
+    }
+
+    public function locationHardware(): HasMany
+    {
+        return $this->hasMany(LocationHardware::class);
+    }
+
+    public function integrationConfigs(): HasMany
+    {
+        return $this->hasMany(Integration\IntegrationSiteConfig::class);
+    }
+
+    public function integrationEvents(): HasMany
+    {
+        return $this->hasMany(Integration\IntegrationEvent::class);
+    }
+
     // Accessors
     public function getAddressAttribute(): string
     {

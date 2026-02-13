@@ -13,6 +13,11 @@ use App\Jobs\SendEventReminderJob;
 use App\Jobs\ChecklistDueJob;
 use App\Jobs\InspectionDueJob;
 use App\Jobs\HazardOverdueJob;
+use App\Domain\Hr\Jobs\EvaluateComplianceMatrixJob;
+use App\Domain\Hr\Jobs\SendExpiryRemindersJob;
+use App\Domain\Hr\Jobs\CalculateWellbeingIndicatorsJob;
+use App\Domain\Hr\Jobs\ProcessLeaveBalanceAccrualJob;
+use App\Domain\Hr\Jobs\ArchiveCandidateDataJob;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -103,3 +108,35 @@ app(Schedule::class)
     ->job(new HazardOverdueJob())
     ->timezone('Pacific/Auckland')
     ->dailyAt('09:00');
+
+// HR Module Scheduled Jobs
+
+// Evaluate compliance matrix for all employees: daily at 01:00
+app(Schedule::class)
+    ->job(new EvaluateComplianceMatrixJob())
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('01:00');
+
+// Calculate wellbeing indicators (fatigue, overtime): daily at 02:00
+app(Schedule::class)
+    ->job(new CalculateWellbeingIndicatorsJob())
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('02:00');
+
+// Send expiry reminders (credentials, training, vetting): daily at 08:00
+app(Schedule::class)
+    ->job(new SendExpiryRemindersJob())
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:00');
+
+// Leave balance accrual: monthly on the 1st at 00:30
+app(Schedule::class)
+    ->job(new ProcessLeaveBalanceAccrualJob())
+    ->timezone('Pacific/Auckland')
+    ->monthlyOn(1, '00:30');
+
+// Archive expired candidate data per retention policy: weekly Sunday 03:00
+app(Schedule::class)
+    ->job(new ArchiveCandidateDataJob())
+    ->timezone('Pacific/Auckland')
+    ->weeklyOn(0, '03:00');

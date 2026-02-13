@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ControlRoom\ControlRoomDashboardController;
 use App\Http\Controllers\ControlRoom\ControlRoomAlertController;
 use App\Http\Controllers\ControlRoom\ControlRoomReportController;
+use App\Http\Controllers\ControlRoom\AlertController as IntegrationAlertController;
 
 /**
  * Control Room Routes
@@ -72,5 +73,24 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:controlRoom.alerts.create')->group(function () {
         Route::post('/control-room/alerts', [ControlRoomAlertController::class, 'store'])
             ->name('control-room.alerts.store');
+    });
+
+    // Integration Alerts (from integration_alerts table)
+    Route::prefix('control-room/integration-alerts')->group(function () {
+        Route::get('/', [IntegrationAlertController::class, 'index'])
+            ->middleware('permission:controlRoom.alerts.view')
+            ->name('control-room.integration-alerts.index');
+        Route::post('/{alert}/ack', [IntegrationAlertController::class, 'acknowledge'])
+            ->middleware('permission:controlRoom.alerts.manage')
+            ->name('control-room.integration-alerts.ack');
+        Route::post('/{alert}/assign', [IntegrationAlertController::class, 'assign'])
+            ->middleware('permission:controlRoom.alerts.assign')
+            ->name('control-room.integration-alerts.assign');
+        Route::post('/{alert}/close', [IntegrationAlertController::class, 'close'])
+            ->middleware('permission:controlRoom.alerts.manage')
+            ->name('control-room.integration-alerts.close');
+        Route::post('/{alert}/create-incident', [IntegrationAlertController::class, 'createIncident'])
+            ->middleware('permission:controlRoom.alerts.manage')
+            ->name('control-room.integration-alerts.create-incident');
     });
 });

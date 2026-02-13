@@ -40,6 +40,13 @@ class StaffBackgroundCheck extends Model
         'notes',
         'created_by',
         'updated_by',
+
+        // NZ Police Vetting fields
+        'nz_police_vetting_ref',
+        'consent_captured_at',
+        'consent_method',
+        'consent_document_path',
+        'approved_agency_ref',
     ];
 
     protected $casts = [
@@ -52,6 +59,7 @@ class StaffBackgroundCheck extends Model
         'enrolled_in_update_service' => 'boolean',
         'verified_at' => 'datetime',
         'renewal_reminder_sent_at' => 'datetime',
+        'consent_captured_at' => 'datetime',
     ];
 
     /**

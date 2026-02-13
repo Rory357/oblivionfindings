@@ -1,0 +1,49 @@
+<?php
+
+namespace App\Domain\Hr\Models;
+
+use App\Models\Concerns\AuditableChanges;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+
+class HrInterview extends Model
+{
+    use HasFactory, AuditableChanges;
+
+    protected $fillable = [
+        'application_id',
+        'scheduled_at',
+        'duration_minutes',
+        'location',
+        'interview_type',
+        'interviewers',
+        'status',
+        'notes',
+        'rating',
+        'outcome',
+        'completed_by',
+    ];
+
+    protected $casts = [
+        'scheduled_at' => 'datetime',
+        'interviewers' => 'array',
+        'rating' => 'integer',
+        'duration_minutes' => 'integer',
+    ];
+
+    /* ------------------------------------------------------------------ */
+    /*  Relationships                                                      */
+    /* ------------------------------------------------------------------ */
+
+    public function application(): BelongsTo
+    {
+        return $this->belongsTo(HrApplication::class, 'application_id');
+    }
+
+    public function completedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'completed_by');
+    }
+}

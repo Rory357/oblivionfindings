@@ -10,6 +10,8 @@ use App\Http\Controllers\Settings\BrandingController;
 use App\Http\Controllers\Settings\ServiceContextController;
 use App\Http\Controllers\Settings\NotificationPreferencesController;
 use App\Http\Controllers\Settings\NotificationEscalationsController;
+use App\Http\Controllers\Settings\IntegrationHubController;
+use App\Http\Controllers\Settings\UnifiSettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -126,4 +128,23 @@ Route::middleware('auth')->group(function () {
     Route::put('settings/notifications/escalations', [NotificationEscalationsController::class, 'update'])
         ->middleware('permission:settings.access.manage')
         ->name('settings.notifications.escalations.update');
+
+    // Integrations hub
+    Route::get('settings/integrations', [IntegrationHubController::class, 'index'])
+        ->middleware('permission:integrations.view')
+        ->name('settings.integrations.index');
+
+    // UniFi integration settings
+    Route::prefix('settings/integrations/unifi')->middleware('permission:integrations.manage_tenant_secrets')->group(function () {
+        Route::get('/', [UnifiSettingsController::class, 'index'])->name('settings.integrations.unifi');
+        Route::post('/key', [UnifiSettingsController::class, 'saveKey']);
+        Route::post('/test', [UnifiSettingsController::class, 'testKey']);
+        Route::post('/rotate', [UnifiSettingsController::class, 'rotateKey']);
+        Route::post('/sync-sites', [UnifiSettingsController::class, 'syncSites']);
+        Route::post('/map-site', [UnifiSettingsController::class, 'mapSite']);
+        Route::delete('/map-site/{siteConfig}', [UnifiSettingsController::class, 'removeSiteMapping']);
+        Route::post('/sync-devices', [UnifiSettingsController::class, 'syncDevices']);
+        Route::put('/hardware/{hardware}/room', [UnifiSettingsController::class, 'assignHardwareRoom']);
+        Route::put('/defaults', [UnifiSettingsController::class, 'updateDefaults']);
+    });
 });

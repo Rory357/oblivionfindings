@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\StaffTimeOff;
@@ -232,6 +234,49 @@ class RosteringController extends Controller
                 'notes' => $b->notes,
             ])->values(),
             'capacity' => $capacity,
+
+            // HR leave overlay: approved leave requests overlapping this week
+            'approvedLeave' => $canManageAny ? HrLeaveRequest::where('status', 'approved')
+                ->where('starts_at', '<', $weekEnd)
+                ->where('ends_at', '>', $weekStart)
+                ->with('user:id,name')
+                ->get()
+                ->map(fn ($l) => [
+                    'id' => $l->id,
+                    'user_id' => $l->user_id,
+                    'user' => $l->user?->name,
+                    'leave_type' => $l->leave_type,
+                    'starts_at' => $l->starts_at?->toIso8601String(),
+                    'ends_at' => $l->ends_at?->toIso8601String(),
+                ])->values() : [],
+
+            // HR compliance badges per staff member
+            'complianceBadges' => $canManageAny ? $this->getComplianceBadges($auth->tenant_id) : [],
         ]);
+    }
+
+    /**
+     * Get compliance status badges for all active staff (for rostering overlays).
+     */
+    protected function getComplianceBadges(?int $tenantId): array
+    {
+        if (!$tenantId) {
+            return [];
+        }
+
+        return HrStaffComplianceStatus::where('tenant_id', $tenantId)
+            ->whereIn('status', ['expired', 'expiring_soon'])
+            ->whereHas('requirement', fn ($q) => $q->where('is_active', true))
+            ->with('requirement:id,code,name,hard_stop')
+            ->get()
+            ->groupBy('user_id')
+            ->map(fn ($statuses, $userId) => [
+                'user_id' => $userId,
+                'has_hard_stop' => $statuses->contains(fn ($s) => $s->requirement?->hard_stop && $s->status === 'expired'),
+                'expired_count' => $statuses->where('status', 'expired')->count(),
+                'expiring_count' => $statuses->where('status', 'expiring_soon')->count(),
+            ])
+            ->values()
+            ->toArray();
     }
 }

@@ -316,6 +316,17 @@ class HandleInertiaRequests extends Middleware
                     'delete' => $user->canDo('risks.delete'),
                 ],
 
+                'integrations' => [
+                    'view' => $user->canDo('integrations.view'),
+                    'manageTenantSecrets' => $user->canDo('integrations.manage_tenant_secrets'),
+                    'manageSiteSecrets' => $user->canDo('integrations.manage_site_secrets'),
+                ],
+
+                'siteHardware' => [
+                    'view' => $user->canDo('siteHardware.view'),
+                    'manage' => $user->canDo('siteHardware.manage'),
+                ],
+
                 'unifi' => [
                     'manage' => $user->canDo('unifi.manage'),
                 ],
@@ -372,6 +383,71 @@ class HandleInertiaRequests extends Middleware
                     'record' => $user->canDo('consents.record'),
                     'withdraw' => $user->canDo('consents.withdraw'),
                     'export' => $user->canDo('consents.export'),
+                ],
+
+                'hr' => [
+                    'recruitment' => [
+                        'view' => $user->canDo('hr.recruitment.view'),
+                        'manage' => $user->canDo('hr.recruitment.manage'),
+                    ],
+                    'employees' => [
+                        'viewAny' => $user->canDo('hr.employees.viewAny'),
+                        'viewOwn' => $user->canDo('hr.employees.viewOwn'),
+                        'manage' => $user->canDo('hr.employees.manage'),
+                        'viewFinancial' => $user->canDo('hr.employees.viewFinancial'),
+                        'viewRestricted' => $user->canDo('hr.employees.viewRestricted'),
+                    ],
+                    'compliance' => [
+                        'view' => $user->canDo('hr.compliance.view'),
+                        'manage' => $user->canDo('hr.compliance.manage'),
+                    ],
+                    'training' => [
+                        'view' => $user->canDo('hr.training.view'),
+                        'manage' => $user->canDo('hr.training.manage'),
+                    ],
+                    'vetting' => [
+                        'view' => $user->canDo('hr.vetting.view'),
+                        'manage' => $user->canDo('hr.vetting.manage'),
+                    ],
+                    'leave' => [
+                        'viewAny' => $user->canDo('hr.leave.viewAny'),
+                        'viewOwn' => $user->canDo('hr.leave.viewOwn'),
+                        'approve' => $user->canDo('hr.leave.approve'),
+                        'manage' => $user->canDo('hr.leave.manage'),
+                    ],
+                    'performance' => [
+                        'view' => $user->canDo('hr.performance.view'),
+                        'manage' => $user->canDo('hr.performance.manage'),
+                    ],
+                    'cases' => [
+                        'view' => $user->canDo('hr.cases.view'),
+                        'manage' => $user->canDo('hr.cases.manage'),
+                    ],
+                    'policies' => [
+                        'view' => $user->canDo('hr.policies.view'),
+                        'manage' => $user->canDo('hr.policies.manage'),
+                        'attest' => $user->canDo('hr.policies.attest'),
+                    ],
+                    'documents' => [
+                        'view' => $user->canDo('hr.documents.view'),
+                        'manage' => $user->canDo('hr.documents.manage'),
+                    ],
+                    'payroll' => [
+                        'view' => $user->canDo('hr.payroll.view'),
+                        'export' => $user->canDo('hr.payroll.export'),
+                    ],
+                    'reports' => [
+                        'view' => $user->canDo('hr.reports.view'),
+                        'export' => $user->canDo('hr.reports.export'),
+                    ],
+                    'driver' => [
+                        'view' => $user->canDo('hr.driver.view'),
+                        'manage' => $user->canDo('hr.driver.manage'),
+                    ],
+                    'onboarding' => [
+                        'view' => $user->canDo('hr.onboarding.view'),
+                        'manage' => $user->canDo('hr.onboarding.manage'),
+                    ],
                 ],
 
                 'governance' => [

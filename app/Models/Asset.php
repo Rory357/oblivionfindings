@@ -168,4 +168,9 @@ class Asset extends Model
     {
         return $this->hasMany(AssetIncidentLink::class);
     }
+
+    public function linkedHardware(): HasMany
+    {
+        return $this->hasMany(LocationHardware::class, 'linked_asset_id');
+    }
 }

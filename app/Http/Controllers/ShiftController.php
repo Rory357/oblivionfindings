@@ -11,6 +11,7 @@ use App\Models\ShiftTask;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Domain\Hr\Services\ComplianceMatrixService;
 use App\Services\NotificationService;
 use App\Services\ServiceContextResolver;
 use Illuminate\Support\Facades\Log;
@@ -625,6 +626,27 @@ class ShiftController extends Controller
 
         // Only allow assigning staff users
         abort_unless(User::staff()->whereKey($data['user_id'])->exists(), 404);
+
+        // HR Compliance check: block assignment if hard-stop failures exist
+        try {
+            $assignee = User::findOrFail($data['user_id']);
+            $compliance = app(ComplianceMatrixService::class)->canAssignToShift($assignee, $shift);
+
+            if ($compliance['blocked']) {
+                $failureNames = collect($compliance['failures'])->pluck('requirement')->implode(', ');
+                return back()->withErrors([
+                    'user_id' => "Cannot assign: staff member has compliance failures ({$failureNames}).",
+                ])->with('compliance_warnings', $compliance['warnings']);
+            }
+
+            // Pass warnings through to the session for UI display
+            if (!empty($compliance['warnings'])) {
+                session()->flash('compliance_warnings', $compliance['warnings']);
+            }
+        } catch (\Throwable $e) {
+            // Don't block assignment if compliance service fails
+            Log::warning('Compliance check failed during shift assignment', ['error' => $e->getMessage()]);
+        }
 
         // Check staff overlap conflicts
         $conflicts = Shift::query()

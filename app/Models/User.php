@@ -147,6 +147,11 @@ class User extends Authenticatable
         return $this->hasMany(\App\Models\StaffCredential::class);
     }
 
+    public function complianceStatuses()
+    {
+        return $this->hasMany(\App\Domain\Hr\Models\HrStaffComplianceStatus::class);
+    }
+
     public function staffAvailabilities()
     {
         return $this->hasMany(\App\Models\StaffAvailability::class);
@@ -166,6 +171,55 @@ class User extends Authenticatable
     public function timesheets()
     {
         return $this->hasMany(\App\Models\Timesheet::class);
+    }
+
+    // ---------------------------
+    // HR Module relationships
+    // ---------------------------
+
+    public function hrEmployeeProfile()
+    {
+        return $this->hasOne(\App\Domain\Hr\Models\HrEmployeeProfile::class);
+    }
+
+    public function hrLeaveRequests()
+    {
+        return $this->hasMany(\App\Domain\Hr\Models\HrLeaveRequest::class);
+    }
+
+    public function hrLeaveBalances()
+    {
+        return $this->hasMany(\App\Domain\Hr\Models\HrLeaveBalance::class);
+    }
+
+    public function hrCases()
+    {
+        return $this->hasMany(\App\Domain\Hr\Models\HrCase::class, 'subject_user_id');
+    }
+
+    public function hrComplianceStatuses()
+    {
+        return $this->hasMany(\App\Domain\Hr\Models\HrStaffComplianceStatus::class);
+    }
+
+    public function hrSupervisionNotes()
+    {
+        return $this->hasMany(\App\Domain\Hr\Models\HrSupervisionNote::class, 'staff_user_id');
+    }
+
+    public function hrPerformanceReviews()
+    {
+        return $this->hasMany(\App\Domain\Hr\Models\HrPerformanceReview::class, 'staff_user_id');
+    }
+
+    public function hrPolicyAttestations()
+    {
+        return $this->hasMany(\App\Domain\Hr\Models\HrPolicyAttestation::class);
+    }
+
+    public function hrDriverEligibility()
+    {
+        return $this->hasOne(\App\Domain\Hr\Models\HrDriverEligibility::class);
     }
 
     // ---------------------------

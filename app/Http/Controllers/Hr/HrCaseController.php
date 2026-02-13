@@ -1,0 +1,266 @@
+<?php
+
+namespace App\Http\Controllers\Hr;
+
+use App\Http\Controllers\Controller;
+use App\Domain\Hr\Models\HrCase;
+use App\Domain\Hr\Models\HrCaseEvent;
+use App\Models\User;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
+
+class HrCaseController extends Controller
+{
+    /**
+     * List all HR cases.
+     */
+    public function index(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.cases.view'), 403);
+
+        $tenantId = null;
+
+        $cases = HrCase::forTenant($tenantId)
+            ->with(['subject:id,name', 'assignedTo:id,name'])
+            ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
+            ->when($request->query('case_type'), fn ($q, $type) => $q->where('case_type', $type))
+            ->when($request->query('severity'), fn ($q, $sev) => $q->where('severity', $sev))
+            ->orderByDesc('opened_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return Inertia::render('hr/cases/index', [
+            'cases' => $cases,
+            'filters' => [
+                'status' => $request->query('status'),
+                'case_type' => $request->query('case_type'),
+                'severity' => $request->query('severity'),
+            ],
+            'can' => [
+                'manage' => $user->canDo('hr.cases.manage'),
+                'disciplinary' => $user->canDo('hr.disciplinary.manage'),
+            ],
+        ]);
+    }
+
+    /**
+     * Show form to create a new HR case.
+     */
+    public function create(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+
+        $staff = User::orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        return Inertia::render('hr/cases/create', [
+            'staff' => $staff,
+            'caseTypes' => [
+                ['value' => 'grievance', 'label' => 'Grievance'],
+                ['value' => 'disciplinary', 'label' => 'Disciplinary'],
+                ['value' => 'investigation', 'label' => 'Investigation'],
+                ['value' => 'welfare', 'label' => 'Welfare'],
+                ['value' => 'complaint', 'label' => 'Complaint'],
+                ['value' => 'other', 'label' => 'Other'],
+            ],
+            'severities' => [
+                ['value' => 'low', 'label' => 'Low'],
+                ['value' => 'medium', 'label' => 'Medium'],
+                ['value' => 'high', 'label' => 'High'],
+                ['value' => 'critical', 'label' => 'Critical'],
+            ],
+        ]);
+    }
+
+    /**
+     * Show form to add an event to a case.
+     */
+    public function createEvent(Request $request, HrCase $case)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+
+        return Inertia::render('hr/cases/create-event', [
+            'hrCase' => $case->load('subject:id,name'),
+            'eventTypes' => [
+                ['value' => 'note', 'label' => 'Note'],
+                ['value' => 'meeting', 'label' => 'Meeting'],
+                ['value' => 'phone_call', 'label' => 'Phone Call'],
+                ['value' => 'letter', 'label' => 'Letter'],
+                ['value' => 'email', 'label' => 'Email'],
+                ['value' => 'document', 'label' => 'Document'],
+                ['value' => 'investigation_update', 'label' => 'Investigation Update'],
+                ['value' => 'other', 'label' => 'Other'],
+            ],
+        ]);
+    }
+
+    /**
+     * Show a single HR case with timeline.
+     *
+     * Loads events and disciplinary actions, sorted by occurred_at.
+     */
+    public function show(Request $request, HrCase $case)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.cases.view'), 403);
+
+        $case->load([
+            'subject:id,name,email',
+            'reportedBy:id,name',
+            'assignedTo:id,name',
+            'events' => fn ($q) => $q->with('creator:id,name')->orderBy('occurred_at'),
+            'disciplinaryActions' => fn ($q) => $q->with([
+                'employee:id,name',
+                'investigator:id,name',
+            ])->orderByDesc('created_at'),
+        ]);
+
+        // Build a combined timeline from events and disciplinary milestones
+        $timeline = $case->events
+            ->map(fn ($event) => [
+                'type' => 'event',
+                'id' => $event->id,
+                'title' => $event->title,
+                'description' => $event->description,
+                'event_type' => $event->event_type,
+                'occurred_at' => $event->occurred_at,
+                'created_by' => $event->creator?->name,
+            ])
+            ->sortBy('occurred_at')
+            ->values();
+
+        return Inertia::render('hr/cases/show', [
+            'case' => $case,
+            'timeline' => $timeline,
+            'can' => [
+                'manage' => $user->canDo('hr.cases.manage'),
+                'disciplinary' => $user->canDo('hr.disciplinary.manage'),
+            ],
+        ]);
+    }
+
+    /**
+     * Store a new HR case.
+     */
+    public function store(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+
+        $data = $request->validate([
+            'user_id' => ['required', 'integer', 'exists:users,id'],
+            'case_type' => ['required', 'string', 'in:grievance,disciplinary,investigation,welfare,complaint,other'],
+            'severity' => ['required', 'string', 'in:low,medium,high,critical'],
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:10000'],
+            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+            'is_confidential' => ['boolean'],
+            'access_list' => ['nullable', 'array'],
+            'access_list.*' => ['integer', 'exists:users,id'],
+            'linked_incident_ids' => ['nullable', 'array'],
+            'linked_incident_ids.*' => ['integer'],
+        ]);
+
+        // Generate a unique case number
+        $lastCase = HrCase::orderByDesc('id')
+            ->first();
+
+        $nextNumber = $lastCase
+            ? ((int) str_replace('HR-', '', $lastCase->case_number ?? 'HR-0')) + 1
+            : 1;
+
+        HrCase::create([
+            'tenant_id' => $user->tenant_id,
+            'case_number' => 'HR-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT),
+            'status' => 'open',
+            'reported_by' => $user->id,
+            'opened_at' => now(),
+            'created_by' => $user->id,
+            ...$data,
+        ]);
+
+        return redirect()->back()->with('success', 'HR case opened.');
+    }
+
+    /**
+     * Update an existing HR case.
+     */
+    public function update(Request $request, HrCase $case)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+
+        $data = $request->validate([
+            'case_type' => ['sometimes', 'string', 'in:grievance,disciplinary,investigation,welfare,complaint,other'],
+            'severity' => ['sometimes', 'string', 'in:low,medium,high,critical'],
+            'title' => ['sometimes', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:10000'],
+            'status' => ['sometimes', 'string', 'in:open,under_investigation,awaiting_response,resolved,closed'],
+            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+            'is_confidential' => ['boolean'],
+            'access_list' => ['nullable', 'array'],
+            'access_list.*' => ['integer', 'exists:users,id'],
+            'linked_incident_ids' => ['nullable', 'array'],
+            'linked_incident_ids.*' => ['integer'],
+        ]);
+
+        $data['updated_by'] = $user->id;
+
+        $case->update($data);
+
+        return redirect()->back()->with('success', 'HR case updated.');
+    }
+
+    /**
+     * Add a timeline event to an HR case.
+     */
+    public function storeEvent(Request $request, HrCase $case)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+
+        $data = $request->validate([
+            'event_type' => ['required', 'string', 'in:note,meeting,phone_call,letter,email,document,investigation_update,other'],
+            'title' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string', 'max:10000'],
+            'occurred_at' => ['required', 'date'],
+            'document_path' => ['nullable', 'string', 'max:500'],
+            'visibility' => ['nullable', 'string', 'in:internal,restricted,full'],
+        ]);
+
+        HrCaseEvent::create([
+            'case_id' => $case->id,
+            'created_by' => $user->id,
+            ...$data,
+        ]);
+
+        return redirect()->back()->with('success', 'Event added to case timeline.');
+    }
+
+    /**
+     * Close an HR case with outcome.
+     */
+    public function close(Request $request, HrCase $case)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+
+        $data = $request->validate([
+            'outcome' => ['required', 'string', 'max:5000'],
+            'outcome_type' => ['required', 'string', 'in:resolved,no_action,disciplinary,referred,withdrawn'],
+        ]);
+
+        $case->update([
+            'status' => 'closed',
+            'outcome' => $data['outcome'],
+            'outcome_type' => $data['outcome_type'],
+            'closed_at' => now(),
+            'updated_by' => $user->id,
+        ]);
+
+        return redirect()->back()->with('success', 'HR case closed.');
+    }
+}

@@ -284,6 +284,62 @@ class RbacSeeder extends Seeder
 
             // Integrations
             ['key' => 'unifi.manage', 'description' => 'Manage UniFi integration settings'],
+            ['key' => 'integrations.view', 'description' => 'View integrations hub'],
+            ['key' => 'integrations.manage_tenant_secrets', 'description' => 'Manage tenant integration API keys'],
+            ['key' => 'integrations.manage_site_secrets', 'description' => 'Manage site integration credentials'],
+            ['key' => 'integrations.view_face_tags', 'description' => 'View face recognition tags'],
+            ['key' => 'integrations.view_person_links', 'description' => 'View tracker-person links'],
+
+            // Site Hardware
+            ['key' => 'siteHardware.view', 'description' => 'View site hardware & configuration'],
+            ['key' => 'siteHardware.manage', 'description' => 'Manage site hardware'],
+
+            // Control Room - additional
+            ['key' => 'controlRoom.alerts.view', 'description' => 'View Control Room alerts'],
+
+            // LLM
+            ['key' => 'llm.generate_client_narrative', 'description' => 'Generate LLM client narratives'],
+            ['key' => 'llm.generate_staff_summary', 'description' => 'Generate LLM staff summaries'],
+
+            // HR Module
+            ['key' => 'hr.recruitment.view', 'description' => 'View recruitment pipeline'],
+            ['key' => 'hr.recruitment.manage', 'description' => 'Manage recruitment (candidates, interviews, offers)'],
+            ['key' => 'hr.employees.viewAny', 'description' => 'View all employee profiles'],
+            ['key' => 'hr.employees.viewOwn', 'description' => 'View own employee profile'],
+            ['key' => 'hr.employees.manage', 'description' => 'Manage employee profiles'],
+            ['key' => 'hr.employees.viewFinancial', 'description' => 'View employee financial details (salary, bank)'],
+            ['key' => 'hr.employees.viewRestricted', 'description' => 'View restricted HR notes'],
+            ['key' => 'hr.compliance.view', 'description' => 'View HR compliance dashboard'],
+            ['key' => 'hr.compliance.manage', 'description' => 'Manage compliance matrix requirements'],
+            ['key' => 'hr.training.view', 'description' => 'View HR training dashboard'],
+            ['key' => 'hr.training.manage', 'description' => 'Manage HR training assignments'],
+            ['key' => 'hr.vetting.view', 'description' => 'View vetting register'],
+            ['key' => 'hr.vetting.manage', 'description' => 'Manage vetting records'],
+            ['key' => 'hr.vetting.view_disclosures', 'description' => 'View vetting disclosures'],
+            ['key' => 'hr.leave.viewAny', 'description' => 'View all leave requests'],
+            ['key' => 'hr.leave.viewOwn', 'description' => 'View own leave requests'],
+            ['key' => 'hr.leave.approve', 'description' => 'Approve/decline leave requests'],
+            ['key' => 'hr.leave.manage', 'description' => 'Manage leave requests and balances'],
+            ['key' => 'hr.performance.view', 'description' => 'View performance reviews and supervision notes'],
+            ['key' => 'hr.performance.manage', 'description' => 'Manage performance reviews and supervision notes'],
+            ['key' => 'hr.cases.view', 'description' => 'View HR cases'],
+            ['key' => 'hr.cases.manage', 'description' => 'Manage HR cases'],
+            ['key' => 'hr.disciplinary.view', 'description' => 'View disciplinary actions'],
+            ['key' => 'hr.disciplinary.manage', 'description' => 'Manage disciplinary actions'],
+            ['key' => 'hr.policies.view', 'description' => 'View HR policy library'],
+            ['key' => 'hr.policies.manage', 'description' => 'Manage HR policies'],
+            ['key' => 'hr.policies.attest', 'description' => 'Attest to HR policies'],
+            ['key' => 'hr.documents.view', 'description' => 'View HR documents'],
+            ['key' => 'hr.documents.manage', 'description' => 'Manage HR documents and templates'],
+            ['key' => 'hr.payroll.view', 'description' => 'View payroll runs'],
+            ['key' => 'hr.payroll.export', 'description' => 'Export payroll data'],
+            ['key' => 'hr.reports.view', 'description' => 'View HR reports'],
+            ['key' => 'hr.reports.export', 'description' => 'Export HR reports'],
+            ['key' => 'hr.driver.view', 'description' => 'View driver eligibility register'],
+            ['key' => 'hr.driver.manage', 'description' => 'Manage driver eligibility'],
+            ['key' => 'hr.wellbeing.view', 'description' => 'View wellbeing dashboard'],
+            ['key' => 'hr.onboarding.view', 'description' => 'View onboarding checklists'],
+            ['key' => 'hr.onboarding.manage', 'description' => 'Manage onboarding checklists'],
 
             // Settings
             ['key' => 'settings.access.manage', 'description' => 'Manage user access (roles & overrides)'],
@@ -550,6 +606,52 @@ class RbacSeeder extends Seeder
                 'privacy.manageLegalHolds',
                 'privacy.reportBreaches',
                 'privacy.conductDPIA',
+
+                // Integrations & Hardware
+                'integrations.view',
+                'integrations.manage_tenant_secrets',
+                'integrations.manage_site_secrets',
+                'siteHardware.view',
+                'siteHardware.manage',
+                'controlRoom.alerts.view',
+
+                // LLM
+                'llm.generate_client_narrative',
+                'llm.generate_staff_summary',
+
+                // HR
+                'hr.recruitment.view',
+                'hr.recruitment.manage',
+                'hr.employees.viewAny',
+                'hr.employees.manage',
+                'hr.employees.viewFinancial',
+                'hr.compliance.view',
+                'hr.compliance.manage',
+                'hr.training.view',
+                'hr.training.manage',
+                'hr.vetting.view',
+                'hr.vetting.manage',
+                'hr.leave.viewAny',
+                'hr.leave.approve',
+                'hr.leave.manage',
+                'hr.performance.view',
+                'hr.performance.manage',
+                'hr.cases.view',
+                'hr.cases.manage',
+                'hr.policies.view',
+                'hr.policies.manage',
+                'hr.policies.attest',
+                'hr.documents.view',
+                'hr.documents.manage',
+                'hr.payroll.view',
+                'hr.payroll.export',
+                'hr.reports.view',
+                'hr.reports.export',
+                'hr.driver.view',
+                'hr.driver.manage',
+                'hr.wellbeing.view',
+                'hr.onboarding.view',
+                'hr.onboarding.manage',
 ])->pluck('id')
         );
 
@@ -648,6 +750,22 @@ class RbacSeeder extends Seeder
                 'consents.viewAny',
                 'consents.record',
                 'consents.withdraw',
+
+                // Integrations & Hardware
+                'siteHardware.view',
+                'controlRoom.alerts.view',
+
+                // HR (coordinator - limited)
+                'hr.employees.viewAny',
+                'hr.compliance.view',
+                'hr.training.view',
+                'hr.vetting.view',
+                'hr.leave.viewAny',
+                'hr.leave.approve',
+                'hr.performance.view',
+                'hr.policies.view',
+                'hr.policies.attest',
+                'hr.onboarding.view',
 ])->pluck('id')
         );
 
@@ -715,6 +833,12 @@ class RbacSeeder extends Seeder
 
                 // Safeguarding (can report concerns)
                 'safeguarding.create',
+
+                // HR (self-service)
+                'hr.employees.viewOwn',
+                'hr.leave.viewOwn',
+                'hr.policies.view',
+                'hr.policies.attest',
 ])->pluck('id')
         );
 
@@ -760,6 +884,44 @@ class RbacSeeder extends Seeder
                 // Safeguarding (HR involvement)
                 'safeguarding.viewAny',
                 'safeguarding.create',
+
+                // HR (full HR access)
+                'hr.recruitment.view',
+                'hr.recruitment.manage',
+                'hr.employees.viewAny',
+                'hr.employees.manage',
+                'hr.employees.viewFinancial',
+                'hr.employees.viewRestricted',
+                'hr.compliance.view',
+                'hr.compliance.manage',
+                'hr.training.view',
+                'hr.training.manage',
+                'hr.vetting.view',
+                'hr.vetting.manage',
+                'hr.vetting.view_disclosures',
+                'hr.leave.viewAny',
+                'hr.leave.approve',
+                'hr.leave.manage',
+                'hr.performance.view',
+                'hr.performance.manage',
+                'hr.cases.view',
+                'hr.cases.manage',
+                'hr.disciplinary.view',
+                'hr.disciplinary.manage',
+                'hr.policies.view',
+                'hr.policies.manage',
+                'hr.policies.attest',
+                'hr.documents.view',
+                'hr.documents.manage',
+                'hr.payroll.view',
+                'hr.payroll.export',
+                'hr.reports.view',
+                'hr.reports.export',
+                'hr.driver.view',
+                'hr.driver.manage',
+                'hr.wellbeing.view',
+                'hr.onboarding.view',
+                'hr.onboarding.manage',
             ])->pluck('id')
         );
 
@@ -830,6 +992,22 @@ class RbacSeeder extends Seeder
                 'vendors.view',
                 'credentials.view',
                 'reports.sites.view',
+
+                // Integrations & Hardware
+                'siteHardware.view',
+                'controlRoom.alerts.view',
+
+                // HR (team lead - view + approve)
+                'hr.employees.viewAny',
+                'hr.compliance.view',
+                'hr.training.view',
+                'hr.leave.viewAny',
+                'hr.leave.approve',
+                'hr.performance.view',
+                'hr.performance.manage',
+                'hr.policies.view',
+                'hr.policies.attest',
+                'hr.onboarding.view',
             ])->pluck('id')
         );
 

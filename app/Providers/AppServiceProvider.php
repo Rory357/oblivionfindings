@@ -14,6 +14,8 @@ use App\Observers\SiteHazardObserver;
 use App\Observers\SiteChecklistRunObserver;
 use App\Events\FleetSignalEmitted;
 use App\Services\AuditLogger;
+use App\Services\Integration\Adapters\UnifiAdapter;
+use App\Services\Integration\IntegrationAdapterRegistry;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -28,7 +30,12 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->singleton(IntegrationAdapterRegistry::class, function () {
+            $registry = new IntegrationAdapterRegistry();
+            $registry->register('unifi', UnifiAdapter::class);
+
+            return $registry;
+        });
     }
 
     /**

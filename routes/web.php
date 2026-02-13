@@ -112,3 +112,6 @@ require __DIR__ . '/privacy.php';
 
 // Board & Governance module
 require __DIR__ . '/governance.php';
+
+// HR module
+require __DIR__ . '/hr.php';

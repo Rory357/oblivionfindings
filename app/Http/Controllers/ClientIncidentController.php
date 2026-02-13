@@ -17,8 +17,14 @@ class ClientIncidentController extends Controller
     {
         $this->authorize('view', $client);
 
+        $user = $request->user();
+
         $incidents = ClientIncident::query()
             ->where('client_id', $client->id)
+            ->when(
+                !$user?->canDo('hr.cases.view'),
+                fn ($q) => $q->where(fn ($q2) => $q2->where('is_hr_confidential', false)->orWhereNull('is_hr_confidential'))
+            )
             ->with([
                 'reporter:id,name,email',
                 'shift:id,starts_at,ends_at,actual_ends_at',

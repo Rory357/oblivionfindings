@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrPayrollRun;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\Timesheet;
@@ -317,6 +318,11 @@ class TimesheetController extends Controller
             return back()->with('error', 'Only draft or returned timesheets can be edited.');
         }
 
+        // Payroll lock check: if timesheet is in a locked payroll run, prevent edits
+        if ($this->isLockedByPayroll($timesheet)) {
+            return back()->with('error', 'This timesheet is locked by a payroll run and cannot be edited.');
+        }
+
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
             'work_date' => ['required', 'date'],
@@ -361,6 +367,11 @@ class TimesheetController extends Controller
         }
 
         abort_unless(in_array($timesheet->status, ['draft', 'returned'], true), 403);
+
+        // Payroll lock check
+        if ($this->isLockedByPayroll($timesheet)) {
+            return back()->with('error', 'This timesheet is locked by a payroll run and cannot be submitted.');
+        }
 
         $timesheet->status = 'submitted';
         $timesheet->submitted_at = now();
@@ -485,5 +496,21 @@ class TimesheetController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Timesheet returned for changes.');
+    }
+
+    /**
+     * Check if a timesheet is locked by a payroll run.
+     */
+    protected function isLockedByPayroll(Timesheet $timesheet): bool
+    {
+        if (!$timesheet->work_date) {
+            return false;
+        }
+
+        return HrPayrollRun::where('tenant_id', $timesheet->user?->tenant_id)
+            ->whereIn('status', ['locked', 'exported'])
+            ->where('period_start', '<=', $timesheet->work_date)
+            ->where('period_end', '>=', $timesheet->work_date)
+            ->exists();
     }
 }
