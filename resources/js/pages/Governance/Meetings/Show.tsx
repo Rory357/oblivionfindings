@@ -1,4 +1,4 @@
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { generate as generatePackRoute, show as showPack } from '@/routes/governance/packs';
@@ -39,7 +39,7 @@ import {
   Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState, FormEvent } from 'react';
+import { useEffect, useState, FormEvent } from 'react';
 import axios from 'axios';
 
 interface BoardMemberItem {
@@ -109,19 +109,52 @@ interface Props extends PageProps {
   canEdit: boolean;
   canManageMinutes: boolean;
   canApproveMinutes: boolean;
+  workflowChecklist: {
+    counts: {
+      done: number;
+      remaining: number;
+      blocked: number;
+    };
+    next_step: {
+      label: string;
+      status: string;
+      detail: string;
+      action_label: string;
+      action_url: string;
+      blocked_by: string | null;
+    } | null;
+    items: Array<{
+      key: string;
+      label: string;
+      status: 'done' | 'in_progress' | 'todo' | 'blocked';
+      detail: string;
+      action_label: string;
+      action_url: string;
+      blocked_by: string | null;
+    }>;
+  };
 }
 
-export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEdit, canManageMinutes, canApproveMinutes }: Props) {
+export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEdit, canManageMinutes, canApproveMinutes, workflowChecklist }: Props) {
+  const page = usePage();
   const [generatingPack, setGeneratingPack] = useState(false);
   const [packMessage, setPackMessage] = useState<string | null>(null);
   const [agendaDialogOpen, setAgendaDialogOpen] = useState(false);
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
   const [minutesDialogOpen, setMinutesDialogOpen] = useState(false);
+  const validTabs = ['agenda', 'attendance', 'minutes', 'resolutions'];
+  const parsedTab = new URLSearchParams(page.url.split('?')[1] ?? '').get('tab');
+  const defaultTab = parsedTab && validTabs.includes(parsedTab) ? parsedTab : 'agenda';
+  const [activeTab, setActiveTab] = useState(defaultTab);
 
   const agendaItems = meeting.agenda_items ?? [];
   const attendances = meeting.attendances ?? [];
   const resolutions = meeting.resolutions ?? [];
   const allBoardMembers = boardMembers ?? [];
+
+  useEffect(() => {
+    setActiveTab(defaultTab);
+  }, [defaultTab]);
 
   // Agenda Item Form
   const agendaForm = useForm({
@@ -184,6 +217,15 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
       minutes_approved: 'bg-green-100 text-green-800',
       archived: 'bg-gray-100 text-gray-800',
     }[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getChecklistStatusColor = (status: 'done' | 'in_progress' | 'todo' | 'blocked') => {
+    return {
+      done: 'bg-green-100 text-green-800 border-green-200',
+      in_progress: 'bg-blue-100 text-blue-800 border-blue-200',
+      todo: 'bg-amber-100 text-amber-800 border-amber-200',
+      blocked: 'bg-red-100 text-red-800 border-red-200',
+    }[status];
   };
 
   const getItemTypeIcon = (type: string) => {
@@ -353,6 +395,58 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
             </div>
           )}
 
+          <Card className="mb-6">
+            <CardHeader className="pb-3">
+              <CardTitle>Meeting Workflow</CardTitle>
+              <CardDescription>Step-by-step checklist for this meeting cycle.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="mb-3 flex flex-wrap gap-2">
+                <Badge variant="outline">{workflowChecklist.counts.done} complete</Badge>
+                {workflowChecklist.counts.remaining > 0 && (
+                  <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                    {workflowChecklist.counts.remaining} remaining
+                  </Badge>
+                )}
+                {workflowChecklist.counts.blocked > 0 && (
+                  <Badge className="bg-red-100 text-red-800 border-red-200">
+                    {workflowChecklist.counts.blocked} blocked
+                  </Badge>
+                )}
+              </div>
+
+              {workflowChecklist.next_step && (
+                <div className="mb-4 rounded-lg border border-blue-200 bg-blue-50 p-3">
+                  <p className="text-xs font-medium uppercase tracking-wide text-blue-700">Next Step</p>
+                  <p className="font-semibold text-blue-900">{workflowChecklist.next_step.label}</p>
+                  <p className="text-sm text-blue-800">{workflowChecklist.next_step.detail}</p>
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {workflowChecklist.items.map((item) => (
+                  <div key={item.key} className="flex flex-col gap-2 rounded-lg border p-3 md:flex-row md:items-start md:justify-between">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <p className="font-medium text-gray-900">{item.label}</p>
+                        <Badge className={getChecklistStatusColor(item.status)}>{item.status.replace('_', ' ')}</Badge>
+                      </div>
+                      <p className="text-sm text-gray-600">{item.detail}</p>
+                      {item.blocked_by && (
+                        <p className="text-xs text-red-700">Blocked by: {item.blocked_by}</p>
+                      )}
+                    </div>
+                    <div>
+                      <Button size="sm" variant="outline" asChild>
+                        <Link href={item.action_url}>{item.action_label}</Link>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Info Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
             <Card>
@@ -391,7 +485,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
           </div>
 
           {/* Tabs */}
-          <Tabs defaultValue="agenda" className="space-y-6">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
             <TabsList>
               <TabsTrigger value="agenda">Agenda</TabsTrigger>
               <TabsTrigger value="attendance">Attendance</TabsTrigger>

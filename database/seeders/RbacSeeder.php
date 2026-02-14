@@ -66,6 +66,21 @@ class RbacSeeder extends Seeder
             ['label' => 'Maintenance Coordinator']
         );
 
+        $roadmapManager = Role::firstOrCreate(
+            ['name' => 'roadmap_manager'],
+            ['label' => 'Roadmap Manager']
+        );
+
+        $itManager = Role::firstOrCreate(
+            ['name' => 'it_manager'],
+            ['label' => 'IT Manager']
+        );
+
+        $facilitiesManager = Role::firstOrCreate(
+            ['name' => 'facilities_manager'],
+            ['label' => 'Facilities Manager']
+        );
+
         $clientRole = Role::firstOrCreate(
             ['name' => 'client'],
             ['label' => 'Client (Portal)']
@@ -102,6 +117,31 @@ class RbacSeeder extends Seeder
             ['label' => 'Board Trustee (Read only)']
         );
 
+        $ceo = Role::firstOrCreate(
+            ['name' => 'ceo'],
+            ['label' => 'CEO']
+        );
+
+        $cfo = Role::firstOrCreate(
+            ['name' => 'cfo'],
+            ['label' => 'CFO']
+        );
+
+        $coo = Role::firstOrCreate(
+            ['name' => 'coo'],
+            ['label' => 'COO']
+        );
+
+        $complianceLead = Role::firstOrCreate(
+            ['name' => 'compliance_lead'],
+            ['label' => 'Compliance Lead']
+        );
+
+        $riskLead = Role::firstOrCreate(
+            ['name' => 'risk_lead'],
+            ['label' => 'Risk Lead']
+        );
+
         // Remove any roles we are not using right now (but only if they are not assigned).
         // This keeps the Access Control UI role list clean.
         $activeRoleNames = [
@@ -115,6 +155,9 @@ class RbacSeeder extends Seeder
             'team_lead',
             'health_safety_officer',
             'maintenance_coordinator',
+            'roadmap_manager',
+            'it_manager',
+            'facilities_manager',
             'next_of_kin',
             'client',
             // Board/Governance roles
@@ -123,6 +166,11 @@ class RbacSeeder extends Seeder
             'board_member',
             'board_observer',
             'board_trustee',
+            'ceo',
+            'cfo',
+            'coo',
+            'compliance_lead',
+            'risk_lead',
         ];
         Role::query()
             ->whereNotIn('name', $activeRoleNames)
@@ -1073,7 +1121,23 @@ class RbacSeeder extends Seeder
         */
         User::query()
             ->select('id', 'role')
-            ->chunk(200, function ($users) use ($admin, $providerManager, $coordinator, $supportWorker, $finance, $hr, $auditor) {
+            ->chunk(200, function ($users) use (
+                $admin,
+                $providerManager,
+                $coordinator,
+                $supportWorker,
+                $finance,
+                $hr,
+                $auditor,
+                $roadmapManager,
+                $itManager,
+                $facilitiesManager,
+                $ceo,
+                $cfo,
+                $coo,
+                $complianceLead,
+                $riskLead
+            ) {
                 foreach ($users as $user) {
                     $roleName = $user->role ?? 'support_worker';
 
@@ -1084,6 +1148,14 @@ class RbacSeeder extends Seeder
                         'finance' => $finance,
                         'hr' => $hr,
                         'auditor' => $auditor,
+                        'roadmap_manager' => $roadmapManager,
+                        'it_manager' => $itManager,
+                        'facilities_manager' => $facilitiesManager,
+                        'ceo' => $ceo,
+                        'cfo' => $cfo,
+                        'coo' => $coo,
+                        'compliance_lead' => $complianceLead,
+                        'risk_lead' => $riskLead,
                         default => $supportWorker,
                     };
 

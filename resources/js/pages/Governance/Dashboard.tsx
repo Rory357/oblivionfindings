@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { Head } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
@@ -10,19 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  AlertTriangle, 
-  CheckCircle, 
-  Clock, 
-  Users, 
-  Shield, 
-  TrendingUp,
-  FileText,
-  Calendar,
-  Vote,
-  AlertOctagon
-} from 'lucide-react';
+import { Calendar, Shield, Users, Vote, AlertOctagon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
 
@@ -48,8 +36,9 @@ interface DashboardWidget {
       id: number;
       reference: string;
       title: string;
-      deadline: string;
+      deadline: string | null;
       is_overdue: boolean;
+      source?: string;
     }>;
   };
   client_safety?: {
@@ -74,6 +63,28 @@ interface DashboardWidget {
   }>;
 }
 
+interface WorkflowAction {
+  id: string;
+  area: string;
+  title: string;
+  detail: string;
+  priority: 'critical' | 'high' | 'medium' | 'low';
+  status: 'overdue' | 'due_soon' | 'pending';
+  due_date: string | null;
+  action_label: string;
+  action_url: string;
+  owner: string | null;
+}
+
+interface WorkflowPayload {
+  summary: {
+    total: number;
+    critical: number;
+    overdue: number;
+  };
+  actions: WorkflowAction[];
+}
+
 interface DashboardData {
   snapshot_id: number;
   period: {
@@ -82,6 +93,7 @@ interface DashboardData {
     end: string;
   };
   widgets: DashboardWidget;
+  workflow?: WorkflowPayload;
 }
 
 export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: PageProps & { isBoardMember: boolean; boardRole?: string }) {
@@ -97,7 +109,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
     setLoading(true);
     try {
       const response = await axios.get(dashboardData.url(), {
-        params: { period }
+        params: { period },
       });
       setData(response.data);
     } catch (error) {
@@ -108,6 +120,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
   };
 
   const widgets = data?.widgets || {};
+  const workflow = data?.workflow;
 
   const getStatusColor = (status: string) => {
     return {
@@ -118,6 +131,39 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
     }[status] || 'bg-gray-100 text-gray-800';
   };
 
+  const getWorkflowStatusColor = (status: WorkflowAction['status']) => {
+    return {
+      overdue: 'bg-red-100 text-red-800 border-red-200',
+      due_soon: 'bg-amber-100 text-amber-800 border-amber-200',
+      pending: 'bg-slate-100 text-slate-800 border-slate-200',
+    }[status];
+  };
+
+  const getWorkflowPriorityColor = (priority: WorkflowAction['priority']) => {
+    return {
+      critical: 'bg-red-100 text-red-800 border-red-200',
+      high: 'bg-orange-100 text-orange-800 border-orange-200',
+      medium: 'bg-blue-100 text-blue-800 border-blue-200',
+      low: 'bg-gray-100 text-gray-700 border-gray-200',
+    }[priority];
+  };
+
+  const decisionHref = (decision: DashboardWidget['decisions_required']['items'][number]) => {
+    if (decision.source === 'roadmap_decision_request') {
+      return '/roadmap/decisions';
+    }
+
+    return showResolution.url({ resolution: decision.id });
+  };
+
+  const decisionActionLabel = (decision: DashboardWidget['decisions_required']['items'][number]) => {
+    if (decision.source === 'roadmap_decision_request') {
+      return 'Open Request';
+    }
+
+    return 'Vote Now';
+  };
+
   return (
     <AppLayout
       user={auth.user}
@@ -126,7 +172,6 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
       <Head title="Governance Dashboard" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
           <div className="flex items-center justify-between mb-8">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">Governance Dashboard</h1>
@@ -157,7 +202,61 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
             </div>
           </div>
 
-          {/* Decisions Required Alert */}
+          <Card className="mb-6">
+            <CardHeader className="pb-3">
+              <CardTitle>Workflow Center</CardTitle>
+              <CardDescription>Prioritized governance actions across meetings, risk, compliance, budget, and decisions.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {workflow && workflow.actions.length > 0 ? (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="outline">{workflow.summary.total} open actions</Badge>
+                    {workflow.summary.critical > 0 && (
+                      <Badge className="bg-red-100 text-red-800 border-red-200">
+                        {workflow.summary.critical} critical
+                      </Badge>
+                    )}
+                    {workflow.summary.overdue > 0 && (
+                      <Badge className="bg-amber-100 text-amber-800 border-amber-200">
+                        {workflow.summary.overdue} overdue
+                      </Badge>
+                    )}
+                  </div>
+                  {workflow.actions.slice(0, 8).map((action) => (
+                    <div
+                      key={action.id}
+                      className="flex flex-col gap-3 rounded-lg border border-gray-200 p-3 md:flex-row md:items-start md:justify-between"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="outline">{action.area}</Badge>
+                          <Badge className={getWorkflowPriorityColor(action.priority)}>{action.priority}</Badge>
+                          <Badge className={getWorkflowStatusColor(action.status)}>{action.status.replace('_', ' ')}</Badge>
+                          {action.due_date && (
+                            <span className="text-xs text-gray-500">Due {action.due_date}</span>
+                          )}
+                        </div>
+                        <p className="font-medium text-gray-900">{action.title}</p>
+                        <p className="text-sm text-gray-600">{action.detail}</p>
+                        {action.owner && (
+                          <p className="text-xs text-gray-500">Owner: {action.owner}</p>
+                        )}
+                      </div>
+                      <div>
+                        <Button size="sm" variant="outline" asChild>
+                          <a href={action.action_url}>{action.action_label}</a>
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-500">No open workflow blockers. Keep monthly checks running.</p>
+              )}
+            </CardContent>
+          </Card>
+
           {widgets.decisions_required && widgets.decisions_required.count > 0 && (
             <Card className="mb-6 border-orange-200 bg-orange-50">
               <CardContent className="pt-6">
@@ -171,8 +270,8 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                     </h3>
                     <div className="mt-3 space-y-2">
                       {(widgets.decisions_required.items || []).map((decision) => (
-                        <div 
-                          key={decision.id}
+                        <div
+                          key={`${decision.source ?? 'governance'}-${decision.id}`}
                           className="flex items-center justify-between p-3 bg-white rounded-lg border border-orange-100"
                         >
                           <div>
@@ -184,8 +283,8 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                               <Badge variant="destructive">Overdue</Badge>
                             )}
                             <Button size="sm" asChild>
-                              <a href={showResolution.url({ resolution: decision.id })}>
-                                Vote Now
+                              <a href={decisionHref(decision)}>
+                                {decisionActionLabel(decision)}
                               </a>
                             </Button>
                           </div>
@@ -198,9 +297,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
             </Card>
           )}
 
-          {/* Widgets Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Top Risks */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -228,10 +325,10 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                       {(widgets.top_risks.items || []).slice(0, 3).map((risk) => (
                         <div key={risk.id} className="flex items-center justify-between text-sm">
                           <span className="truncate flex-1">{risk.title}</span>
-                          <Badge 
-                            variant="outline" 
+                          <Badge
+                            variant="outline"
                             className={cn(
-                              "ml-2",
+                              'ml-2',
                               risk.color === 'red' && 'border-red-200 text-red-700',
                               risk.color === 'orange' && 'border-orange-200 text-orange-700',
                             )}
@@ -251,7 +348,6 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
               </CardContent>
             </Card>
 
-            {/* Client Safety */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -264,7 +360,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                 {widgets.client_safety ? (
                   <div className="space-y-4">
                     <Badge className={getStatusColor(widgets.client_safety.status)}>
-                      {widgets.client_safety.status === 'good' ? 'Good' : 
+                      {widgets.client_safety.status === 'good' ? 'Good' :
                        widgets.client_safety.status === 'warning' ? 'Attention Needed' : 'Critical'}
                     </Badge>
                     <div className="grid grid-cols-2 gap-4">
@@ -288,7 +384,6 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
               </CardContent>
             </Card>
 
-            {/* Workforce */}
             <Card>
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -315,9 +410,9 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                       </div>
                     </div>
                     <p className="text-xs text-gray-500">
-                      {widgets.workforce.overtime_percentage > 10 
-                        ? '⚠️ High overtime levels detected' 
-                        : '✓ Workforce metrics within normal range'}
+                      {widgets.workforce.overtime_percentage > 10
+                        ? 'High overtime levels detected'
+                        : 'Workforce metrics within normal range'}
                     </p>
                   </div>
                 ) : (
@@ -326,7 +421,6 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
               </CardContent>
             </Card>
 
-            {/* Compliance Calendar */}
             <Card className="md:col-span-2 lg:col-span-3">
               <CardHeader className="pb-3">
                 <CardTitle className="flex items-center gap-2 text-lg">
@@ -338,21 +432,21 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                 {(widgets.compliance_calendar || []).length > 0 ? (
                   <div className="space-y-2">
                     {(widgets.compliance_calendar || []).slice(0, 5).map((item) => (
-                      <div 
+                      <div
                         key={item.id}
                         className={cn(
-                          "flex items-center justify-between p-3 rounded-lg border",
-                          item.days_remaining < 0 && "bg-red-50 border-red-200",
-                          item.days_remaining < 7 && item.days_remaining >= 0 && "bg-yellow-50 border-yellow-200",
-                          item.days_remaining >= 7 && "bg-gray-50 border-gray-200"
+                          'flex items-center justify-between p-3 rounded-lg border',
+                          item.days_remaining < 0 && 'bg-red-50 border-red-200',
+                          item.days_remaining < 7 && item.days_remaining >= 0 && 'bg-yellow-50 border-yellow-200',
+                          item.days_remaining >= 7 && 'bg-gray-50 border-gray-200',
                         )}
                       >
                         <div className="flex items-center gap-4">
                           <div className={cn(
-                            "w-2 h-2 rounded-full",
-                            item.days_remaining < 0 && "bg-red-500",
-                            item.days_remaining < 7 && item.days_remaining >= 0 && "bg-yellow-500",
-                            item.days_remaining >= 7 && "bg-green-500"
+                            'w-2 h-2 rounded-full',
+                            item.days_remaining < 0 && 'bg-red-500',
+                            item.days_remaining < 7 && item.days_remaining >= 0 && 'bg-yellow-500',
+                            item.days_remaining >= 7 && 'bg-green-500',
                           )} />
                           <div>
                             <p className="font-medium text-gray-900">{item.title}</p>
@@ -362,7 +456,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                         <div className="flex items-center gap-4">
                           <div className="text-right">
                             <p className="text-sm font-medium">
-                              {item.days_remaining < 0 
+                              {item.days_remaining < 0
                                 ? `${Math.abs(item.days_remaining)} days overdue`
                                 : `${item.days_remaining} days remaining`
                               }
