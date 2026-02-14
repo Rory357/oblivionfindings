@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Calendar,
+  CalendarDays,
   ShieldAlert,
   FileCheck,
   Target,
@@ -17,7 +18,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
-  active?: boolean;
+  matcher?: (url: string) => boolean;
 }
 
 export default function GovernanceNav() {
@@ -35,6 +36,13 @@ export default function GovernanceNav() {
       label: 'Meetings',
       href: '/governance/meetings',
       icon: <Calendar className="w-5 h-5" />,
+      matcher: (currentUrl) => currentUrl === '/governance/meetings' || currentUrl.startsWith('/governance/meetings?'),
+    },
+    {
+      label: 'Meeting Calendar',
+      href: '/governance/meetings/calendar',
+      icon: <CalendarDays className="w-5 h-5" />,
+      matcher: (currentUrl) => currentUrl.startsWith('/governance/meetings/calendar'),
     },
     ...(canManage
       ? [
@@ -85,7 +93,7 @@ export default function GovernanceNav() {
   return (
     <nav className="space-y-1">
       {navItems.map((item) => {
-        const isActive = url.startsWith(item.href);
+        const isActive = item.matcher ? item.matcher(url) : url.startsWith(item.href);
         return (
           <Link
             key={item.href}

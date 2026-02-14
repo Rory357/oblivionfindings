@@ -169,4 +169,70 @@ class GovernanceMeetingsTest extends TestCase
         $attendance = MeetingAttendance::first();
         $this->assertNotNull($attendance);
     }
+
+    public function test_meeting_show_includes_workflow_checklist(): void
+    {
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin);
+
+        $response = $this->actingAs($admin)->get("/governance/meetings/{$meeting->id}");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Governance/Meetings/Show')
+            ->has('workflowChecklist')
+            ->has('workflowChecklist.items', 8)
+            ->where('workflowChecklist.items.0.key', 'agenda')
+        );
+    }
+
+    public function test_admin_can_view_meetings_calendar(): void
+    {
+        $admin = $this->createAdminUser();
+        $meeting = $this->createMeeting($admin, [
+            'title' => 'Calendar Meeting',
+            'meeting_type' => 'full_board',
+            'scheduled_at' => now()->addDays(2),
+        ]);
+
+        $response = $this->actingAs($admin)->get('/governance/meetings/calendar');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Governance/Meetings/Calendar')
+            ->where('month', now()->format('Y-m'))
+            ->where('selectedMeetingType', 'all')
+            ->where('meetings.0.id', $meeting->id)
+            ->where('meetings.0.title', 'Calendar Meeting')
+        );
+    }
+
+    public function test_calendar_filters_by_meeting_type(): void
+    {
+        $admin = $this->createAdminUser();
+        $month = now()->format('Y-m');
+
+        $this->createMeeting($admin, [
+            'title' => 'Full Board Meeting',
+            'meeting_type' => 'full_board',
+            'scheduled_at' => now()->addDays(3),
+        ]);
+
+        $financeMeeting = $this->createMeeting($admin, [
+            'title' => 'Finance Committee',
+            'meeting_type' => 'finance',
+            'scheduled_at' => now()->addDays(4),
+        ]);
+
+        $response = $this->actingAs($admin)->get("/governance/meetings/calendar?month={$month}&meeting_type=finance");
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('Governance/Meetings/Calendar')
+            ->where('selectedMeetingType', 'finance')
+            ->has('meetings', 1)
+            ->where('meetings.0.id', $financeMeeting->id)
+            ->where('meetings.0.meeting_type', 'finance')
+        );
+    }
 }

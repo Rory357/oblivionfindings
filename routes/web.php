@@ -1,12 +1,11 @@
 <?php
 
+use App\Http\Controllers\ContactController;
+use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\QualityChecklistController;
+use App\Http\Controllers\TodayDashboardController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
-use Laravel\Fortify\Features;
-use App\Http\Controllers\DashboardController;
-use App\Http\Controllers\TodayDashboardController;
-use App\Http\Controllers\QualityChecklistController;
-
 /*
 |--------------------------------------------------------------------------
 | Web Routes
@@ -35,7 +34,7 @@ use App\Http\Controllers\QualityChecklistController;
 |
 */
 
-use App\Http\Controllers\ContactController;
+use Laravel\Fortify\Features;
 
 Route::get('/robots.txt', function () {
     $disallowAll = ! config('app.indexing_enabled');
@@ -88,30 +87,33 @@ Route::middleware(['auth', 'verified'])->group(function () {
 });
 
 // Domain-specific routes
-require __DIR__ . '/auth.php';
-require __DIR__ . '/portal.php';
-require __DIR__ . '/clients.php';
-require __DIR__ . '/staff.php';
-require __DIR__ . '/incidents.php';
-require __DIR__ . '/assets.php';
-require __DIR__ . '/sites.php';
-require __DIR__ . '/fleet.php';
-require __DIR__ . '/control-room.php';
-require __DIR__ . '/shifts.php';
-require __DIR__ . '/medications.php';
-require __DIR__ . '/reports.php';
-require __DIR__ . '/integrations.php';
-require __DIR__ . '/settings.php';
-require __DIR__ . '/respite.php';
+require __DIR__.'/auth.php';
+require __DIR__.'/portal.php';
+require __DIR__.'/clients.php';
+require __DIR__.'/staff.php';
+require __DIR__.'/incidents.php';
+require __DIR__.'/assets.php';
+require __DIR__.'/sites.php';
+require __DIR__.'/fleet.php';
+require __DIR__.'/control-room.php';
+require __DIR__.'/shifts.php';
+require __DIR__.'/medications.php';
+require __DIR__.'/reports.php';
+require __DIR__.'/integrations.php';
+require __DIR__.'/settings.php';
+require __DIR__.'/respite.php';
 
 // Compliance module routes
-require __DIR__ . '/safeguarding.php';
-require __DIR__ . '/consents.php';
-require __DIR__ . '/training.php';
-require __DIR__ . '/privacy.php';
+require __DIR__.'/safeguarding.php';
+require __DIR__.'/consents.php';
+require __DIR__.'/training.php';
+require __DIR__.'/privacy.php';
 
 // Board & Governance module
-require __DIR__ . '/governance.php';
+require __DIR__.'/governance.php';
+
+// Roadmap module
+require __DIR__.'/roadmap.php';
 
 // HR module
-require __DIR__ . '/hr.php';
+require __DIR__.'/hr.php';

@@ -1,11 +1,11 @@
 import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { index as meetingsIndex, create as createMeeting, show as showMeeting } from '@/routes/governance/meetings';
+import { create as createMeeting, show as showMeeting } from '@/routes/governance/meetings';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, MapPin, Users } from 'lucide-react';
+import { Calendar, Clock, MapPin, CalendarDays } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface Meeting {
@@ -87,9 +87,17 @@ export default function MeetingsIndex({ auth, meetings }: Props) {
               <h1 className="text-3xl font-bold text-gray-900">Board Meetings</h1>
               <p className="text-gray-500 mt-1">Schedule and manage governance meetings</p>
             </div>
-            <Button asChild>
-              <Link href={createMeeting.url()}>Schedule Meeting</Link>
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" asChild>
+                <Link href="/governance/meetings/calendar">
+                  <CalendarDays className="w-4 h-4 mr-1" />
+                  Calendar View
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link href={createMeeting.url()}>Schedule Meeting</Link>
+              </Button>
+            </div>
           </div>
 
           {/* Meetings List */}

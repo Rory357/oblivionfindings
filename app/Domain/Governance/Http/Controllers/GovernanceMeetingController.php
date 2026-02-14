@@ -10,12 +10,18 @@ use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\MeetingAgendaItem;
 use App\Domain\Governance\Models\MeetingAttendance;
 use App\Domain\Governance\Models\MeetingMinute;
+use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class GovernanceMeetingController extends Controller
 {
+    public function __construct(
+        protected GovernanceWorkflowService $workflowService
+    ) {}
+
     public function create()
     {
         $boardMembers = \App\Domain\Governance\Models\BoardMember::with('user')->get();
@@ -34,6 +40,80 @@ class GovernanceMeetingController extends Controller
             ->paginate(15);
 
         return Inertia::render('Governance/Meetings/Index', [
+            'meetings' => $meetings,
+        ]);
+    }
+
+    public function calendar(Request $request)
+    {
+        $validated = $request->validate([
+            'month' => 'nullable|date_format:Y-m',
+            'date' => 'nullable|date_format:Y-m-d',
+            'meeting_type' => 'nullable|in:all,full_board,audit_risk,people,finance,special_general,executive_session',
+        ]);
+
+        $month = isset($validated['month'])
+            ? Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth()
+            : now()->startOfMonth();
+
+        $viewStart = $month->copy()->startOfMonth()->startOfWeek(Carbon::MONDAY);
+        $viewEnd = $month->copy()->endOfMonth()->endOfWeek(Carbon::SUNDAY);
+
+        $meetingType = $validated['meeting_type'] ?? 'all';
+
+        $query = GovernanceMeeting::query()
+            ->with(['chair.user', 'secretary.user'])
+            ->whereBetween('scheduled_at', [$viewStart, $viewEnd]);
+
+        if ($meetingType !== 'all') {
+            $query->where('meeting_type', $meetingType);
+        }
+
+        $meetings = $query
+            ->orderBy('scheduled_at')
+            ->get()
+            ->map(fn (GovernanceMeeting $meeting) => [
+                'id' => $meeting->id,
+                'title' => $meeting->title,
+                'meeting_type' => $meeting->meeting_type,
+                'scheduled_at' => $meeting->scheduled_at?->toIso8601String(),
+                'duration_minutes' => $meeting->duration_minutes,
+                'location' => $meeting->location,
+                'status' => $meeting->status,
+                'quorum_met' => $meeting->quorum_met,
+                'chair' => $meeting->chair?->user ? [
+                    'name' => $meeting->chair->user->name,
+                ] : null,
+                'secretary' => $meeting->secretary?->user ? [
+                    'name' => $meeting->secretary->user->name,
+                ] : null,
+            ])
+            ->values();
+
+        $selectedDate = $validated['date'] ?? null;
+        if ($selectedDate === null) {
+            $today = now()->toDateString();
+            $selectedDate = ($today >= $viewStart->toDateString() && $today <= $viewEnd->toDateString())
+                ? $today
+                : $month->toDateString();
+        }
+
+        return Inertia::render('Governance/Meetings/Calendar', [
+            'month' => $month->format('Y-m'),
+            'monthLabel' => $month->format('F Y'),
+            'previousMonth' => $month->copy()->subMonth()->format('Y-m'),
+            'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
+            'selectedDate' => $selectedDate,
+            'selectedMeetingType' => $meetingType,
+            'meetingTypes' => [
+                ['value' => 'all', 'label' => 'All Types'],
+                ['value' => 'full_board', 'label' => 'Full Board'],
+                ['value' => 'audit_risk', 'label' => 'Audit & Risk'],
+                ['value' => 'people', 'label' => 'People Committee'],
+                ['value' => 'finance', 'label' => 'Finance Committee'],
+                ['value' => 'special_general', 'label' => 'Special General'],
+                ['value' => 'executive_session', 'label' => 'Executive Session'],
+            ],
             'meetings' => $meetings,
         ]);
     }
@@ -60,6 +140,7 @@ class GovernanceMeetingController extends Controller
             'canEdit' => $meeting->isEditable() && auth()->user()->can('update', $meeting),
             'canManageMinutes' => auth()->user()->can('manageMinutes', $meeting),
             'canApproveMinutes' => auth()->user()->can('approveMinutes', $meeting),
+            'workflowChecklist' => $this->workflowService->meetingChecklist($meeting, auth()->user()),
         ]);
     }
 

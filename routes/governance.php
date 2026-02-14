@@ -44,6 +44,7 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     // Meetings
     Route::middleware('permission:governance.meetings.view')->group(function () {
         Route::get('/meetings', [GovernanceMeetingController::class, 'index'])->name('meetings.index');
+        Route::get('/meetings/calendar', [GovernanceMeetingController::class, 'calendar'])->name('meetings.calendar');
         Route::get('/meetings/create', [GovernanceMeetingController::class, 'create'])->name('meetings.create');
         Route::get('/meetings/{meeting}', [GovernanceMeetingController::class, 'show'])->name('meetings.show');
         

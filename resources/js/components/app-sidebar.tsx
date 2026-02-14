@@ -11,7 +11,7 @@ import {
     SidebarMenuItem,
 } from '@/components/ui/sidebar';
 import { dashboard } from '@/routes';
-import { type NavItem, type NavGroup } from '@/types';
+import { type NavGroup, type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
@@ -85,7 +85,8 @@ function buildNavigationGroups({
     const incidentPlural = labels['incident.plural'] ?? 'Incidents';
     const notePlural = labels['note.plural'] ?? 'Notes';
     const timelineLabel = labels['timeline.singular'] ?? 'Timeline';
-    const emergencyLabel = labels['emergency_access.singular'] ?? 'Emergency Access';
+    const emergencyLabel =
+        labels['emergency_access.singular'] ?? 'Emergency Access';
     const respitePlural = labels['respite.plural'] ?? 'Respite';
 
     // Main navigation group (always visible)
@@ -141,30 +142,70 @@ function buildNavigationGroups({
     };
 
     if (can?.sites?.viewAny) {
-        sitesGroup.items.push({ title: 'All Sites', href: '/sites', icon: MapPin });
-        sitesGroup.items.push({ title: 'Head Office', href: '/sites?type=head_office', icon: Building2 });
-        sitesGroup.items.push({ title: 'Houses', href: '/sites?type=house', icon: Home });
-        sitesGroup.items.push({ title: 'Facilities', href: '/sites?type=facility', icon: Warehouse });
+        sitesGroup.items.push({
+            title: 'All Sites',
+            href: '/sites',
+            icon: MapPin,
+        });
+        sitesGroup.items.push({
+            title: 'Head Office',
+            href: '/sites?type=head_office',
+            icon: Building2,
+        });
+        sitesGroup.items.push({
+            title: 'Houses',
+            href: '/sites?type=house',
+            icon: Home,
+        });
+        sitesGroup.items.push({
+            title: 'Facilities',
+            href: '/sites?type=facility',
+            icon: Warehouse,
+        });
     }
 
     if (can?.calendar?.view) {
-        sitesGroup.items.push({ title: 'Calendars', href: '/sites/calendar', icon: CalendarDays });
+        sitesGroup.items.push({
+            title: 'Calendars',
+            href: '/sites/calendar',
+            icon: CalendarDays,
+        });
     }
 
     if (can?.checklists?.manageTemplates) {
-        sitesGroup.items.push({ title: 'Checklist Templates', href: '/sites/checklists/templates', icon: FileQuestion });
+        sitesGroup.items.push({
+            title: 'Checklist Templates',
+            href: '/sites/checklists/templates',
+            icon: FileQuestion,
+        });
     } else if (can?.checklists?.view) {
-        sitesGroup.items.push({ title: 'Checklists & Walkthroughs', href: '/sites/checklists/templates', icon: ClipboardCheck });
+        sitesGroup.items.push({
+            title: 'Checklists & Walkthroughs',
+            href: '/sites/checklists/templates',
+            icon: ClipboardCheck,
+        });
     }
 
     if (can?.hazards?.view) {
-        sitesGroup.items.push({ title: 'Hazards', href: '/compliance/hazards', icon: ShieldAlert });
+        sitesGroup.items.push({
+            title: 'Hazards',
+            href: '/compliance/hazards',
+            icon: ShieldAlert,
+        });
     }
 
-    sitesGroup.items.push({ title: 'Documents & Notes', href: '/sites?tab=documents', icon: FileText });
+    sitesGroup.items.push({
+        title: 'Documents & Notes',
+        href: '/sites?tab=documents',
+        icon: FileText,
+    });
 
     if (can?.checklists?.view) {
-        sitesGroup.items.push({ title: 'Inspections & Maintenance', href: '/sites?tab=inspections', icon: Wrench });
+        sitesGroup.items.push({
+            title: 'Inspections & Maintenance',
+            href: '/sites?tab=inspections',
+            icon: Wrench,
+        });
     }
 
     if (can?.vendors?.view || can?.credentials?.view) {
@@ -174,21 +215,37 @@ function buildNavigationGroups({
                 : `/sites/${activeSiteId}/credentials`
             : '/sites';
 
-        sitesGroup.items.push({ title: 'Vendors & Credentials', href, icon: Truck });
+        sitesGroup.items.push({
+            title: 'Vendors & Credentials',
+            href,
+            icon: Truck,
+        });
     }
 
     if (can?.assets?.viewAny) {
-        sitesGroup.items.push({ title: 'Assets', href: '/assets', icon: Package });
+        sitesGroup.items.push({
+            title: 'Assets',
+            href: '/assets',
+            icon: Package,
+        });
     }
 
     // Support Worker specific nav
     if (role === 'support_worker') {
         operationsGroup.items.push(
             { title: 'My Shifts', href: '/shifts', icon: CalendarDays },
-            { title: timesheetPlural, href: '/timesheets', icon: ClipboardList },
+            {
+                title: timesheetPlural,
+                href: '/timesheets',
+                icon: ClipboardList,
+            },
             { title: clientPlural, href: '/clients', icon: Users },
             { title: notePlural, href: '/notes', icon: FileText },
-            { title: timelineLabel, href: '/timeline', icon: MessageSquareText }
+            {
+                title: timelineLabel,
+                href: '/timeline',
+                icon: MessageSquareText,
+            },
         );
 
         if (can?.medications?.view) {
@@ -242,10 +299,18 @@ function buildNavigationGroups({
 
     // Provider/Manager/Admin nav - Operations
     if (can?.clients?.viewAny) {
-        operationsGroup.items.push({ title: clientPlural, href: '/clients', icon: Users });
+        operationsGroup.items.push({
+            title: clientPlural,
+            href: '/clients',
+            icon: Users,
+        });
     }
     if (can?.shifts?.viewAny) {
-        operationsGroup.items.push({ title: shiftPlural, href: '/shifts', icon: CalendarDays });
+        operationsGroup.items.push({
+            title: shiftPlural,
+            href: '/shifts',
+            icon: CalendarDays,
+        });
     }
     if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned) {
         operationsGroup.items.push({
@@ -278,7 +343,11 @@ function buildNavigationGroups({
 
     // Resources
     if (can?.assets?.viewAny || can?.assets?.viewAssigned) {
-        resourcesGroup.items.push({ title: assetPlural, href: '/assets', icon: Package });
+        resourcesGroup.items.push({
+            title: assetPlural,
+            href: '/assets',
+            icon: Package,
+        });
     }
     if (can?.assets?.alertsView) {
         resourcesGroup.items.push({
@@ -288,7 +357,11 @@ function buildNavigationGroups({
         });
     }
     if (can?.staff?.viewAny) {
-        resourcesGroup.items.push({ title: staffPlural, href: '/staff', icon: Users });
+        resourcesGroup.items.push({
+            title: staffPlural,
+            href: '/staff',
+            icon: Users,
+        });
     }
     if (can?.fleet?.viewAny) {
         resourcesGroup.items.push({
@@ -344,71 +417,175 @@ function buildNavigationGroups({
 
     // My HR is always visible to any authenticated user
     hrGroup.items.push({ title: 'My HR', href: '/hr/my', icon: Home });
-    hrGroup.items.push({ title: 'My Training', href: '/hr/my/training', icon: Target });
+    hrGroup.items.push({
+        title: 'My Training',
+        href: '/hr/my/training',
+        icon: Target,
+    });
 
-    const hasAnyHr = can?.hr?.recruitment?.view || can?.hr?.employees?.viewAny || can?.hr?.compliance?.view
-        || can?.hr?.leave?.viewAny || can?.hr?.performance?.view || can?.hr?.reports?.view
-        || can?.hr?.policies?.view;
+    const hasAnyHr =
+        can?.hr?.recruitment?.view ||
+        can?.hr?.employees?.viewAny ||
+        can?.hr?.compliance?.view ||
+        can?.hr?.leave?.viewAny ||
+        can?.hr?.performance?.view ||
+        can?.hr?.reports?.view ||
+        can?.hr?.policies?.view;
 
     if (hasAnyHr) {
         if (can?.hr?.recruitment?.view) {
-            hrGroup.items.push({ title: 'Recruitment', href: '/hr/recruitment', icon: Users });
+            hrGroup.items.push({
+                title: 'Recruitment',
+                href: '/hr/recruitment',
+                icon: Users,
+            });
         }
         if (can?.hr?.employees?.viewAny) {
-            hrGroup.items.push({ title: 'People', href: '/hr/people', icon: Users });
+            hrGroup.items.push({
+                title: 'People',
+                href: '/hr/people',
+                icon: Users,
+            });
         }
         if (can?.hr?.compliance?.view) {
-            hrGroup.items.push({ title: 'Compliance', href: '/hr/compliance', icon: Shield });
+            hrGroup.items.push({
+                title: 'Compliance',
+                href: '/hr/compliance',
+                icon: Shield,
+            });
         }
         if (can?.hr?.leave?.viewAny) {
-            hrGroup.items.push({ title: 'Leave & Rosters', href: '/hr/leave', icon: CalendarDays });
+            hrGroup.items.push({
+                title: 'Leave & Rosters',
+                href: '/hr/leave',
+                icon: CalendarDays,
+            });
         }
         if (can?.hr?.performance?.view) {
-            hrGroup.items.push({ title: 'Performance', href: '/hr/performance', icon: ClipboardCheck });
+            hrGroup.items.push({
+                title: 'Performance',
+                href: '/hr/performance',
+                icon: ClipboardCheck,
+            });
         }
         if (can?.hr?.policies?.view) {
-            hrGroup.items.push({ title: 'Policies', href: '/hr/policies', icon: FileText });
+            hrGroup.items.push({
+                title: 'Policies',
+                href: '/hr/policies',
+                icon: FileText,
+            });
         }
         if (can?.hr?.reports?.view) {
-            hrGroup.items.push({ title: 'Reports', href: '/hr/reports', icon: FileText });
+            hrGroup.items.push({
+                title: 'Reports',
+                href: '/hr/reports',
+                icon: FileText,
+            });
         }
     }
 
+    const canSeeRoadmap = can?.roadmap?.view || can?.governance?.view;
+
     // Governance
     if (can?.governance?.view) {
+        governanceGroup.items.push({
+            title: 'Dashboard',
+            href: '/governance/dashboard',
+            icon: Landmark,
+        });
+
+        if (canSeeRoadmap) {
+            governanceGroup.items.push({
+                title: 'Roadmap',
+                href: '/roadmap/dashboard',
+                icon: Target,
+            });
+        }
+
         governanceGroup.items.push(
-            { title: 'Dashboard', href: '/governance/dashboard', icon: Landmark },
-            { title: 'Meetings', href: '/governance/meetings', icon: CalendarDays },
+            {
+                title: 'Meetings',
+                href: '/governance/meetings',
+                icon: CalendarDays,
+            },
             ...(can?.governance?.meetings?.manage
-                ? [{ title: 'Admin', href: '/governance/admin/board-members', icon: Users }]
+                ? [
+                      {
+                          title: 'Admin',
+                          href: '/governance/admin/board-members',
+                          icon: Users,
+                      },
+                  ]
                 : []),
             { title: 'Risks', href: '/governance/risks', icon: Scale },
-            { title: 'Resolutions', href: '/governance/resolutions', icon: Vote },
-            { title: 'Compliance', href: '/governance/compliance', icon: Shield },
+            {
+                title: 'Resolutions',
+                href: '/governance/resolutions',
+                icon: Vote,
+            },
+            {
+                title: 'Compliance',
+                href: '/governance/compliance',
+                icon: Shield,
+            },
             { title: 'Strategy', href: '/governance/strategy', icon: Target },
-            { title: 'Performance', href: '/governance/performance', icon: Gavel },
+            {
+                title: 'Performance',
+                href: '/governance/performance',
+                icon: Gavel,
+            },
             { title: 'Budgets', href: '/governance/budgets', icon: Folder },
-            { title: 'Action Items', href: '/governance/actions', icon: ClipboardList },
+            {
+                title: 'Action Items',
+                href: '/governance/actions',
+                icon: ClipboardList,
+            },
         );
+    } else if (canSeeRoadmap) {
+        governanceGroup.items.push({
+            title: 'Roadmap',
+            href: '/roadmap/dashboard',
+            icon: Target,
+        });
     }
 
     // System
     if (can?.reports?.viewAny) {
-        systemGroup.items.push({ title: 'Reports', href: '/reports', icon: FileText });
+        systemGroup.items.push({
+            title: 'Reports',
+            href: '/reports',
+            icon: FileText,
+        });
     }
     if (can?.calendar?.viewAny) {
-        systemGroup.items.push({ title: 'Calendar', href: '/calendar', icon: CalendarDays });
+        systemGroup.items.push({
+            title: 'Calendar',
+            href: '/calendar',
+            icon: CalendarDays,
+        });
     }
     if (can?.timeline?.viewAny) {
-        systemGroup.items.push({ title: 'Timeline', href: '/timeline', icon: MessageSquareText });
+        systemGroup.items.push({
+            title: 'Timeline',
+            href: '/timeline',
+            icon: MessageSquareText,
+        });
     }
     if (can?.summaries?.viewAny) {
-        systemGroup.items.push({ title: 'Summaries', href: '/summaries', icon: FileText });
+        systemGroup.items.push({
+            title: 'Summaries',
+            href: '/summaries',
+            icon: FileText,
+        });
     }
     if (can?.audit?.viewAny) {
         systemGroup.items.push(
             { title: 'Audit Logs', href: '/audit-logs', icon: Shield },
-            { title: 'QA Checklist', href: '/quality/checklist', icon: ClipboardList }
+            {
+                title: 'QA Checklist',
+                href: '/quality/checklist',
+                icon: ClipboardList,
+            },
         );
     }
     if (can?.controlRoom?.viewAny) {
@@ -418,7 +595,11 @@ function buildNavigationGroups({
             icon: ShieldAlert,
         });
     }
-    systemGroup.items.push({ title: 'Settings', href: '/settings', icon: Settings });
+    systemGroup.items.push({
+        title: 'Settings',
+        href: '/settings',
+        icon: Settings,
+    });
 
     return [
         mainGroup,
@@ -440,7 +621,12 @@ export function AppSidebar() {
     const can = auth?.can;
 
     const activeSiteId = page.props?.site?.id ?? null;
-    const navigationGroups = buildNavigationGroups({ role, can, labels: labels ?? {}, activeSiteId });
+    const navigationGroups = buildNavigationGroups({
+        role,
+        can,
+        labels: labels ?? {},
+        activeSiteId,
+    });
 
     return (
         <Sidebar collapsible="icon" variant="inset">
