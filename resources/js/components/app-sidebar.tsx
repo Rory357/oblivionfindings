@@ -34,9 +34,11 @@ import {
     Settings,
     Shield,
     ShieldAlert,
+    ShieldCheck,
     Target,
     Truck,
     Users,
+    UserCog,
     Vote,
     Warehouse,
     Wrench,
@@ -595,6 +597,21 @@ function buildNavigationGroups({
             icon: ShieldAlert,
         });
     }
+    
+    // Access Control & Users (for admins)
+    if (can?.settings?.manageAccess) {
+        systemGroup.items.push({
+            title: 'Access Control',
+            href: '/system/access',
+            icon: ShieldCheck,
+        });
+        systemGroup.items.push({
+            title: 'Users',
+            href: '/system/users',
+            icon: UserCog,
+        });
+    }
+    
     systemGroup.items.push({
         title: 'Settings',
         href: '/settings',

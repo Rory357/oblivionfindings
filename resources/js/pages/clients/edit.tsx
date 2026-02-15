@@ -9,6 +9,7 @@ export default function EditClient({ client, sites = [], serviceContexts = [] })
     const { data, setData, put, processing, errors } = useForm({
         site_id: (client.site_id ?? null) as number | null,
         service_context_id: (client.service_context_id ?? null) as number | null,
+        nhi_number: client.nhi_number ?? '',
         first_name: client.first_name ?? '',
         last_name: client.last_name ?? '',
         preferred_name: client.preferred_name ?? '',
@@ -103,6 +104,22 @@ export default function EditClient({ client, sites = [], serviceContexts = [] })
                         )}
                         <div className="mt-1 text-xs text-slate-500">
                             Residential / home support / respite classification (used for audit and reporting).
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="text-sm font-medium">NHI Number</label>
+                        <input
+                            className="mt-1 w-full rounded-md border bg-transparent p-2"
+                            placeholder="e.g., ZAC5961"
+                            value={data.nhi_number}
+                            onChange={(e) => setData('nhi_number', e.target.value.toUpperCase())}
+                        />
+                        {errors.nhi_number && (
+                            <div className="mt-1 text-xs text-red-400">{errors.nhi_number}</div>
+                        )}
+                        <div className="mt-1 text-xs text-slate-500">
+                            3 letters followed by 4 digits (e.g., ZAC5961)
                         </div>
                     </div>
 

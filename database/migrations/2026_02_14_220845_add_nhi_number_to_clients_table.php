@@ -9,20 +9,21 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('clients', function (Blueprint $table) {
-            // Optional: allow a client to log in (Client dashboard mode)
-            $table->foreignId('user_id')
+            $table->string('nhi_number', 10)
                 ->nullable()
-                ->after('id')
                 ->unique()
-                ->constrained('users')
-                ->nullOnDelete();
+                ->after('user_id')
+                ->comment('New Zealand National Health Index number (3 letters + 4 numbers)');
+            
+            $table->index('nhi_number');
         });
     }
 
     public function down(): void
     {
         Schema::table('clients', function (Blueprint $table) {
-            $table->dropConstrainedForeignId('user_id');
+            $table->dropIndex(['nhi_number']);
+            $table->dropColumn('nhi_number');
         });
     }
 };

@@ -33,6 +33,7 @@ type Props = {
         date_of_birth?: string | null;
         gender?: string | null;
         status: string;
+        nhi_number?: string | null;
         phone?: string | null;
         email?: string | null;
         address_line_1?: string | null;
@@ -223,7 +224,7 @@ export default function ClientShow({
                         </div>
                     }
                     backHref="/clients"
-                    description={`${client.status}${client.service_context ? ` • ${client.service_context.name}` : ''}${client.site ? ` • ${client.site.name}` : ''}`}
+                    description={`${client.nhi_number ? `NHI: ${client.nhi_number} • ` : ''}${client.status}${client.service_context ? ` • ${client.service_context.name}` : ''}${client.site ? ` • ${client.site.name}` : ''}`}
                     actions={
                         <>
                             {can.edit ? (

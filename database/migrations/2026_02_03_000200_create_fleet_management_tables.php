@@ -74,8 +74,11 @@ return new class extends Migration
             $table->dateTime('ended_at')->nullable();
             $table->decimal('start_latitude', 10, 7)->nullable();
             $table->decimal('start_longitude', 10, 7)->nullable();
+            $table->string('start_address')->nullable();
             $table->decimal('end_latitude', 10, 7)->nullable();
             $table->decimal('end_longitude', 10, 7)->nullable();
+            $table->string('end_address')->nullable();
+            $table->timestamp('reverse_geocoded_at')->nullable();
             $table->decimal('distance_km', 10, 3)->default(0);
             $table->unsignedInteger('duration_s')->default(0);
             $table->string('status')->default('open'); // open|closed|archived

@@ -71,9 +71,9 @@ class SiteHazardController extends Controller
             'actions.completedBy:id,name',
         ]);
 
-        // Get users for assignment dropdown
-        $users = \App\Models\User::select(['id', 'name'])
-            ->where('is_active', true)
+        // Get staff for assignment dropdown
+        $users = \App\Models\User::staff()
+            ->select(['id', 'name'])
             ->orderBy('name')
             ->get();
 

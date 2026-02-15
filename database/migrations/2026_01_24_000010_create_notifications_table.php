@@ -14,9 +14,16 @@ return new class extends Migration
             $table->morphs('notifiable');
             $table->json('data');
             $table->timestamp('read_at')->nullable();
+            $table->timestamp('acknowledged_at')->nullable();
+            $table->unsignedInteger('escalation_count')->default(0);
+            $table->timestamp('last_escalated_at')->nullable();
             $table->timestamps();
 
             $table->index(['notifiable_type', 'notifiable_id', 'read_at']);
+            $table->index(
+                ['notifiable_type', 'notifiable_id', 'acknowledged_at'],
+                'notifications_ack_lookup_idx'
+            );
         });
     }
 

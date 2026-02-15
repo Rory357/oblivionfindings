@@ -18,10 +18,24 @@ return new class extends Migration {
             $table->boolean('is_active')->default(true)->index();
             $table->timestamps();
         });
+
+        Schema::table('client_incidents', function (Blueprint $table) {
+            $table->foreignId('template_id')
+                ->nullable()
+                ->after('shift_id')
+                ->constrained('incident_templates')
+                ->nullOnDelete();
+        });
     }
 
     public function down(): void
     {
+        if (Schema::hasTable('client_incidents') && Schema::hasColumn('client_incidents', 'template_id')) {
+            Schema::table('client_incidents', function (Blueprint $table) {
+                $table->dropConstrainedForeignId('template_id');
+            });
+        }
+
         Schema::dropIfExists('incident_templates');
     }
 };

@@ -325,7 +325,10 @@ class SiteController extends Controller
     {
         $this->authorize('create', Site::class);
 
-        $users = \App\Models\User::select(['id', 'name'])->orderBy('name')->get();
+        $users = \App\Models\User::staff()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
 
         return inertia('sites/create', [
             'users' => $users,
@@ -354,7 +357,10 @@ class SiteController extends Controller
     {
         $this->authorize('update', $site);
 
-        $users = \App\Models\User::select(['id', 'name'])->orderBy('name')->get();
+        $users = \App\Models\User::staff()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
 
         return inertia('sites/edit', [
             'site' => [

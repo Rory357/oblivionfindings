@@ -47,6 +47,13 @@ return new class extends Migration
             $table->index(['is_active', 'auto_attach']);
         });
 
+        Schema::table('control_room_signal_rules', function (Blueprint $table) {
+            $table->foreign('playbook_id')
+                ->references('id')
+                ->on('control_room_playbooks')
+                ->nullOnDelete();
+        });
+
         // Playbook Steps - individual tasks in a playbook
         Schema::create('control_room_playbook_steps', function (Blueprint $table) {
             $table->id();
@@ -187,6 +194,12 @@ return new class extends Migration
 
     public function down(): void
     {
+        if (Schema::hasTable('control_room_signal_rules')) {
+            Schema::table('control_room_signal_rules', function (Blueprint $table) {
+                $table->dropForeign(['playbook_id']);
+            });
+        }
+
         Schema::dropIfExists('control_room_evidence_items');
         Schema::dropIfExists('control_room_evidence_packs');
         Schema::dropIfExists('control_room_playbook_run_steps');

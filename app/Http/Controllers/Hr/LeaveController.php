@@ -127,7 +127,8 @@ class LeaveController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.manage'), 403);
 
-        $staff = \App\Models\User::orderBy('name')
+        $staff = \App\Models\User::staff()
+            ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
         return Inertia::render('hr/leave/create', [

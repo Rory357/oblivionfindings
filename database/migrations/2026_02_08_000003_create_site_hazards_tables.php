@@ -47,6 +47,8 @@ return new class extends Migration {
             // Due dates
             $table->date('due_date')->nullable()->index();
             $table->date('review_date')->nullable();
+            $table->timestamp('warning_sent_at')->nullable();
+            $table->timestamp('overdue_notified_at')->nullable();
 
             // Related entities
             $table->foreignId('linked_inspection_id')->nullable();

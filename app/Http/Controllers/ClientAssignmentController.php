@@ -13,10 +13,9 @@ class ClientAssignmentController extends Controller
     {
         $this->authorize('update', $client);
 
-        $workers = User::query()
-            ->whereHas('roles', fn($q) => $q->where('name', 'support_worker'))
+        $workers = User::staff()
             ->orderBy('name')
-            ->get(['id', 'name', 'email']); // role no longer needed here
+            ->get(['id', 'name', 'email']);
 
         $assignedIds = $client->supportWorkers()->pluck('users.id')->values();
 
@@ -36,8 +35,7 @@ class ClientAssignmentController extends Controller
             'user_ids.*' => ['integer', 'exists:users,id'],
         ]);
 
-        $allowedWorkerIds = User::query()
-            ->whereHas('roles', fn($q) => $q->where('name', 'support_worker'))
+        $allowedWorkerIds = User::staff()
             ->whereIn('id', $validated['user_ids'] ?? [])
             ->pluck('id')
             ->all();

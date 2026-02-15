@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Client;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateClientRequest extends FormRequest
@@ -31,6 +32,7 @@ class UpdateClientRequest extends FormRequest
             'postcode' => ['nullable', 'string', 'max:20'],
             'funding_type' => ['nullable', 'string', 'max:100'],
             'funding_notes' => ['nullable', 'string', 'max:2000'],
+            'nhi_number' => Client::nhiValidationRules($this->route('client')?->id),
         ];
     }
 }

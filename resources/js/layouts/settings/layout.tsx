@@ -72,16 +72,6 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
     }
     if (can?.settings?.manageAccess) {
         extraItems.push({
-            title: 'Access Control',
-            href: '/settings/access',
-            icon: null,
-        });
-        extraItems.push({
-            title: 'Roles',
-            href: '/settings/roles',
-            icon: null,
-        });
-        extraItems.push({
             title: 'Notification defaults',
             href: '/settings/notifications/roles',
             icon: null,

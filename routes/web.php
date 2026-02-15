@@ -117,3 +117,6 @@ require __DIR__.'/roadmap.php';
 
 // HR module
 require __DIR__.'/hr.php';
+
+// System module (Access Control, Users)
+require __DIR__.'/system.php';

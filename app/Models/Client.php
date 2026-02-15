@@ -13,6 +13,8 @@ class Client extends Model
     use AuditableChanges;
 
     protected $fillable = [
+        'user_id',
+        'nhi_number',
         'site_id',
         'service_context_id',
         'first_name',
@@ -38,7 +40,7 @@ class Client extends Model
         'date_of_birth' => 'date',
     ];
 
-    protected $appends = ['profile_photo_url', 'avatar'];
+    protected $appends = ['profile_photo_url', 'avatar', 'full_name'];
 
     public function getProfilePhotoUrlAttribute(): ?string
     {
@@ -52,6 +54,18 @@ class Client extends Model
         return $this->profile_photo_url;
     }
 
+    public function getFullNameAttribute(): string
+    {
+        return $this->first_name . ' ' . $this->last_name;
+    }
+
+    /**
+     * The user account associated with this client (for portal access)
+     */
+    public function user()
+    {
+        return $this->belongsTo(User::class);
+    }
 
     public function site()
     {
@@ -78,6 +92,14 @@ class Client extends Model
         return $this->belongsToMany(\App\Models\User::class, 'client_portal_users')
             ->withPivot('relation')
             ->withTimestamps();
+    }
+
+    /**
+     * Next of kin relationships
+     */
+    public function nextOfKins()
+    {
+        return $this->hasMany(NextOfKin::class);
     }
 
     public function medicalProfile()
@@ -153,5 +175,29 @@ class Client extends Model
     public function onboardingOverrides()
     {
         return $this->hasMany(\App\Models\ClientOnboardingOverride::class);
+    }
+
+    /**
+     * Scope: Find by NHI number
+     */
+    public function scopeByNhi($query, string $nhi)
+    {
+        return $query->where('nhi_number', strtoupper($nhi));
+    }
+
+    /**
+     * Validate NHI number format (3 letters + 4 numbers)
+     */
+    public static function validateNhi(string $nhi): bool
+    {
+        return preg_match('/^[A-Z]{3}\d{4}$/i', $nhi) === 1;
+    }
+
+    /**
+     * Set NHI number (auto-format to uppercase)
+     */
+    public function setNhiNumberAttribute($value): void
+    {
+        $this->attributes['nhi_number'] = $value ? strtoupper($value) : null;
     }
 }

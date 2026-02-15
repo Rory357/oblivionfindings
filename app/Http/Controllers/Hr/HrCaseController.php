@@ -52,7 +52,8 @@ class HrCaseController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
 
-        $staff = User::orderBy('name')
+        $staff = User::staff()
+            ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
         return Inertia::render('hr/cases/create', [
