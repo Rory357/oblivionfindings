@@ -137,6 +137,11 @@ class Client extends Model
         return $this->hasMany(\App\Models\ClientControlledDrugDiscrepancy::class);
     }
 
+    public function medicationAllergies()
+    {
+        return $this->hasMany(\App\Models\MedicationAllergy::class);
+    }
+
     public function documents()
     {
         return $this->hasMany(\App\Models\ClientDocument::class);

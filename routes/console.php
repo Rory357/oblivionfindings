@@ -145,6 +145,14 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->weeklyOn(0, '03:00');
 
+// Medical Module Scheduled Jobs
+
+// Clear stale medication alerts: hourly
+app(Schedule::class)
+    ->call(fn () => app(\App\Services\MedicationAlertService::class)->clearStaleAlerts())
+    ->timezone('Pacific/Auckland')
+    ->hourly();
+
 // Roadmap Module Scheduled Jobs
 
 // Suggestion ingestion + dedupe sweep: hourly

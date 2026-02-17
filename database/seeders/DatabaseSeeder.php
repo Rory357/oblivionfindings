@@ -22,9 +22,11 @@ class DatabaseSeeder extends Seeder
         $this->call(SystemAssetsSeeder::class);
         $this->call(SystemShiftsSeeder::class);
         $this->call(SystemMedicationsSeeder::class);
+        $this->call(MedicationEnterpriseSeeder::class);
         $this->call(SystemIncidentsSeeder::class);
         $this->call(SystemDocumentsAndNotesSeeder::class);
         $this->call(SafeguardingSeeder::class);
+        $this->call(MedicationWorkflowDemoSeeder::class);
 
         // Compliance module seeders
         $this->call(ConsentTypesSeeder::class);

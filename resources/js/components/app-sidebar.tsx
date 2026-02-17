@@ -339,6 +339,11 @@ function buildNavigationGroups({
             href: '/medications',
             icon: ClipboardList,
         });
+        operationsGroup.items.push({
+            title: 'Medication Dashboard',
+            href: '/medications/dashboard',
+            icon: ShieldCheck,
+        });
     }
     if (can?.medications?.breakGlass) {
         operationsGroup.items.push({
