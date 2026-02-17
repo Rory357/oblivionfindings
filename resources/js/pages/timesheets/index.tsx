@@ -11,6 +11,7 @@ type Timesheet = {
     ends_at: string;
     break_minutes: number;
     status: string;
+    is_residential_billable?: boolean;
     submitted_at?: string | null;
     client: { id: number; first_name: string; last_name: string };
     staff: { id: number; name: string };
@@ -265,6 +266,9 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                             {new Date(t.ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             {t.break_minutes ? ` • break ${t.break_minutes}m` : ''}
                                         </div>
+                                        {t.is_residential_billable ? (
+                                            <div className="mt-1 text-xs text-emerald-400">Residential billable</div>
+                                        ) : null}
                                     </td>
                                     <td className="p-3">
                                         <Link className="underline" href={`/clients/${t.client.id}`}>{t.client.first_name} {t.client.last_name}</Link>

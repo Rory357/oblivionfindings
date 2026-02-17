@@ -164,6 +164,11 @@ function buildNavigationGroups({
             href: '/sites?type=facility',
             icon: Warehouse,
         });
+        sitesGroup.items.push({
+            title: 'Residential',
+            href: '/sites?type=residential',
+            icon: Home,
+        });
     }
 
     if (can?.calendar?.view) {

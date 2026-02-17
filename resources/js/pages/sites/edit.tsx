@@ -18,7 +18,7 @@ import { Building2, Home, Warehouse, MapPin, AlertTriangle } from 'lucide-react'
 type Site = {
     id: number;
     name: string;
-    type: 'head_office' | 'house' | 'facility';
+    type: 'head_office' | 'house' | 'facility' | 'residential';
     phone?: string;
     email?: string;
     manager_name?: string;
@@ -60,6 +60,7 @@ const siteTypes = [
     { value: 'head_office', label: 'Head Office', icon: Building2, description: 'Administrative headquarters with meeting rooms' },
     { value: 'house', label: 'House', icon: Home, description: 'Residential home with client bedrooms' },
     { value: 'facility', label: 'Facilities', icon: Warehouse, description: 'Workshop, cafe, or day programme space' },
+    { value: 'residential', label: 'Residential', icon: Home, description: 'Client home used for residential/home-support visits' },
 ];
 
 export default function EditSite() {

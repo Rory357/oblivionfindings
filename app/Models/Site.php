@@ -186,6 +186,7 @@ class Site extends Model
             'head_office' => 'Head Office',
             'house' => 'House',
             'facility' => 'Facilities',
+            'residential' => 'Residential',
             default => 'Site',
         };
     }

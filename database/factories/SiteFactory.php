@@ -13,7 +13,7 @@ class SiteFactory extends Factory
     {
         return [
             'name' => fake()->company() . ' ' . fake()->randomElement(['Home', 'Care', 'Services']),
-            'type' => fake()->randomElement(['head_office', 'house', 'facility']),
+            'type' => fake()->randomElement(['head_office', 'house', 'facility', 'residential']),
             'address_line_1' => fake()->streetAddress(),
             'suburb' => fake()->city(),
             'city' => fake()->city(),

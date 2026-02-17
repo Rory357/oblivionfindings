@@ -20,6 +20,7 @@ class Timesheet extends Model
         'ends_at',
         'break_minutes',
         'notes',
+        'is_residential_billable',
         'status',
         'submitted_at',
         'submitted_by',
@@ -39,6 +40,7 @@ class Timesheet extends Model
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
         'returned_at' => 'datetime',
+        'is_residential_billable' => 'boolean',
     ];
 
     public function client()

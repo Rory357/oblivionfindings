@@ -42,6 +42,7 @@ class SitePolicy
             'head_office' => 'sites.type.head_office.view',
             'house' => 'sites.type.house.view',
             'facility' => 'sites.type.facility.view',
+            'residential' => 'sites.type.house.view',
         ];
 
         $hasTypeScopedPermissions = collect($typePermissions)

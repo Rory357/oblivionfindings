@@ -240,6 +240,7 @@ class TimesheetController extends Controller
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:600'],
             'notes' => ['nullable', 'string'],
+            'is_residential_billable' => ['nullable', 'boolean'],
             // timesheets start as draft; submission is a separate action
         ]);
 
@@ -263,6 +264,7 @@ class TimesheetController extends Controller
             'ends_at' => $data['ends_at'],
             'break_minutes' => (int) ($data['break_minutes'] ?? 0),
             'notes' => $data['notes'] ?? null,
+            'is_residential_billable' => (bool) ($data['is_residential_billable'] ?? false),
             'status' => 'draft',
             'created_by' => $auth->id,
         ]);
@@ -330,6 +332,7 @@ class TimesheetController extends Controller
             'ends_at' => ['required', 'date', 'after:starts_at'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:600'],
             'notes' => ['nullable', 'string'],
+            'is_residential_billable' => ['nullable', 'boolean'],
         ]);
 
         $timesheet->fill([
@@ -339,6 +342,7 @@ class TimesheetController extends Controller
             'ends_at' => $data['ends_at'],
             'break_minutes' => (int) ($data['break_minutes'] ?? 0),
             'notes' => $data['notes'] ?? null,
+            'is_residential_billable' => (bool) ($data['is_residential_billable'] ?? false),
         ]);
 
         $timesheet->save();

@@ -27,6 +27,7 @@ class TimesheetFactory extends Factory
             'ends_at' => $endTime,
             'break_minutes' => fake()->randomElement([0, 30, 60]),
             'notes' => fake()->optional()->paragraph(),
+            'is_residential_billable' => false,
             'status' => 'draft',
             'submitted_at' => null,
             'approved_at' => null,
