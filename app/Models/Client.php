@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 
 class Client extends Model
 {
@@ -196,6 +197,26 @@ class Client extends Model
     public static function validateNhi(string $nhi): bool
     {
         return preg_match('/^[A-Z]{3}\d{4}$/i', $nhi) === 1;
+    }
+
+    /**
+     * Validation rules for NHI number.
+     */
+    public static function nhiValidationRules(?int $ignoreClientId = null): array
+    {
+        $unique = Rule::unique('clients', 'nhi_number');
+
+        if ($ignoreClientId !== null) {
+            $unique = $unique->ignore($ignoreClientId);
+        }
+
+        return [
+            'nullable',
+            'string',
+            'max:10',
+            'regex:/^[A-Z]{3}\d{4}$/i',
+            $unique,
+        ];
     }
 
     /**

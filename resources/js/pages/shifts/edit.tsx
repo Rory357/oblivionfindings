@@ -6,7 +6,13 @@ import { Label } from '@/components/ui/label';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
-type Client = { id: number; first_name: string; last_name: string; service_context_id?: number | null };
+type Client = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    service_context_id?: number | null;
+    site?: { id: number; name: string } | null;
+};
 type Staff = { id: number; name: string; email: string };
 type ServiceContext = { id: number; name: string; type: string; is_active: boolean };
 
@@ -15,6 +21,7 @@ type Props = { shift: any; clients: Client[]; staff: Staff[]; serviceContexts: S
 export default function ShiftEdit({ shift, clients, staff, serviceContexts, defaultServiceContextId = null }: Props) {
     const { labels } = usePage().props as any;
     const shiftLabel = labels?.['shift.singular'] ?? 'Shift';
+    const locationForClient = (client: Client | null | undefined): string => client?.site?.name?.trim() ?? '';
 
     const [taskBusyId, setTaskBusyId] = useState<number | null>(null);
     const [taskError, setTaskError] = useState<string | null>(null);
@@ -92,14 +99,15 @@ export default function ShiftEdit({ shift, clients, staff, serviceContexts, defa
                                 value={form.data.client_id}
                                 onChange={(e) => {
                                     const nextId = e.target.value;
-                                    form.setData('client_id', nextId);
+                                    const client = clients.find((c) => String(c.id) === String(nextId));
+                                    form.setData('client_id', Number(nextId));
                                     if (!form.data.service_context_id) {
-                                        const client = clients.find((c) => String(c.id) === String(nextId));
                                         const inherited = client?.service_context_id ?? defaultServiceContextId;
                                         if (inherited) {
                                             form.setData('service_context_id', inherited as any);
                                         }
                                     }
+                                    form.setData('location', locationForClient(client));
                                 }}
                             >
                                 {clients.map((c) => (

@@ -15,7 +15,6 @@ import { type NavGroup, type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
-    Building2,
     CalendarDays,
     ClipboardCheck,
     ClipboardList,
@@ -37,10 +36,9 @@ import {
     ShieldCheck,
     Target,
     Truck,
-    Users,
     UserCog,
+    Users,
     Vote,
-    Warehouse,
     Wrench,
 } from 'lucide-react';
 import AppLogo from './app-logo';
@@ -149,26 +147,6 @@ function buildNavigationGroups({
             href: '/sites',
             icon: MapPin,
         });
-        sitesGroup.items.push({
-            title: 'Head Office',
-            href: '/sites?type=head_office',
-            icon: Building2,
-        });
-        sitesGroup.items.push({
-            title: 'Houses',
-            href: '/sites?type=house',
-            icon: Home,
-        });
-        sitesGroup.items.push({
-            title: 'Facilities',
-            href: '/sites?type=facility',
-            icon: Warehouse,
-        });
-        sitesGroup.items.push({
-            title: 'Residential',
-            href: '/sites?type=residential',
-            icon: Home,
-        });
     }
 
     if (can?.calendar?.view) {
@@ -203,28 +181,22 @@ function buildNavigationGroups({
 
     sitesGroup.items.push({
         title: 'Documents & Notes',
-        href: '/sites?tab=documents',
+        href: activeSiteId ? `/sites/${activeSiteId}` : '/sites',
         icon: FileText,
     });
 
     if (can?.checklists?.view) {
         sitesGroup.items.push({
             title: 'Inspections & Maintenance',
-            href: '/sites?tab=inspections',
+            href: '/sites/inspections',
             icon: Wrench,
         });
     }
 
     if (can?.vendors?.view || can?.credentials?.view) {
-        const href = activeSiteId
-            ? can?.vendors?.view
-                ? `/sites/${activeSiteId}/vendors`
-                : `/sites/${activeSiteId}/credentials`
-            : '/sites';
-
         sitesGroup.items.push({
             title: 'Vendors & Credentials',
-            href,
+            href: '/sites/vendors-credentials',
             icon: Truck,
         });
     }
@@ -607,7 +579,7 @@ function buildNavigationGroups({
             icon: ShieldAlert,
         });
     }
-    
+
     // Access Control & Users (for admins)
     if (can?.settings?.manageAccess) {
         systemGroup.items.push({
@@ -621,7 +593,7 @@ function buildNavigationGroups({
             icon: UserCog,
         });
     }
-    
+
     systemGroup.items.push({
         title: 'Settings',
         href: '/settings',
@@ -647,7 +619,18 @@ export function AppSidebar() {
     const role = auth.user?.role ?? null;
     const can = auth?.can;
 
-    const activeSiteId = page.props?.site?.id ?? null;
+    const normalizeSiteId = (value: unknown): number | null => {
+        const n = Number(value);
+        return Number.isInteger(n) && n > 0 ? n : null;
+    };
+
+    const siteIdFromProp = normalizeSiteId(page.props?.site?.id);
+    const siteIdFromUrl = (() => {
+        const m = String(page.url ?? '').match(/^\/sites\/(\d+)(?:\/|$)/);
+        return normalizeSiteId(m?.[1]);
+    })();
+
+    const activeSiteId = siteIdFromProp ?? siteIdFromUrl ?? null;
     const navigationGroups = buildNavigationGroups({
         role,
         can,

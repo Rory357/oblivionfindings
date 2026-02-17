@@ -34,6 +34,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('sites.calendar.global')
         ->middleware('permission:calendar.view');
 
+    // Global inspections & maintenance
+    Route::get('/sites/inspections', [SiteInspectionController::class, 'globalIndex'])
+        ->name('sites.inspections.global')
+        ->middleware('permission:checklists.view');
+
+    // Global vendors & credentials register
+    Route::get('/sites/vendors-credentials', [SiteVendorController::class, 'globalIndex'])
+        ->name('sites.vendors-credentials.global');
+
     // Site-scoped routes
     Route::prefix('sites/{site}')->middleware('permission:sites.viewAny')->group(function () {
         

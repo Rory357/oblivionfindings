@@ -352,6 +352,10 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             <ClipboardCheck className="w-4 h-4" />
                             Checklists
                         </TabsTrigger>
+                        <TabsTrigger value="inspections" className="flex items-center gap-1">
+                            <Settings className="w-4 h-4" />
+                            Inspections
+                        </TabsTrigger>
                         <TabsTrigger value="hazards" className="flex items-center gap-1">
                             <ShieldAlert className="w-4 h-4" />
                             Hazards
@@ -625,6 +629,27 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                     <p>Scheduled checklists and completed runs</p>
                                     <Button asChild variant="outline" className="mt-4">
                                         <Link href={`/sites/${site.id}/checklists`}>Manage Checklists</Link>
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Inspections Tab */}
+                    <TabsContent value="inspections">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle>Inspections & Maintenance</CardTitle>
+                                <Button asChild>
+                                    <Link href={`/sites/${site.id}/inspections`}>View All Inspections</Link>
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-center py-8 text-slate-400">
+                                    <Settings className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                    <p>Scheduled inspections and completed records</p>
+                                    <Button asChild variant="outline" className="mt-4">
+                                        <Link href={`/sites/${site.id}/inspections`}>Manage Inspections</Link>
                                     </Button>
                                 </div>
                             </CardContent>

@@ -130,6 +130,85 @@ class SiteInspectionController extends Controller
             ->with('success', 'Inspection schedule deleted.');
     }
 
+    public function globalIndex(Request $request)
+    {
+        abort_unless($request->user()?->canDo('checklists.view'), 403);
+
+        $allowedSiteTypes = $this->allowedSiteTypes($request);
+
+        $schedules = SiteInspectionSchedule::query()
+            ->with(['site:id,name,type', 'assignedTo:id,name'])
+            ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
+            ->when($request->inspection_type, fn ($q) => $q->where('inspection_type', $request->inspection_type))
+            ->when($request->status === 'active', fn ($q) => $q->where('is_active', true))
+            ->when($request->status === 'inactive', fn ($q) => $q->where('is_active', false))
+            ->when($request->due_state === 'overdue', fn ($q) => $q->whereDate('next_due_date', '<', now()->toDateString()))
+            ->when($request->due_state === 'due_soon', fn ($q) => $q->whereBetween('next_due_date', [now()->toDateString(), now()->addDays(7)->toDateString()]))
+            ->orderBy('next_due_date')
+            ->limit(500)
+            ->get()
+            ->map(fn (SiteInspectionSchedule $schedule) => [
+                'id' => $schedule->id,
+                'site_id' => $schedule->site_id,
+                'site_name' => $schedule->site?->name,
+                'site_type' => $schedule->site?->type,
+                'inspection_type' => $schedule->inspection_type,
+                'title' => $schedule->title,
+                'frequency' => $schedule->frequency,
+                'next_due_date' => $schedule->next_due_date?->toDateString(),
+                'is_active' => (bool) $schedule->is_active,
+                'assigned_to_name' => $schedule->assignedTo?->name,
+            ])
+            ->values();
+
+        $records = SiteInspectionRecord::query()
+            ->with(['site:id,name,type', 'completedBy:id,name', 'schedule:id,title'])
+            ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
+            ->when($request->result, fn ($q) => $q->where('result', $request->result))
+            ->orderByDesc('completed_at')
+            ->orderByDesc('due_date')
+            ->limit(500)
+            ->get()
+            ->map(fn (SiteInspectionRecord $record) => [
+                'id' => $record->id,
+                'site_id' => $record->site_id,
+                'site_name' => $record->site?->name,
+                'site_type' => $record->site?->type,
+                'schedule_title' => $record->schedule?->title,
+                'due_date' => $record->due_date?->toDateString(),
+                'completed_at' => $record->completed_at?->toDateTimeString(),
+                'completed_by_name' => $record->completedBy?->name,
+                'result' => $record->result,
+                'findings' => $record->findings,
+            ])
+            ->values();
+
+        $sites = Site::query()
+            ->active()
+            ->whereIn('type', $allowedSiteTypes)
+            ->select(['id', 'name', 'type'])
+            ->orderBy('name')
+            ->get();
+
+        $inspectionTypes = SiteInspectionSchedule::query()
+            ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            ->select('inspection_type')
+            ->distinct()
+            ->orderBy('inspection_type')
+            ->pluck('inspection_type')
+            ->values();
+
+        return inertia('sites/inspections/global', [
+            'schedules' => $schedules,
+            'records' => $records,
+            'sites' => $sites,
+            'inspectionTypes' => $inspectionTypes,
+            'filters' => $request->only(['site_id', 'inspection_type', 'status', 'due_state', 'result']),
+        ]);
+    }
+
     private function frequencyToRrule(string $frequency, ?string $custom): ?string
     {
         if ($custom) {
@@ -158,5 +237,24 @@ class SiteInspectionController extends Controller
             'annual' => $current->addYear()->toDateString(),
             default => $current->addMonth()->toDateString(),
         };
+    }
+
+    private function allowedSiteTypes(Request $request): array
+    {
+        $user = $request->user();
+        $map = [
+            'head_office' => 'sites.type.head_office.view',
+            'house' => 'sites.type.house.view',
+            'facility' => 'sites.type.facility.view',
+            'residential' => 'sites.type.house.view',
+        ];
+
+        $allowed = collect($map)
+            ->filter(fn (string $permission) => $user?->canDo($permission))
+            ->keys()
+            ->values()
+            ->all();
+
+        return $allowed !== [] ? $allowed : array_keys($map);
     }
 }
