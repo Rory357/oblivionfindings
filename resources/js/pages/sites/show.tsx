@@ -37,7 +37,7 @@ import {
 type Site = {
     id: number;
     name: string;
-    type: 'head_office' | 'house' | 'facility';
+    type: 'head_office' | 'house' | 'facility' | 'residential';
     display_type: string;
     phone?: string | null;
     email?: string | null;
@@ -137,12 +137,14 @@ const typeIcons = {
     head_office: Building2,
     house: Home,
     facility: Warehouse,
+    residential: Home,
 };
 
 const typeColors = {
     head_office: 'bg-blue-500/10 text-blue-400 border-blue-500/30',
     house: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30',
     facility: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
+    residential: 'bg-violet-500/10 text-violet-400 border-violet-500/30',
 };
 
 function bytes(n?: number | null): string {
@@ -368,10 +370,10 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             )}
                         </TabsTrigger>
                         <TabsTrigger value="type-specific" className="flex items-center gap-1">
-                            {site.type === 'house' && <BedDouble className="w-4 h-4" />}
+                            {(site.type === 'house' || site.type === 'residential') && <BedDouble className="w-4 h-4" />}
                             {site.type === 'head_office' && <DoorOpen className="w-4 h-4" />}
                             {site.type === 'facility' && <LayoutGrid className="w-4 h-4" />}
-                            {site.type === 'house' ? 'Rooms' : site.type === 'head_office' ? 'Resources' : 'Zones'}
+                            {site.type === 'house' || site.type === 'residential' ? 'Rooms' : site.type === 'head_office' ? 'Resources' : 'Zones'}
                         </TabsTrigger>
                     </TabsList>
 
@@ -1014,7 +1016,7 @@ function DocumentsTab({ site, documents, can_edit }: { site: Site; documents: Do
 }
 
 function TypeSpecificTab({ site, data }: { site: Site; data: TypeSpecificData }) {
-    if (site.type === 'house') {
+    if (site.type === 'house' || site.type === 'residential') {
         return (
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between">

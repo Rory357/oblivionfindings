@@ -29,6 +29,7 @@ export default function TimesheetCreate({ clients, shift }: Props) {
         ends_at: end,
         break_minutes: 0,
         notes: '',
+        is_residential_billable: false,
     });
 
     return (
@@ -98,6 +99,16 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                 rows={4}
                             />
                         </div>
+
+                        <label className="flex items-center gap-2 text-sm">
+                            <Input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={form.data.is_residential_billable}
+                                onChange={(e) => form.setData('is_residential_billable', e.target.checked)}
+                            />
+                            Residential / home-support shift billable
+                        </label>
                     </div>
 
                     <div className="flex items-center gap-2">

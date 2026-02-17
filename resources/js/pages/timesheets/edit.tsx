@@ -26,6 +26,7 @@ export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmi
         ends_at: timesheet.ends_at?.slice(0, 16) ?? '',
         break_minutes: timesheet.break_minutes ?? 0,
         notes: timesheet.notes ?? '',
+        is_residential_billable: !!timesheet.is_residential_billable,
     });
 
     const decision = useForm({
@@ -129,6 +130,17 @@ export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmi
                             <Label>Notes</Label>
                             <textarea className="w-full rounded-md border bg-background p-2 text-sm" value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} rows={4} disabled={!editable} />
                         </div>
+
+                        <label className="flex items-center gap-2 text-sm">
+                            <Input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={form.data.is_residential_billable}
+                                onChange={(e) => form.setData('is_residential_billable', e.target.checked)}
+                                disabled={!editable}
+                            />
+                            Residential / home-support shift billable
+                        </label>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">

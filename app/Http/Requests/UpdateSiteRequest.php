@@ -15,7 +15,7 @@ class UpdateSiteRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'in:head_office,house,facility'],
+            'type' => ['required', 'in:head_office,house,facility,residential'],
             'phone' => ['nullable', 'string', 'max:60'],
             'email' => ['nullable', 'string', 'email', 'max:255'],
             'manager_name' => ['nullable', 'string', 'max:255'],
