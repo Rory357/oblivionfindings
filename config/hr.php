@@ -30,11 +30,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Leave Engine Defaults
+    |--------------------------------------------------------------------------
+    */
+    'leave' => [
+        'full_time_hours_per_week' => env('HR_FULL_TIME_HOURS_PER_WEEK', 40),
+        'accrual_types' => ['annual', 'sick'],
+        'default_entitlements' => [
+            'annual' => env('HR_ANNUAL_LEAVE_HOURS', 152), // 4 weeks @ 38h
+            'sick' => env('HR_SICK_LEAVE_HOURS', 80), // 10 days @ 8h
+            'bereavement' => env('HR_BEREAVEMENT_LEAVE_HOURS', 24),
+            'parental' => 0,
+            'public_holiday' => 0,
+            'unpaid' => 0,
+            'toil' => 0,
+            'other' => 0,
+        ],
+        'carryover_caps' => [
+            'annual' => env('HR_ANNUAL_CARRYOVER_CAP', 80),
+            'sick' => env('HR_SICK_CARRYOVER_CAP', 40),
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Retention Periods (months)
     |--------------------------------------------------------------------------
     */
     'retention' => [
         'unsuccessful_candidate_months' => env('HR_RETENTION_CANDIDATE_MONTHS', 24),
+        'anonymise_candidates_before_archive' => env('HR_ANONYMISE_CANDIDATES_ON_ARCHIVE', true),
         'employee_records_years' => env('HR_RETENTION_EMPLOYEE_YEARS', 7),
         'vetting_records_years' => env('HR_RETENTION_VETTING_YEARS', 7),
     ],
@@ -48,6 +73,8 @@ return [
         'default_validity_months' => env('HR_VETTING_VALIDITY_MONTHS', 36),
         'reminder_days_before_expiry' => env('HR_VETTING_REMINDER_DAYS', 60),
     ],
+
+    'expiry_reminder_days' => [90, 60, 30, 14, 7],
 
     /*
     |--------------------------------------------------------------------------
@@ -76,10 +103,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Engagement Action Plans
+    |--------------------------------------------------------------------------
+    */
+    'engagement' => [
+        'action_plan_reminder_days_before' => [14, 7, 3, 1, 0],
+        'action_plan_overdue_escalation_days' => [1, 3, 7],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Payroll Export
     |--------------------------------------------------------------------------
     */
     'payroll' => [
         'default_format' => env('HR_PAYROLL_FORMAT', 'csv'),
+        'overtime_daily_hours' => env('HR_PAYROLL_OVERTIME_DAILY_HOURS', 8),
+        'default_regular_multiplier' => env('HR_PAYROLL_REGULAR_MULTIPLIER', 1.00),
+        'default_overtime_multiplier' => env('HR_PAYROLL_OVERTIME_MULTIPLIER', 1.50),
+        'default_public_holiday_multiplier' => env('HR_PAYROLL_PUBLIC_HOLIDAY_MULTIPLIER', 1.50),
+        'default_sleepover_flat_rate' => env('HR_PAYROLL_SLEEP_OVER_FLAT_RATE', 0),
+        'default_on_call_hourly_rate' => env('HR_PAYROLL_ON_CALL_HOURLY_RATE', 0),
     ],
+
+    'candidate_retention_months' => env('HR_RETENTION_CANDIDATE_MONTHS', 24),
 ];

@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -12,8 +12,9 @@ interface DriverRecord {
     user: { id: number; name: string };
     licence_class: string;
     licence_number: string;
-    licence_expiry: string;
-    status: 'approved' | 'pending' | 'suspended' | 'expired';
+    licence_expiry?: string | null;
+    licence_expires_at?: string | null;
+    status: 'eligible' | 'pending_review' | 'suspended' | 'expired';
     approved_at: string | null;
     suspended_at: string | null;
 }
@@ -29,28 +30,27 @@ interface Props {
     };
     summary: {
         total: number;
-        approved: number;
+        eligible: number;
+        expiring: number;
         pending: number;
         suspended: number;
-        expired: number;
     };
     filters: { status: string | null; q: string };
-    can: { manage: boolean };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Driver Eligibility', href: '/hr/drivers' },
+    { title: 'Driver Eligibility', href: '/hr/compliance/drivers' },
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    approved: {
+    eligible: {
         className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
-        label: 'Approved',
+        label: 'Eligible',
     },
-    pending: {
+    pending_review: {
         className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
-        label: 'Pending',
+        label: 'Pending Review',
     },
     suspended: {
         className: 'border-red-500/30 text-red-400 bg-red-500/10',
@@ -62,9 +62,9 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     },
 };
 
-export default function DriversIndex({ records, summary, filters, can }: Props) {
+export default function DriversIndex({ records, summary, filters }: Props) {
     function applyFilter(key: string, value: string | null) {
-        router.get('/hr/drivers', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
+        router.get('/hr/compliance/drivers', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
     }
 
     return (
@@ -87,10 +87,10 @@ export default function DriversIndex({ records, summary, filters, can }: Props) 
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Approved</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Eligible</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-emerald-500">{summary.approved}</p>
+                            <p className="text-2xl font-bold text-emerald-500">{summary.eligible}</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -111,10 +111,10 @@ export default function DriversIndex({ records, summary, filters, can }: Props) 
                     </Card>
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">Expired</CardTitle>
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Expiring</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-bold text-slate-400">{summary.expired}</p>
+                            <p className="text-2xl font-bold text-slate-400">{summary.expiring}</p>
                         </CardContent>
                     </Card>
                 </div>
@@ -135,8 +135,9 @@ export default function DriversIndex({ records, summary, filters, can }: Props) 
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="__none__">All Status</SelectItem>
-                            <SelectItem value="approved">Approved</SelectItem>
-                            <SelectItem value="pending">Pending</SelectItem>
+                            <SelectItem value="eligible">Eligible</SelectItem>
+                            <SelectItem value="pending_review">Pending Review</SelectItem>
+                            <SelectItem value="expiring">Expiring</SelectItem>
                             <SelectItem value="suspended">Suspended</SelectItem>
                             <SelectItem value="expired">Expired</SelectItem>
                         </SelectContent>
@@ -165,7 +166,7 @@ export default function DriversIndex({ records, summary, filters, can }: Props) 
                                             <td className="px-4 py-3 font-medium">{record.user.name}</td>
                                             <td className="px-4 py-3">{record.licence_class}</td>
                                             <td className="px-4 py-3 text-muted-foreground">{record.licence_number}</td>
-                                            <td className="px-4 py-3 text-muted-foreground">{record.licence_expiry}</td>
+                                            <td className="px-4 py-3 text-muted-foreground">{record.licence_expires_at || record.licence_expiry || '-'}</td>
                                             <td className="px-4 py-3">
                                                 <Badge variant="outline" className={config.className}>
                                                     {config.label}

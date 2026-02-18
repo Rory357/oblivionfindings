@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrComplianceMatrix;
 use App\Domain\Hr\Models\HrComplianceRequirement;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -25,7 +26,25 @@ class ComplianceMatrixController extends Controller
         $requirements = HrComplianceRequirement::with('matrixEntries')
             ->orderBy('category')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(fn (HrComplianceRequirement $requirement) => [
+                'id' => $requirement->id,
+                'name' => $requirement->name,
+                'type' => $requirement->check_type,
+                'description' => $requirement->description,
+                'renewal_period_months' => $requirement->validity_months,
+                'is_mandatory' => (bool) $requirement->hard_stop,
+                'is_active' => (bool) $requirement->is_active,
+
+                // Keep native fields available for newer screens.
+                'code' => $requirement->code,
+                'category' => $requirement->category,
+                'check_type' => $requirement->check_type,
+                'validity_months' => $requirement->validity_months,
+                'renewal_reminder_days' => $requirement->renewal_reminder_days,
+                'hard_stop' => (bool) $requirement->hard_stop,
+            ])
+            ->values();
 
         $matrixEntries = HrComplianceMatrix::with('requirement:id,code,name,category')
             ->orderBy('role')
@@ -54,6 +73,7 @@ class ComplianceMatrixController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
+        $this->normalizeLegacyRequirementPayload($request, false);
 
         $validated = $request->validate([
             'code'                  => ['required', 'string', 'max:50'],
@@ -86,6 +106,7 @@ class ComplianceMatrixController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
+        $this->normalizeLegacyRequirementPayload($request, true);
 
         $validated = $request->validate([
             'code'                  => ['sometimes', 'required', 'string', 'max:50'],
@@ -173,5 +194,52 @@ class ComplianceMatrixController extends Controller
             ->delete();
 
         return redirect()->back()->with('success', 'Matrix entry removed.');
+    }
+
+    private function normalizeLegacyRequirementPayload(Request $request, bool $isUpdate): void
+    {
+        $payload = $request->all();
+        $legacyType = isset($payload['type']) ? trim((string) $payload['type']) : '';
+
+        if (! isset($payload['check_type']) && $legacyType !== '') {
+            $payload['check_type'] = $this->mapLegacyTypeToCheckType($legacyType);
+        }
+
+        if (! isset($payload['category']) && $legacyType !== '') {
+            $payload['category'] = $legacyType;
+        }
+
+        if (! isset($payload['validity_months']) && array_key_exists('renewal_period_months', $payload)) {
+            $payload['validity_months'] = $payload['renewal_period_months'];
+        }
+
+        if (! array_key_exists('hard_stop', $payload) && array_key_exists('is_mandatory', $payload)) {
+            $payload['hard_stop'] = (bool) $payload['is_mandatory'];
+        }
+
+        if ((! isset($payload['code']) || trim((string) $payload['code']) === '') && isset($payload['name'])) {
+            $payload['code'] = Str::upper(Str::slug((string) $payload['name'], '_'));
+        }
+
+        if (! $isUpdate && (! isset($payload['category']) || trim((string) $payload['category']) === '')) {
+            $payload['category'] = 'general';
+        }
+
+        if (! $isUpdate && (! isset($payload['check_type']) || trim((string) $payload['check_type']) === '')) {
+            $payload['check_type'] = 'manual';
+        }
+
+        $request->replace($payload);
+    }
+
+    private function mapLegacyTypeToCheckType(string $legacyType): string
+    {
+        return match ($legacyType) {
+            'training' => 'training_course',
+            'check' => 'background_check',
+            'document' => 'policy_attestation',
+            'certification', 'license' => 'credential',
+            default => 'manual',
+        };
     }
 }

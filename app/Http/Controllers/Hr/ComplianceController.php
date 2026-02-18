@@ -153,11 +153,36 @@ class ComplianceController extends Controller
             ->orderBy('status')
             ->get();
 
+        $complianceStatuses = $statuses
+            ->map(fn (HrStaffComplianceStatus $status) => [
+                'id' => $status->id,
+                'requirement_id' => $status->requirement_id,
+                'requirement_name' => $status->requirement?->name ?? 'Unknown requirement',
+                'requirement_type' => $status->requirement?->check_type ?? 'manual',
+                'renewal_period_months' => $status->requirement?->validity_months,
+                'status' => $status->status,
+                'expiry_date' => optional($status->expires_at)->toDateString(),
+                'completed_date' => optional($status->valid_from)->toDateString(),
+                'evidence_url' => $status->evidence_url ?? null,
+                'evidence_notes' => $status->notes ?? null,
+                'is_mandatory' => (bool) ($status->requirement?->hard_stop ?? false),
+            ])
+            ->values();
+
+        $summary = [
+            'compliant' => $statuses->where('status', 'compliant')->count(),
+            'expiring_soon' => $statuses->where('status', 'expiring_soon')->count(),
+            'expired' => $statuses->where('status', 'expired')->count(),
+            'not_started' => $statuses->where('status', 'not_started')->count(),
+        ];
+
         $hardStopFailures = $this->complianceMatrixService->getHardStopFailures($staff);
         $softWarnings = $this->complianceMatrixService->getSoftWarnings($staff);
 
         return Inertia::render('hr/compliance/staff-detail', [
             'staff' => $staff->only(['id', 'name', 'email']),
+            'complianceStatuses' => $complianceStatuses,
+            'summary' => $summary,
             'statuses' => $statuses,
             'hardStopFailures' => $hardStopFailures,
             'softWarnings' => $softWarnings,

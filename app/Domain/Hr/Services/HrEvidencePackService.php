@@ -10,6 +10,7 @@ use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Auth\Access\AuthorizationException;
 
 class HrEvidencePackService
 {
@@ -46,16 +47,9 @@ class HrEvidencePackService
      */
     public function generateEmployeePack(HrEmployeeProfile $profile, User $requestedBy, array $options = []): array
     {
-        // TODO: Check that $requestedBy has permission to view this employee's compliance data
-        //       (hr_admin, compliance_officer, or direct manager)
-        // TODO: Collect all HrStaffComplianceStatus records for the employee
-        // TODO: For each status, gather the linked evidence (training record, credential, check, attestation)
-        // TODO: Collect relevant HrDocuments (certificates, signed forms)
-        // TODO: Apply redaction to PII fields based on $options['redact_pii'] flag
-        // TODO: If $requestedBy is not hr_admin, always redact sensitive fields
-        // TODO: Structure the pack as a JSON-serialisable array
-        // TODO: Optionally store the pack as a timestamped file for audit trail
-        // TODO: Log audit trail entry (who generated what, when)
+        if (! $this->canGeneratePack($requestedBy, $profile)) {
+            throw new AuthorizationException('You do not have permission to generate this evidence pack.');
+        }
 
         $redactPii = $options['redact_pii'] ?? true;
         $includeDocuments = $options['include_documents'] ?? true;
@@ -94,15 +88,9 @@ class HrEvidencePackService
      */
     public function generateBulkPack(?int $tenantId, User $requestedBy, ?int $siteId = null, array $options = []): array
     {
-        // TODO: Query all active HrEmployeeProfile records for the tenant (optionally filtered by site)
-        // TODO: For each employee, call generateEmployeePack()
-        // TODO: Build a summary section with compliance statistics:
-        //       - total employees evaluated
-        //       - fully compliant count
-        //       - non-compliant count
-        //       - expiring soon count
-        // TODO: Store the bulk pack as a timestamped JSON file for audit trail
-        // TODO: Log audit trail entry
+        if (! $this->hasPrivilegedAccess($requestedBy)) {
+            throw new AuthorizationException('Only HR/compliance administrators can generate bulk evidence packs.');
+        }
 
         $query = HrEmployeeProfile::where('tenant_id', $tenantId)->active();
         if ($siteId) {
@@ -147,15 +135,8 @@ class HrEvidencePackService
      */
     public function storePack(array $pack, ?string $filename = null): string
     {
-        // TODO: Generate a filename with tenant, date, and type prefix
-        // TODO: Store as JSON on the 'private' disk under evidence-packs/
-        // TODO: Return the storage path
-
-        $filename = $filename ?? sprintf(
-            'evidence-packs/%s_%s.json',
-            now()->format('Y-m-d_His'),
-            $pack['generated_by'] ?? 'system'
-        );
+        $tenantPrefix = data_get($pack, 'summary.tenant_id', data_get($pack, 'employee.tenant_id', 'global'));
+        $filename = $filename ?? sprintf('evidence-packs/%s_%s_%s.json', $tenantPrefix, now()->format('Y-m-d_His'), $pack['generated_by'] ?? 'system');
 
         Storage::disk('private')->put($filename, json_encode($pack, JSON_PRETTY_PRINT));
 
@@ -244,9 +225,19 @@ class HrEvidencePackService
      */
     protected function hasPrivilegedAccess(User $user): bool
     {
-        // TODO: Check user roles for hr_admin, compliance_officer, or super_admin
-        // TODO: Optionally check specific permissions via Spatie or policy
+        if ($user->canDo('hr.compliance.manage') || $user->canDo('hr.compliance.view')) {
+            return true;
+        }
 
-        return $user->hasAnyRole(['hr_admin', 'compliance_officer', 'super_admin']);
+        return $user->hasRole('admin', 'hr', 'provider_manager', 'compliance_lead');
+    }
+
+    protected function canGeneratePack(User $requestedBy, HrEmployeeProfile $profile): bool
+    {
+        if ($this->hasPrivilegedAccess($requestedBy)) {
+            return true;
+        }
+
+        return (int) $requestedBy->id === (int) $profile->user_id;
     }
 }

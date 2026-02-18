@@ -109,7 +109,7 @@ class MyHrController extends Controller
             'leave_type' => ['required', 'string', Rule::in(LeaveService::LEAVE_TYPES)],
             'starts_at' => ['required', 'date', 'after_or_equal:today'],
             'ends_at' => ['required', 'date', 'after_or_equal:starts_at'],
-            'hours_requested' => ['required', 'numeric', 'min:0.5', 'max:999'],
+            'hours_requested' => ['nullable', 'numeric', 'min:0.5', 'max:999'],
             'reason' => ['nullable', 'string', 'max:2000'],
             'supporting_doc' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:5120'],
         ]);
@@ -134,11 +134,13 @@ class MyHrController extends Controller
     {
         $user = $request->user();
         abort_unless($leaveRequest->user_id === $user->id, 403);
-        abort_unless($leaveRequest->status === 'pending', 422);
+        abort_unless(in_array($leaveRequest->status, ['pending', 'approved'], true), 422);
 
-        $leaveRequest->update([
-            'status' => 'cancelled',
-        ]);
+        try {
+            $this->leaveService->cancelRequest($leaveRequest, $user->id);
+        } catch (\LogicException $exception) {
+            return redirect()->back()->withErrors(['leave_request' => $exception->getMessage()]);
+        }
 
         return redirect()->back()->with('success', 'Leave request cancelled.');
     }
@@ -149,9 +151,31 @@ class MyHrController extends Controller
         $tenantId = null;
 
         $complianceStatuses = HrStaffComplianceStatus::where('user_id', $user->id)
-            ->with('requirement:id,code,name,category,validity_months')
+            ->with('requirement:id,code,name,category,description,validity_months')
             ->orderBy('status')
-            ->get();
+            ->get()
+            ->map(function (HrStaffComplianceStatus $status) {
+                $normalizedStatus = match ($status->status) {
+                    'compliant' => 'compliant',
+                    'expiring_soon' => 'expiring_soon',
+                    'expired', 'non_compliant' => 'expired',
+                    default => 'not_started',
+                };
+
+                return [
+                    'id' => $status->id,
+                    'status' => $normalizedStatus,
+                    'expiry_date' => optional($status->expires_at)->toDateString(),
+                    'completed_at' => optional($status->valid_from)->toDateString(),
+                    'requirement' => [
+                        'id' => $status->requirement?->id,
+                        'name' => $status->requirement?->name ?? 'Untitled requirement',
+                        'category' => $status->requirement?->category ?? 'general',
+                        'description' => $status->requirement?->description,
+                    ],
+                ];
+            })
+            ->values();
 
         return Inertia::render('hr/my/training', [
             'complianceStatuses' => $complianceStatuses,

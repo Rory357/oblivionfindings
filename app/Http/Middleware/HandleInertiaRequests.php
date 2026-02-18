@@ -444,6 +444,9 @@ class HandleInertiaRequests extends Middleware
                         'view' => $user->canDo('hr.driver.view'),
                         'manage' => $user->canDo('hr.driver.manage'),
                     ],
+                    'wellbeing' => [
+                        'view' => $user->canDo('hr.wellbeing.view'),
+                    ],
                     'onboarding' => [
                         'view' => $user->canDo('hr.onboarding.view'),
                         'manage' => $user->canDo('hr.onboarding.manage'),

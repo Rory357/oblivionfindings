@@ -1,11 +1,17 @@
-import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Checkbox } from '@/components/ui/checkbox';
+import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, Briefcase } from 'lucide-react';
 
@@ -52,11 +58,16 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
 
     const getSeverityColor = (severity: string) => {
         switch (severity) {
-            case 'critical': return 'text-red-600 bg-red-50';
-            case 'high': return 'text-orange-600 bg-orange-50';
-            case 'medium': return 'text-yellow-600 bg-yellow-50';
-            case 'low': return 'text-slate-600 bg-slate-50';
-            default: return '';
+            case 'critical':
+                return 'text-red-600 bg-red-50';
+            case 'high':
+                return 'text-orange-600 bg-orange-50';
+            case 'medium':
+                return 'text-yellow-600 bg-yellow-50';
+            case 'low':
+                return 'text-slate-600 bg-slate-50';
+            default:
+                return '';
         }
     };
 
@@ -64,7 +75,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New HR Case" />
 
-            <div className="space-y-6 max-w-4xl">
+            <div className="max-w-4xl space-y-6">
                 <div className="flex items-center gap-4">
                     <Link href="/hr/cases">
                         <Button variant="outline" size="sm">
@@ -76,7 +87,9 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                         <Briefcase className="h-6 w-6 text-blue-500" />
                         <div>
                             <h1 className="text-2xl font-bold">New HR Case</h1>
-                            <p className="text-muted-foreground">Open a new HR case for investigation or action</p>
+                            <p className="text-muted-foreground">
+                                Open a new HR case for investigation or action
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -87,44 +100,73 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                             <CardTitle>Case Information</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                                 <div className="space-y-2">
                                     <Label htmlFor="user_id">
-                                        Subject (Staff Member) <span className="text-red-500">*</span>
+                                        Subject (Staff Member){' '}
+                                        <span className="text-red-500">*</span>
                                     </Label>
                                     <Select
                                         value={data.user_id}
-                                        onValueChange={(value) => setData('user_id', value)}
+                                        onValueChange={(value) =>
+                                            setData('user_id', value)
+                                        }
                                     >
-                                        <SelectTrigger id="user_id" className={errors.user_id ? 'border-red-500' : ''}>
+                                        <SelectTrigger
+                                            id="user_id"
+                                            className={
+                                                errors.user_id
+                                                    ? 'border-red-500'
+                                                    : ''
+                                            }
+                                        >
                                             <SelectValue placeholder="Select staff member" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {staff.map((s) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
                                                     {s.name} ({s.email})
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {errors.user_id && (
-                                        <p className="text-sm text-red-500">{errors.user_id}</p>
+                                        <p className="text-sm text-red-500">
+                                            {errors.user_id}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="assigned_to">Assigned To</Label>
+                                    <Label htmlFor="assigned_to">
+                                        Assigned To
+                                    </Label>
                                     <Select
-                                        value={data.assigned_to}
-                                        onValueChange={(value) => setData('assigned_to', value)}
+                                        value={data.assigned_to || '__none__'}
+                                        onValueChange={(value) =>
+                                            setData(
+                                                'assigned_to',
+                                                value === '__none__'
+                                                    ? ''
+                                                    : value,
+                                            )
+                                        }
                                     >
                                         <SelectTrigger id="assigned_to">
                                             <SelectValue placeholder="Select assignee" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">Unassigned</SelectItem>
+                                            <SelectItem value="__none__">
+                                                Unassigned
+                                            </SelectItem>
                                             {staff.map((s) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>
+                                                <SelectItem
+                                                    key={s.id}
+                                                    value={String(s.id)}
+                                                >
                                                     {s.name}
                                                 </SelectItem>
                                             ))}
@@ -134,45 +176,72 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
 
                                 <div className="space-y-2">
                                     <Label htmlFor="case_type">
-                                        Case Type <span className="text-red-500">*</span>
+                                        Case Type{' '}
+                                        <span className="text-red-500">*</span>
                                     </Label>
                                     <Select
                                         value={data.case_type}
-                                        onValueChange={(value) => setData('case_type', value)}
+                                        onValueChange={(value) =>
+                                            setData('case_type', value)
+                                        }
                                     >
-                                        <SelectTrigger id="case_type" className={errors.case_type ? 'border-red-500' : ''}>
+                                        <SelectTrigger
+                                            id="case_type"
+                                            className={
+                                                errors.case_type
+                                                    ? 'border-red-500'
+                                                    : ''
+                                            }
+                                        >
                                             <SelectValue placeholder="Select case type" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {caseTypes.map((type) => (
-                                                <SelectItem key={type.value} value={type.value}>
+                                                <SelectItem
+                                                    key={type.value}
+                                                    value={type.value}
+                                                >
                                                     {type.label}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
                                     {errors.case_type && (
-                                        <p className="text-sm text-red-500">{errors.case_type}</p>
+                                        <p className="text-sm text-red-500">
+                                            {errors.case_type}
+                                        </p>
                                     )}
                                 </div>
 
                                 <div className="space-y-2">
                                     <Label htmlFor="severity">
-                                        Severity <span className="text-red-500">*</span>
+                                        Severity{' '}
+                                        <span className="text-red-500">*</span>
                                     </Label>
                                     <Select
                                         value={data.severity}
-                                        onValueChange={(value) => setData('severity', value)}
+                                        onValueChange={(value) =>
+                                            setData('severity', value)
+                                        }
                                     >
-                                        <SelectTrigger id="severity" className={errors.severity ? 'border-red-500' : ''}>
+                                        <SelectTrigger
+                                            id="severity"
+                                            className={
+                                                errors.severity
+                                                    ? 'border-red-500'
+                                                    : ''
+                                            }
+                                        >
                                             <SelectValue placeholder="Select severity" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {severities.map((sev) => (
-                                                <SelectItem 
-                                                    key={sev.value} 
+                                                <SelectItem
+                                                    key={sev.value}
                                                     value={sev.value}
-                                                    className={getSeverityColor(sev.value)}
+                                                    className={getSeverityColor(
+                                                        sev.value,
+                                                    )}
                                                 >
                                                     {sev.label}
                                                 </SelectItem>
@@ -180,24 +249,33 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                         </SelectContent>
                                     </Select>
                                     {errors.severity && (
-                                        <p className="text-sm text-red-500">{errors.severity}</p>
+                                        <p className="text-sm text-red-500">
+                                            {errors.severity}
+                                        </p>
                                     )}
                                 </div>
                             </div>
 
                             <div className="space-y-2">
                                 <Label htmlFor="title">
-                                    Case Title <span className="text-red-500">*</span>
+                                    Case Title{' '}
+                                    <span className="text-red-500">*</span>
                                 </Label>
                                 <Input
                                     id="title"
                                     placeholder="Brief summary of the case"
                                     value={data.title}
-                                    onChange={(e) => setData('title', e.target.value)}
-                                    className={errors.title ? 'border-red-500' : ''}
+                                    onChange={(e) =>
+                                        setData('title', e.target.value)
+                                    }
+                                    className={
+                                        errors.title ? 'border-red-500' : ''
+                                    }
                                 />
                                 {errors.title && (
-                                    <p className="text-sm text-red-500">{errors.title}</p>
+                                    <p className="text-sm text-red-500">
+                                        {errors.title}
+                                    </p>
                                 )}
                             </div>
 
@@ -208,11 +286,19 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                     placeholder="Detailed description of the situation, including relevant dates, witnesses, and any initial actions taken..."
                                     rows={6}
                                     value={data.description}
-                                    onChange={(e) => setData('description', e.target.value)}
-                                    className={errors.description ? 'border-red-500' : ''}
+                                    onChange={(e) =>
+                                        setData('description', e.target.value)
+                                    }
+                                    className={
+                                        errors.description
+                                            ? 'border-red-500'
+                                            : ''
+                                    }
                                 />
                                 {errors.description && (
-                                    <p className="text-sm text-red-500">{errors.description}</p>
+                                    <p className="text-sm text-red-500">
+                                        {errors.description}
+                                    </p>
                                 )}
                             </div>
 
@@ -220,14 +306,23 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
                                 <Checkbox
                                     id="is_confidential"
                                     checked={data.is_confidential}
-                                    onCheckedChange={(checked) => setData('is_confidential', checked as boolean)}
+                                    onCheckedChange={(checked) =>
+                                        setData(
+                                            'is_confidential',
+                                            checked as boolean,
+                                        )
+                                    }
                                 />
                                 <div className="space-y-1">
-                                    <Label htmlFor="is_confidential" className="text-sm font-medium">
+                                    <Label
+                                        htmlFor="is_confidential"
+                                        className="text-sm font-medium"
+                                    >
                                         Mark as confidential
                                     </Label>
                                     <p className="text-xs text-muted-foreground">
-                                        Confidential cases are only visible to HR managers and assigned personnel
+                                        Confidential cases are only visible to
+                                        HR managers and assigned personnel
                                     </p>
                                 </div>
                             </div>
@@ -236,7 +331,9 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
 
                     <div className="flex items-center justify-end gap-4">
                         <Link href="/hr/cases">
-                            <Button type="button" variant="outline">Cancel</Button>
+                            <Button type="button" variant="outline">
+                                Cancel
+                            </Button>
                         </Link>
                         <Button type="submit" disabled={processing}>
                             {processing ? 'Creating...' : 'Open Case'}

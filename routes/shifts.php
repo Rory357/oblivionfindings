@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\AttendanceController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSeriesController;
 use App\Http\Controllers\ShiftTaskController;
@@ -117,4 +118,15 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/timesheets/{timesheet}/return', [TimesheetController::class, 'returnForChanges'])
         ->middleware('permission:timesheets.approve|timesheets.manageAny')
         ->name('timesheets.return');
+
+    // Attendance (clock in/out)
+    Route::get('/attendance', [AttendanceController::class, 'index'])
+        ->middleware('permission:timesheets.viewAny|timesheets.viewAssigned')
+        ->name('attendance.index');
+    Route::post('/attendance/clock-in', [AttendanceController::class, 'clockIn'])
+        ->middleware('permission:timesheets.create')
+        ->name('attendance.clockIn');
+    Route::post('/attendance/clock-out', [AttendanceController::class, 'clockOut'])
+        ->middleware('permission:timesheets.create')
+        ->name('attendance.clockOut');
 });

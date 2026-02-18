@@ -26,8 +26,10 @@ class HrPayrollRun extends Model
         'export_format',
         'export_path',
         'total_hours',
+        'total_gross',
         'total_staff',
         'notes',
+        'validation_errors',
         'created_by',
     ];
 
@@ -37,7 +39,9 @@ class HrPayrollRun extends Model
         'locked_at' => 'datetime',
         'exported_at' => 'datetime',
         'total_hours' => 'decimal:2',
+        'total_gross' => 'decimal:2',
         'total_staff' => 'integer',
+        'validation_errors' => 'array',
     ];
 
     /* ------------------------------------------------------------------ */

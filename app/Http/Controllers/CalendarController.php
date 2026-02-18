@@ -35,8 +35,9 @@ class CalendarController extends Controller
                 ->get(['id', 'name', 'email']);
 
             $clients = Client::query()
+                ->with('site:id,name')
                 ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name', 'service_context_id']);
+                ->get(['id', 'first_name', 'last_name', 'service_context_id', 'site_id']);
         }
 
         return inertia('calendar/index', [

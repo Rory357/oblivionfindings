@@ -23,10 +23,9 @@ import type {
     DateSelectArg,
     EventClickArg,
     EventDropArg,
-    EventResizeDoneArg,
 } from '@fullcalendar/core';
 import dayGridPlugin from '@fullcalendar/daygrid';
-import interactionPlugin from '@fullcalendar/interaction';
+import interactionPlugin, { type EventResizeDoneArg } from '@fullcalendar/interaction';
 import listPlugin from '@fullcalendar/list';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -38,7 +37,13 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 type Props = {
     canManageAny: boolean;
     staff: Array<{ id: number; name: string; email: string }>;
-    clients: Array<{ id: number; first_name: string; last_name: string; service_context_id?: number | null }>;
+    clients: Array<{
+        id: number;
+        first_name: string;
+        last_name: string;
+        service_context_id?: number | null;
+        site?: { id: number; name: string } | null;
+    }>;
     serviceContexts: Array<{ id: number; name: string; type: string; is_active: boolean }>;
     defaultServiceContextId?: number | null;
 };
@@ -140,6 +145,7 @@ export default function CalendarIndex(props: Props) {
                 id: c.id,
                 label: `${c.first_name} ${c.last_name}`,
                 service_context_id: c.service_context_id ?? null,
+                site_name: c.site?.name ?? '',
             })),
         [props.clients],
     );
@@ -151,6 +157,22 @@ export default function CalendarIndex(props: Props) {
         }
         return m;
     }, [props.clients]);
+
+    const clientLocationById = useMemo(() => {
+        const m = new Map<number, string>();
+        for (const c of props.clients ?? []) {
+            m.set(c.id, c.site?.name?.trim() ?? '');
+        }
+        return m;
+    }, [props.clients]);
+
+    const locationForClientId = useCallback((selectedClientId: number | '' | null | undefined): string => {
+        if (selectedClientId === '' || selectedClientId === null || selectedClientId === undefined) {
+            return '';
+        }
+
+        return clientLocationById.get(Number(selectedClientId)) ?? '';
+    }, [clientLocationById]);
 
     const serviceContextOptions = useMemo(() => {
         return (props.serviceContexts ?? []).map((sc) => ({
@@ -292,7 +314,7 @@ export default function CalendarIndex(props: Props) {
             user_id: prefillStaff,
             starts_at: toDatetimeLocalValue(start),
             ends_at: toDatetimeLocalValue(end),
-            location: '',
+            location: locationForClientId(prefillClient),
             status: 'scheduled',
             notes: '',
         });
@@ -686,6 +708,7 @@ export default function CalendarIndex(props: Props) {
                                                         s.service_context_id === ''
                                                             ? (inherited === null ? '' : inherited)
                                                             : s.service_context_id,
+                                                    location: locationForClientId(nextClientId),
                                                 };
                                             })
                                         }

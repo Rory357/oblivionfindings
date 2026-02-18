@@ -1,12 +1,15 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { type BreadcrumbItem } from '@/types';
+import { useState } from 'react';
 import { Plus } from 'lucide-react';
 
 interface Checklist {
@@ -16,12 +19,32 @@ interface Checklist {
         user: { name: string };
     };
     template_key: string;
-    status: 'not_started' | 'in_progress' | 'completed' | 'overdue';
+    status: 'pending' | 'in_progress' | 'completed' | 'overdue';
     started_at: string | null;
     completed_at: string | null;
     due_date: string | null;
     tasks_count: number;
     tasks_completed_count: number;
+}
+
+interface TemplateTask {
+    category: string;
+    title: string;
+    description: string | null;
+    is_required: boolean;
+    sort_order: number;
+    assigned_to_role: string | null;
+    sign_off_required: boolean;
+}
+
+interface TemplateRow {
+    id: number;
+    role: string;
+    site_type: string | null;
+    is_active: boolean;
+    tasks: TemplateTask[];
+    task_count: number;
+    updated_at: string | null;
 }
 
 interface Props {
@@ -33,6 +56,9 @@ interface Props {
         per_page: number;
         total: number;
     };
+    templates: TemplateRow[];
+    templateRoleOptions: string[];
+    siteTypeOptions: string[];
     filters: { status: string | null; q: string };
     can: { manage: boolean };
 }
@@ -43,9 +69,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    not_started: {
+    pending: {
         className: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
-        label: 'Not Started',
+        label: 'Pending',
     },
     in_progress: {
         className: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
@@ -61,9 +87,105 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     },
 };
 
-export default function OnboardingIndex({ checklists, filters, can }: Props) {
+const createTemplateTask = (sortOrder = 1): TemplateTask => ({
+    category: 'general',
+    title: '',
+    description: '',
+    is_required: true,
+    sort_order: sortOrder,
+    assigned_to_role: '',
+    sign_off_required: false,
+});
+
+export default function OnboardingIndex({ checklists, templates, templateRoleOptions, siteTypeOptions, filters, can }: Props) {
+    const [editingTemplateId, setEditingTemplateId] = useState<number | null>(null);
+    const { data, setData, put, processing, errors, reset, transform } = useForm({
+        template_id: '',
+        role: templateRoleOptions[0] ?? 'support_worker',
+        site_type: siteTypeOptions[0] ?? 'all',
+        is_active: true,
+        tasks: [createTemplateTask()],
+    });
+
     function applyFilter(key: string, value: string | null) {
         router.get('/hr/onboarding', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
+    }
+
+    function resetTemplateForm() {
+        setEditingTemplateId(null);
+        reset();
+        setData({
+            template_id: '',
+            role: templateRoleOptions[0] ?? 'support_worker',
+            site_type: siteTypeOptions[0] ?? 'all',
+            is_active: true,
+            tasks: [createTemplateTask()],
+        });
+    }
+
+    function addTemplateTask() {
+        setData('tasks', [...data.tasks, createTemplateTask(data.tasks.length + 1)]);
+    }
+
+    function updateTemplateTask(index: number, patch: Partial<TemplateTask>) {
+        setData('tasks', data.tasks.map((task, i) => (i === index ? { ...task, ...patch } : task)));
+    }
+
+    function removeTemplateTask(index: number) {
+        setData(
+            'tasks',
+            data.tasks
+                .filter((_, i) => i !== index)
+                .map((task, i) => ({ ...task, sort_order: i + 1 })),
+        );
+    }
+
+    function startEditTemplate(template: TemplateRow) {
+        setEditingTemplateId(template.id);
+        setData({
+            template_id: String(template.id),
+            role: template.role,
+            site_type: template.site_type || 'all',
+            is_active: template.is_active,
+            tasks: template.tasks.length > 0
+                ? template.tasks.map((task, i) => ({
+                    ...task,
+                    description: task.description || '',
+                    assigned_to_role: task.assigned_to_role || '',
+                    sort_order: task.sort_order || i + 1,
+                }))
+                : [createTemplateTask()],
+        });
+    }
+
+    function submitTemplate(e: React.FormEvent) {
+        e.preventDefault();
+
+        const tasksPayload = data.tasks
+            .map((task, index) => ({
+                category: task.category?.trim() || 'general',
+                title: task.title.trim(),
+                description: task.description?.trim() || null,
+                is_required: Boolean(task.is_required),
+                sort_order: Number(task.sort_order || index + 1),
+                assigned_to_role: task.assigned_to_role?.trim() || null,
+                sign_off_required: Boolean(task.sign_off_required),
+            }))
+            .filter((task) => task.title !== '');
+
+        const payload = {
+            template_id: editingTemplateId ? String(editingTemplateId) : '',
+            role: data.role,
+            site_type: data.site_type,
+            is_active: data.is_active,
+            tasks: tasksPayload,
+        };
+
+        transform(() => payload);
+        put('/hr/onboarding/templates', {
+            preserveScroll: true,
+            onSuccess: () => resetTemplateForm(),
+        });
     }
 
     return (
@@ -98,13 +220,194 @@ export default function OnboardingIndex({ checklists, filters, can }: Props) {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="__none__">All Status</SelectItem>
-                            <SelectItem value="not_started">Not Started</SelectItem>
+                            <SelectItem value="pending">Pending</SelectItem>
                             <SelectItem value="in_progress">In Progress</SelectItem>
                             <SelectItem value="completed">Completed</SelectItem>
                             <SelectItem value="overdue">Overdue</SelectItem>
                         </SelectContent>
                     </Select>
                 </div>
+
+                {can.manage && (
+                    <>
+                        <Card>
+                            <CardContent className="space-y-4 pt-6">
+                                <div className="flex items-center justify-between">
+                                    <h2 className="text-lg font-semibold">{editingTemplateId ? 'Edit Onboarding Template' : 'Create Onboarding Template'}</h2>
+                                    {editingTemplateId && (
+                                        <Button type="button" variant="outline" size="sm" onClick={resetTemplateForm}>
+                                            Cancel Edit
+                                        </Button>
+                                    )}
+                                </div>
+
+                                <form onSubmit={submitTemplate} className="space-y-4">
+                                    <div className="grid gap-4 md:grid-cols-3">
+                                        <div className="space-y-2">
+                                            <Label>Role</Label>
+                                            <Select value={data.role || '__none__'} onValueChange={(v) => setData('role', v === '__none__' ? '' : v)}>
+                                                <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="__none__">Select role</SelectItem>
+                                                    {templateRoleOptions.map((role) => (
+                                                        <SelectItem key={role} value={role}>{role.replace(/_/g, ' ')}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            {errors.role && <p className="text-xs text-destructive">{errors.role}</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Site Type</Label>
+                                            <Select value={data.site_type || '__none__'} onValueChange={(v) => setData('site_type', v === '__none__' ? '' : v)}>
+                                                <SelectTrigger><SelectValue placeholder="All" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="__none__">All</SelectItem>
+                                                    {siteTypeOptions.map((siteType) => (
+                                                        <SelectItem key={siteType} value={siteType}>{siteType.replace(/_/g, ' ')}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="flex items-end">
+                                            <label className="flex items-center gap-2 text-sm">
+                                                <Checkbox checked={data.is_active} onCheckedChange={(checked) => setData('is_active', Boolean(checked))} />
+                                                <span>Template active</span>
+                                            </label>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-3">
+                                        <div className="flex items-center justify-between">
+                                            <Label>Template Tasks</Label>
+                                            <Button type="button" size="sm" variant="outline" onClick={addTemplateTask}>
+                                                Add Task
+                                            </Button>
+                                        </div>
+
+                                        {data.tasks.map((task, index) => (
+                                            <div key={`${index}-${task.sort_order}`} className="space-y-3 rounded-md border p-3">
+                                                <div className="grid gap-3 md:grid-cols-4">
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">Category</Label>
+                                                        <Select value={task.category || 'general'} onValueChange={(value) => updateTemplateTask(index, { category: value })}>
+                                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                                            <SelectContent>
+                                                                <SelectItem value="general">General</SelectItem>
+                                                                <SelectItem value="it">IT</SelectItem>
+                                                                <SelectItem value="compliance">Compliance</SelectItem>
+                                                                <SelectItem value="payroll">Payroll</SelectItem>
+                                                                <SelectItem value="induction">Induction</SelectItem>
+                                                            </SelectContent>
+                                                        </Select>
+                                                    </div>
+                                                    <div className="space-y-1 md:col-span-2">
+                                                        <Label className="text-xs">Task Title</Label>
+                                                        <Input
+                                                            value={task.title}
+                                                            onChange={(e) => updateTemplateTask(index, { title: e.target.value })}
+                                                            placeholder="Create user account"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">Sort Order</Label>
+                                                        <Input
+                                                            type="number"
+                                                            min={1}
+                                                            value={task.sort_order}
+                                                            onChange={(e) => updateTemplateTask(index, { sort_order: Number(e.target.value || index + 1) })}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="grid gap-3 md:grid-cols-2">
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">Description</Label>
+                                                        <Input
+                                                            value={task.description || ''}
+                                                            onChange={(e) => updateTemplateTask(index, { description: e.target.value })}
+                                                            placeholder="Provide laptop, MFA, and email setup"
+                                                        />
+                                                    </div>
+                                                    <div className="space-y-1">
+                                                        <Label className="text-xs">Assigned Role</Label>
+                                                        <Input
+                                                            value={task.assigned_to_role || ''}
+                                                            onChange={(e) => updateTemplateTask(index, { assigned_to_role: e.target.value })}
+                                                            placeholder="team_lead"
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center justify-between">
+                                                    <div className="flex items-center gap-6">
+                                                        <label className="flex items-center gap-2 text-xs">
+                                                            <Checkbox checked={task.is_required} onCheckedChange={(checked) => updateTemplateTask(index, { is_required: Boolean(checked) })} />
+                                                            <span>Required</span>
+                                                        </label>
+                                                        <label className="flex items-center gap-2 text-xs">
+                                                            <Checkbox checked={task.sign_off_required} onCheckedChange={(checked) => updateTemplateTask(index, { sign_off_required: Boolean(checked) })} />
+                                                            <span>Sign-off required</span>
+                                                        </label>
+                                                    </div>
+                                                    {data.tasks.length > 1 && (
+                                                        <Button type="button" variant="ghost" size="sm" onClick={() => removeTemplateTask(index)}>
+                                                            Remove
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                        {errors.tasks && <p className="text-xs text-destructive">{errors.tasks}</p>}
+                                    </div>
+
+                                    <Button type="submit" disabled={processing}>
+                                        {processing ? 'Saving...' : editingTemplateId ? 'Update Template' : 'Create Template'}
+                                    </Button>
+                                </form>
+                            </CardContent>
+                        </Card>
+
+                        <Card>
+                            <CardContent className="p-0">
+                                <table className="w-full text-sm">
+                                    <thead className="border-b bg-muted/50">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left font-medium">Role</th>
+                                            <th className="px-4 py-3 text-left font-medium">Site Type</th>
+                                            <th className="px-4 py-3 text-left font-medium">Tasks</th>
+                                            <th className="px-4 py-3 text-left font-medium">Status</th>
+                                            <th className="px-4 py-3 text-right font-medium">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {templates.map((template) => (
+                                            <tr key={template.id} className="hover:bg-muted/30">
+                                                <td className="px-4 py-3 font-medium">{template.role.replace(/_/g, ' ')}</td>
+                                                <td className="px-4 py-3 text-muted-foreground">{(template.site_type || 'all').replace(/_/g, ' ')}</td>
+                                                <td className="px-4 py-3 text-muted-foreground">{template.task_count}</td>
+                                                <td className="px-4 py-3">
+                                                    <Badge variant={template.is_active ? 'default' : 'secondary'}>
+                                                        {template.is_active ? 'Active' : 'Inactive'}
+                                                    </Badge>
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <Button variant="outline" size="sm" onClick={() => startEditTemplate(template)}>
+                                                        Edit
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {templates.length === 0 && (
+                                            <tr>
+                                                <td colSpan={5} className="px-4 py-8 text-center text-muted-foreground">
+                                                    No onboarding templates configured.
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </CardContent>
+                        </Card>
+                    </>
+                )}
 
                 {/* Table */}
                 <Card>
@@ -122,7 +425,7 @@ export default function OnboardingIndex({ checklists, filters, can }: Props) {
                             </thead>
                             <tbody className="divide-y">
                                 {checklists.data.map((checklist) => {
-                                    const config = statusConfig[checklist.status] || statusConfig.not_started;
+                                    const config = statusConfig[checklist.status] || statusConfig.pending;
                                     const progressPercent = checklist.tasks_count > 0
                                         ? Math.round((checklist.tasks_completed_count / checklist.tasks_count) * 100)
                                         : 0;

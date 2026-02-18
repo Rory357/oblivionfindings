@@ -18,10 +18,13 @@ import {
     CalendarDays,
     ClipboardCheck,
     ClipboardList,
+    Clock3,
     FileQuestion,
     FileText,
     Folder,
     Gavel,
+    GraduationCap,
+    HeartPulse,
     Home,
     Landmark,
     LayoutGrid,
@@ -36,6 +39,7 @@ import {
     ShieldCheck,
     Target,
     Truck,
+    UserMinus,
     UserCog,
     Users,
     Vote,
@@ -76,7 +80,6 @@ function buildNavigationGroups({
     activeSiteId?: number | null;
 }): NavGroup[] {
     const clientPlural = labels['client.plural'] ?? 'Clients';
-    const sitePlural = labels['site.plural'] ?? 'Sites';
     const staffPlural = labels['staff.plural'] ?? 'Staff';
     const shiftPlural = labels['shift.plural'] ?? 'Shifts';
     const timesheetPlural = labels['timesheet.plural'] ?? 'Timesheets';
@@ -201,18 +204,19 @@ function buildNavigationGroups({
         });
     }
 
-    if (can?.assets?.viewAny) {
-        sitesGroup.items.push({
-            title: 'Assets',
-            href: '/assets',
-            icon: Package,
-        });
-    }
-
     // Support Worker specific nav
     if (role === 'support_worker') {
+        operationsGroup.items.push({ title: 'My Shifts', href: '/shifts', icon: CalendarDays });
+
+        if (can?.timesheets?.viewAssigned || can?.timesheets?.create) {
+            operationsGroup.items.push({
+                title: 'Attendance',
+                href: '/attendance',
+                icon: Clock3,
+            });
+        }
+
         operationsGroup.items.push(
-            { title: 'My Shifts', href: '/shifts', icon: CalendarDays },
             {
                 title: timesheetPlural,
                 href: '/timesheets',
@@ -296,6 +300,11 @@ function buildNavigationGroups({
             title: timesheetPlural,
             href: '/timesheets',
             icon: ClipboardList,
+        });
+        operationsGroup.items.push({
+            title: 'Attendance',
+            href: '/attendance',
+            icon: Clock3,
         });
     }
     if (can?.respite?.viewAny) {
@@ -411,8 +420,16 @@ function buildNavigationGroups({
         can?.hr?.recruitment?.view ||
         can?.hr?.employees?.viewAny ||
         can?.hr?.compliance?.view ||
+        can?.hr?.training?.view ||
+        can?.hr?.vetting?.view ||
+        can?.hr?.driver?.view ||
+        can?.hr?.onboarding?.view ||
         can?.hr?.leave?.viewAny ||
         can?.hr?.performance?.view ||
+        can?.hr?.cases?.view ||
+        can?.hr?.documents?.view ||
+        can?.hr?.payroll?.view ||
+        can?.hr?.wellbeing?.view ||
         can?.hr?.reports?.view ||
         can?.hr?.policies?.view;
 
@@ -422,6 +439,11 @@ function buildNavigationGroups({
                 title: 'Recruitment',
                 href: '/hr/recruitment',
                 icon: Users,
+            });
+            hrGroup.items.push({
+                title: 'Careers Page',
+                href: '/careers',
+                icon: BookOpen,
             });
         }
         if (can?.hr?.employees?.viewAny) {
@@ -438,11 +460,44 @@ function buildNavigationGroups({
                 icon: Shield,
             });
         }
+        if (can?.hr?.training?.view) {
+            hrGroup.items.push({
+                title: 'Training',
+                href: '/hr/compliance/training',
+                icon: GraduationCap,
+            });
+        }
+        if (can?.hr?.vetting?.view) {
+            hrGroup.items.push({
+                title: 'Vetting',
+                href: '/hr/compliance/vetting',
+                icon: ShieldCheck,
+            });
+        }
+        if (can?.hr?.driver?.view) {
+            hrGroup.items.push({
+                title: 'Driver Eligibility',
+                href: '/hr/compliance/drivers',
+                icon: Truck,
+            });
+        }
         if (can?.hr?.leave?.viewAny) {
             hrGroup.items.push({
                 title: 'Leave & Rosters',
                 href: '/hr/leave',
                 icon: CalendarDays,
+            });
+        }
+        if (can?.hr?.onboarding?.view) {
+            hrGroup.items.push({
+                title: 'Onboarding',
+                href: '/hr/onboarding',
+                icon: ClipboardList,
+            });
+            hrGroup.items.push({
+                title: 'Offboarding',
+                href: '/hr/offboarding',
+                icon: UserMinus,
             });
         }
         if (can?.hr?.performance?.view) {
@@ -451,12 +506,45 @@ function buildNavigationGroups({
                 href: '/hr/performance',
                 icon: ClipboardCheck,
             });
+            hrGroup.items.push({
+                title: 'Development Goals',
+                href: '/hr/development/goals',
+                icon: Target,
+            });
+        }
+        if (can?.hr?.cases?.view) {
+            hrGroup.items.push({
+                title: 'Cases',
+                href: '/hr/cases',
+                icon: ShieldAlert,
+            });
+        }
+        if (can?.hr?.wellbeing?.view) {
+            hrGroup.items.push({
+                title: 'Wellbeing',
+                href: '/hr/wellbeing',
+                icon: HeartPulse,
+            });
         }
         if (can?.hr?.policies?.view) {
             hrGroup.items.push({
                 title: 'Policies',
                 href: '/hr/policies',
                 icon: FileText,
+            });
+        }
+        if (can?.hr?.documents?.view) {
+            hrGroup.items.push({
+                title: 'Documents',
+                href: '/hr/documents',
+                icon: FileText,
+            });
+        }
+        if (can?.hr?.payroll?.view) {
+            hrGroup.items.push({
+                title: 'Payroll',
+                href: '/hr/payroll',
+                icon: Landmark,
             });
         }
         if (can?.hr?.reports?.view) {

@@ -4,12 +4,17 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffboardingChecklist;
+use App\Domain\Hr\Models\HrOffboardingTask;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
+use App\Domain\Hr\Notifications\OnboardingTaskAssignedNotification;
+use App\Domain\Hr\Services\HrWebhookService;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class OnboardingService
 {
@@ -28,24 +33,10 @@ class OnboardingService
      */
     public function generateChecklist(HrEmployeeProfile $profile, int $createdBy): HrOnboardingChecklist
     {
-        // TODO: Look up the active template by role (position_role) and optionally site_type
-        // TODO: Fall back to a 'default' template if no role-specific template exists
-        // TODO: Create HrOnboardingChecklist record with status 'pending'
-        // TODO: Clone each task from the template's tasks JSON array into HrOnboardingTask rows
-        // TODO: Set default due_date based on start_date + offset days per task
-        // TODO: Assign tasks to roles/users where specified in the template
-        // TODO: Fire OnboardingStarted event for notification listeners
-        // TODO: Log audit trail entry
-
         return DB::transaction(function () use ($profile, $createdBy) {
-            $template = HrOnboardingTemplate::where('tenant_id', $profile->tenant_id)
-                ->active()
-                ->where(function ($q) use ($profile) {
-                    $q->where('role', $profile->position_role)
-                      ->orWhere('role', 'default');
-                })
-                ->orderByRaw("CASE WHEN role = ? THEN 0 ELSE 1 END", [$profile->position_role])
-                ->first();
+            $profile->loadMissing('primarySite');
+            $siteType = $profile->primarySite?->type ?? 'all';
+            $template = $this->resolveTemplate($profile->tenant_id, $profile->position_role, $siteType);
 
             if (! $template) {
                 throw new \RuntimeException(
@@ -56,26 +47,83 @@ class OnboardingService
             $checklist = HrOnboardingChecklist::create([
                 'tenant_id' => $profile->tenant_id,
                 'employee_profile_id' => $profile->id,
-                'template_key' => $template->role,
+                'template_key' => "{$template->role}:{$template->site_type}",
                 'status' => 'pending',
                 'started_at' => now(),
-                'due_date' => $profile->start_date?->addDays(30),
+                'due_date' => Carbon::parse($profile->start_date ?? now())->addDays(30),
                 'created_by' => $createdBy,
             ]);
 
             $tasks = $template->tasks ?? [];
+            $taskByIndex = [];
             foreach ($tasks as $index => $taskDef) {
-                HrOnboardingTask::create([
+                $assigneeId = $this->resolveAssignee(
+                    $taskDef['assigned_to_user_id'] ?? null,
+                    $taskDef['assigned_to_role'] ?? null,
+                    $profile,
+                );
+                $offsetDays = (int) ($taskDef['due_days_offset'] ?? $taskDef['offset_days'] ?? 0);
+                $dueDate = $profile->start_date
+                    ? Carbon::parse($profile->start_date)->addDays($offsetDays)->toDateString()
+                    : null;
+
+                $task = HrOnboardingTask::create([
                     'checklist_id' => $checklist->id,
                     'category' => $taskDef['category'] ?? 'general',
                     'title' => $taskDef['title'],
                     'description' => $taskDef['description'] ?? null,
                     'is_required' => $taskDef['is_required'] ?? true,
                     'sort_order' => $taskDef['sort_order'] ?? ($index + 1),
+                    'assigned_to_user_id' => $assigneeId,
                     'assigned_to_role' => $taskDef['assigned_to_role'] ?? null,
                     'sign_off_required' => $taskDef['sign_off_required'] ?? false,
+                    'due_date' => $dueDate,
                     'status' => 'pending',
                 ]);
+
+                $taskByIndex[$index] = $task;
+            }
+
+            foreach ($tasks as $index => $taskDef) {
+                $dependencyIndexes = collect($taskDef['dependency_indexes'] ?? $taskDef['depends_on'] ?? [])
+                    ->filter(fn ($value) => is_numeric($value))
+                    ->map(fn ($value) => (int) $value)
+                    ->values();
+
+                if ($dependencyIndexes->isEmpty() || ! isset($taskByIndex[$index])) {
+                    continue;
+                }
+
+                $dependencyIds = $dependencyIndexes
+                    ->map(fn (int $dependencyIndex) => $taskByIndex[$dependencyIndex]->id ?? null)
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                if ($dependencyIds !== []) {
+                    $taskByIndex[$index]->update(['dependency_task_ids' => $dependencyIds]);
+                }
+            }
+
+            foreach ($taskByIndex as $task) {
+                if (! $task->assigned_to_user_id) {
+                    continue;
+                }
+
+                $assignee = User::find($task->assigned_to_user_id);
+                if (! $assignee) {
+                    continue;
+                }
+
+                try {
+                    $assignee->notify(new OnboardingTaskAssignedNotification($task));
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to notify onboarding task assignee', [
+                        'task_id' => $task->id,
+                        'assignee_id' => $assignee->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
             }
 
             return $checklist->load('tasks');
@@ -97,23 +145,29 @@ class OnboardingService
      */
     public function completeTask(HrOnboardingTask $task, int $completedBy, array $data = []): HrOnboardingTask
     {
-        // TODO: Verify the task is not already completed
-        // TODO: Verify the parent checklist is in 'pending' or 'in_progress' status
-        // TODO: If sign_off_required, verify that signed_off_by is provided
-        // TODO: Update task status to 'completed' with timestamp and completed_by
-        // TODO: Store evidence_path if provided
-        // TODO: Check if all required tasks in the checklist are now complete
-        // TODO: If all required tasks done, mark checklist as 'completed'
-        // TODO: Fire TaskCompleted / ChecklistCompleted events
-        // TODO: Log audit trail entry
-
         if ($task->status === 'completed') {
             throw new \LogicException("Task '{$task->title}' is already completed.");
         }
 
-        $checklist = $task->checklist;
+        $checklist = $task->checklist()->with('tasks')->firstOrFail();
         if (! in_array($checklist->status, ['pending', 'in_progress'], true)) {
             throw new \LogicException("Cannot complete tasks on a '{$checklist->status}' checklist.");
+        }
+
+        $dependencyTaskIds = collect($task->dependency_task_ids ?? [])->map(fn ($id) => (int) $id)->filter();
+        if ($dependencyTaskIds->isNotEmpty()) {
+            $completedDependencies = $checklist->tasks
+                ->whereIn('id', $dependencyTaskIds->all())
+                ->where('status', 'completed')
+                ->count();
+
+            if ($completedDependencies !== $dependencyTaskIds->count()) {
+                throw new \LogicException('This task cannot be completed until all dependency tasks are complete.');
+            }
+        }
+
+        if ($task->sign_off_required && empty($data['signed_off_by'])) {
+            throw new \LogicException("Task '{$task->title}' requires sign-off.");
         }
 
         $task->update([
@@ -136,6 +190,57 @@ class OnboardingService
     }
 
     /**
+     * Complete an offboarding task with dependency + sign-off validation.
+     *
+     * @throws \LogicException
+     */
+    public function completeOffboardingTask(HrOffboardingTask $task, int $completedBy, array $data = []): HrOffboardingTask
+    {
+        if ($task->status === 'completed') {
+            throw new \LogicException("Task '{$task->title}' is already completed.");
+        }
+
+        $checklist = $task->checklist()->with(['tasks', 'employeeProfile'])->firstOrFail();
+        if (! in_array($checklist->status, ['pending', 'in_progress'], true)) {
+            throw new \LogicException("Cannot complete tasks on a '{$checklist->status}' checklist.");
+        }
+
+        $dependencyTaskIds = collect($task->dependency_task_ids ?? [])->map(fn ($id) => (int) $id)->filter();
+        if ($dependencyTaskIds->isNotEmpty()) {
+            $completedDependencies = $checklist->tasks
+                ->whereIn('id', $dependencyTaskIds->all())
+                ->where('status', 'completed')
+                ->count();
+
+            if ($completedDependencies !== $dependencyTaskIds->count()) {
+                throw new \LogicException('This task cannot be completed until all dependency tasks are complete.');
+            }
+        }
+
+        if ($task->sign_off_required && empty($data['signed_off_by'])) {
+            throw new \LogicException("Task '{$task->title}' requires sign-off.");
+        }
+
+        $task->update([
+            'status' => 'completed',
+            'completed_at' => now(),
+            'completed_by' => $completedBy,
+            'evidence_path' => $data['evidence_path'] ?? $task->evidence_path,
+            'notes' => $data['notes'] ?? $task->notes,
+            'signed_off_by' => $data['signed_off_by'] ?? $task->signed_off_by,
+            'signed_off_at' => isset($data['signed_off_by']) ? now() : $task->signed_off_at,
+        ]);
+
+        if ($checklist->status === 'pending') {
+            $checklist->update(['status' => 'in_progress']);
+        }
+
+        $this->checkOffboardingChecklistCompletion($checklist);
+
+        return $task->fresh();
+    }
+
+    /**
      * Generate an offboarding checklist for a departing employee.
      *
      * Creates an HrOffboardingChecklist with standard departure tasks
@@ -148,48 +253,71 @@ class OnboardingService
      */
     public function generateOffboardingChecklist(HrEmployeeProfile $profile, int $createdBy, array $options = []): HrOffboardingChecklist
     {
-        // TODO: Look up offboarding template by role (similar to onboarding)
-        // TODO: If no template exists, use a hardcoded default set of offboarding tasks:
-        //       - Revoke system access / deactivate accounts
-        //       - Collect company equipment (laptop, phone, keys, ID badge)
-        //       - Final pay calculation and leave payout
-        //       - Exit interview scheduling
-        //       - Knowledge transfer / handover documentation
-        //       - Remove from rosters and shift schedules
-        //       - Archive employee documents
-        //       - Update employee profile (is_active = false, end_date, termination_reason)
-        // TODO: Create HrOffboardingChecklist with associated tasks
-        // TODO: Set due_date based on end_date or options
-        // TODO: Notify relevant managers (HR, IT, direct supervisor)
-        // TODO: Fire OffboardingStarted event
-        // TODO: Log audit trail entry
-
         return DB::transaction(function () use ($profile, $createdBy, $options) {
             $endDate = $options['end_date'] ?? $profile->end_date ?? now()->addWeeks(2);
+            $offboardingTemplate = HrOnboardingTemplate::query()
+                ->forTenant($profile->tenant_id)
+                ->active()
+                ->where('role', 'offboarding:' . $profile->position_role)
+                ->first();
 
             $checklist = HrOffboardingChecklist::create([
                 'tenant_id' => $profile->tenant_id,
                 'employee_profile_id' => $profile->id,
-                'template_key' => 'offboarding',
+                'template_key' => $offboardingTemplate?->role ?? 'offboarding:default',
                 'status' => 'pending',
                 'started_at' => now(),
                 'due_date' => $endDate,
                 'created_by' => $createdBy,
             ]);
 
-            $defaultTasks = $this->getDefaultOffboardingTasks();
-            foreach ($defaultTasks as $index => $taskDef) {
-                HrOnboardingTask::create([
-                    'checklist_id' => $checklist->id,
+            $tasks = $offboardingTemplate?->tasks ?: $this->getDefaultOffboardingTasks();
+            $taskByIndex = [];
+            foreach ($tasks as $index => $taskDef) {
+                $assigneeId = $this->resolveAssignee(
+                    $taskDef['assigned_to_user_id'] ?? null,
+                    $taskDef['assigned_to_role'] ?? null,
+                    $profile,
+                );
+                $offsetDays = (int) ($taskDef['due_days_offset'] ?? 0);
+                $dueDate = Carbon::parse($endDate)->subDays(max($offsetDays, 0))->toDateString();
+
+                $task = HrOffboardingTask::create([
+                    'offboarding_checklist_id' => $checklist->id,
                     'category' => $taskDef['category'],
                     'title' => $taskDef['title'],
                     'description' => $taskDef['description'],
                     'is_required' => $taskDef['is_required'],
                     'sort_order' => $index + 1,
+                    'assigned_to_user_id' => $assigneeId,
                     'assigned_to_role' => $taskDef['assigned_to_role'] ?? null,
                     'sign_off_required' => $taskDef['sign_off_required'] ?? false,
+                    'due_date' => $dueDate,
                     'status' => 'pending',
                 ]);
+
+                $taskByIndex[$index] = $task;
+            }
+
+            foreach ($tasks as $index => $taskDef) {
+                $dependencyIndexes = collect($taskDef['dependency_indexes'] ?? [])
+                    ->filter(fn ($value) => is_numeric($value))
+                    ->map(fn ($value) => (int) $value)
+                    ->values();
+
+                if ($dependencyIndexes->isEmpty() || ! isset($taskByIndex[$index])) {
+                    continue;
+                }
+
+                $dependencyIds = $dependencyIndexes
+                    ->map(fn (int $dependencyIndex) => $taskByIndex[$dependencyIndex]->id ?? null)
+                    ->filter()
+                    ->values()
+                    ->all();
+
+                if ($dependencyIds !== []) {
+                    $taskByIndex[$index]->update(['dependency_task_ids' => $dependencyIds]);
+                }
             }
 
             return $checklist->load('tasks');
@@ -231,7 +359,115 @@ class OnboardingService
                 'status' => 'completed',
                 'completed_at' => now(),
             ]);
+
+            try {
+                app(HrWebhookService::class)->publish($checklist->tenant_id, 'onboarding.checklist.completed', [
+                    'checklist_id' => $checklist->id,
+                    'employee_profile_id' => $checklist->employee_profile_id,
+                    'template_key' => $checklist->template_key,
+                    'completed_at' => optional($checklist->completed_at)->toDateTimeString(),
+                ]);
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to queue onboarding completion webhook.', [
+                    'checklist_id' => $checklist->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+        } elseif ($checklist->status !== 'in_progress') {
+            $checklist->update(['status' => 'in_progress']);
         }
+    }
+
+    /**
+     * Check if all required offboarding tasks are complete and close the checklist.
+     */
+    protected function checkOffboardingChecklistCompletion(HrOffboardingChecklist $checklist): void
+    {
+        $pendingRequired = $checklist->tasks()
+            ->where('is_required', true)
+            ->where('status', '!=', 'completed')
+            ->count();
+
+        if ($pendingRequired === 0) {
+            $checklist->update([
+                'status' => 'completed',
+                'completed_at' => now(),
+            ]);
+
+            try {
+                app(HrWebhookService::class)->publish($checklist->tenant_id, 'offboarding.checklist.completed', [
+                    'checklist_id' => $checklist->id,
+                    'employee_profile_id' => $checklist->employee_profile_id,
+                    'template_key' => $checklist->template_key,
+                    'completed_at' => optional($checklist->completed_at)->toDateTimeString(),
+                ]);
+            } catch (\Throwable $exception) {
+                Log::warning('Failed to queue offboarding completion webhook.', [
+                    'checklist_id' => $checklist->id,
+                    'error' => $exception->getMessage(),
+                ]);
+            }
+
+            $profile = $checklist->employeeProfile;
+            if ($profile && $profile->is_active) {
+                $profile->update([
+                    'is_active' => false,
+                    'end_date' => $profile->end_date ?? ($checklist->due_date ?? now()->toDateString()),
+                ]);
+            }
+        } elseif ($checklist->status !== 'in_progress') {
+            $checklist->update(['status' => 'in_progress']);
+        }
+    }
+
+    protected function resolveTemplate(?int $tenantId, ?string $positionRole, string $siteType): ?HrOnboardingTemplate
+    {
+        $query = HrOnboardingTemplate::query()
+            ->forTenant($tenantId)
+            ->active()
+            ->where(function ($builder) use ($positionRole) {
+                $builder->where('role', $positionRole)
+                    ->orWhere('role', 'default');
+            })
+            ->where(function ($builder) use ($siteType) {
+                $builder->where('site_type', $siteType)
+                    ->orWhere('site_type', 'all');
+            })
+            ->orderByRaw('CASE WHEN role = ? THEN 0 ELSE 1 END', [$positionRole])
+            ->orderByRaw('CASE WHEN site_type = ? THEN 0 ELSE 1 END', [$siteType]);
+
+        return $query->first();
+    }
+
+    protected function resolveAssignee(?int $assignedToUserId, ?string $assignedToRole, HrEmployeeProfile $profile): ?int
+    {
+        if ($assignedToUserId) {
+            return $assignedToUserId;
+        }
+
+        if (! $assignedToRole) {
+            return null;
+        }
+
+        $users = User::query()
+            ->when(
+                $profile->tenant_id !== null && Schema::hasColumn('users', 'tenant_id'),
+                fn ($query) => $query->where('tenant_id', $profile->tenant_id)
+            );
+
+        if ($assignedToRole === 'employee') {
+            return $profile->user_id;
+        }
+
+        if ($assignedToRole === 'manager') {
+            return (clone $users)
+                ->where('role', 'team_lead')
+                ->value('id');
+        }
+
+        return (clone $users)
+            ->where('role', $assignedToRole)
+            ->value('id');
     }
 
     /**

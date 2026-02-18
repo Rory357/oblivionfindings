@@ -31,7 +31,6 @@ interface MatrixEntry {
 interface Props {
     requirements: ComplianceRequirement[];
     roles: string[];
-    siteTypes: string[];
     matrixEntries: MatrixEntry[];
     can: { manage: boolean };
 }
@@ -51,7 +50,7 @@ const requirementTypeOptions = [
     { value: 'other', label: 'Other' },
 ];
 
-export default function ComplianceMatrix({ requirements, roles, siteTypes, matrixEntries, can }: Props) {
+export default function ComplianceMatrix({ requirements, roles, matrixEntries, can }: Props) {
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -113,18 +112,15 @@ export default function ComplianceMatrix({ requirements, roles, siteTypes, matri
 
     function toggleMatrixEntry(requirementId: number, role: string, currentlyEnabled: boolean) {
         if (!can.manage) return;
-        if (currentlyEnabled) {
-            const entry = matrixEntries.find((e) => e.requirement_id === requirementId && e.role === role);
-            if (entry) {
-                router.delete(`/hr/compliance/matrix/${entry.id}`, { preserveScroll: true });
-            }
-        } else {
-            router.post('/hr/compliance/matrix', {
-                requirement_id: requirementId,
-                role: role,
-                is_mandatory: true,
-            }, { preserveScroll: true });
-        }
+        const action = currentlyEnabled ? 'unassign' : 'assign';
+        const mandatory = currentlyEnabled ? isEntryMandatory(requirementId, role) : true;
+
+        router.post('/hr/compliance/matrix', {
+            requirement_id: requirementId,
+            role,
+            is_mandatory: mandatory,
+            action,
+        }, { preserveScroll: true });
     }
 
     function isEntryEnabled(requirementId: number, role: string): boolean {

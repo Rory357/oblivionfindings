@@ -43,7 +43,7 @@ class HrOffboardingChecklist extends Model
 
     public function tasks(): HasMany
     {
-        return $this->hasMany(HrOnboardingTask::class, 'checklist_id');
+        return $this->hasMany(HrOffboardingTask::class, 'offboarding_checklist_id');
     }
 
     public function creator(): BelongsTo
