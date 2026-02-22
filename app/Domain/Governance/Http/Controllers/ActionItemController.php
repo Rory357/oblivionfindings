@@ -71,6 +71,8 @@ class ActionItemController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorize('create', ActionItem::class);
+
         $validated = $request->validate([
             'source_type' => 'required|string',
             'source_id' => 'required|integer',
@@ -88,5 +90,54 @@ class ActionItemController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Action item created.');
+    }
+
+    public function updateProgress(Request $request, ActionItem $action)
+    {
+        $this->authorize('update', $action);
+
+        $validated = $request->validate([
+            'progress_pct' => 'required|integer|min:0|max:100',
+            'progress_notes' => 'nullable|string',
+        ]);
+
+        $action->updateProgress($validated['progress_pct'], $validated['progress_notes'] ?? null);
+
+        return redirect()->back()->with('success', 'Progress updated.');
+    }
+
+    public function block(Request $request, ActionItem $action)
+    {
+        $this->authorize('update', $action);
+
+        $validated = $request->validate([
+            'blocked_reason' => 'required|string|max:500',
+        ]);
+
+        $action->block($validated['blocked_reason']);
+
+        return redirect()->back()->with('success', 'Action item marked as blocked.');
+    }
+
+    public function unblock(ActionItem $action)
+    {
+        $this->authorize('update', $action);
+
+        $action->unblock();
+
+        return redirect()->back()->with('success', 'Action item unblocked.');
+    }
+
+    public function escalate(Request $request, ActionItem $action)
+    {
+        $this->authorize('update', $action);
+
+        $validated = $request->validate([
+            'escalation_reason' => 'required|string|max:500',
+        ]);
+
+        $action->escalate(auth()->id(), $validated['escalation_reason']);
+
+        return redirect()->back()->with('success', 'Action item escalated.');
     }
 }

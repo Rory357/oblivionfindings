@@ -4,18 +4,21 @@ namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrInterviewKit;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class InterviewKitController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $kits = HrInterviewKit::query()
             ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
@@ -45,6 +48,7 @@ class InterviewKitController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -56,7 +60,7 @@ class InterviewKitController extends Controller
         ]);
 
         HrInterviewKit::create([
-            'tenant_id' => $user->tenant_id ?? null,
+            'tenant_id' => $tenantId,
             'name' => $validated['name'],
             'role' => $validated['role'] ?? null,
             'criteria' => $validated['criteria'] ?? [],
@@ -73,7 +77,8 @@ class InterviewKitController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $kit->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $kit->tenant_id);
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
@@ -97,7 +102,8 @@ class InterviewKitController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $kit->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $kit->tenant_id);
 
         $kit->update([
             'is_active' => ! $kit->is_active,
@@ -105,13 +111,6 @@ class InterviewKitController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Interview kit status updated.');
-    }
-
-    private function assertTenantAccess(?int $tenantId, ?int $resourceTenantId): void
-    {
-        if ($tenantId !== null && $tenantId !== $resourceTenantId) {
-            abort(404);
-        }
     }
 }
 

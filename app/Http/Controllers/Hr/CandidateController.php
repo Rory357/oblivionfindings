@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrInterview;
@@ -21,6 +22,8 @@ use Inertia\Inertia;
 
 class CandidateController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly RecruitmentService $recruitmentService,
         private readonly HrWebhookService $webhookService,
@@ -35,7 +38,7 @@ class CandidateController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $sites = Site::query()
             ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->orderBy('name')
@@ -57,7 +60,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $siteRule = Rule::exists('sites', 'id');
         if ($tenantId !== null) {
@@ -145,7 +148,8 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $candidate->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
 
         $candidate->load([
             'applications.targetSite:id,name',
@@ -273,7 +277,8 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $candidate->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
 
 
         $validated = $request->validate([
@@ -303,7 +308,8 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         $validated = $request->validate([
             'target_stage' => ['nullable', 'string', Rule::in(RecruitmentService::STAGES)],
@@ -331,7 +337,8 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         $validated = $request->validate([
             'rejection_reason' => ['nullable', 'string', 'max:2000'],
@@ -353,7 +360,8 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
 
         $validated = $request->validate([
@@ -384,9 +392,10 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $application = $interview->application()->firstOrFail();
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         $validated = $request->validate([
             'status' => ['required', 'string', Rule::in(['scheduled', 'completed', 'cancelled', 'no_show'])],
@@ -410,9 +419,10 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $application = $interview->application()->with('interviewKit')->firstOrFail();
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         $validated = $request->validate([
             'overall_score' => ['nullable', 'numeric', 'min:0', 'max:100'],
@@ -475,7 +485,8 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
 
         $validated = $request->validate([
@@ -502,9 +513,10 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $application = $reference->application()->firstOrFail();
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         $validated = $request->validate([
             'status' => ['required', 'string', Rule::in(['pending', 'requested', 'contacted', 'completed'])],
@@ -534,12 +546,12 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
 
         $application->load('candidate:id,first_name,last_name,personal_email');
 
-        $tenantId = $user->tenant_id ?? null;
         $sites = Site::query()
             ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->orderBy('name')
@@ -571,7 +583,7 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $applicationRule = Rule::exists('hr_applications', 'id');
         $siteRule = Rule::exists('sites', 'id');
@@ -598,7 +610,7 @@ class CandidateController extends Controller
             ->with('candidate')
             ->where('id', $validated['application_id'])
             ->firstOrFail();
-        $this->assertTenantAccess($tenantId, $application->tenant_id);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
         abort_unless($application->candidate, 404);
 
         if (in_array($application->candidate->status, RecruitmentService::TERMINAL, true)) {
@@ -642,10 +654,11 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
 
         $application = $offer->application()->with('candidate')->firstOrFail();
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         if ($offer->approval_status !== 'approved') {
             return redirect()->back()->with('error', 'Offer must be approved before sending.');
@@ -692,9 +705,10 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $application = $offer->application()->with('candidate')->firstOrFail();
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         if ($offer->approval_status === 'approved') {
             return redirect()->back()->with('success', 'Offer already approved.');
@@ -722,9 +736,10 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $application = $offer->application()->with('candidate')->firstOrFail();
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
         $validated = $request->validate([
             'response' => ['required', 'string', Rule::in(['accepted', 'declined', 'withdrawn'])],
@@ -811,9 +826,10 @@ class CandidateController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $application = $offer->application()->with('candidate')->firstOrFail();
-        $this->assertTenantAccess($user->tenant_id ?? null, $application->tenant_id);
+        $this->assertHrTenantAccess($tenantId, $application->tenant_id);
         $candidate = $application->candidate;
         abort_unless($candidate, 404);
 
@@ -932,12 +948,5 @@ class CandidateController extends Controller
         $weightedTotal = (float) $weighted->sum(fn (array $row) => $row['score'] * $row['weight']);
 
         return round($weightedTotal / $totalWeight, 2);
-    }
-
-    private function assertTenantAccess(?int $tenantId, ?int $resourceTenantId): void
-    {
-        if ($tenantId !== null && $tenantId !== $resourceTenantId) {
-            abort(404);
-        }
     }
 }

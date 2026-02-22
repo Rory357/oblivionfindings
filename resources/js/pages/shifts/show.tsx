@@ -593,7 +593,18 @@ export default function ShiftShow({ shift, handover, notes, incidents, incidentT
                     onClick={() =>
                       noteForm.post(`/clients/${shift.client.id}/notes`, {
                         preserveScroll: true,
-                        onSuccess: () => noteForm.reset({ type: 'shift_note', subject: '', goal: '', body: '', visibility: 'internal', pin: false, shift_id: shift.id }),
+                        onSuccess: () => {
+                          noteForm.reset();
+                          noteForm.setData({
+                            type: 'shift_note',
+                            subject: '',
+                            goal: '',
+                            body: '',
+                            visibility: 'internal',
+                            pin: false,
+                            shift_id: shift.id,
+                          });
+                        },
                       })
                     }
                     disabled={noteForm.processing || !noteForm.data.body}

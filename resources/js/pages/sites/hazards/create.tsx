@@ -97,7 +97,7 @@ export default function CreateHazard() {
                             <div>
                                 <Label>Hazard Type *</Label>
                                 <Select
-                                    value={data.hazard_type}
+                                    value={data.hazard_type || undefined}
                                     onValueChange={(v) => setData('hazard_type', v)}
                                 >
                                     <SelectTrigger className="mt-1">

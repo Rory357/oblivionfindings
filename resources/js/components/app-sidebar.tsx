@@ -204,6 +204,19 @@ function buildNavigationGroups({
         });
     }
 
+    // My HR group — self-service items visible to all authenticated users
+    const myHrGroup: NavGroup = {
+        id: 'hr',
+        label: 'HR',
+        items: [
+            { title: 'My HR', href: '/hr/my', icon: Home },
+            { title: 'My Training', href: '/hr/my/training', icon: Target },
+            { title: 'My Reviews', href: '/hr/my/reviews', icon: ClipboardCheck },
+            { title: 'My Goals', href: '/hr/my/goals', icon: Target },
+            { title: 'My Surveys', href: '/hr/my/surveys', icon: MessageSquareText },
+        ],
+    };
+
     // Support Worker specific nav
     if (role === 'support_worker') {
         operationsGroup.items.push({ title: 'My Shifts', href: '/shifts', icon: CalendarDays });
@@ -277,6 +290,7 @@ function buildNavigationGroups({
             ...(operationsGroup.items.length > 0 ? [operationsGroup] : []),
             ...(resourcesGroup.items.length > 0 ? [resourcesGroup] : []),
             ...(complianceGroup.items.length > 0 ? [complianceGroup] : []),
+            myHrGroup,
         ];
     }
 
@@ -401,20 +415,8 @@ function buildNavigationGroups({
         });
     }
 
-    // HR
-    const hrGroup: NavGroup = {
-        id: 'hr',
-        label: 'HR',
-        items: [],
-    };
-
-    // My HR is always visible to any authenticated user
-    hrGroup.items.push({ title: 'My HR', href: '/hr/my', icon: Home });
-    hrGroup.items.push({
-        title: 'My Training',
-        href: '/hr/my/training',
-        icon: Target,
-    });
+    // HR — start with self-service items already in myHrGroup
+    const hrGroup = myHrGroup;
 
     const hasAnyHr =
         can?.hr?.recruitment?.view ||

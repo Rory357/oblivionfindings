@@ -1,13 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs';
 
 export default function MedicalSimple() {
     const { client, medications, conditions, emergency_contacts, profile } = usePage<any>().props;
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Clients', href: '/clients' }, { title: `${client?.first_name} ${client?.last_name}`, href: `/clients/${client?.id}` }, { title: 'Medical' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Clients', href: '/clients' }, { title: `${client?.first_name} ${client?.last_name}`, href: `/clients/${client?.id}` }, { title: 'Medical', href: `/clients/${client?.id}/medical` }]}>
             <Head title={`Medical - ${client?.first_name} ${client?.last_name}`} />
 
             <div className="space-y-6 p-6">
@@ -16,7 +16,7 @@ export default function MedicalSimple() {
                     <p className="text-sm text-muted-foreground">{client?.first_name} {client?.last_name}</p>
                 </div>
 
-                <Tabs defaultValue="overview" className="space-y-4">
+                <TabsRoot defaultValue="overview" className="space-y-4">
                     <TabsList>
                         <TabsTrigger value="overview">Overview</TabsTrigger>
                         <TabsTrigger value="medications">Medications ({medications?.length || 0})</TabsTrigger>
@@ -67,7 +67,7 @@ export default function MedicalSimple() {
                             </CardContent>
                         </Card>
                     </TabsContent>
-                </Tabs>
+                </TabsRoot>
             </div>
         </AppLayout>
     );

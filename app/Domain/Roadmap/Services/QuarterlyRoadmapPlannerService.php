@@ -102,52 +102,30 @@ class QuarterlyRoadmapPlannerService
         });
     }
 
+    /**
+     * @deprecated Use approve() directly. Kept for backward compatibility.
+     */
     public function submitForManagerReview(QuarterlyRoadmapPlan $plan, int $userId): QuarterlyRoadmapPlan
     {
-        if ($plan->status !== QuarterlyRoadmapPlan::STATUS_DRAFT) {
-            throw new \RuntimeException('Only draft plans can be submitted for manager review.');
-        }
-
-        $plan->update(['status' => QuarterlyRoadmapPlan::STATUS_MANAGER_REVIEW]);
-
-        $this->changeLogService->log(
-            $plan->tenant_id,
-            QuarterlyRoadmapPlan::class,
-            $plan->id,
-            'plan.manager_review',
-            ['status' => QuarterlyRoadmapPlan::STATUS_MANAGER_REVIEW],
-            null,
-            $userId,
-        );
-
-        return $plan->fresh('items.initiative');
+        return $this->approve($plan, $userId);
     }
 
+    /**
+     * @deprecated Use approve() directly. Kept for backward compatibility.
+     */
     public function submitForExecutiveReview(QuarterlyRoadmapPlan $plan, int $userId): QuarterlyRoadmapPlan
     {
-        if ($plan->status !== QuarterlyRoadmapPlan::STATUS_MANAGER_REVIEW) {
-            throw new \RuntimeException('Plan must be in manager review to submit for executive review.');
-        }
-
-        $plan->update(['status' => QuarterlyRoadmapPlan::STATUS_EXEC_REVIEW]);
-
-        $this->changeLogService->log(
-            $plan->tenant_id,
-            QuarterlyRoadmapPlan::class,
-            $plan->id,
-            'plan.exec_review',
-            ['status' => QuarterlyRoadmapPlan::STATUS_EXEC_REVIEW],
-            null,
-            $userId,
-        );
-
-        return $plan->fresh('items.initiative');
+        return $this->approve($plan, $userId);
     }
 
     public function approve(QuarterlyRoadmapPlan $plan, int $userId): QuarterlyRoadmapPlan
     {
-        if (! in_array($plan->status, [QuarterlyRoadmapPlan::STATUS_MANAGER_REVIEW, QuarterlyRoadmapPlan::STATUS_EXEC_REVIEW], true)) {
-            throw new \RuntimeException('Plan must be in review before approval.');
+        if (! in_array($plan->status, [
+            QuarterlyRoadmapPlan::STATUS_DRAFT,
+            QuarterlyRoadmapPlan::STATUS_MANAGER_REVIEW,
+            QuarterlyRoadmapPlan::STATUS_EXEC_REVIEW,
+        ], true)) {
+            throw new \RuntimeException('Plan must be a draft or in review before approval.');
         }
 
         $plan->update([

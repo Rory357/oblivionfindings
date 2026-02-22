@@ -7,23 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import SafetyCheckPanel from './SafetyCheckPanel';
+import SafetyCheckPanel, { type SafetyCheck } from './SafetyCheckPanel';
 import PrnHistoryPanel from './PrnHistoryPanel';
 
 interface Witness {
   id: number;
   name: string;
-}
-
-interface SafetyCheck {
-  safe: boolean;
-  blocked: boolean;
-  block_reason?: string;
-  safety_level: string;
-  safety_info: { label: string; color: string; icon: string };
-  warnings: Array<{ type: string; severity: string; message: string; details?: Record<string, unknown> }>;
-  can_proceed: boolean;
-  requires_acknowledgment: boolean;
 }
 
 interface Medication {

@@ -13,7 +13,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Building2, Home, Warehouse, MapPin, AlertTriangle } from 'lucide-react';
+import { Building2, Home, Warehouse, MapPin, AlertTriangle, Upload, FileText, Trash2 } from 'lucide-react';
+import { useRef, useState } from 'react';
 
 type Site = {
     id: number;
@@ -50,9 +51,20 @@ type User = {
     name: string;
 };
 
+type SiteDocument = {
+    id: number;
+    title: string;
+    category?: string;
+    expiry_date?: string;
+    notes?: string;
+    original_name: string;
+    size_bytes: number;
+};
+
 type PageProps = {
     site: Site;
     users: User[];
+    documents: SiteDocument[];
     labels?: Record<string, string>;
 };
 
@@ -64,9 +76,73 @@ const siteTypes = [
 ];
 
 export default function EditSite() {
-    const { site, users, labels } = usePage<PageProps>().props;
+    const { site, users, documents: initialDocuments, labels } = usePage<PageProps>().props;
     const siteSingular = labels?.['site.singular'] ?? 'Site';
     const sitePlural = labels?.['site.plural'] ?? 'Sites';
+
+    const [uploadedDocs, setUploadedDocs] = useState<SiteDocument[]>(initialDocuments ?? []);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [pendingDoc, setPendingDoc] = useState({ title: '', category: '', expiry_date: '', notes: '' });
+
+    const csrfToken = () => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+
+    const handleUploadDocument = async () => {
+        const file = fileInputRef.current?.files?.[0];
+        if (!file || !pendingDoc.title.trim()) return;
+
+        setUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('title', pendingDoc.title);
+            if (pendingDoc.category) formData.append('category', pendingDoc.category);
+            if (pendingDoc.expiry_date) formData.append('expiry_date', pendingDoc.expiry_date);
+            if (pendingDoc.notes) formData.append('notes', pendingDoc.notes);
+
+            const res = await fetch(`/sites/${site.id}/documents`, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken() },
+                body: formData,
+            });
+
+            if (res.ok) {
+                const json = await res.json();
+                setUploadedDocs((prev) => [json.document, ...prev]);
+                setPendingDoc({ title: '', category: '', expiry_date: '', notes: '' });
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            } else {
+                alert('Failed to upload document. Please try again.');
+            }
+        } catch {
+            alert('Upload failed. Please check your connection and try again.');
+        } finally {
+            setUploading(false);
+        }
+    };
+
+    const handleDeleteDocument = async (docId: number) => {
+        if (!confirm('Are you sure you want to delete this document?')) return;
+        try {
+            const res = await fetch(`/sites/${site.id}/documents/${docId}`, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-TOKEN': csrfToken() },
+            });
+            if (res.ok) {
+                setUploadedDocs((prev) => prev.filter((d) => d.id !== docId));
+            } else {
+                alert('Failed to delete document.');
+            }
+        } catch {
+            alert('Delete failed. Please check your connection and try again.');
+        }
+    };
+
+    const formatFileSize = (bytes: number) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
 
     const { data, setData, put, processing, errors } = useForm({
         name: site.name,
@@ -198,7 +274,7 @@ export default function EditSite() {
                             <div>
                                 <Label htmlFor="primary_contact_user_id">Site Lead / Manager</Label>
                                 <Select
-                                    value={data.primary_contact_user_id}
+                                    value={data.primary_contact_user_id || undefined}
                                     onValueChange={(v) => setData('primary_contact_user_id', v)}
                                 >
                                     <SelectTrigger className="mt-1">
@@ -466,6 +542,121 @@ export default function EditSite() {
                                     rows={4}
                                 />
                             </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Documents */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <FileText className="w-5 h-5" />
+                                Documents
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {/* Upload form */}
+                            <div className="p-4 rounded-lg border space-y-3">
+                                <h4 className="text-sm font-medium flex items-center gap-2">
+                                    <Upload className="w-4 h-4" />
+                                    Upload Document
+                                </h4>
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <Label>Title *</Label>
+                                        <Input
+                                            value={pendingDoc.title}
+                                            onChange={(e) => setPendingDoc({ ...pendingDoc, title: e.target.value })}
+                                            placeholder="e.g. Fire Evacuation Plan"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Category</Label>
+                                        <Select
+                                            value={pendingDoc.category || undefined}
+                                            onValueChange={(v) => setPendingDoc({ ...pendingDoc, category: v })}
+                                        >
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select category" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="evacuation_plan">Evacuation Plan</SelectItem>
+                                                <SelectItem value="compliance_cert">Compliance Certificate</SelectItem>
+                                                <SelectItem value="insurance">Insurance</SelectItem>
+                                                <SelectItem value="lease">Lease / Tenancy</SelectItem>
+                                                <SelectItem value="safety">Health & Safety</SelectItem>
+                                                <SelectItem value="policy">Policy</SelectItem>
+                                                <SelectItem value="other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>Expiry Date</Label>
+                                        <Input
+                                            type="date"
+                                            value={pendingDoc.expiry_date}
+                                            onChange={(e) => setPendingDoc({ ...pendingDoc, expiry_date: e.target.value })}
+                                        />
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label>Comments</Label>
+                                    <Textarea
+                                        value={pendingDoc.notes}
+                                        onChange={(e) => setPendingDoc({ ...pendingDoc, notes: e.target.value })}
+                                        placeholder="Add any comments or notes about this document..."
+                                        rows={3}
+                                    />
+                                </div>
+                                <div>
+                                    <Label>File *</Label>
+                                    <Input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+                                        className="cursor-pointer"
+                                    />
+                                    <p className="text-xs text-slate-500 mt-1">PDF, Word, Excel, or images. Max 20MB.</p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    onClick={handleUploadDocument}
+                                    disabled={uploading || !pendingDoc.title.trim()}
+                                >
+                                    <Upload className="w-4 h-4 mr-2" />
+                                    {uploading ? 'Uploading...' : 'Upload Document'}
+                                </Button>
+                            </div>
+
+                            {/* Uploaded documents list */}
+                            {uploadedDocs.length > 0 && (
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-medium">Uploaded Documents ({uploadedDocs.length})</h4>
+                                    {uploadedDocs.map((doc) => (
+                                        <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <FileText className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium truncate">{doc.title}</p>
+                                                    <p className="text-xs text-slate-500 truncate">
+                                                        {doc.original_name}
+                                                        {doc.size_bytes > 0 && ` · ${formatFileSize(doc.size_bytes)}`}
+                                                        {doc.category && ` · ${doc.category}`}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="text-red-400 hover:text-red-300 flex-shrink-0"
+                                                onClick={() => handleDeleteDocument(doc.id)}
+                                            >
+                                                <Trash2 className="w-4 h-4" />
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 

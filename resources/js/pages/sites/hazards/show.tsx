@@ -173,7 +173,7 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                                 <div className="flex-1">
                                     <Label>Assign to</Label>
                                     <Select
-                                        value={assignForm.data.assigned_to_user_id}
+                                        value={assignForm.data.assigned_to_user_id || undefined}
                                         onValueChange={(v) => assignForm.setData('assigned_to_user_id', v)}
                                     >
                                         <SelectTrigger>

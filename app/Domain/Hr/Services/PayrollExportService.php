@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayRateRule;
+use App\Domain\Hr\Models\HrPayrollExportProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayrollRunItem;
 use App\Models\Timesheet;
@@ -12,9 +13,40 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 
 class PayrollExportService
 {
+    /**
+     * @return array<string, string>
+     */
+    public function exportFieldCatalog(): array
+    {
+        return [
+            'employee_number' => 'Employee Number',
+            'name' => 'Employee Name',
+            'email' => 'Employee Email',
+            'position_title' => 'Position Title',
+            'period_start' => 'Period Start',
+            'period_end' => 'Period End',
+            'regular_hours' => 'Regular Hours',
+            'overtime_hours' => 'Overtime Hours',
+            'sleepover_count' => 'Sleepover Count',
+            'on_call_hours' => 'On Call Hours',
+            'public_holiday_hours' => 'Public Holiday Hours',
+            'mileage_km' => 'Mileage (KM)',
+            'base_hourly_rate' => 'Base Hourly Rate',
+            'overtime_multiplier' => 'Overtime Multiplier',
+            'public_holiday_multiplier' => 'Public Holiday Multiplier',
+            'sleepover_rate' => 'Sleepover Rate',
+            'on_call_rate' => 'On Call Rate',
+            'gross_pay' => 'Gross Pay',
+            'allowances_total' => 'Allowances Total',
+            'timesheet_ids' => 'Timesheet IDs',
+            'item_notes' => 'Item Notes',
+        ];
+    }
+
     /**
      * @throws \InvalidArgumentException
      */
@@ -132,64 +164,61 @@ class PayrollExportService
     /**
      * @throws \LogicException
      */
-    public function generateExport(HrPayrollRun $run, int $exportedBy): string
+    public function generateExport(HrPayrollRun $run, int $exportedBy, ?HrPayrollExportProfile $profile = null): string
     {
         if ($run->locked_at === null) {
             throw new \LogicException('Cannot export an unlocked payroll run.');
         }
 
         $items = $run->items()->with(['user.hrEmployeeProfile'])->orderBy('id')->get();
-
-        $headers = [
-            'employee_number',
-            'name',
-            'position_title',
-            'regular_hours',
-            'overtime_hours',
-            'sleepover_count',
-            'on_call_hours',
-            'public_holiday_hours',
-            'mileage_km',
-            'base_hourly_rate',
-            'gross_pay',
-            'allowances_total',
-        ];
-
-        $rows = [];
-        foreach ($items as $item) {
-            $profile = $item->user?->hrEmployeeProfile;
-            $allowancesTotal = collect($item->allowances ?? [])->sum('amount');
-
-            $rows[] = [
-                $profile?->employee_number ?? '',
-                $item->user?->name ?? '',
-                $profile?->position_title ?? '',
-                (float) $item->regular_hours,
-                (float) $item->overtime_hours,
-                (int) $item->sleepover_count,
-                (float) $item->on_call_hours,
-                (float) $item->public_holiday_hours,
-                (float) $item->mileage_km,
-                (float) $item->base_hourly_rate,
-                (float) $item->gross_pay,
-                round((float) $allowancesTotal, 2),
-            ];
+        $resolvedProfile = $profile;
+        if (! $resolvedProfile) {
+            $resolvedProfile = HrPayrollExportProfile::query()
+                ->where('tenant_id', $run->tenant_id)
+                ->where('is_default', true)
+                ->orderByDesc('id')
+                ->first();
         }
 
-        $csv = implode(',', $headers) . "\n";
-        foreach ($rows as $row) {
-            $escaped = array_map(
-                fn ($value) => '"' . str_replace('"', '""', (string) $value) . '"',
-                $row
+        if ($resolvedProfile && (int) $resolvedProfile->tenant_id !== (int) $run->tenant_id) {
+            throw new \LogicException('Selected export profile does not belong to this payroll run tenant.');
+        }
+
+        $rows = $this->buildCanonicalRows($run, $items->all());
+
+        if ($resolvedProfile) {
+            $mappings = $this->normalizeMappings((array) ($resolvedProfile->mappings ?? []));
+            if ($mappings === []) {
+                throw new \LogicException('Export profile has no mappings configured.');
+            }
+
+            $csv = $this->buildCsvFromRows(
+                rows: $rows,
+                mappings: $mappings,
+                delimiter: (string) ($resolvedProfile->delimiter ?: ','),
+                enclosure: (string) ($resolvedProfile->enclosure ?: '"'),
+                lineEnding: (string) ($resolvedProfile->line_ending ?: "\n"),
+                includeHeaders: (bool) $resolvedProfile->include_headers,
             );
-            $csv .= implode(',', $escaped) . "\n";
+        } else {
+            $csv = $this->buildCsvFromRows(
+                rows: $rows,
+                mappings: $this->defaultExportMappings(),
+                delimiter: ',',
+                enclosure: '"',
+                lineEnding: "\n",
+                includeHeaders: true,
+            );
         }
+
+        $profileSuffix = $resolvedProfile ? '_' . Str::slug($resolvedProfile->name) : '';
 
         $filename = sprintf(
-            'payroll-exports/run-%d_%s_%s.csv',
+            'payroll-exports/run-%d_%s_%s%s.csv',
             $run->id,
             $run->period_start->format('Y-m-d'),
-            $run->period_end->format('Y-m-d')
+            $run->period_end->format('Y-m-d'),
+            $profileSuffix
         );
 
         Storage::disk('private')->put($filename, $csv);
@@ -198,6 +227,7 @@ class PayrollExportService
             'status' => 'exported',
             'exported_at' => now(),
             'exported_by' => $exportedBy,
+            'export_profile_id' => $resolvedProfile?->id,
             'export_format' => 'csv',
             'export_path' => $filename,
         ]);
@@ -590,5 +620,173 @@ class PayrollExportService
         if (Schema::hasColumn('users', 'tenant_id')) {
             $query->whereHas('user', fn ($userQuery) => $userQuery->where('tenant_id', $tenantId));
         }
+    }
+
+    /**
+     * @param array<int, HrPayrollRunItem> $items
+     * @return array<int, array<string, scalar|null>>
+     */
+    protected function buildCanonicalRows(HrPayrollRun $run, array $items): array
+    {
+        return collect($items)
+            ->map(function (HrPayrollRunItem $item) use ($run) {
+                $profile = $item->user?->hrEmployeeProfile;
+                $allowancesTotal = collect($item->allowances ?? [])->sum('amount');
+
+                return [
+                    'employee_number' => $profile?->employee_number ?? '',
+                    'name' => $item->user?->name ?? '',
+                    'email' => $item->user?->email ?? '',
+                    'position_title' => $profile?->position_title ?? '',
+                    'period_start' => optional($run->period_start)->toDateString(),
+                    'period_end' => optional($run->period_end)->toDateString(),
+                    'regular_hours' => (float) $item->regular_hours,
+                    'overtime_hours' => (float) $item->overtime_hours,
+                    'sleepover_count' => (int) $item->sleepover_count,
+                    'on_call_hours' => (float) $item->on_call_hours,
+                    'public_holiday_hours' => (float) $item->public_holiday_hours,
+                    'mileage_km' => (float) $item->mileage_km,
+                    'base_hourly_rate' => (float) $item->base_hourly_rate,
+                    'overtime_multiplier' => (float) $item->overtime_multiplier,
+                    'public_holiday_multiplier' => (float) $item->public_holiday_multiplier,
+                    'sleepover_rate' => (float) $item->sleepover_rate,
+                    'on_call_rate' => (float) $item->on_call_rate,
+                    'gross_pay' => (float) $item->gross_pay,
+                    'allowances_total' => round((float) $allowancesTotal, 2),
+                    'timesheet_ids' => collect($item->timesheet_ids ?? [])->join('|'),
+                    'item_notes' => $item->notes ?? '',
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{header: string, source: string, value?: mixed}>
+     */
+    protected function defaultExportMappings(): array
+    {
+        return [
+            ['header' => 'employee_number', 'source' => 'employee_number'],
+            ['header' => 'name', 'source' => 'name'],
+            ['header' => 'position_title', 'source' => 'position_title'],
+            ['header' => 'regular_hours', 'source' => 'regular_hours'],
+            ['header' => 'overtime_hours', 'source' => 'overtime_hours'],
+            ['header' => 'sleepover_count', 'source' => 'sleepover_count'],
+            ['header' => 'on_call_hours', 'source' => 'on_call_hours'],
+            ['header' => 'public_holiday_hours', 'source' => 'public_holiday_hours'],
+            ['header' => 'mileage_km', 'source' => 'mileage_km'],
+            ['header' => 'base_hourly_rate', 'source' => 'base_hourly_rate'],
+            ['header' => 'gross_pay', 'source' => 'gross_pay'],
+            ['header' => 'allowances_total', 'source' => 'allowances_total'],
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $mappings
+     * @return array<int, array{header: string, source: string, value?: mixed}>
+     */
+    protected function normalizeMappings(array $mappings): array
+    {
+        $catalog = $this->exportFieldCatalog();
+
+        return collect($mappings)
+            ->filter(fn ($mapping) => is_array($mapping))
+            ->map(function (array $mapping) use ($catalog) {
+                $header = trim((string) ($mapping['header'] ?? ''));
+                $source = trim((string) ($mapping['source'] ?? ''));
+
+                if ($header === '' || $source === '') {
+                    return null;
+                }
+
+                if ($source !== 'static' && ! array_key_exists($source, $catalog)) {
+                    return null;
+                }
+
+                $normalized = [
+                    'header' => $header,
+                    'source' => $source,
+                ];
+
+                if ($source === 'static') {
+                    $normalized['value'] = $mapping['value'] ?? '';
+                }
+
+                return $normalized;
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<int, array<string, scalar|null>> $rows
+     * @param array<int, array{header: string, source: string, value?: mixed}> $mappings
+     */
+    protected function buildCsvFromRows(
+        array $rows,
+        array $mappings,
+        string $delimiter,
+        string $enclosure,
+        string $lineEnding,
+        bool $includeHeaders = true,
+    ): string {
+        $safeDelimiter = mb_substr($delimiter !== '' ? $delimiter : ',', 0, 1);
+        $safeEnclosure = mb_substr($enclosure !== '' ? $enclosure : '"', 0, 1);
+        $safeLineEnding = $this->normalizeLineEnding($lineEnding);
+
+        $lines = [];
+        if ($includeHeaders) {
+            $headers = collect($mappings)->map(fn (array $mapping) => $mapping['header'])->all();
+            $lines[] = $this->encodeCsvRow($headers, $safeDelimiter, $safeEnclosure);
+        }
+
+        foreach ($rows as $row) {
+            $values = [];
+            foreach ($mappings as $mapping) {
+                if ($mapping['source'] === 'static') {
+                    $values[] = $mapping['value'] ?? '';
+                    continue;
+                }
+
+                $values[] = $row[$mapping['source']] ?? '';
+            }
+
+            $lines[] = $this->encodeCsvRow($values, $safeDelimiter, $safeEnclosure);
+        }
+
+        return implode($safeLineEnding, $lines) . $safeLineEnding;
+    }
+
+    /**
+     * @param array<int, mixed> $values
+     */
+    protected function encodeCsvRow(array $values, string $delimiter, string $enclosure): string
+    {
+        return collect($values)
+            ->map(function ($value) use ($enclosure) {
+                $stringValue = (string) ($value ?? '');
+                $escaped = str_replace($enclosure, $enclosure . $enclosure, $stringValue);
+
+                return $enclosure . $escaped . $enclosure;
+            })
+            ->implode($delimiter);
+    }
+
+    protected function normalizeLineEnding(string $lineEnding): string
+    {
+        $trimmed = trim($lineEnding);
+        if ($trimmed === '\r\n') {
+            return "\r\n";
+        }
+        if ($trimmed === '\r') {
+            return "\r";
+        }
+        if ($trimmed === '\n' || $trimmed === '') {
+            return "\n";
+        }
+
+        return $lineEnding;
     }
 }

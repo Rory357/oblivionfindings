@@ -94,10 +94,33 @@ class Budget extends Model
 
     public function propose(int $userId): void
     {
+        $this->loadMissing('lineItems');
+
+        $totalBudget = number_format((float) $this->total_budget, 2);
+        $lineItemCount = $this->lineItems->count();
+
+        $resolution = Resolution::create([
+            'title' => "Budget Approval: " . ($this->title ?: "FY{$this->fiscal_year}"),
+            'decision_type' => 'budget_approval',
+            'context' => "The " . ($this->title ?: "FY{$this->fiscal_year}") . " budget totalling \${$totalBudget} across {$lineItemCount} line items has been submitted for board approval.",
+            'options' => [],
+            'recommendation' => 'Approve the proposed budget as presented.',
+            'cost_impact' => [
+                'amount' => (float) $this->total_budget,
+                'currency' => $this->currency ?? 'NZD',
+                'description' => "Total budget envelope for FY{$this->fiscal_year}",
+            ],
+            'voting_threshold' => 'simple_majority',
+            'status' => 'draft',
+            'proposed_by' => $userId,
+            'proposed_at' => now(),
+        ]);
+
         $this->update([
             'status' => 'proposed',
             'proposed_by' => $userId,
             'proposed_at' => now(),
+            'approval_resolution_id' => $resolution->id,
         ]);
     }
 
@@ -177,6 +200,7 @@ class Budget extends Model
                 'title' => "Budget Adjustment: " . number_format(abs($amount), 2) . " - {$reason}",
                 'decision_type' => 'budget_approval',
                 'context' => "A budget adjustment of \$" . number_format($amount, 2) . " has been requested for: {$reason}. This exceeds the {$thresholdPct}% threshold and requires board approval.",
+                'options' => [],
                 'recommendation' => $amount > 0 ? 'Approve the additional allocation' : 'Approve the budget reduction',
                 'cost_impact' => ['amount' => $amount, 'currency' => 'NZD', 'description' => $reason],
                 'voting_threshold' => 'simple_majority',

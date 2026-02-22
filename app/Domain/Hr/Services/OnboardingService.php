@@ -10,6 +10,7 @@ use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
 use App\Domain\Hr\Notifications\OnboardingTaskAssignedNotification;
 use App\Domain\Hr\Services\HrWebhookService;
+use App\Models\AssetAssignment;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -273,6 +274,8 @@ class OnboardingService
 
             $tasks = $offboardingTemplate?->tasks ?: $this->getDefaultOffboardingTasks();
             $taskByIndex = [];
+            $equipmentCollectionTaskId = null;
+            $equipmentCollectionRole = 'hr_admin';
             foreach ($tasks as $index => $taskDef) {
                 $assigneeId = $this->resolveAssignee(
                     $taskDef['assigned_to_user_id'] ?? null,
@@ -297,6 +300,12 @@ class OnboardingService
                 ]);
 
                 $taskByIndex[$index] = $task;
+
+                $taskTitle = strtolower((string) ($taskDef['title'] ?? ''));
+                if ($equipmentCollectionTaskId === null && str_contains($taskTitle, 'collect company equipment')) {
+                    $equipmentCollectionTaskId = $task->id;
+                    $equipmentCollectionRole = (string) ($taskDef['assigned_to_role'] ?? 'hr_admin');
+                }
             }
 
             foreach ($tasks as $index => $taskDef) {
@@ -317,6 +326,50 @@ class OnboardingService
 
                 if ($dependencyIds !== []) {
                     $taskByIndex[$index]->update(['dependency_task_ids' => $dependencyIds]);
+                }
+            }
+
+            $activeAssignments = $this->getActiveStaffAssetAssignments($profile);
+            if ($activeAssignments->isNotEmpty()) {
+                $nextSortOrder = count($taskByIndex) + 1;
+                $assetTaskAssigneeId = $this->resolveAssignee(
+                    null,
+                    $equipmentCollectionRole !== '' ? $equipmentCollectionRole : 'hr_admin',
+                    $profile,
+                );
+
+                foreach ($activeAssignments as $assignment) {
+                    $assetName = trim((string) ($assignment->asset?->name ?? 'Assigned asset'));
+                    $assetMeta = collect([
+                        $assignment->asset?->asset_tag ? 'Tag ' . $assignment->asset->asset_tag : null,
+                        $assignment->asset?->serial_number ? 'Serial ' . $assignment->asset->serial_number : null,
+                    ])->filter()->implode(', ');
+
+                    $description = 'Recover this assigned asset as part of offboarding.';
+                    if ($assetMeta !== '') {
+                        $description .= ' ' . $assetMeta . '.';
+                    }
+
+                    $assetTask = HrOffboardingTask::create([
+                        'offboarding_checklist_id' => $checklist->id,
+                        'category' => 'assets',
+                        'title' => "Return asset: {$assetName}",
+                        'description' => $description,
+                        'is_required' => true,
+                        'sort_order' => $nextSortOrder++,
+                        'assigned_to_user_id' => $assetTaskAssigneeId,
+                        'assigned_to_role' => $equipmentCollectionRole !== '' ? $equipmentCollectionRole : 'hr_admin',
+                        'sign_off_required' => true,
+                        'due_date' => Carbon::parse($endDate)->toDateString(),
+                        'status' => 'pending',
+                        'notes' => "asset_assignment_id={$assignment->id};asset_id={$assignment->asset_id}",
+                    ]);
+
+                    if ($equipmentCollectionTaskId) {
+                        $assetTask->update([
+                            'dependency_task_ids' => [$equipmentCollectionTaskId],
+                        ]);
+                    }
                 }
             }
 
@@ -538,5 +591,21 @@ class OnboardingService
                 'sign_off_required' => true,
             ],
         ];
+    }
+
+    protected function getActiveStaffAssetAssignments(HrEmployeeProfile $profile)
+    {
+        if (! $profile->user_id) {
+            return collect();
+        }
+
+        return AssetAssignment::query()
+            ->with('asset:id,name,asset_tag,serial_number')
+            ->whereIn('assignee_type', ['staff', 'user', User::class])
+            ->where('assignee_id', $profile->user_id)
+            ->whereNull('released_at')
+            ->orderBy('assigned_at')
+            ->orderBy('id')
+            ->get();
     }
 }

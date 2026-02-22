@@ -10,12 +10,15 @@ use App\Models\User;
 use App\Notifications\AppEventNotification;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Str;
 
 class HrAutomationService
 {
     public const ACTION_NOTIFY_USERS = 'notify_users';
     public const ACTION_NOTIFY_ROLE_GROUP = 'notify_role_group';
     public const ACTION_QUEUE_REPORT_EXPORT = 'queue_report_export';
+    public const ACTION_NOTIFY_TEAMS_WEBHOOK = 'notify_microsoft_teams';
 
     /**
      * @return array<int, string>
@@ -26,6 +29,7 @@ class HrAutomationService
             self::ACTION_NOTIFY_USERS,
             self::ACTION_NOTIFY_ROLE_GROUP,
             self::ACTION_QUEUE_REPORT_EXPORT,
+            self::ACTION_NOTIFY_TEAMS_WEBHOOK,
         ];
     }
 
@@ -75,6 +79,22 @@ class HrAutomationService
      */
     protected function matchesConditions(array $payload, array $conditions): bool
     {
+        $ruleConditions = Arr::get($conditions, 'rules');
+        if (is_array($ruleConditions) && $ruleConditions !== []) {
+            $logic = strtolower((string) Arr::get($conditions, 'logic', 'all'));
+            $evaluations = collect($ruleConditions)
+                ->filter(fn ($rule) => is_array($rule) && ! empty($rule['field']) && ! empty($rule['operator']))
+                ->map(fn (array $rule) => $this->evaluateConditionRule($payload, $rule));
+
+            if ($evaluations->isEmpty()) {
+                return true;
+            }
+
+            return $logic === 'any'
+                ? $evaluations->contains(true)
+                : ! $evaluations->contains(false);
+        }
+
         $equals = collect(Arr::get($conditions, 'equals', []));
         foreach ($equals as $field => $expectedValue) {
             $actual = data_get($payload, (string) $field);
@@ -97,6 +117,162 @@ class HrAutomationService
 
     /**
      * @param array<string, mixed> $payload
+     * @param array<string, mixed> $rule
+     */
+    protected function evaluateConditionRule(array $payload, array $rule): bool
+    {
+        $field = trim((string) ($rule['field'] ?? ''));
+        $operator = strtolower(trim((string) ($rule['operator'] ?? '')));
+        $expected = $rule['value'] ?? null;
+        $actual = data_get($payload, $field);
+
+        return match ($operator) {
+            'equals' => $this->scalarValue($actual) === $this->scalarValue($expected),
+            'not_equals' => $this->scalarValue($actual) !== $this->scalarValue($expected),
+            'contains' => Str::contains(
+                Str::lower($this->scalarValue($actual)),
+                Str::lower($this->scalarValue($expected))
+            ),
+            'starts_with' => Str::startsWith(
+                Str::lower($this->scalarValue($actual)),
+                Str::lower($this->scalarValue($expected))
+            ),
+            'ends_with' => Str::endsWith(
+                Str::lower($this->scalarValue($actual)),
+                Str::lower($this->scalarValue($expected))
+            ),
+            'exists' => ! $this->isMissingValue($actual),
+            'not_exists' => $this->isMissingValue($actual),
+            'in' => $this->valueInList($actual, $expected),
+            'not_in' => ! $this->valueInList($actual, $expected),
+            'gt' => $this->compareValues($actual, $expected, '>'),
+            'gte' => $this->compareValues($actual, $expected, '>='),
+            'lt' => $this->compareValues($actual, $expected, '<'),
+            'lte' => $this->compareValues($actual, $expected, '<='),
+            default => false,
+        };
+    }
+
+    /**
+     * @param mixed $value
+     */
+    protected function scalarValue($value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'true' : 'false';
+        }
+
+        if (is_array($value)) {
+            return collect($value)
+                ->map(fn ($item) => is_scalar($item) ? trim((string) $item) : '')
+                ->filter()
+                ->join(',');
+        }
+
+        if ($value === null) {
+            return '';
+        }
+
+        return trim((string) $value);
+    }
+
+    /**
+     * @param mixed $value
+     */
+    protected function isMissingValue($value): bool
+    {
+        if ($value === null) {
+            return true;
+        }
+
+        if (is_string($value)) {
+            return trim($value) === '';
+        }
+
+        if (is_array($value)) {
+            return collect($value)->filter(fn ($item) => ! $this->isMissingValue($item))->isEmpty();
+        }
+
+        return false;
+    }
+
+    /**
+     * @param mixed $actual
+     * @param mixed $expected
+     */
+    protected function valueInList($actual, $expected): bool
+    {
+        $expectedList = is_array($expected)
+            ? collect($expected)
+            : collect(explode(',', (string) $expected));
+
+        $normalizedExpected = $expectedList
+            ->map(fn ($item) => Str::lower(trim((string) $item)))
+            ->filter()
+            ->values();
+
+        if ($normalizedExpected->isEmpty()) {
+            return false;
+        }
+
+        if (is_array($actual)) {
+            $normalizedActual = collect($actual)
+                ->map(fn ($item) => Str::lower(trim((string) $item)))
+                ->filter()
+                ->values();
+
+            return $normalizedActual->intersect($normalizedExpected)->isNotEmpty();
+        }
+
+        return $normalizedExpected->contains(Str::lower($this->scalarValue($actual)));
+    }
+
+    /**
+     * @param mixed $actual
+     * @param mixed $expected
+     */
+    protected function compareValues($actual, $expected, string $operator): bool
+    {
+        if (is_numeric($actual) && is_numeric($expected)) {
+            $left = (float) $actual;
+            $right = (float) $expected;
+
+            return match ($operator) {
+                '>' => $left > $right,
+                '>=' => $left >= $right,
+                '<' => $left < $right,
+                '<=' => $left <= $right,
+                default => false,
+            };
+        }
+
+        $leftTime = strtotime((string) $actual);
+        $rightTime = strtotime((string) $expected);
+        if ($leftTime !== false && $rightTime !== false) {
+            return match ($operator) {
+                '>' => $leftTime > $rightTime,
+                '>=' => $leftTime >= $rightTime,
+                '<' => $leftTime < $rightTime,
+                '<=' => $leftTime <= $rightTime,
+                default => false,
+            };
+        }
+
+        $left = $this->scalarValue($actual);
+        $right = $this->scalarValue($expected);
+        $comparison = strcmp($left, $right);
+
+        return match ($operator) {
+            '>' => $comparison > 0,
+            '>=' => $comparison >= 0,
+            '<' => $comparison < 0,
+            '<=' => $comparison <= 0,
+            default => false,
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $payload
      */
     protected function executeActions(HrAutomationRule $rule, ?int $tenantId, string $eventType, array $payload): void
     {
@@ -113,6 +289,7 @@ class HrAutomationService
                 self::ACTION_NOTIFY_USERS => $this->actionNotifyUsers($tenantId, $eventType, $payload, $action),
                 self::ACTION_NOTIFY_ROLE_GROUP => $this->actionNotifyRoleGroup($eventType, $payload, $action),
                 self::ACTION_QUEUE_REPORT_EXPORT => $this->actionQueueReportExport($tenantId, $action),
+                self::ACTION_NOTIFY_TEAMS_WEBHOOK => $this->actionNotifyTeamsWebhook($tenantId, $eventType, $payload, $action),
                 default => null,
             };
         }
@@ -231,6 +408,43 @@ class HrAutomationService
 
     /**
      * @param array<string, mixed> $payload
+     * @param array<string, mixed> $action
+     */
+    protected function actionNotifyTeamsWebhook(?int $tenantId, string $eventType, array $payload, array $action): void
+    {
+        $webhookUrl = trim((string) ($action['webhook_url'] ?? ''));
+        if ($webhookUrl === '') {
+            return;
+        }
+
+        $title = trim((string) ($action['title'] ?? 'HR automation event'));
+        $body = trim((string) ($action['body'] ?? "Automation rule triggered for {$eventType}."));
+        $includePayload = (bool) ($action['include_payload'] ?? false);
+        $timeoutSeconds = max(2, min(30, (int) ($action['timeout_seconds'] ?? 10)));
+
+        $text = $title !== '' ? "{$title}\n{$body}" : $body;
+        if ($includePayload) {
+            $payloadJson = json_encode($payload, JSON_PRETTY_PRINT);
+            if (is_string($payloadJson) && $payloadJson !== '') {
+                $text .= "\n\nPayload:\n{$payloadJson}";
+            }
+        }
+
+        $response = Http::timeout($timeoutSeconds)->asJson()->post($webhookUrl, [
+            'title' => $title,
+            'text' => $text,
+            'event_type' => $eventType,
+            'tenant_id' => $tenantId,
+            'occurred_at' => now()->toIso8601String(),
+        ]);
+
+        if (! $response->successful()) {
+            throw new \RuntimeException("Teams webhook returned HTTP {$response->status()}.");
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
      */
     protected function recordRun(
         HrAutomationRule $rule,
@@ -266,6 +480,7 @@ class HrAutomationService
             ['value' => self::ACTION_NOTIFY_USERS, 'label' => 'Notify users'],
             ['value' => self::ACTION_NOTIFY_ROLE_GROUP, 'label' => 'Notify role group'],
             ['value' => self::ACTION_QUEUE_REPORT_EXPORT, 'label' => 'Generate report export'],
+            ['value' => self::ACTION_NOTIFY_TEAMS_WEBHOOK, 'label' => 'Notify Microsoft Teams'],
         ];
     }
 }

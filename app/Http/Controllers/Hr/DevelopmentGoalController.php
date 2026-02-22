@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hr;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Notifications\DevelopmentGoalAssignedNotification;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -12,14 +13,17 @@ use Inertia\Inertia;
 
 class DevelopmentGoalController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.view'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $canManage = $user->canDo('hr.performance.manage');
         $status = $request->query('status');
+        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
         $goals = HrDevelopmentGoal::query()
             ->with(['employee:id,name,email', 'manager:id,name'])
@@ -58,7 +62,7 @@ class DevelopmentGoalController extends Controller
 
         $staff = User::query()
             ->staff()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->when($tenantStaffIds !== [], fn ($query) => $query->whereIn('id', $tenantStaffIds))
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
@@ -79,13 +83,10 @@ class DevelopmentGoalController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
-        $employeeRule = Rule::exists('users', 'id');
-        $managerRule = Rule::exists('users', 'id');
-        if ($tenantId !== null) {
-            $employeeRule = $employeeRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-            $managerRule = $managerRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        }
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
+        $employeeRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
+        $managerRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
 
         $validated = $request->validate([
             'employee_user_id' => ['required', 'integer', $employeeRule],
@@ -125,7 +126,8 @@ class DevelopmentGoalController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $goal->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $goal->tenant_id);
 
         $canManage = $user->canDo('hr.performance.manage');
         $isGoalOwner = $goal->employee_user_id === $user->id;
@@ -159,12 +161,5 @@ class DevelopmentGoalController extends Controller
         $goal->update($payload);
 
         return redirect()->back()->with('success', 'Development goal updated.');
-    }
-
-    private function assertTenantAccess(?int $tenantId, ?int $resourceTenantId): void
-    {
-        if ($tenantId !== null && $tenantId !== $resourceTenantId) {
-            abort(404);
-        }
     }
 }

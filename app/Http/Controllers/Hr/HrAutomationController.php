@@ -8,20 +8,39 @@ use App\Domain\Hr\Services\HrAutomationService;
 use App\Domain\Hr\Services\HrReportingService;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class HrAutomationController extends Controller
 {
+    use ResolvesHrTenant;
+
     private const ROLE_GROUPS = [
         'managers',
         'managers_core',
         'coordinators',
         'auditors',
         'approvers',
+    ];
+    private const CONDITION_OPERATORS = [
+        'equals',
+        'not_equals',
+        'in',
+        'not_in',
+        'contains',
+        'starts_with',
+        'ends_with',
+        'exists',
+        'not_exists',
+        'gt',
+        'gte',
+        'lt',
+        'lte',
     ];
 
     public function __construct(
@@ -35,7 +54,7 @@ class HrAutomationController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $rules = HrAutomationRule::query()
             ->forTenant($tenantId)
@@ -80,9 +99,8 @@ class HrAutomationController extends Controller
             ->values();
 
         $recipientOptions = User::query()
-            ->staff()
             ->when(
-                $tenantId !== null && Schema::hasColumn('users', 'tenant_id'),
+                Schema::hasColumn('users', 'tenant_id'),
                 fn ($query) => $query->where('tenant_id', $tenantId)
             )
             ->orderBy('name')
@@ -104,6 +122,14 @@ class HrAutomationController extends Controller
                 'value' => $group,
                 'label' => str_replace('_', ' ', $group),
             ])->values(),
+            'conditionOperatorOptions' => collect(self::CONDITION_OPERATORS)->map(fn (string $operator) => [
+                'value' => $operator,
+                'label' => str_replace('_', ' ', $operator),
+            ])->values(),
+            'conditionLogicOptions' => [
+                ['value' => 'all', 'label' => 'All conditions (AND)'],
+                ['value' => 'any', 'label' => 'Any condition (OR)'],
+            ],
             'reportTypeOptions' => collect($this->reportingService->reportTypes())
                 ->map(fn (array $meta, string $key) => [
                     'value' => $key,
@@ -120,15 +146,16 @@ class HrAutomationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $validated = $this->validatePayload($request, $user->tenant_id ?? null);
+        $validated = $this->validatePayload($request, $tenantId);
 
         HrAutomationRule::query()->create([
-            'tenant_id' => $user->tenant_id ?? null,
+            'tenant_id' => $tenantId,
             'name' => $validated['name'],
             'event_type' => $validated['event_type'],
             'conditions' => $this->buildConditions($validated),
-            'actions' => [$this->buildAction($validated)],
+            'actions' => $this->buildActions($validated),
             'is_active' => (bool) ($validated['is_active'] ?? true),
             'stop_on_match' => (bool) ($validated['stop_on_match'] ?? false),
             'created_by' => $user->id,
@@ -142,15 +169,16 @@ class HrAutomationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $rule->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $rule->tenant_id);
 
-        $validated = $this->validatePayload($request, $user->tenant_id ?? null, $rule->id);
+        $validated = $this->validatePayload($request, $tenantId, $rule->id);
 
         $rule->update([
             'name' => $validated['name'],
             'event_type' => $validated['event_type'],
             'conditions' => $this->buildConditions($validated),
-            'actions' => [$this->buildAction($validated)],
+            'actions' => $this->buildActions($validated),
             'is_active' => (bool) ($validated['is_active'] ?? $rule->is_active),
             'stop_on_match' => (bool) ($validated['stop_on_match'] ?? $rule->stop_on_match),
             'updated_by' => $user->id,
@@ -163,7 +191,8 @@ class HrAutomationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $rule->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $rule->tenant_id);
 
         $wasActive = (bool) $rule->is_active;
         $rule->update([
@@ -177,22 +206,15 @@ class HrAutomationController extends Controller
     /**
      * @return array<string, mixed>
      */
-    private function validatePayload(Request $request, ?int $tenantId, ?int $ignoreRuleId = null): array
+    private function validatePayload(Request $request, int $tenantId, ?int $ignoreRuleId = null): array
     {
         $recipientRule = Rule::exists('users', 'id');
-        if ($tenantId !== null && Schema::hasColumn('users', 'tenant_id')) {
+        if (Schema::hasColumn('users', 'tenant_id')) {
             $recipientRule = $recipientRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
         }
 
         $nameRule = Rule::unique('hr_automation_rules', 'name')
-            ->where(function ($query) use ($tenantId) {
-                if ($tenantId === null) {
-                    $query->whereNull('tenant_id');
-                    return;
-                }
-
-                $query->where('tenant_id', $tenantId);
-            });
+            ->where(fn ($query) => $query->where('tenant_id', $tenantId));
 
         if ($ignoreRuleId !== null) {
             $nameRule = $nameRule->ignore($ignoreRuleId);
@@ -201,18 +223,55 @@ class HrAutomationController extends Controller
         return $request->validate([
             'name' => ['required', 'string', 'max:120', $nameRule],
             'event_type' => ['required', 'string', Rule::in(HrWebhookService::SUPPORTED_EVENTS)],
+            'condition_logic' => ['nullable', 'string', Rule::in(['all', 'any'])],
             'condition_field' => ['nullable', 'string', 'max:120'],
             'condition_value' => ['nullable', 'string', 'max:255'],
+            'condition_rules' => ['nullable', 'array'],
+            'condition_rules.*.field' => ['required_with:condition_rules', 'string', 'max:120'],
+            'condition_rules.*.operator' => ['required_with:condition_rules', 'string', Rule::in(self::CONDITION_OPERATORS)],
+            'condition_rules.*.value' => ['nullable'],
+            'condition_rules_json' => ['nullable', 'string', 'max:50000'],
             'action_type' => ['required', 'string', Rule::in($this->automationService->supportedActionTypes())],
             'action_title' => ['nullable', 'string', 'max:255'],
             'action_body' => ['nullable', 'string', 'max:1000'],
             'action_url' => ['nullable', 'string', 'max:500'],
+            'action_webhook_url' => [
+                Rule::requiredIf(fn () => $request->input('action_type') === HrAutomationService::ACTION_NOTIFY_TEAMS_WEBHOOK),
+                'nullable',
+                'url',
+                'max:1500',
+            ],
+            'action_webhook_timeout_seconds' => [
+                'nullable',
+                'integer',
+                'min:2',
+                'max:30',
+            ],
+            'action_include_payload' => ['nullable', 'boolean'],
             'role_group' => ['nullable', 'string', Rule::in(self::ROLE_GROUPS)],
             'recipient_user_ids' => ['nullable', 'array'],
             'recipient_user_ids.*' => ['integer', $recipientRule],
             'report_type' => ['nullable', 'string', Rule::in(array_keys($this->reportingService->reportTypes()))],
             'report_date_from' => ['nullable', 'date'],
             'report_date_to' => ['nullable', 'date', 'after_or_equal:report_date_from'],
+            'actions' => ['nullable', 'array'],
+            'actions.*.type' => ['required_with:actions', 'string', Rule::in($this->automationService->supportedActionTypes())],
+            'actions.*.title' => ['nullable', 'string', 'max:255'],
+            'actions.*.body' => ['nullable', 'string', 'max:1000'],
+            'actions.*.url' => ['nullable', 'string', 'max:500'],
+            'actions.*.role_group' => ['nullable', 'string', Rule::in(self::ROLE_GROUPS)],
+            'actions.*.recipient_user_ids' => ['nullable', 'array'],
+            'actions.*.recipient_user_ids.*' => ['integer', $recipientRule],
+            'actions.*.user_ids' => ['nullable', 'array'],
+            'actions.*.user_ids.*' => ['integer', $recipientRule],
+            'actions.*.report_type' => ['nullable', 'string', Rule::in(array_keys($this->reportingService->reportTypes()))],
+            'actions.*.report_date_from' => ['nullable', 'date'],
+            'actions.*.report_date_to' => ['nullable', 'date'],
+            'actions.*.filters' => ['nullable', 'array'],
+            'actions.*.webhook_url' => ['nullable', 'url', 'max:1500'],
+            'actions.*.timeout_seconds' => ['nullable', 'integer', 'min:2', 'max:30'],
+            'actions.*.include_payload' => ['nullable', 'boolean'],
+            'actions_json' => ['nullable', 'string', 'max:100000'],
             'is_active' => ['nullable', 'boolean'],
             'stop_on_match' => ['nullable', 'boolean'],
         ]);
@@ -224,6 +283,63 @@ class HrAutomationController extends Controller
      */
     private function buildConditions(array $validated): array
     {
+        $validated = $this->normalizeAdvancedPayload($validated);
+        $conditionRules = $validated['condition_rules'] ?? [];
+        if (is_array($conditionRules) && $conditionRules !== []) {
+            $logic = (string) ($validated['condition_logic'] ?? 'all');
+            $logic = in_array($logic, ['all', 'any'], true) ? $logic : 'all';
+
+            $rules = [];
+            foreach ($conditionRules as $index => $rule) {
+                if (! is_array($rule)) {
+                    throw ValidationException::withMessages([
+                        "condition_rules.{$index}" => 'Each condition rule must be an object.',
+                    ]);
+                }
+
+                $field = trim((string) ($rule['field'] ?? ''));
+                $operator = strtolower(trim((string) ($rule['operator'] ?? '')));
+                if ($field === '' || ! in_array($operator, self::CONDITION_OPERATORS, true)) {
+                    throw ValidationException::withMessages([
+                        "condition_rules.{$index}" => 'Condition rule field/operator is invalid.',
+                    ]);
+                }
+
+                $value = $rule['value'] ?? null;
+                if (in_array($operator, ['exists', 'not_exists'], true)) {
+                    $value = null;
+                } elseif (in_array($operator, ['in', 'not_in'], true)) {
+                    $value = is_array($value)
+                        ? collect($value)->map(fn ($item) => trim((string) $item))->filter()->values()->all()
+                        : collect(explode(',', (string) $value))->map(fn ($item) => trim((string) $item))->filter()->values()->all();
+
+                    if ($value === []) {
+                        throw ValidationException::withMessages([
+                            "condition_rules.{$index}.value" => 'List-based operators require one or more values.',
+                        ]);
+                    }
+                } else {
+                    $value = trim((string) $value);
+                    if ($value === '') {
+                        throw ValidationException::withMessages([
+                            "condition_rules.{$index}.value" => 'This operator requires a value.',
+                        ]);
+                    }
+                }
+
+                $rules[] = [
+                    'field' => $field,
+                    'operator' => $operator,
+                    'value' => $value,
+                ];
+            }
+
+            return [
+                'logic' => $logic,
+                'rules' => $rules,
+            ];
+        }
+
         $field = trim((string) ($validated['condition_field'] ?? ''));
         $value = trim((string) ($validated['condition_value'] ?? ''));
 
@@ -244,21 +360,69 @@ class HrAutomationController extends Controller
      */
     private function buildAction(array $validated): array
     {
-        $type = (string) $validated['action_type'];
+        return $this->normalizeActionPayload($validated);
+    }
+
+    /**
+     * @param array<string, mixed> $validated
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildActions(array $validated): array
+    {
+        $validated = $this->normalizeAdvancedPayload($validated);
+        $actions = $validated['actions'] ?? null;
+
+        if (is_array($actions) && $actions !== []) {
+            return collect($actions)
+                ->map(function ($action, int $index) {
+                    if (! is_array($action)) {
+                        throw ValidationException::withMessages([
+                            "actions.{$index}" => 'Each action must be an object.',
+                        ]);
+                    }
+
+                    return $this->normalizeActionPayload($action, "actions.{$index}");
+                })
+                ->values()
+                ->all();
+        }
+
+        return [$this->buildAction($validated)];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function normalizeActionPayload(array $payload, string $errorPrefix = 'action'): array
+    {
+        $type = (string) ($payload['action_type'] ?? $payload['type'] ?? '');
+        if (! in_array($type, $this->automationService->supportedActionTypes(), true)) {
+            throw ValidationException::withMessages([
+                "{$errorPrefix}.type" => 'Action type is invalid.',
+            ]);
+        }
+
         $base = [
             'type' => $type,
-            'title' => $validated['action_title'] ?? null,
-            'body' => $validated['action_body'] ?? null,
-            'url' => $validated['action_url'] ?? null,
+            'title' => $payload['action_title'] ?? $payload['title'] ?? null,
+            'body' => $payload['action_body'] ?? $payload['body'] ?? null,
+            'url' => $payload['action_url'] ?? $payload['url'] ?? null,
         ];
 
         if ($type === HrAutomationService::ACTION_NOTIFY_ROLE_GROUP) {
-            $base['role_group'] = $validated['role_group'] ?? 'managers';
+            $roleGroup = (string) ($payload['role_group'] ?? 'managers');
+            if (! in_array($roleGroup, self::ROLE_GROUPS, true)) {
+                throw ValidationException::withMessages([
+                    "{$errorPrefix}.role_group" => 'Role group is invalid.',
+                ]);
+            }
+            $base['role_group'] = $roleGroup;
             return $base;
         }
 
         if ($type === HrAutomationService::ACTION_NOTIFY_USERS) {
-            $base['user_ids'] = collect($validated['recipient_user_ids'] ?? [])
+            $base['user_ids'] = collect($payload['recipient_user_ids'] ?? $payload['user_ids'] ?? [])
                 ->filter(fn ($id) => is_numeric($id))
                 ->map(fn ($id) => (int) $id)
                 ->unique()
@@ -269,16 +433,25 @@ class HrAutomationController extends Controller
 
         if ($type === HrAutomationService::ACTION_QUEUE_REPORT_EXPORT) {
             $filters = [];
-            if (! empty($validated['report_date_from'])) {
-                $filters['date_from'] = (string) $validated['report_date_from'];
+            $inputFilters = is_array($payload['filters'] ?? null) ? $payload['filters'] : [];
+
+            if (! empty($payload['report_date_from'] ?? $inputFilters['date_from'] ?? null)) {
+                $filters['date_from'] = (string) ($payload['report_date_from'] ?? $inputFilters['date_from']);
             }
-            if (! empty($validated['report_date_to'])) {
-                $filters['date_to'] = (string) $validated['report_date_to'];
+            if (! empty($payload['report_date_to'] ?? $inputFilters['date_to'] ?? null)) {
+                $filters['date_to'] = (string) ($payload['report_date_to'] ?? $inputFilters['date_to']);
             }
 
-            $base['report_type'] = (string) ($validated['report_type'] ?? 'headcount');
+            $reportType = (string) ($payload['report_type'] ?? 'headcount');
+            if (! array_key_exists($reportType, $this->reportingService->reportTypes())) {
+                throw ValidationException::withMessages([
+                    "{$errorPrefix}.report_type" => 'Report type is invalid.',
+                ]);
+            }
+
+            $base['report_type'] = $reportType;
             $base['filters'] = $filters;
-            $base['recipient_user_ids'] = collect($validated['recipient_user_ids'] ?? [])
+            $base['recipient_user_ids'] = collect($payload['recipient_user_ids'] ?? [])
                 ->filter(fn ($id) => is_numeric($id))
                 ->map(fn ($id) => (int) $id)
                 ->unique()
@@ -287,13 +460,55 @@ class HrAutomationController extends Controller
             return $base;
         }
 
+        if ($type === HrAutomationService::ACTION_NOTIFY_TEAMS_WEBHOOK) {
+            $webhookUrl = trim((string) ($payload['action_webhook_url'] ?? $payload['webhook_url'] ?? ''));
+            if ($webhookUrl === '') {
+                throw ValidationException::withMessages([
+                    "{$errorPrefix}.webhook_url" => 'Webhook URL is required for Microsoft Teams action.',
+                ]);
+            }
+
+            $base['webhook_url'] = $webhookUrl;
+            $base['timeout_seconds'] = max(2, min(30, (int) ($payload['action_webhook_timeout_seconds'] ?? $payload['timeout_seconds'] ?? 10)));
+            $base['include_payload'] = (bool) ($payload['action_include_payload'] ?? $payload['include_payload'] ?? false);
+            return $base;
+        }
+
         return $base;
     }
 
-    private function assertTenantAccess(?int $tenantId, ?int $resourceTenantId): void
+    /**
+     * @param array<string, mixed> $validated
+     * @return array<string, mixed>
+     */
+    private function normalizeAdvancedPayload(array $validated): array
     {
-        if ($tenantId !== null && $tenantId !== $resourceTenantId) {
-            abort(404);
+        if ((empty($validated['condition_rules']) || ! is_array($validated['condition_rules']))
+            && ! empty($validated['condition_rules_json'])
+        ) {
+            $decoded = json_decode((string) $validated['condition_rules_json'], true);
+            if (! is_array($decoded)) {
+                throw ValidationException::withMessages([
+                    'condition_rules_json' => 'Condition rules JSON must decode to an array.',
+                ]);
+            }
+
+            $validated['condition_rules'] = $decoded;
         }
+
+        if ((empty($validated['actions']) || ! is_array($validated['actions']))
+            && ! empty($validated['actions_json'])
+        ) {
+            $decoded = json_decode((string) $validated['actions_json'], true);
+            if (! is_array($decoded)) {
+                throw ValidationException::withMessages([
+                    'actions_json' => 'Actions JSON must decode to an array.',
+                ]);
+            }
+
+            $validated['actions'] = $decoded;
+        }
+
+        return $validated;
     }
 }

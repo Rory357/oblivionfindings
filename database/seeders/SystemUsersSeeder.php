@@ -123,11 +123,17 @@ class SystemUsersSeeder extends Seeder
         } else {
             foreach ($workers as $worker) {
                 $staff = Staff::query()->where('user_id', $worker->id)->first();
-                if ($staff) {
-                    $this->upsertHrEmployeeProfile($worker, $staff);
-                }
+                $this->upsertHrEmployeeProfile($worker, $staff);
             }
         }
+
+        // Ensure every staff user has an HR profile, even if the legacy staff
+        // record is missing or incomplete.
+        User::staff()->with('staffProfile')->get()->each(function (User $staffUser): void {
+            /** @var Staff|null $staff */
+            $staff = $staffUser->staffProfile;
+            $this->upsertHrEmployeeProfile($staffUser, $staff);
+        });
 
         // Create a board member
         $boardUser = User::updateOrCreate(
@@ -148,12 +154,12 @@ class SystemUsersSeeder extends Seeder
         $this->command->info('Created ' . (count($users) + 8 + 1) . ' users with staff records.');
     }
 
-    private function upsertHrEmployeeProfile(User $user, Staff $staff): void
+    private function upsertHrEmployeeProfile(User $user, ?Staff $staff): void
     {
-        $employeeNumber = trim((string) ($staff->employee_id ?: 'EMP' . str_pad((string) $user->id, 4, '0', STR_PAD_LEFT)));
-        $positionTitle = trim((string) ($staff->job_title ?: $this->defaultJobTitleForRole($user->role)));
+        $employeeNumber = trim((string) (($staff?->employee_id) ?: 'EMP' . str_pad((string) $user->id, 4, '0', STR_PAD_LEFT)));
+        $positionTitle = trim((string) (($staff?->job_title) ?: $this->defaultJobTitleForRole($user->role)));
         $positionRole = trim((string) ($user->role ?: 'support_worker'));
-        $startDate = $staff->hire_date ? $staff->hire_date->toDateString() : now()->subMonths(6)->toDateString();
+        $startDate = $staff?->hire_date ? $staff->hire_date->toDateString() : now()->subMonths(6)->toDateString();
 
         HrEmployeeProfile::updateOrCreate(
             ['user_id' => $user->id],
@@ -166,7 +172,7 @@ class SystemUsersSeeder extends Seeder
                 'employment_type' => 'full_time',
                 'contract_type' => 'permanent',
                 'start_date' => $startDate,
-                'is_active' => $staff->status !== 'terminated',
+                'is_active' => ($staff?->status ?? 'active') !== 'terminated',
                 'updated_by' => $user->id,
                 'created_by' => $user->id,
             ]

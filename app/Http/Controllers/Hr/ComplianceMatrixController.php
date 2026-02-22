@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrComplianceMatrix;
 use App\Domain\Hr\Models\HrComplianceRequirement;
 use Illuminate\Http\Request;
@@ -12,6 +13,8 @@ use Inertia\Inertia;
 
 class ComplianceMatrixController extends Controller
 {
+    use ResolvesHrTenant;
+
     /* ------------------------------------------------------------------ */
     /*  Index — matrix grid view                                           */
     /* ------------------------------------------------------------------ */
@@ -21,9 +24,10 @@ class ComplianceMatrixController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.view'), 403);
 
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $requirements = HrComplianceRequirement::with('matrixEntries')
+        $requirements = HrComplianceRequirement::where('tenant_id', $tenantId)
+            ->with('matrixEntries')
             ->orderBy('category')
             ->orderBy('name')
             ->get()
@@ -46,7 +50,8 @@ class ComplianceMatrixController extends Controller
             ])
             ->values();
 
-        $matrixEntries = HrComplianceMatrix::with('requirement:id,code,name,category')
+        $matrixEntries = HrComplianceMatrix::where('tenant_id', $tenantId)
+            ->with('requirement:id,code,name,category')
             ->orderBy('role')
             ->get();
 
@@ -73,6 +78,7 @@ class ComplianceMatrixController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->normalizeLegacyRequirementPayload($request, false);
 
         $validated = $request->validate([
@@ -90,7 +96,7 @@ class ComplianceMatrixController extends Controller
 
         HrComplianceRequirement::create([
             ...$validated,
-            'tenant_id'  => $user->tenant_id,
+            'tenant_id'  => $tenantId,
             'is_active'  => $validated['is_active'] ?? true,
             'created_by' => $user->id,
         ]);
@@ -106,6 +112,8 @@ class ComplianceMatrixController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $requirement->tenant_id);
         $this->normalizeLegacyRequirementPayload($request, true);
 
         $validated = $request->validate([
@@ -135,6 +143,8 @@ class ComplianceMatrixController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $requirement->tenant_id);
 
         // Soft deactivate rather than hard delete to preserve audit trail
         $requirement->update([
@@ -144,6 +154,7 @@ class ComplianceMatrixController extends Controller
 
         // Remove associated matrix entries
         HrComplianceMatrix::where('requirement_id', $requirement->id)
+            ->where('tenant_id', $tenantId)
             ->delete();
 
         return redirect()->back()->with('success', 'Compliance requirement deactivated.');
@@ -157,6 +168,7 @@ class ComplianceMatrixController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'requirement_id' => ['required', 'integer', 'exists:hr_compliance_requirements,id'],
@@ -168,12 +180,13 @@ class ComplianceMatrixController extends Controller
         ]);
 
         $requirement = HrComplianceRequirement::where('id', $validated['requirement_id'])
+            ->where('tenant_id', $tenantId)
             ->firstOrFail();
 
         if ($validated['action'] === 'assign') {
             HrComplianceMatrix::updateOrCreate(
                 [
-                    'tenant_id'      => $user->tenant_id,
+                    'tenant_id'      => $tenantId,
                     'requirement_id' => $requirement->id,
                     'role'           => $validated['role'],
                     'site_type'      => $validated['site_type'] ?? null,
@@ -189,6 +202,7 @@ class ComplianceMatrixController extends Controller
 
         // Unassign
         HrComplianceMatrix::where('requirement_id', $requirement->id)
+            ->where('tenant_id', $tenantId)
             ->where('role', $validated['role'])
             ->when($validated['site_type'], fn ($q) => $q->where('site_type', $validated['site_type']))
             ->delete();

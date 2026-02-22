@@ -11,7 +11,7 @@ interface SafetyWarning {
   details?: Record<string, unknown>;
 }
 
-interface SafetyCheck {
+export interface SafetyCheck {
   safe: boolean;
   blocked: boolean;
   block_reason?: string;

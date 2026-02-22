@@ -3,18 +3,20 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrReportExport;
 use App\Domain\Hr\Models\HrReportSubscription;
 use App\Domain\Hr\Services\HrReportingService;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class HrReportController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly HrReportingService $reportingService,
     ) {}
@@ -24,8 +26,15 @@ class HrReportController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $reportTypes = $this->reportingService->reportTypes();
+        $allowedRecipientIds = collect($this->hrStaffUserIdsForTenant($tenantId))
+            ->push($user->id)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
 
         $subscriptions = HrReportSubscription::query()
             ->forTenant($tenantId)
@@ -67,11 +76,7 @@ class HrReportController extends Controller
             ->values();
 
         $recipientOptions = User::query()
-            ->staff()
-            ->when(
-                $tenantId !== null && Schema::hasColumn('users', 'tenant_id'),
-                fn ($query) => $query->where('tenant_id', $tenantId)
-            )
+            ->whereIn('id', $allowedRecipientIds)
             ->orderBy('name')
             ->limit(200)
             ->get(['id', 'name', 'email'])
@@ -138,7 +143,7 @@ class HrReportController extends Controller
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $filters = $this->parseFilters($validated);
         $report = $this->reportingService->generate(
             reportType: $validated['report_type'],
@@ -177,12 +182,7 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $tenantId = $user->tenant_id ?? null;
-
-        $recipientRule = Rule::exists('users', 'id');
-        if ($tenantId !== null && Schema::hasColumn('users', 'tenant_id')) {
-            $recipientRule = $recipientRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        }
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'report_type' => ['required', 'string', Rule::in(array_keys($this->reportingService->reportTypes()))],
@@ -190,7 +190,6 @@ class HrReportController extends Controller
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
 
-        $tenantId = $user->tenant_id ?? null;
         $filters = $this->parseFilters($validated);
         $export = $this->reportingService->createExport(
             reportType: $validated['report_type'],
@@ -211,7 +210,8 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $export->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $export->tenant_id);
 
         $filters = array_merge((array) ($export->filters ?? []), [
             'date_from' => optional($export->period_start)->toDateString(),
@@ -245,7 +245,8 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $export->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $export->tenant_id);
         abort_unless(Storage::disk('private')->exists($export->storage_path), 404);
 
         $filename = basename($export->storage_path);
@@ -259,11 +260,15 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $tenantId = $user->tenant_id ?? null;
-        $recipientRule = Rule::exists('users', 'id');
-        if ($tenantId !== null && Schema::hasColumn('users', 'tenant_id')) {
-            $recipientRule = $recipientRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        }
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $allowedRecipientIds = collect($this->hrStaffUserIdsForTenant($tenantId))
+            ->push($user->id)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $recipientRule = Rule::in($allowedRecipientIds);
 
         $validated = $request->validate([
             'report_type' => ['required', 'string', Rule::in(array_keys($this->reportingService->reportTypes()))],
@@ -321,13 +326,16 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $subscription->tenant_id);
-
-        $tenantId = $user->tenant_id ?? null;
-        $recipientRule = Rule::exists('users', 'id');
-        if ($tenantId !== null && Schema::hasColumn('users', 'tenant_id')) {
-            $recipientRule = $recipientRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        }
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $subscription->tenant_id);
+        $allowedRecipientIds = collect($this->hrStaffUserIdsForTenant($tenantId))
+            ->push($user->id)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $recipientRule = Rule::in($allowedRecipientIds);
 
         $validated = $request->validate([
             'report_type' => ['sometimes', 'string', Rule::in(array_keys($this->reportingService->reportTypes()))],
@@ -405,7 +413,8 @@ class HrReportController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $subscription->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $subscription->tenant_id);
 
         $subscription->is_active = ! $subscription->is_active;
         $subscription->next_run_at = $subscription->is_active
@@ -441,10 +450,4 @@ class HrReportController extends Controller
         return strlen($runAt) === 5 ? "{$runAt}:00" : $runAt;
     }
 
-    private function assertTenantAccess(?int $tenantId, ?int $resourceTenantId): void
-    {
-        if ($tenantId !== null && $tenantId !== $resourceTenantId) {
-            abort(404);
-        }
-    }
 }

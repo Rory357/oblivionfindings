@@ -52,6 +52,12 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/policies/{policy}/attest', [MyHrController::class, 'attestPolicy'])->name('policies.attest');
         Route::get('/profile', [MyHrController::class, 'profile'])->name('profile');
         Route::put('/profile', [MyHrController::class, 'updateProfile'])->name('profile.update');
+        Route::get('/reviews', [MyHrController::class, 'reviews'])->name('reviews');
+        Route::put('/reviews/{review}', [MyHrController::class, 'updateReview'])->name('reviews.update');
+        Route::get('/goals', [MyHrController::class, 'goals'])->name('goals');
+        Route::put('/goals/{goal}', [MyHrController::class, 'updateGoal'])->name('goals.update');
+        Route::get('/surveys', [MyHrController::class, 'surveys'])->name('surveys');
+        Route::post('/surveys/{survey}', [MyHrController::class, 'submitSurvey'])->name('surveys.submit');
     });
 
     /*
@@ -310,6 +316,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.disciplinary.manage');
         Route::post('/{case}/disciplinary', [DisciplinaryController::class, 'store'])->name('disciplinary.store')
             ->middleware('permission:hr.disciplinary.manage');
+        Route::get('/disciplinary/{action}/edit', [DisciplinaryController::class, 'edit'])->name('disciplinary.edit')
+            ->middleware('permission:hr.disciplinary.manage');
         Route::put('/disciplinary/{action}', [DisciplinaryController::class, 'update'])->name('disciplinary.update')
             ->middleware('permission:hr.disciplinary.manage');
         Route::post('/disciplinary/{action}/advance', [DisciplinaryController::class, 'advanceStage'])->name('disciplinary.advance')
@@ -431,6 +439,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/payroll/runs', [PayrollExportController::class, 'createRun'])->name('payroll.runs.store');
             Route::post('/payroll/runs/{run}/lock', [PayrollExportController::class, 'lockRun'])->name('payroll.runs.lock');
             Route::post('/payroll/runs/{run}/export', [PayrollExportController::class, 'export'])->name('payroll.runs.export');
+            Route::post('/payroll/export-profiles', [PayrollExportController::class, 'storeProfile'])->name('payroll.profiles.store');
+            Route::put('/payroll/export-profiles/{profile}', [PayrollExportController::class, 'updateProfile'])->name('payroll.profiles.update');
+            Route::post('/payroll/export-profiles/{profile}/set-default', [PayrollExportController::class, 'setDefaultProfile'])->name('payroll.profiles.set-default');
         });
     });
 

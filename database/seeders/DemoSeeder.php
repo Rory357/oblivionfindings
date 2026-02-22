@@ -19,23 +19,31 @@ class DemoSeeder extends Seeder
             ['email' => 'admin@demo.test'],
             ['name' => 'Demo Admin', 'password' => Hash::make('password'), 'role' => 'admin', 'approved_at' => now()]
         );
-        $this->upsertStaffAndHrProfile($admin, 'ADM' . str_pad((string) $admin->id, 3, '0', STR_PAD_LEFT), 'System Administrator', 'IT');
+        $this->upsertStaffAndHrProfile($admin, 'DEMO-ADM-' . str_pad((string) $admin->id, 3, '0', STR_PAD_LEFT), 'System Administrator', 'IT');
 
         $manager = User::updateOrCreate(
             ['email' => 'manager@demo.test'],
             ['name' => 'Demo Manager', 'password' => Hash::make('password'), 'role' => 'provider_manager', 'approved_at' => now()]
         );
-        $this->upsertStaffAndHrProfile($manager, 'PM' . str_pad((string) $manager->id, 3, '0', STR_PAD_LEFT), 'Provider Manager', 'Operations');
+        $this->upsertStaffAndHrProfile($manager, 'DEMO-PM-' . str_pad((string) $manager->id, 3, '0', STR_PAD_LEFT), 'Provider Manager', 'Operations');
 
-        $workers = User::factory()->count(6)->create([
-            'role' => 'support_worker',
-            'password' => Hash::make('password'),
-        ]);
+        $workers = collect();
+        for ($i = 1; $i <= 6; $i++) {
+            $workers->push(User::updateOrCreate(
+                ['email' => "sw{$i}@demo.test"],
+                [
+                    'name' => "Support Worker {$i}",
+                    'role' => 'support_worker',
+                    'password' => Hash::make('password'),
+                    'approved_at' => now(),
+                ]
+            ));
+        }
 
-        foreach ($workers as $index => $worker) {
+        foreach ($workers as $worker) {
             $this->upsertStaffAndHrProfile(
                 $worker,
-                'SW' . str_pad((string) ($index + 1), 3, '0', STR_PAD_LEFT),
+                'DEMO-SW-' . str_pad((string) $worker->id, 3, '0', STR_PAD_LEFT),
                 'Support Worker',
                 'Clinical'
             );
@@ -54,10 +62,12 @@ class DemoSeeder extends Seeder
 
     private function upsertStaffAndHrProfile(User $user, string $employeeId, string $jobTitle, string $department): void
     {
+        $resolvedEmployeeId = $this->resolveUniqueEmployeeId($employeeId, $user->id);
+
         $staff = Staff::updateOrCreate(
             ['user_id' => $user->id],
             [
-                'employee_id' => $employeeId,
+                'employee_id' => $resolvedEmployeeId,
                 'job_title' => $jobTitle,
                 'department' => $department,
                 'status' => 'active',
@@ -81,5 +91,23 @@ class DemoSeeder extends Seeder
                 'updated_by' => $user->id,
             ]
         );
+    }
+
+    private function resolveUniqueEmployeeId(string $candidate, int $userId): string
+    {
+        $employeeId = $candidate;
+        $suffix = 1;
+
+        while (
+            Staff::query()
+                ->where('employee_id', $employeeId)
+                ->where('user_id', '!=', $userId)
+                ->exists()
+        ) {
+            $employeeId = "{$candidate}-{$suffix}";
+            $suffix++;
+        }
+
+        return $employeeId;
     }
 }

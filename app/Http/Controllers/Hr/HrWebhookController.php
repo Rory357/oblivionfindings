@@ -6,12 +6,15 @@ use App\Domain\Hr\Models\HrWebhookDelivery;
 use App\Domain\Hr\Models\HrWebhookEndpoint;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class HrWebhookController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly HrWebhookService $webhookService,
     ) {}
@@ -21,7 +24,7 @@ class HrWebhookController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $endpoints = $this->webhookService->endpointsForTenant($tenantId)
             ->map(fn (HrWebhookEndpoint $endpoint) => [
@@ -77,6 +80,7 @@ class HrWebhookController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:120'],
@@ -91,7 +95,7 @@ class HrWebhookController extends Controller
             'is_active' => ['nullable', 'boolean'],
         ]);
 
-        $this->webhookService->createEndpoint($user->tenant_id ?? null, $user->id, $validated);
+        $this->webhookService->createEndpoint($tenantId, $user->id, $validated);
 
         return redirect()->back()->with('success', 'Webhook endpoint created.');
     }
@@ -100,7 +104,8 @@ class HrWebhookController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $endpoint->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $endpoint->tenant_id);
 
         $validated = $request->validate([
             'name' => ['sometimes', 'string', 'max:120'],
@@ -124,7 +129,8 @@ class HrWebhookController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $endpoint->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $endpoint->tenant_id);
 
         $wasActive = (bool) $endpoint->is_active;
         $this->webhookService->updateEndpoint($endpoint, $user->id, [
@@ -138,17 +144,11 @@ class HrWebhookController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $delivery->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $delivery->tenant_id);
 
         $this->webhookService->queueRetry($delivery);
 
         return redirect()->back()->with('success', 'Webhook delivery retry queued.');
-    }
-
-    private function assertTenantAccess(?int $tenantId, ?int $resourceTenantId): void
-    {
-        if ($tenantId !== null && $tenantId !== $resourceTenantId) {
-            abort(404);
-        }
     }
 }

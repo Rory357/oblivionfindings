@@ -29,6 +29,14 @@ type Props = {
     resources: Resource[];
 };
 
+type ResourceFormData = {
+    name: string;
+    resource_type: Resource['resource_type'];
+    capacity: string;
+    calendar_email: string;
+    amenities: string;
+};
+
 const typeLabels: Record<string, string> = {
     boardroom: 'Boardroom',
     training_room: 'Training Room',
@@ -47,9 +55,9 @@ export default function SiteResources({ site, resources }: Props) {
     const [showForm, setShowForm] = useState(false);
     const [editingResource, setEditingResource] = useState<Resource | null>(null);
 
-    const form = useForm({
+    const form = useForm<ResourceFormData>({
         name: '',
-        resource_type: 'meeting_room' as const,
+        resource_type: 'meeting_room',
         capacity: '',
         calendar_email: '',
         amenities: '',
@@ -75,11 +83,6 @@ export default function SiteResources({ site, resources }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const data = {
-            ...form.data,
-            capacity: form.data.capacity ? parseInt(form.data.capacity) : null,
-            amenities: form.data.amenities.split(',').map(s => s.trim()).filter(Boolean),
-        };
         if (editingResource) {
             form.put(`/sites/${site.id}/resources/${editingResource.id}`, {
                 onSuccess: resetForm,
@@ -170,7 +173,7 @@ export default function SiteResources({ site, resources }: Props) {
                                         <Label>Type *</Label>
                                         <select
                                             value={form.data.resource_type}
-                                            onChange={(e) => form.setData('resource_type', e.target.value as any)}
+                                            onChange={(e) => form.setData('resource_type', e.target.value as Resource['resource_type'])}
                                             className="w-full rounded-md border bg-background px-3 py-2"
                                             required
                                         >

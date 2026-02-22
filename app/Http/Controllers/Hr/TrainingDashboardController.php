@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\StaffTrainingRecord;
 use App\Models\TrainingCourse;
 use App\Models\Site;
@@ -11,6 +13,8 @@ use Inertia\Inertia;
 
 class TrainingDashboardController extends Controller
 {
+    use ResolvesHrTenant;
+
     /* ------------------------------------------------------------------ */
     /*  Index — training dashboard: overdue, due soon, by site             */
     /* ------------------------------------------------------------------ */
@@ -19,12 +23,28 @@ class TrainingDashboardController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.training.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $staffUserIds = $this->hrStaffUserIdsForTenant($tenantId);
 
         $filterSiteId = $request->query('site_id');
 
+        if ($filterSiteId) {
+            $staffUserIds = HrEmployeeProfile::query()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($query) use ($filterSiteId) {
+                    $query->where('primary_site_id', (int) $filterSiteId)
+                        ->orWhereJsonContains('secondary_site_ids', (int) $filterSiteId);
+                })
+                ->pluck('user_id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
+
         // Overdue / expired training records
-        // Note: StaffTrainingRecord is not tenant-aware; scoping is by user_id only
+        // StaffTrainingRecord is not tenant-aware; scope by tenant staff user IDs.
         $overdue = StaffTrainingRecord::expired()
+            ->whereIn('user_id', $staffUserIds)
             ->with([
                 'user:id,name,email',
                 'trainingCourse:id,name,code,category',
@@ -35,6 +55,7 @@ class TrainingDashboardController extends Controller
 
         // Expiring within next 60 days
         $dueSoon = StaffTrainingRecord::expiringSoon(2)
+            ->whereIn('user_id', $staffUserIds)
             ->with([
                 'user:id,name,email',
                 'trainingCourse:id,name,code,category',
@@ -49,9 +70,12 @@ class TrainingDashboardController extends Controller
 
         $bySite = [];
         foreach ($sites as $site) {
-            // Count training records for staff at this site
-            // Note: Using assignedClients site relationship as proxy for staff site
-            $staffAtSite = \App\Models\Staff::whereHas('user.assignedClients.site', fn ($q) => $q->where('sites.id', $site->id))
+            $staffAtSite = HrEmployeeProfile::query()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($query) use ($site) {
+                    $query->where('primary_site_id', $site->id)
+                        ->orWhereJsonContains('secondary_site_ids', $site->id);
+                })
                 ->pluck('user_id');
 
             $bySite[] = [
@@ -71,6 +95,7 @@ class TrainingDashboardController extends Controller
         $matrix = [];
         foreach ($courses as $course) {
             $expiringCount = StaffTrainingRecord::where('training_course_id', $course->id)
+                ->whereIn('user_id', $staffUserIds)
                 ->expiringSoon(2)
                 ->count();
 
@@ -89,8 +114,8 @@ class TrainingDashboardController extends Controller
         /* ------------------------------------------------------------------ */
 
         $renewalNeeded = TrainingCourse::where('requires_renewal', true)
-            ->whereHas('trainingRecords', fn ($q) => $q->expired())
-            ->withCount(['trainingRecords' => fn ($q) => $q->expired()])
+            ->whereHas('trainingRecords', fn ($q) => $q->expired()->whereIn('user_id', $staffUserIds))
+            ->withCount(['trainingRecords' => fn ($q) => $q->expired()->whereIn('user_id', $staffUserIds)])
             ->orderBy('training_records_count', 'desc')
             ->limit(20)
             ->get();
@@ -101,10 +126,10 @@ class TrainingDashboardController extends Controller
 
         return Inertia::render('hr/training/index', [
             'stats' => [
-                'totalRecords'       => StaffTrainingRecord::count(),
-                'expiredCount'       => StaffTrainingRecord::expired()->count(),
-                'dueSoonCount'       => StaffTrainingRecord::expiringSoon(2)->count(),
-                'completedThisMonth' => StaffTrainingRecord::whereMonth('completed_at', now()->month)->count(),
+                'totalRecords'       => StaffTrainingRecord::whereIn('user_id', $staffUserIds)->count(),
+                'expiredCount'       => StaffTrainingRecord::expired()->whereIn('user_id', $staffUserIds)->count(),
+                'dueSoonCount'       => StaffTrainingRecord::expiringSoon(2)->whereIn('user_id', $staffUserIds)->count(),
+                'completedThisMonth' => StaffTrainingRecord::whereIn('user_id', $staffUserIds)->whereMonth('completed_at', now()->month)->count(),
             ],
             'overdue'       => $overdue,
             'dueSoon'       => $dueSoon,

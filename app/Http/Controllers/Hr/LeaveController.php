@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\LeaveService;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -14,6 +17,8 @@ use Inertia\Inertia;
 
 class LeaveController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly LeaveService $leaveService,
         private readonly HrWebhookService $webhookService,
@@ -28,7 +33,7 @@ class LeaveController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.viewAny'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $status = $request->query('status');
         $leaveType = $request->query('leave_type');
         $slaWindow = (string) $request->query('sla', '');
@@ -135,13 +140,13 @@ class LeaveController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.viewAny'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $canManage = $user->canDo('hr.leave.manage');
         $year = (int) $request->query('year', now()->year);
         $search = trim((string) $request->query('q', ''));
 
         $balances = HrLeaveBalance::query()
-            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->where('tenant_id', $tenantId)
             ->where('year', $year)
             ->when(! $canManage, fn ($q) => $q->where('user_id', $user->id))
             ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) =>
@@ -175,9 +180,10 @@ class LeaveController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.manage'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
-        $staff = \App\Models\User::staff()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
+        $staff = User::staff()
+            ->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds))
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
@@ -198,9 +204,8 @@ class LeaveController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.viewAny'), 403);
-        if (($user->tenant_id ?? null) !== null && $leaveRequest->tenant_id !== $user->tenant_id) {
-            abort(404);
-        }
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $leaveRequest->tenant_id);
 
         $leaveRequest->load([
             'user:id,name,email',
@@ -239,6 +244,7 @@ class LeaveController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'user_id'         => ['nullable', 'integer', 'exists:users,id'],
@@ -260,12 +266,16 @@ class LeaveController extends Controller
         $requestUser = $user;
         if (! empty($validated['user_id']) && (int) $validated['user_id'] !== (int) $user->id) {
             abort_unless($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage'), 403);
-            $requestUser = \App\Models\User::query()->findOrFail((int) $validated['user_id']);
-            if (($user->tenant_id ?? null) !== null && ($requestUser->tenant_id ?? null) !== $user->tenant_id) {
+            $requestUser = User::query()->findOrFail((int) $validated['user_id']);
+            $profileTenantId = HrEmployeeProfile::query()
+                ->where('user_id', $requestUser->id)
+                ->value('tenant_id');
+            if (is_numeric($profileTenantId) && (int) $profileTenantId !== $tenantId) {
                 abort(404);
             }
         }
         $data['created_by'] = $user->id;
+        $data['tenant_id'] = $tenantId;
 
         try {
             $leaveRequest = $this->leaveService->submitRequest($requestUser, $data);
@@ -293,9 +303,8 @@ class LeaveController extends Controller
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage')), 403);
-        if (($user->tenant_id ?? null) !== null && $leaveRequest->tenant_id !== $user->tenant_id) {
-            abort(404);
-        }
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $leaveRequest->tenant_id);
 
         $validated = $request->validate([
             'review_notes' => ['nullable', 'string', 'max:2000'],
@@ -332,9 +341,8 @@ class LeaveController extends Controller
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage')), 403);
-        if (($user->tenant_id ?? null) !== null && $leaveRequest->tenant_id !== $user->tenant_id) {
-            abort(404);
-        }
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $leaveRequest->tenant_id);
 
         $validated = $request->validate([
             'review_notes' => ['required', 'string', 'max:2000'],
@@ -365,6 +373,7 @@ class LeaveController extends Controller
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage')), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'request_ids' => ['required', 'array', 'min:1', 'max:200'],
@@ -373,7 +382,7 @@ class LeaveController extends Controller
         ]);
 
         $ids = collect($validated['request_ids'])->map(fn ($id) => (int) $id)->values();
-        $requests = $this->loadPendingRequestsForBulk($ids, $user->tenant_id ?? null);
+        $requests = $this->loadPendingRequestsForBulk($ids, $tenantId);
 
         if ($requests->count() !== $ids->count()) {
             return redirect()->back()->withErrors([
@@ -406,6 +415,7 @@ class LeaveController extends Controller
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage')), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'request_ids' => ['required', 'array', 'min:1', 'max:200'],
@@ -414,7 +424,7 @@ class LeaveController extends Controller
         ]);
 
         $ids = collect($validated['request_ids'])->map(fn ($id) => (int) $id)->values();
-        $requests = $this->loadPendingRequestsForBulk($ids, $user->tenant_id ?? null);
+        $requests = $this->loadPendingRequestsForBulk($ids, $tenantId);
 
         if ($requests->count() !== $ids->count()) {
             return redirect()->back()->withErrors([
@@ -447,10 +457,8 @@ class LeaveController extends Controller
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage')), 403);
-
-        if (($user->tenant_id ?? null) !== null && $leaveRequest->tenant_id !== $user->tenant_id) {
-            abort(404);
-        }
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $leaveRequest->tenant_id);
 
         if ($leaveRequest->status !== 'pending') {
             return redirect()->back()->withErrors([
@@ -482,11 +490,12 @@ class LeaveController extends Controller
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('hr.leave.approve') || $user->canDo('hr.leave.manage')), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $escalated = $this->leaveService->escalatePendingApprovals($user->tenant_id ?? null);
+        $escalated = $this->leaveService->escalatePendingApprovals($tenantId);
 
         if ($escalated > 0) {
-            $this->webhookService->publish($user->tenant_id ?? null, 'leave.request.escalated', [
+            $this->webhookService->publish($tenantId, 'leave.request.escalated', [
                 'escalated_count' => $escalated,
                 'manual' => true,
             ]);
@@ -499,12 +508,12 @@ class LeaveController extends Controller
      * @param Collection<int, int> $ids
      * @return Collection<int, HrLeaveRequest>
      */
-    private function loadPendingRequestsForBulk(Collection $ids, ?int $tenantId): Collection
+    private function loadPendingRequestsForBulk(Collection $ids, int $tenantId): Collection
     {
         return HrLeaveRequest::query()
             ->whereIn('id', $ids->all())
             ->where('status', 'pending')
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->where('tenant_id', $tenantId)
             ->orderBy('id')
             ->get();
     }

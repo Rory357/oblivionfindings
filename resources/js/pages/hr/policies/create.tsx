@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Head, Link, useForm } from '@inertiajs/react';
-import { ArrowLeft, FileText, Upload, FileCheck, X, FileDigit } from 'lucide-react';
+import { ArrowLeft, FileText, Upload, FileCheck, X } from 'lucide-react';
 import { useState, useRef } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -33,7 +33,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
     const [showCustomCategory, setShowCustomCategory] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const { data, setData, post, processing, errors, progress } = useForm({
+    const { data, setData, transform, post, processing, errors, progress } = useForm({
         title: '',
         category: '',
         custom_category: '',
@@ -78,25 +78,15 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Build form data manually to ensure all fields are included correctly
-        const formData = new FormData();
-        formData.append('title', data.title);
-        formData.append('category', showCustomCategory ? data.custom_category : data.category);
-        formData.append('requires_attestation', data.requires_attestation ? '1' : '0');
-        formData.append('attestation_frequency_months', data.attestation_frequency_months);
-        formData.append('effective_from', data.effective_from);
-        formData.append('content_mode', data.content_mode);
-
-        if (data.content_mode === 'pdf_and_summary' && data.content_summary) {
-            formData.append('content_summary', data.content_summary);
-        }
-
-        if (data.document) {
-            formData.append('document', data.document);
-        }
-
+        transform((current) => ({
+            ...current,
+            category: showCustomCategory ? current.custom_category : current.category,
+            content_summary:
+                current.content_mode === 'pdf_and_summary'
+                    ? current.content_summary
+                    : '',
+        }));
         post('/hr/policies', {
-            data: formData,
             forceFormData: true,
         });
     };
@@ -289,7 +279,7 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                                 <Label>Content Format</Label>
                                 <RadioGroup
                                     value={data.content_mode}
-                                    onValueChange={(value: 'pdf_only' | 'pdf_and_summary') => setData('content_mode', value)}
+                                    onValueChange={(value) => setData('content_mode', value as 'pdf_only' | 'pdf_and_summary')}
                                     className="grid grid-cols-1 md:grid-cols-2 gap-4"
                                 >
                                     <RadioGroupItem value="pdf_only">

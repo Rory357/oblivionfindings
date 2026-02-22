@@ -3,17 +3,20 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class SupervisionController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * Supervision & performance overview.
      */
@@ -22,7 +25,7 @@ class SupervisionController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.view'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $search = trim((string) $request->query('q', ''));
         $staffId = $request->query('staff_id');
 
@@ -137,9 +140,8 @@ class SupervisionController extends Controller
         ];
 
         $staffQuery = User::query()->staff();
-        if ($tenantId !== null && Schema::hasColumn('users', 'tenant_id')) {
-            $staffQuery->where('tenant_id', $tenantId);
-        }
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
+        $staffQuery->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds));
 
         $staff = $staffQuery
             ->orderBy('name')
@@ -180,12 +182,11 @@ class SupervisionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
         $staff = User::staff()
-            ->when(
-                $user->tenant_id !== null && Schema::hasColumn('users', 'tenant_id'),
-                fn ($query) => $query->where('tenant_id', $user->tenant_id)
-            )
+            ->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds))
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
@@ -209,6 +210,8 @@ class SupervisionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $note->tenant_id);
 
         $note->load(['employee:id,name', 'supervisor:id,name']);
 
@@ -227,6 +230,7 @@ class SupervisionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'employee_user_id' => ['required', 'integer', 'exists:users,id'],
@@ -240,8 +244,15 @@ class SupervisionController extends Controller
             'is_visible_to_employee' => ['boolean'],
         ]);
 
+        $employeeTenantId = HrEmployeeProfile::query()
+            ->where('user_id', (int) $data['employee_user_id'])
+            ->value('tenant_id');
+        if (is_numeric($employeeTenantId) && (int) $employeeTenantId !== $tenantId) {
+            abort(404);
+        }
+
         HrSupervisionNote::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'supervisor_user_id' => $user->id,
             'created_by' => $user->id,
             ...$data,
@@ -257,14 +268,14 @@ class SupervisionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $note->tenant_id);
 
         $note->load(['employee:id,name', 'supervisor:id,name']);
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
         $staff = User::staff()
-            ->when(
-                $user->tenant_id !== null && Schema::hasColumn('users', 'tenant_id'),
-                fn ($query) => $query->where('tenant_id', $user->tenant_id)
-            )
+            ->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds))
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
@@ -289,6 +300,8 @@ class SupervisionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $note->tenant_id);
 
         $data = $request->validate([
             'session_date' => ['sometimes', 'date'],

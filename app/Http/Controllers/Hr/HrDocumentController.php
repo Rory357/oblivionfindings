@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Services\HrDocumentMergeService;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -16,6 +17,8 @@ use Inertia\Inertia;
 
 class HrDocumentController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly HrDocumentMergeService $mergeService,
     ) {}
@@ -28,7 +31,7 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.view'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $category = $request->query('category') ?: $request->query('type');
         $q = trim((string) $request->query('q', ''));
         $employeeProfileId = $request->query('employee_profile_id');
@@ -115,7 +118,7 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $employees = HrEmployeeProfile::query()
             ->with('user:id,name')
@@ -144,12 +147,10 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $employeeRule = Rule::exists('hr_employee_profiles', 'id');
-        if ($tenantId !== null) {
-            $employeeRule = $employeeRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        }
+        $employeeRule = $employeeRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
 
         $data = $request->validate([
             'employee_profile_id' => ['required', 'integer', $employeeRule],
@@ -160,7 +161,7 @@ class HrDocumentController extends Controller
         ]);
 
         $profile = HrEmployeeProfile::query()->findOrFail($data['employee_profile_id']);
-        $this->assertTenantAccess($tenantId, $profile->tenant_id);
+        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
 
         $file = $request->file('file');
         $path = $file->store("hr-documents/{$profile->tenant_id}/{$profile->id}", 'private');
@@ -192,14 +193,12 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $templateRule = Rule::exists('hr_document_templates', 'id');
         $employeeRule = Rule::exists('hr_employee_profiles', 'id');
-        if ($tenantId !== null) {
-            $templateRule = $templateRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-            $employeeRule = $employeeRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
-        }
+        $templateRule = $templateRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
+        $employeeRule = $employeeRule->where(fn ($query) => $query->where('tenant_id', $tenantId));
 
         $data = $request->validate([
             'template_id' => ['required', 'integer', $templateRule],
@@ -212,13 +211,13 @@ class HrDocumentController extends Controller
         $template = HrDocumentTemplate::query()->findOrFail($data['template_id']);
         $profile = HrEmployeeProfile::query()->with('user')->findOrFail($data['employee_profile_id']);
 
-        $this->assertTenantAccess($tenantId, $template->tenant_id);
-        $this->assertTenantAccess($tenantId, $profile->tenant_id);
+        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
+        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
 
         $offer = null;
         if (! empty($data['offer_id'])) {
             $offer = HrOffer::query()->with('application:id,tenant_id')->findOrFail($data['offer_id']);
-            $this->assertTenantAccess($tenantId, $offer->application?->tenant_id);
+            $this->assertHrTenantAccess($tenantId, $offer->application?->tenant_id);
         }
 
         $document = $this->mergeService->generateDocument(
@@ -246,7 +245,8 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.view'), 403);
 
-        $this->assertTenantAccess($user->tenant_id ?? null, $document->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
 
         abort_unless(
             Storage::disk($document->storage_disk)->exists($document->storage_path),
@@ -267,7 +267,8 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $this->assertTenantAccess($user->tenant_id ?? null, $document->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
 
         if ($document->storage_path && $document->storage_disk) {
             Storage::disk($document->storage_disk)->delete($document->storage_path);
@@ -286,7 +287,7 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $category = $request->query('category');
         $q = trim((string) $request->query('q', ''));
 
@@ -344,7 +345,8 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $this->assertTenantAccess($user->tenant_id ?? null, $template->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
 
         return Inertia::render('hr/documents/edit-template', [
             'template' => [
@@ -369,6 +371,7 @@ class HrDocumentController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -386,7 +389,7 @@ class HrDocumentController extends Controller
             ->all();
 
         HrDocumentTemplate::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'name' => $data['name'],
             'category' => $data['category'],
             'content' => $data['content'],
@@ -409,7 +412,8 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $this->assertTenantAccess($user->tenant_id ?? null, $template->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
 
         $data = $request->validate([
             'name' => ['sometimes', 'string', 'max:255'],
@@ -448,7 +452,8 @@ class HrDocumentController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.documents.manage'), 403);
 
-        $this->assertTenantAccess($user->tenant_id ?? null, $template->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $template->tenant_id);
 
         $template->update([
             'is_active' => ! (bool) $template->is_active,
@@ -464,12 +469,5 @@ class HrDocumentController extends Controller
     private function documentCategories(): array
     {
         return ['contract', 'letter', 'policy', 'certificate', 'offer', 'other'];
-    }
-
-    private function assertTenantAccess(?int $tenantId, ?int $resourceTenantId): void
-    {
-        if ($tenantId !== null && $tenantId !== $resourceTenantId) {
-            abort(404);
-        }
     }
 }

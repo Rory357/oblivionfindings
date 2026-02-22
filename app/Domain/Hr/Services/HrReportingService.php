@@ -3,8 +3,12 @@
 namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrCase;
+use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrOffboardingChecklist;
+use App\Domain\Hr\Models\HrOnboardingChecklist;
+use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrReportExport;
 use App\Domain\Hr\Models\HrReportSubscription;
@@ -29,6 +33,10 @@ class HrReportingService
             'cases' => ['title' => 'HR Cases', 'description' => 'HR cases by type, severity, and status', 'category' => 'compliance'],
             'wellbeing' => ['title' => 'Wellbeing Indicators', 'description' => 'Staff wellbeing indicators and flags', 'category' => 'compliance'],
             'compliance' => ['title' => 'Compliance Overview', 'description' => 'Compliance requirement status overview', 'category' => 'compliance'],
+            'recruitment_funnel' => ['title' => 'Recruitment Funnel', 'description' => 'Candidate pipeline progression and conversion', 'category' => 'recruitment'],
+            'payroll_overview' => ['title' => 'Payroll Overview', 'description' => 'Payroll run throughput and gross pay trends', 'category' => 'payroll'],
+            'leave_sla' => ['title' => 'Leave Approval SLA', 'description' => 'Approval lead times and overdue leave queues', 'category' => 'leave'],
+            'onboarding_completion' => ['title' => 'Onboarding & Offboarding Completion', 'description' => 'Workflow completion and overdue task posture', 'category' => 'onboarding'],
         ];
     }
 
@@ -54,6 +62,10 @@ class HrReportingService
             'cases' => $this->generateCasesReport($tenantId, $resolvedFrom, $resolvedTo),
             'wellbeing' => $this->generateWellbeingReport($tenantId),
             'compliance' => $this->generateComplianceReport($tenantId),
+            'recruitment_funnel' => $this->generateRecruitmentFunnel($tenantId, $resolvedFrom, $resolvedTo),
+            'payroll_overview' => $this->generatePayrollOverview($tenantId, $resolvedFrom, $resolvedTo),
+            'leave_sla' => $this->generateLeaveSlaReport($tenantId, $resolvedFrom, $resolvedTo),
+            'onboarding_completion' => $this->generateOnboardingCompletionReport($tenantId, $resolvedFrom, $resolvedTo),
             default => [],
         };
 
@@ -301,5 +313,127 @@ class HrReportingService
             'report_generated_at' => now()->toIso8601String(),
         ];
     }
-}
 
+    private function generateRecruitmentFunnel(?int $tenantId, string $dateFrom, string $dateTo): array
+    {
+        $candidates = HrCandidate::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->whereBetween('created_at', [$dateFrom, Carbon::parse($dateTo)->endOfDay()])
+            ->get();
+
+        $hiredCount = $candidates->where('status', 'hired')->count();
+        $activeCount = $candidates->reject(fn (HrCandidate $candidate) => in_array($candidate->status, ['withdrawn', 'rejected', 'hired'], true))->count();
+
+        return [
+            'total_candidates' => $candidates->count(),
+            'active_candidates' => $activeCount,
+            'hired_candidates' => $hiredCount,
+            'withdrawn_candidates' => $candidates->where('status', 'withdrawn')->count(),
+            'rejected_candidates' => $candidates->where('status', 'rejected')->count(),
+            'conversion_rate' => $candidates->count() > 0 ? round(($hiredCount / $candidates->count()) * 100, 1) : 0.0,
+            'stage_breakdown' => $candidates->groupBy('status')->map(fn ($group) => $group->count()),
+            'source_breakdown' => $candidates->groupBy(fn (HrCandidate $candidate) => $candidate->source ?: 'unknown')->map(fn ($group) => $group->count()),
+        ];
+    }
+
+    private function generatePayrollOverview(?int $tenantId, string $dateFrom, string $dateTo): array
+    {
+        $runs = HrPayrollRun::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->whereDate('period_start', '>=', $dateFrom)
+            ->whereDate('period_end', '<=', $dateTo)
+            ->get();
+
+        return [
+            'total_runs' => $runs->count(),
+            'by_status' => $runs->groupBy('status')->map(fn ($group) => $group->count()),
+            'total_gross' => round((float) $runs->sum('total_gross'), 2),
+            'total_hours' => round((float) $runs->sum('total_hours'), 2),
+            'total_staff_paid' => (int) $runs->sum('total_staff'),
+            'average_gross_per_run' => $runs->count() > 0 ? round((float) $runs->avg('total_gross'), 2) : 0.0,
+            'average_hours_per_run' => $runs->count() > 0 ? round((float) $runs->avg('total_hours'), 2) : 0.0,
+            'locked_runs' => $runs->where('status', 'locked')->count(),
+            'exported_runs' => $runs->whereNotNull('exported_at')->count(),
+            'latest_exported_at' => optional($runs->whereNotNull('exported_at')->sortByDesc('exported_at')->first()?->exported_at)->toDateTimeString(),
+        ];
+    }
+
+    private function generateLeaveSlaReport(?int $tenantId, string $dateFrom, string $dateTo): array
+    {
+        $requests = HrLeaveRequest::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->whereBetween('submitted_at', [$dateFrom, Carbon::parse($dateTo)->endOfDay()])
+            ->get();
+
+        $decided = $requests->filter(
+            fn (HrLeaveRequest $request) => in_array((string) $request->status, ['approved', 'declined', 'cancelled'], true)
+                && $request->reviewed_at
+                && $request->submitted_at
+        );
+
+        $averageDecisionHours = $decided->count() > 0
+            ? round((float) $decided->avg(fn (HrLeaveRequest $request) => $request->submitted_at->diffInMinutes($request->reviewed_at) / 60), 2)
+            : 0.0;
+
+        return [
+            'total_requests' => $requests->count(),
+            'pending_requests' => $requests->where('status', 'pending')->count(),
+            'pending_overdue' => $requests
+                ->where('status', 'pending')
+                ->filter(fn (HrLeaveRequest $request) => $request->approval_due_at && $request->approval_due_at->lt(now()))
+                ->count(),
+            'pending_due_within_24h' => $requests
+                ->where('status', 'pending')
+                ->filter(fn (HrLeaveRequest $request) => $request->approval_due_at && $request->approval_due_at->between(now(), now()->addDay()))
+                ->count(),
+            'escalated_requests' => $requests->whereNotNull('escalated_at')->count(),
+            'average_decision_hours' => $averageDecisionHours,
+            'status_breakdown' => $requests->groupBy('status')->map(fn ($group) => $group->count()),
+        ];
+    }
+
+    private function generateOnboardingCompletionReport(?int $tenantId, string $dateFrom, string $dateTo): array
+    {
+        $onboarding = HrOnboardingChecklist::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->whereBetween('started_at', [$dateFrom, Carbon::parse($dateTo)->endOfDay()])
+            ->get();
+
+        $offboarding = HrOffboardingChecklist::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->whereBetween('started_at', [$dateFrom, Carbon::parse($dateTo)->endOfDay()])
+            ->get();
+
+        $onboardingCompleted = $onboarding->where('status', 'completed');
+        $offboardingCompleted = $offboarding->where('status', 'completed');
+
+        $onboardingAverageDays = $onboardingCompleted->count() > 0
+            ? round((float) $onboardingCompleted->avg(fn (HrOnboardingChecklist $checklist) => $checklist->started_at?->diffInDays($checklist->completed_at)), 1)
+            : 0.0;
+
+        $offboardingAverageDays = $offboardingCompleted->count() > 0
+            ? round((float) $offboardingCompleted->avg(fn (HrOffboardingChecklist $checklist) => $checklist->started_at?->diffInDays($checklist->completed_at)), 1)
+            : 0.0;
+
+        return [
+            'onboarding_total' => $onboarding->count(),
+            'onboarding_completed' => $onboardingCompleted->count(),
+            'onboarding_overdue' => $onboarding
+                ->filter(fn (HrOnboardingChecklist $checklist) => $checklist->status !== 'completed'
+                    && $checklist->due_date
+                    && Carbon::parse($checklist->due_date)->lt(now()->startOfDay()))
+                ->count(),
+            'onboarding_status_breakdown' => $onboarding->groupBy('status')->map(fn ($group) => $group->count()),
+            'onboarding_average_completion_days' => $onboardingAverageDays,
+            'offboarding_total' => $offboarding->count(),
+            'offboarding_completed' => $offboardingCompleted->count(),
+            'offboarding_overdue' => $offboarding
+                ->filter(fn (HrOffboardingChecklist $checklist) => $checklist->status !== 'completed'
+                    && $checklist->due_date
+                    && Carbon::parse($checklist->due_date)->lt(now()->startOfDay()))
+                ->count(),
+            'offboarding_status_breakdown' => $offboarding->groupBy('status')->map(fn ($group) => $group->count()),
+            'offboarding_average_completion_days' => $offboardingAverageDays,
+        ];
+    }
+}

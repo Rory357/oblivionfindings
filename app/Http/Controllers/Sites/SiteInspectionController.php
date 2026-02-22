@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
 use App\Models\Site;
 use App\Models\SiteInspectionSchedule;
 use App\Models\SiteInspectionRecord;
@@ -11,6 +12,7 @@ use Illuminate\Http\Request;
 
 class SiteInspectionController extends Controller
 {
+    use ResolvesAllowedSiteTypes;
     public function index(Request $request, Site $site)
     {
         $this->authorize('view', $site);
@@ -239,22 +241,4 @@ class SiteInspectionController extends Controller
         };
     }
 
-    private function allowedSiteTypes(Request $request): array
-    {
-        $user = $request->user();
-        $map = [
-            'head_office' => 'sites.type.head_office.view',
-            'house' => 'sites.type.house.view',
-            'facility' => 'sites.type.facility.view',
-            'residential' => 'sites.type.house.view',
-        ];
-
-        $allowed = collect($map)
-            ->filter(fn (string $permission) => $user?->canDo($permission))
-            ->keys()
-            ->values()
-            ->all();
-
-        return $allowed !== [] ? $allowed : array_keys($map);
-    }
 }

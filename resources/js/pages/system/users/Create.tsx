@@ -97,6 +97,10 @@ export default function CreateUser({ clients, roles, can }: Props) {
         'next_of_kin.is_emergency_contact': true,
     });
 
+    const setNestedData = (key: string, value: unknown) => {
+        (form.setData as unknown as (k: string, v: unknown) => void)(key, value);
+    };
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         form.post('/system/users');
@@ -286,7 +290,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                                 id="employee_id"
                                                 value={form.data['staff.employee_id']}
                                                 onChange={(e) =>
-                                                    form.setData('staff.employee_id', e.target.value)
+                                                    setNestedData('staff.employee_id', e.target.value)
                                                 }
                                                 placeholder="EMP001"
                                             />
@@ -298,7 +302,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                                 id="job_title"
                                                 value={form.data['staff.job_title']}
                                                 onChange={(e) =>
-                                                    form.setData('staff.job_title', e.target.value)
+                                                    setNestedData('staff.job_title', e.target.value)
                                                 }
                                                 placeholder="Support Worker"
                                             />
@@ -311,7 +315,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                             id="department"
                                             value={form.data['staff.department']}
                                             onChange={(e) =>
-                                                form.setData('staff.department', e.target.value)
+                                                setNestedData('staff.department', e.target.value)
                                             }
                                             placeholder="Clinical Services"
                                         />
@@ -428,7 +432,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                         id="nhi_number"
                                         value={form.data['client.nhi_number']}
                                         onChange={(e) =>
-                                            form.setData('client.nhi_number', e.target.value.toUpperCase())
+                                            setNestedData('client.nhi_number', e.target.value.toUpperCase())
                                         }
                                         placeholder="ABC1234"
                                         maxLength={10}
@@ -445,7 +449,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                             id="first_name"
                                             value={form.data['client.first_name']}
                                             onChange={(e) =>
-                                                form.setData('client.first_name', e.target.value)
+                                                setNestedData('client.first_name', e.target.value)
                                             }
                                         />
                                         <InputError message={form.errors['client.first_name']} />
@@ -456,7 +460,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                             id="last_name"
                                             value={form.data['client.last_name']}
                                             onChange={(e) =>
-                                                form.setData('client.last_name', e.target.value)
+                                                setNestedData('client.last_name', e.target.value)
                                             }
                                         />
                                         <InputError message={form.errors['client.last_name']} />
@@ -469,7 +473,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                         type="date"
                                         value={form.data['client.date_of_birth']}
                                         onChange={(e) =>
-                                            form.setData('client.date_of_birth', e.target.value)
+                                            setNestedData('client.date_of_birth', e.target.value)
                                         }
                                     />
                                 </div>
@@ -491,7 +495,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                     <Select
                                         value={form.data['next_of_kin.client_id']}
                                         onValueChange={(value) =>
-                                            form.setData('next_of_kin.client_id', value)
+                                            setNestedData('next_of_kin.client_id', value)
                                         }
                                     >
                                         <SelectTrigger id="nok_client" className={form.errors['next_of_kin.client_id'] ? 'border-red-500' : ''}>
@@ -513,7 +517,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                     <Select
                                         value={form.data['next_of_kin.relationship']}
                                         onValueChange={(value) =>
-                                            form.setData('next_of_kin.relationship', value)
+                                            setNestedData('next_of_kin.relationship', value)
                                         }
                                     >
                                         <SelectTrigger id="nok_relationship" className={form.errors['next_of_kin.relationship'] ? 'border-red-500' : ''}>
@@ -541,7 +545,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                             id="nok_primary"
                                             checked={form.data['next_of_kin.is_primary_contact']}
                                             onCheckedChange={(checked) =>
-                                                form.setData('next_of_kin.is_primary_contact', checked as boolean)
+                                                setNestedData('next_of_kin.is_primary_contact', checked as boolean)
                                             }
                                         />
                                         <Label htmlFor="nok_primary" className="text-sm font-normal">
@@ -553,7 +557,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                             id="nok_emergency"
                                             checked={form.data['next_of_kin.is_emergency_contact']}
                                             onCheckedChange={(checked) =>
-                                                form.setData('next_of_kin.is_emergency_contact', checked as boolean)
+                                                setNestedData('next_of_kin.is_emergency_contact', checked as boolean)
                                             }
                                         />
                                         <Label htmlFor="nok_emergency" className="text-sm font-normal">

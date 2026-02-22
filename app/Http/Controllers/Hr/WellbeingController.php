@@ -8,12 +8,15 @@ use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Services\EngagementService;
 use App\Domain\Hr\Services\WellbeingIndicatorService;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class WellbeingController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly WellbeingIndicatorService $wellbeingIndicatorService,
         private readonly EngagementService $engagementService,
@@ -24,7 +27,7 @@ class WellbeingController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.wellbeing.view'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $canManage = $user->canDo('hr.performance.manage');
         $statusFilter = (string) $request->string('status', 'all');
         $ownerFilter = $request->integer('owner');
@@ -154,7 +157,8 @@ class WellbeingController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $survey->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
 
         $canDashboardView = $user->canDo('hr.wellbeing.view');
         $canManage = $user->canDo('hr.performance.manage');
@@ -257,7 +261,8 @@ class WellbeingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $survey->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
 
         $validated = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
@@ -283,7 +288,8 @@ class WellbeingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $survey->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
 
         $this->engagementService->publishSurvey($survey, $user);
 
@@ -294,7 +300,8 @@ class WellbeingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $survey->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
 
         $this->engagementService->closeSurvey($survey, $user);
 
@@ -305,7 +312,8 @@ class WellbeingController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $survey->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
 
         $validated = $request->validate([
             'answers' => ['required', 'array'],
@@ -320,10 +328,13 @@ class WellbeingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $survey->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
+        $ownerRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
 
         $validated = $request->validate([
-            'owner_user_id' => ['required', 'integer', 'exists:users,id'],
+            'owner_user_id' => ['required', 'integer', $ownerRule],
             'title' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
             'priority' => ['required', 'string', Rule::in(['low', 'medium', 'high'])],
@@ -353,7 +364,8 @@ class WellbeingController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
-        $this->assertTenantAccess($user->tenant_id ?? null, $plan->tenant_id);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $plan->tenant_id);
 
         $canManage = $user->canDo('hr.performance.manage');
         $isOwner = $plan->owner_user_id === $user->id;
@@ -380,12 +392,5 @@ class WellbeingController extends Controller
         $plan->update($payload);
 
         return redirect()->back()->with('success', 'Action plan updated.');
-    }
-
-    private function assertTenantAccess(?int $tenantId, ?int $resourceTenantId): void
-    {
-        if ($tenantId !== null && $tenantId !== $resourceTenantId) {
-            abort(404);
-        }
     }
 }

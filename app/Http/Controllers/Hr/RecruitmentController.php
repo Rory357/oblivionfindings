@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Services\RecruitmentService;
 use Illuminate\Http\Request;
@@ -10,12 +11,14 @@ use Inertia\Inertia;
 
 class RecruitmentController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $search = trim((string) $request->query('search', ''));
         $source = trim((string) $request->query('source', ''));
 

@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { AlertCircle, AlertTriangle, Calendar, ChevronLeft, ChevronRight, Clock, Pill, Plus, ShieldAlert } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Calendar, ChevronLeft, ChevronRight, Clock, Pill, Plus, ShieldAlert, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import axios from 'axios';
 import RecordAdministrationDialog from '@/components/medications/RecordAdministrationDialog';
-import SafetyCheckPanel from '@/components/medications/SafetyCheckPanel';
+import SafetyCheckPanel, { type SafetyCheck } from '@/components/medications/SafetyCheckPanel';
 import PrnHistoryPanel from '@/components/medications/PrnHistoryPanel';
 
 interface Medication {
@@ -85,17 +85,6 @@ interface PrnRow {
   safety_check: SafetyCheck | null;
 }
 
-interface SafetyCheck {
-  safe: boolean;
-  blocked: boolean;
-  block_reason?: string;
-  safety_level: string;
-  safety_info: { label: string; color: string; icon: string };
-  warnings: Array<{ type: string; severity: string; message: string; details?: Record<string, unknown> }>;
-  can_proceed: boolean;
-  requires_acknowledgment: boolean;
-}
-
 interface HistoryItem {
   id: number;
   medication_name: string;
@@ -139,6 +128,7 @@ interface Props {
   initialDate: string;
   witnesses: Array<{ id: number; name: string }>;
   userId: number;
+  [key: string]: unknown;
 }
 
 const scheduleStateColors: Record<string, string> = {
@@ -152,8 +142,7 @@ const scheduleStateColors: Record<string, string> = {
 };
 
 export default function EnhancedMar() {
-  const { props } = usePage<{ props: Props }>();
-  const { client, initialDate, witnesses, userId } = props;
+  const { client, initialDate, witnesses, userId } = usePage<Props>().props;
 
   const [date, setDate] = useState(initialDate);
   const [marData, setMarData] = useState<MarData | null>(null);
@@ -309,7 +298,7 @@ export default function EnhancedMar() {
                     {marData.controlled_discrepancies.map((disc) => (
                       <div key={disc.id} className="text-sm text-red-700">
                         <span className="font-medium">{disc.medication_name || 'Medication'}</span>
-                        {disc.difference !== null && (
+                        {disc.difference != null && (
                           <span className="ml-2">Difference: {disc.difference > 0 ? '+' : ''}{disc.difference}</span>
                         )}
                         {disc.reason && <span className="ml-2 text-red-600">- {disc.reason}</span>}
@@ -412,7 +401,7 @@ export default function EnhancedMar() {
                           {row.schedule_state_label.label}
                         </Badge>
                         {row.administration && (
-                          <Badge variant="outline" className={row.scheduleStateColors[row.administration.status_label.label.toLowerCase()]}>
+                          <Badge variant="outline" className={getStateBadgeClass(row.administration.status)}>
                             {row.administration.status_label.label}
                           </Badge>
                         )}

@@ -96,7 +96,7 @@ export default function InboxMenus() {
 
     const reloadInbox = () => {
         // Refresh just the inbox payload so counts / read state update immediately.
-        router.reload({ only: ['inbox'], preserveScroll: true });
+        router.reload({ only: ['inbox'] });
     };
 
     const markNotificationRead = (id: string) => {

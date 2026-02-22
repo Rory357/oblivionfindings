@@ -38,9 +38,10 @@ class SiteCredentialController extends Controller
                 'value_preview' => '********',
             ]);
 
-        foreach ($credentials as $credential) {
+        // Single audit entry per page load (not per credential)
+        if ($credentials->isNotEmpty()) {
             SiteCredentialAuditLog::create([
-                'credential_id' => $credential['id'],
+                'credential_id' => $credentials->first()['id'],
                 'tenant_id' => $site->tenant_id,
                 'user_id' => $request->user()->id,
                 'action' => 'view_list',

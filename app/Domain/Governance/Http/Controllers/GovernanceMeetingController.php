@@ -247,12 +247,17 @@ class GovernanceMeetingController extends Controller
         $this->authorize('manageMinutes', $meeting);
 
         $validated = $request->validate([
-            'content_blocks' => 'required|array',
+            'content_blocks' => 'nullable|array',
         ]);
+
+        $contentBlocks = $validated['content_blocks'] ?? null;
+        if (empty($contentBlocks)) {
+            $contentBlocks = $meeting->generateMinutesSkeleton();
+        }
 
         $minutes = MeetingMinute::create([
             'governance_meeting_id' => $meeting->id,
-            'content_blocks' => $validated['content_blocks'],
+            'content_blocks' => $contentBlocks,
             'status' => 'draft',
             'drafted_by' => auth()->id(),
             'drafted_at' => now(),
@@ -335,6 +340,8 @@ class GovernanceMeetingController extends Controller
 
     public function lockMeeting(GovernanceMeeting $meeting)
     {
+        $this->authorize('update', $meeting);
+
         if ($meeting->isLocked()) {
             return redirect()->back()->with('error', 'Meeting is already locked.');
         }
@@ -346,6 +353,8 @@ class GovernanceMeetingController extends Controller
 
     public function signMinutes(GovernanceMeeting $meeting)
     {
+        $this->authorize('approveMinutes', $meeting);
+
         $minutes = $meeting->minutes;
         if (!$minutes) {
             return redirect()->back()->with('error', 'No minutes found for this meeting.');
@@ -358,6 +367,46 @@ class GovernanceMeetingController extends Controller
         $minutes->sign(auth()->id());
 
         return redirect()->back()->with('success', 'Minutes signed successfully.');
+    }
+
+    public function advanceStatus(GovernanceMeeting $meeting)
+    {
+        $this->authorize('update', $meeting);
+
+        $advanced = $meeting->autoAdvanceStatus();
+
+        if (!$advanced) {
+            return redirect()->back()->with('error', 'Cannot advance meeting status. Check prerequisites.');
+        }
+
+        return redirect()->back()->with('success', 'Meeting status advanced to: ' . str_replace('_', ' ', $meeting->fresh()->status));
+    }
+
+    public function submitRsvp(Request $request, GovernanceMeeting $meeting)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:attending,apology,tentative',
+            'dietary_requirements' => 'nullable|string|max:255',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $boardMember = auth()->user()->boardMember;
+        if (!$boardMember) {
+            return redirect()->back()->with('error', 'You are not a board member.');
+        }
+
+        \App\Domain\Governance\Models\MeetingRsvp::updateOrCreate(
+            [
+                'governance_meeting_id' => $meeting->id,
+                'board_member_id' => $boardMember->id,
+            ],
+            [
+                ...$validated,
+                'responded_at' => now(),
+            ]
+        );
+
+        return redirect()->back()->with('success', 'RSVP recorded.');
     }
 
     protected function reorderAgendaItems(GovernanceMeeting $meeting): void

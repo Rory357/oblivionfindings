@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
 use App\Models\Site;
 use App\Models\SiteHazard;
 use App\Services\Sites\SiteHazardRiskCalculator;
@@ -10,6 +11,8 @@ use Illuminate\Http\Request;
 
 class SiteHazardController extends Controller
 {
+    use ResolvesAllowedSiteTypes;
+
     public function __construct(
         private SiteHazardRiskCalculator $riskCalculator
     ) {}
@@ -102,8 +105,25 @@ class SiteHazardController extends Controller
             'due_date' => 'nullable|date',
         ]);
 
+        // Calculate risk rating from severity + likelihood
+        $riskRating = $this->riskCalculator->calculate(
+            $validated['severity'],
+            $validated['likelihood']
+        );
+
+        // Generate unique reference number
+        $latestRef = SiteHazard::withTrashed()
+            ->where('reference_number', 'like', 'HAZ-%')
+            ->orderByDesc('id')
+            ->value('reference_number');
+        $nextNum = 1;
+        if ($latestRef && preg_match('/HAZ-(\d+)/', $latestRef, $matches)) {
+            $nextNum = (int) $matches[1] + 1;
+        }
+        $referenceNumber = 'HAZ-' . str_pad($nextNum, 5, '0', STR_PAD_LEFT);
+
         $assignedToUserId = $validated['assigned_to_user_id'] ?? null;
-        if (in_array($validated['severity'], ['high', 'critical'], true) && !$assignedToUserId) {
+        if ($this->riskCalculator->requiresAssignment($riskRating) && !$assignedToUserId) {
             $assignedToUserId = \App\Models\User::query()
                 ->whereHas('roles', fn ($q) => $q->where('name', 'health_safety_officer'))
                 ->value('id');
@@ -113,10 +133,13 @@ class SiteHazardController extends Controller
             ...$validated,
             'site_id' => $site->id,
             'tenant_id' => $site->tenant_id,
+            'reference_number' => $referenceNumber,
+            'risk_rating' => $riskRating,
             'reported_by_user_id' => $request->user()->id,
             'assigned_to_user_id' => $assignedToUserId,
             'assigned_at' => $assignedToUserId ? now() : null,
             'status' => 'open',
+            'due_date' => $validated['due_date'] ?? now()->addDays($this->riskCalculator->suggestedDueDays($riskRating))->toDateString(),
         ]);
 
         return redirect()
@@ -133,6 +156,12 @@ class SiteHazardController extends Controller
             'severity' => 'required|in:' . implode(',', SiteHazardRiskCalculator::severities()),
             'likelihood' => 'required|in:' . implode(',', SiteHazardRiskCalculator::likelihoods()),
         ]);
+
+        // Recalculate risk rating when severity or likelihood changes
+        $validated['risk_rating'] = $this->riskCalculator->calculate(
+            $validated['severity'],
+            $validated['likelihood']
+        );
 
         $hazard->update($validated);
 
@@ -233,21 +262,4 @@ class SiteHazardController extends Controller
         ]);
     }
 
-    private function allowedSiteTypes(Request $request): array
-    {
-        $user = $request->user();
-        $map = [
-            'head_office' => 'sites.type.head_office.view',
-            'house' => 'sites.type.house.view',
-            'facility' => 'sites.type.facility.view',
-        ];
-
-        $allowed = collect($map)
-            ->filter(fn (string $permission) => $user?->canDo($permission))
-            ->keys()
-            ->values()
-            ->all();
-
-        return $allowed !== [] ? $allowed : array_keys($map);
-    }
 }

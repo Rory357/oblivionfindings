@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { type BreadcrumbItem } from '@/types';
 import { useState } from 'react';
 
@@ -52,6 +53,8 @@ interface Props {
     eventOptions: Option[];
     actionOptions: Option[];
     roleGroupOptions: Option[];
+    conditionOperatorOptions: Option[];
+    conditionLogicOptions: Option[];
     reportTypeOptions: Option[];
     recipientOptions: RecipientOption[];
     can: { manage: boolean };
@@ -75,20 +78,29 @@ export default function HrAutomationsPage({
     eventOptions,
     actionOptions,
     roleGroupOptions,
+    conditionOperatorOptions,
+    conditionLogicOptions,
     reportTypeOptions,
     recipientOptions,
     can,
 }: Props) {
     const [editingRuleId, setEditingRuleId] = useState<number | null>(null);
+    const [advancedMode, setAdvancedMode] = useState(false);
     const { data, setData, post, put, processing, errors, reset } = useForm({
         name: '',
         event_type: eventOptions[0]?.value ?? '',
+        condition_logic: conditionLogicOptions[0]?.value ?? 'all',
         condition_field: '',
         condition_value: '',
+        condition_rules_json: '',
         action_type: actionOptions[0]?.value ?? 'notify_role_group',
         action_title: '',
         action_body: '',
         action_url: '',
+        action_webhook_url: '',
+        action_webhook_timeout_seconds: '10',
+        action_include_payload: false,
+        actions_json: '',
         role_group: roleGroupOptions[0]?.value ?? 'managers',
         recipient_user_ids: [] as number[],
         report_type: reportTypeOptions[0]?.value ?? 'headcount',
@@ -113,15 +125,28 @@ export default function HrAutomationsPage({
             .map((id) => Number(id));
         const reportFilters = (action?.filters as Record<string, string> | undefined) ?? {};
 
+        const hasAdvancedConditions = Array.isArray((rule.conditions as { rules?: unknown[] }).rules)
+            && ((rule.conditions as { rules?: unknown[] }).rules ?? []).length > 0;
+        const hasAdvancedActions = rule.actions.length > 1;
+        setAdvancedMode(hasAdvancedConditions || hasAdvancedActions);
+
         setData({
             name: rule.name,
             event_type: rule.event_type,
+            condition_logic: String((rule.conditions as { logic?: string }).logic ?? conditionLogicOptions[0]?.value ?? 'all'),
             condition_field: String(conditionField ?? ''),
             condition_value: String(conditionValue ?? ''),
+            condition_rules_json: hasAdvancedConditions
+                ? JSON.stringify((rule.conditions as { rules?: unknown[] }).rules ?? [], null, 2)
+                : '',
             action_type: actionType,
             action_title: String(action?.title ?? ''),
             action_body: String(action?.body ?? ''),
             action_url: String(action?.url ?? ''),
+            action_webhook_url: String(action?.webhook_url ?? ''),
+            action_webhook_timeout_seconds: String(action?.timeout_seconds ?? '10'),
+            action_include_payload: Boolean(action?.include_payload ?? false),
+            actions_json: hasAdvancedActions ? JSON.stringify(rule.actions, null, 2) : '',
             role_group: String(action?.role_group ?? roleGroupOptions[0]?.value ?? 'managers'),
             recipient_user_ids: recipientIds,
             report_type: String(action?.report_type ?? reportTypeOptions[0]?.value ?? 'headcount'),
@@ -140,10 +165,17 @@ export default function HrAutomationsPage({
                 onSuccess: () => {
                     setEditingRuleId(null);
                     reset();
+                    setAdvancedMode(false);
                     setData('event_type', eventOptions[0]?.value ?? '');
+                    setData('condition_logic', conditionLogicOptions[0]?.value ?? 'all');
                     setData('action_type', actionOptions[0]?.value ?? 'notify_role_group');
                     setData('role_group', roleGroupOptions[0]?.value ?? 'managers');
                     setData('report_type', reportTypeOptions[0]?.value ?? 'headcount');
+                    setData('condition_rules_json', '');
+                    setData('action_webhook_url', '');
+                    setData('action_webhook_timeout_seconds', '10');
+                    setData('action_include_payload', false);
+                    setData('actions_json', '');
                     setData('is_active', true);
                     setData('stop_on_match', false);
                 },
@@ -155,10 +187,17 @@ export default function HrAutomationsPage({
             preserveScroll: true,
             onSuccess: () => {
                 reset();
+                setAdvancedMode(false);
                 setData('event_type', eventOptions[0]?.value ?? '');
+                setData('condition_logic', conditionLogicOptions[0]?.value ?? 'all');
                 setData('action_type', actionOptions[0]?.value ?? 'notify_role_group');
                 setData('role_group', roleGroupOptions[0]?.value ?? 'managers');
                 setData('report_type', reportTypeOptions[0]?.value ?? 'headcount');
+                setData('condition_rules_json', '');
+                setData('action_webhook_url', '');
+                setData('action_webhook_timeout_seconds', '10');
+                setData('action_include_payload', false);
+                setData('actions_json', '');
                 setData('is_active', true);
                 setData('stop_on_match', false);
             },
@@ -210,10 +249,17 @@ export default function HrAutomationsPage({
                                         onClick={() => {
                                             setEditingRuleId(null);
                                             reset();
+                                            setAdvancedMode(false);
                                             setData('event_type', eventOptions[0]?.value ?? '');
+                                            setData('condition_logic', conditionLogicOptions[0]?.value ?? 'all');
                                             setData('action_type', actionOptions[0]?.value ?? 'notify_role_group');
                                             setData('role_group', roleGroupOptions[0]?.value ?? 'managers');
                                             setData('report_type', reportTypeOptions[0]?.value ?? 'headcount');
+                                            setData('condition_rules_json', '');
+                                            setData('action_webhook_url', '');
+                                            setData('action_webhook_timeout_seconds', '10');
+                                            setData('action_include_payload', false);
+                                            setData('actions_json', '');
                                             setData('is_active', true);
                                             setData('stop_on_match', false);
                                         }}
@@ -252,6 +298,58 @@ export default function HrAutomationsPage({
                                     <Label>Condition Value (optional)</Label>
                                     <Input value={data.condition_value} onChange={(e) => setData('condition_value', e.target.value)} placeholder="annual" />
                                 </div>
+
+                                <div className="md:col-span-2 flex items-center gap-2 rounded-md border p-3">
+                                    <Checkbox checked={advancedMode} onCheckedChange={(checked) => setAdvancedMode(Boolean(checked))} />
+                                    <div>
+                                        <p className="text-sm font-medium">Use advanced workflow builder (JSON)</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Enables multi-condition logic and multiple actions per rule.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                {advancedMode && (
+                                    <>
+                                        <div className="space-y-2">
+                                            <Label>Condition Logic</Label>
+                                            <Select value={data.condition_logic} onValueChange={(value) => setData('condition_logic', value)}>
+                                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    {conditionLogicOptions.map((logicOption) => (
+                                                        <SelectItem key={logicOption.value} value={logicOption.value}>{logicOption.label}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div className="space-y-2 md:col-span-2">
+                                            <Label>Condition Rules JSON</Label>
+                                            <Textarea
+                                                value={data.condition_rules_json}
+                                                onChange={(e) => setData('condition_rules_json', e.target.value)}
+                                                rows={6}
+                                                placeholder={`[\n  {"field":"status","operator":"equals","value":"approved"},\n  {"field":"leave_type","operator":"in","value":["annual","sick"]}\n]`}
+                                            />
+                                            {errors.condition_rules_json && <p className="text-xs text-red-500">{errors.condition_rules_json}</p>}
+                                            <p className="text-xs text-muted-foreground">
+                                                Supported operators: {conditionOperatorOptions.map((item) => item.value).join(', ')}.
+                                            </p>
+                                        </div>
+                                        <div className="space-y-2 md:col-span-2">
+                                            <Label>Actions JSON (optional override)</Label>
+                                            <Textarea
+                                                value={data.actions_json}
+                                                onChange={(e) => setData('actions_json', e.target.value)}
+                                                rows={8}
+                                                placeholder={`[\n  {"type":"notify_users","title":"Leave approved","recipient_user_ids":[1,2]},\n  {"type":"queue_report_export","report_type":"leave_sla","report_date_from":"2026-01-01","report_date_to":"2026-12-31"}\n]`}
+                                            />
+                                            {errors.actions_json && <p className="text-xs text-red-500">{errors.actions_json}</p>}
+                                            <p className="text-xs text-muted-foreground">
+                                                Leave empty to use the single action fields below.
+                                            </p>
+                                        </div>
+                                    </>
+                                )}
 
                                 <div className="space-y-2">
                                     <Label>Action</Label>
@@ -344,6 +442,38 @@ export default function HrAutomationsPage({
                                             <Label>Report Date To</Label>
                                             <Input type="date" value={data.report_date_to} onChange={(e) => setData('report_date_to', e.target.value)} />
                                         </div>
+                                    </>
+                                )}
+
+                                {data.action_type === 'notify_microsoft_teams' && (
+                                    <>
+                                        <div className="space-y-2 md:col-span-2">
+                                            <Label>Microsoft Teams Webhook URL</Label>
+                                            <Input
+                                                type="url"
+                                                value={data.action_webhook_url}
+                                                onChange={(e) => setData('action_webhook_url', e.target.value)}
+                                                placeholder="https://*.webhook.office.com/webhookb2/..."
+                                            />
+                                            {errors.action_webhook_url && <p className="text-xs text-red-500">{errors.action_webhook_url}</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Webhook Timeout (seconds)</Label>
+                                            <Input
+                                                type="number"
+                                                min={2}
+                                                max={30}
+                                                value={data.action_webhook_timeout_seconds}
+                                                onChange={(e) => setData('action_webhook_timeout_seconds', e.target.value)}
+                                            />
+                                        </div>
+                                        <label className="flex items-center gap-2 text-sm pt-7">
+                                            <Checkbox
+                                                checked={data.action_include_payload}
+                                                onCheckedChange={(checked) => setData('action_include_payload', Boolean(checked))}
+                                            />
+                                            <span>Include event payload in Teams message</span>
+                                        </label>
                                     </>
                                 )}
 

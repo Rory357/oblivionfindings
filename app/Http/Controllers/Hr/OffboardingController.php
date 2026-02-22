@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Hr;
 
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOffboardingTask;
@@ -12,6 +13,8 @@ use Inertia\Inertia;
 
 class OffboardingController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly OnboardingService $onboardingService,
     ) {}
@@ -21,12 +24,12 @@ class OffboardingController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.view'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $status = $request->query('status');
         $search = trim((string) $request->query('q', ''));
 
         $checklists = HrOffboardingChecklist::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->where('tenant_id', $tenantId)
             ->with([
                 'employeeProfile.user:id,name,email',
                 'creator:id,name',
@@ -44,7 +47,7 @@ class OffboardingController extends Controller
             ->withQueryString();
 
         $baseQuery = HrOffboardingChecklist::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId));
+            ->where('tenant_id', $tenantId);
 
         $today = now()->toDateString();
         $nextWeek = now()->addDays(7)->toDateString();
@@ -81,9 +84,8 @@ class OffboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.view'), 403);
-        if (($user->tenant_id ?? null) !== null && $checklist->tenant_id !== $user->tenant_id) {
-            abort(404);
-        }
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
 
         $checklist->load([
             'employeeProfile.user:id,name,email',
@@ -108,16 +110,16 @@ class OffboardingController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
 
-        $tenantId = $user->tenant_id ?? null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $existingProfileIds = HrOffboardingChecklist::query()
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->where('tenant_id', $tenantId)
             ->whereIn('status', ['pending', 'in_progress'])
             ->pluck('employee_profile_id');
 
         $employees = HrEmployeeProfile::query()
             ->with('user:id,name,email')
-            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->where('tenant_id', $tenantId)
             ->where('is_active', true)
             ->whereNotIn('id', $existingProfileIds)
             ->get()
@@ -139,6 +141,7 @@ class OffboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
@@ -146,9 +149,7 @@ class OffboardingController extends Controller
         ]);
 
         $profile = HrEmployeeProfile::query()->findOrFail((int) $validated['employee_profile_id']);
-        if (($user->tenant_id ?? null) !== null && $profile->tenant_id !== $user->tenant_id) {
-            abort(404);
-        }
+        $this->assertHrTenantAccess($tenantId, $profile->tenant_id);
 
         $existing = HrOffboardingChecklist::query()
             ->where('employee_profile_id', $profile->id)
@@ -173,12 +174,11 @@ class OffboardingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $checklist = $task->checklist;
         abort_unless($checklist, 404);
-        if (($user->tenant_id ?? null) !== null && $checklist->tenant_id !== $user->tenant_id) {
-            abort(404);
-        }
+        $this->assertHrTenantAccess($tenantId, $checklist->tenant_id);
 
         $validated = $request->validate([
             'evidence_path' => ['nullable', 'string', 'max:500'],

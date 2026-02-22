@@ -143,7 +143,7 @@ export default function MedicationsAudit({ filters, logs }: Props) {
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Medications', href: '/medications' }, { title: 'Audit Log' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Medications', href: '/medications' }, { title: 'Audit Log', href: '/medications/audit' }]}>
             <Head title="Medication Audit Log" />
 
             <div className="space-y-6 p-6">

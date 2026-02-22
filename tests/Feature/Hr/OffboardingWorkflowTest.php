@@ -4,6 +4,8 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffboardingChecklist;
 use App\Domain\Hr\Models\HrOffboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
+use App\Models\Asset;
+use App\Models\AssetAssignment;
 use App\Models\Role;
 use App\Models\User;
 
@@ -145,4 +147,55 @@ test('offboarding dashboard exposes overdue summary and supports status filter',
 
     expect($response->inertiaProps('summary.overdue'))->toBeGreaterThan(0);
     expect($response->inertiaProps('filters.status'))->toBe('in_progress');
+});
+
+test('offboarding checklist includes assigned asset return tasks for staff', function () {
+    $asset = Asset::factory()->create([
+        'created_by_user_id' => $this->hr->id,
+        'updated_by_user_id' => $this->hr->id,
+        'name' => 'Laptop Pro 15',
+        'asset_tag' => 'AST-9911',
+        'serial_number' => 'SN-OFFBOARD-9911',
+    ]);
+
+    $assignment = AssetAssignment::query()->create([
+        'asset_id' => $asset->id,
+        'assignee_type' => 'staff',
+        'assignee_id' => $this->staff->id,
+        'purpose' => 'Primary work device',
+        'assigned_at' => now()->subDays(30),
+    ]);
+
+    $this->actingAs($this->hr)
+        ->post('/hr/offboarding', [
+            'employee_profile_id' => $this->profile->id,
+            'end_date' => now()->addDays(7)->toDateString(),
+        ])
+        ->assertSessionHas('success');
+
+    $checklist = HrOffboardingChecklist::query()
+        ->where('employee_profile_id', $this->profile->id)
+        ->latest('id')
+        ->first();
+
+    expect($checklist)->not->toBeNull();
+
+    $collectTask = HrOffboardingTask::query()
+        ->where('offboarding_checklist_id', $checklist->id)
+        ->where('title', 'Collect company equipment')
+        ->first();
+
+    $assetTask = HrOffboardingTask::query()
+        ->where('offboarding_checklist_id', $checklist->id)
+        ->where('category', 'assets')
+        ->where('title', 'like', 'Return asset:%')
+        ->first();
+
+    expect($collectTask)->not->toBeNull();
+    expect($assetTask)->not->toBeNull();
+    expect($assetTask?->title)->toContain('Laptop Pro 15');
+    expect($assetTask?->is_required)->toBeTrue();
+    expect($assetTask?->sign_off_required)->toBeTrue();
+    expect($assetTask?->dependency_task_ids ?? [])->toContain($collectTask?->id);
+    expect((string) ($assetTask?->notes ?? ''))->toContain("asset_assignment_id={$assignment->id}");
 });

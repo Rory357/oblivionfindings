@@ -127,28 +127,38 @@ export default function SiteCredentials({ site, credentials, canReveal, canManag
                 },
                 body: JSON.stringify({ password }),
             });
+            if (!response.ok) {
+                alert(response.status === 403 ? 'Incorrect password.' : 'Failed to reveal credential.');
+                return;
+            }
             const data = await response.json();
             if (data.value) {
                 setRevealedValue(data.value);
                 setRevealDialogOpen(false);
                 setPassword('');
             }
-        } catch (error) {
-            console.error('Failed to reveal credential:', error);
+        } catch {
+            alert('Failed to reveal credential. Please check your connection and try again.');
         } finally {
             setRevealing(false);
         }
     };
 
     const copyToClipboard = async (value: string, credentialId: number) => {
-        await navigator.clipboard.writeText(value);
+        try {
+            await navigator.clipboard.writeText(value);
+        } catch {
+            alert('Failed to copy to clipboard.');
+            return;
+        }
 
-        await fetch(`/sites/${site.id}/credentials/${credentialId}/copy`, {
+        // Fire-and-forget audit log
+        fetch(`/sites/${site.id}/credentials/${credentialId}/copy`, {
             method: 'POST',
             headers: {
                 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
             },
-        });
+        }).catch(() => {});
     };
 
     return (

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCaseEvent;
 use App\Models\User;
@@ -11,6 +12,8 @@ use Inertia\Inertia;
 
 class HrCaseController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * List all HR cases.
      */
@@ -19,23 +22,128 @@ class HrCaseController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.view'), 403);
 
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $search = trim((string) $request->query('q', ''));
+        $slaWindow = trim((string) $request->query('sla_window', ''));
+        $now = now();
+        $next24Hours = now()->addDay();
 
         $cases = HrCase::forTenant($tenantId)
             ->with(['subject:id,name', 'assignedTo:id,name'])
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->query('case_type'), fn ($q, $type) => $q->where('case_type', $type))
             ->when($request->query('severity'), fn ($q, $sev) => $q->where('severity', $sev))
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($inner) use ($search) {
+                    $inner->where('case_number', 'like', "%{$search}%")
+                        ->orWhere('title', 'like', "%{$search}%")
+                        ->orWhereHas('subject', fn ($subjects) => $subjects->where('name', 'like', "%{$search}%"));
+                });
+            })
+            ->when($slaWindow !== '', function ($query) use ($slaWindow, $now, $next24Hours) {
+                if ($slaWindow === 'overdue') {
+                    $query->whereHas('disciplinaryActions', function ($actions) use ($now) {
+                        $actions
+                            ->whereNotIn('stage', ['closed'])
+                            ->whereNotNull('response_deadline')
+                            ->where('response_deadline', '<', $now);
+                    });
+                }
+
+                if ($slaWindow === 'due_24h') {
+                    $query->whereHas('disciplinaryActions', function ($actions) use ($now, $next24Hours) {
+                        $actions
+                            ->whereNotIn('stage', ['closed'])
+                            ->whereNotNull('response_deadline')
+                            ->whereBetween('response_deadline', [$now, $next24Hours]);
+                    });
+                }
+
+                if ($slaWindow === 'missing_deadline') {
+                    $query->whereHas('disciplinaryActions', function ($actions) {
+                        $actions
+                            ->whereNotIn('stage', ['closed'])
+                            ->whereNull('response_deadline');
+                    });
+                }
+
+                if ($slaWindow === 'escalation') {
+                    $query->whereHas('disciplinaryActions', function ($actions) use ($now) {
+                        $actions
+                            ->whereNotIn('stage', ['closed'])
+                            ->where(function ($inner) use ($now) {
+                                $inner->where(function ($branch) use ($now) {
+                                    $branch->whereNotNull('response_deadline')
+                                        ->where('response_deadline', '<', $now);
+                                })->orWhereNull('investigator_user_id')
+                                    ->orWhere(function ($branch) {
+                                        $branch->where('stage', 'response_period')
+                                            ->whereNull('response_deadline');
+                                    })
+                                    ->orWhereHas('hrCase', function ($caseQuery) {
+                                        $caseQuery->whereIn('severity', ['high', 'critical'])
+                                            ->whereNotIn('status', ['closed', 'resolved']);
+                                    });
+                            });
+                    });
+                }
+            })
             ->orderByDesc('opened_at')
             ->paginate(20)
             ->withQueryString();
 
+        $openCasesQuery = HrCase::query()
+            ->forTenant($tenantId)
+            ->whereNotIn('status', ['closed', 'resolved']);
+
+        $activeDisciplinaryQuery = \App\Domain\Hr\Models\HrDisciplinaryAction::query()
+            ->where('tenant_id', $tenantId)
+            ->whereNotIn('stage', ['closed'])
+            ->whereHas('hrCase', fn ($query) => $query->whereNotIn('status', ['closed', 'resolved']));
+
+        $summary = [
+            'open_cases' => (clone $openCasesQuery)->count(),
+            'unassigned_open_cases' => (clone $openCasesQuery)->whereNull('assigned_to')->count(),
+            'high_severity_open_cases' => (clone $openCasesQuery)->whereIn('severity', ['high', 'critical'])->count(),
+            'disciplinary_active' => (clone $activeDisciplinaryQuery)->count(),
+            'disciplinary_sla_overdue' => (clone $activeDisciplinaryQuery)
+                ->whereNotNull('response_deadline')
+                ->where('response_deadline', '<', $now)
+                ->count(),
+            'disciplinary_sla_due_24h' => (clone $activeDisciplinaryQuery)
+                ->whereNotNull('response_deadline')
+                ->whereBetween('response_deadline', [$now, $next24Hours])
+                ->count(),
+            'disciplinary_missing_deadline' => (clone $activeDisciplinaryQuery)
+                ->whereNull('response_deadline')
+                ->count(),
+            'escalation_candidates' => (clone $activeDisciplinaryQuery)
+                ->where(function ($query) use ($now) {
+                    $query->where(function ($branch) use ($now) {
+                        $branch->whereNotNull('response_deadline')
+                            ->where('response_deadline', '<', $now);
+                    })->orWhereNull('investigator_user_id')
+                        ->orWhere(function ($branch) {
+                            $branch->where('stage', 'response_period')
+                                ->whereNull('response_deadline');
+                        })
+                        ->orWhereHas('hrCase', function ($caseQuery) {
+                            $caseQuery->whereIn('severity', ['high', 'critical'])
+                                ->whereNotIn('status', ['closed', 'resolved']);
+                        });
+                })
+                ->count(),
+        ];
+
         return Inertia::render('hr/cases/index', [
             'cases' => $cases,
+            'summary' => $summary,
             'filters' => [
                 'status' => $request->query('status'),
                 'case_type' => $request->query('case_type'),
                 'severity' => $request->query('severity'),
+                'q' => $search !== '' ? $search : null,
+                'sla_window' => $slaWindow !== '' ? $slaWindow : null,
             ],
             'can' => [
                 'manage' => $user->canDo('hr.cases.manage'),
@@ -51,8 +159,11 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
         $staff = User::staff()
+            ->whereIn('id', $staffIds)
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
@@ -82,6 +193,8 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $case->tenant_id);
 
         return Inertia::render('hr/cases/create-event', [
             'hrCase' => $case->load('subject:id,name'),
@@ -107,6 +220,8 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $case->tenant_id);
 
         $case->load([
             'subject:id,name,email',
@@ -119,8 +234,12 @@ class HrCaseController extends Controller
             ])->orderByDesc('created_at'),
         ]);
 
+        $canManageCases = $user->canDo('hr.cases.manage');
+        $canManageDisciplinary = $user->canDo('hr.disciplinary.manage');
+
         // Build a combined timeline from events and disciplinary milestones
         $timeline = $case->events
+            ->filter(fn (HrCaseEvent $event) => $this->canViewCaseEvent($user, $case, $event, $canManageCases, $canManageDisciplinary))
             ->map(fn ($event) => [
                 'type' => 'event',
                 'id' => $event->id,
@@ -129,6 +248,7 @@ class HrCaseController extends Controller
                 'event_type' => $event->event_type,
                 'occurred_at' => $event->occurred_at,
                 'created_by' => $event->creator?->name,
+                'visibility' => $this->normalizeCaseEventVisibility($event->visibility),
             ])
             ->sortBy('occurred_at')
             ->values();
@@ -150,6 +270,7 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'user_id' => ['required', 'integer', 'exists:users,id'],
@@ -166,7 +287,8 @@ class HrCaseController extends Controller
         ]);
 
         // Generate a unique case number
-        $lastCase = HrCase::orderByDesc('id')
+        $lastCase = HrCase::where('tenant_id', $tenantId)
+            ->orderByDesc('id')
             ->first();
 
         $nextNumber = $lastCase
@@ -174,7 +296,7 @@ class HrCaseController extends Controller
             : 1;
 
         HrCase::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'case_number' => 'HR-' . str_pad($nextNumber, 5, '0', STR_PAD_LEFT),
             'status' => 'open',
             'reported_by' => $user->id,
@@ -193,6 +315,8 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $case->tenant_id);
 
         $data = $request->validate([
             'case_type' => ['sometimes', 'string', 'in:grievance,disciplinary,investigation,welfare,complaint,other'],
@@ -222,6 +346,8 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $case->tenant_id);
 
         $data = $request->validate([
             'event_type' => ['required', 'string', 'in:note,meeting,phone_call,letter,email,document,investigation_update,other'],
@@ -248,6 +374,8 @@ class HrCaseController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.cases.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $case->tenant_id);
 
         $data = $request->validate([
             'outcome' => ['required', 'string', 'max:5000'],
@@ -263,5 +391,42 @@ class HrCaseController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'HR case closed.');
+    }
+
+    protected function normalizeCaseEventVisibility(?string $visibility): string
+    {
+        return match ($visibility) {
+            'full', 'restricted', 'internal' => $visibility,
+            default => 'internal',
+        };
+    }
+
+    protected function canViewCaseEvent(
+        User $viewer,
+        HrCase $case,
+        HrCaseEvent $event,
+        bool $canManageCases,
+        bool $canManageDisciplinary
+    ): bool {
+        $visibility = $this->normalizeCaseEventVisibility($event->visibility);
+
+        if ($canManageCases || $canManageDisciplinary) {
+            return true;
+        }
+
+        if ($visibility === 'full') {
+            return true;
+        }
+
+        if ($visibility === 'restricted') {
+            $allowedIds = collect([$case->assigned_to, $case->reported_by, $case->user_id])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->values();
+
+            return $allowedIds->contains((int) $viewer->id);
+        }
+
+        return false;
     }
 }

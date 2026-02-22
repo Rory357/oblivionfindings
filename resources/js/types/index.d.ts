@@ -3,6 +3,7 @@ import { LucideIcon } from 'lucide-react';
 
 export interface Auth {
     user: User;
+    can?: Record<string, unknown>;
 }
 
 export interface BreadcrumbItem {
@@ -30,6 +31,8 @@ export interface SharedData {
     sidebarOpen: boolean;
     [key: string]: unknown;
 }
+
+export type PageProps<T extends Record<string, unknown> = Record<string, unknown>> = SharedData & T;
 
 export interface User {
     id: number;

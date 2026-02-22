@@ -1,5 +1,4 @@
 import * as React from "react"
-import { Check } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface RadioGroupProps extends React.HTMLAttributes<HTMLDivElement> {
@@ -34,10 +33,11 @@ const RadioGroup = React.forwardRef<HTMLDivElement, RadioGroupProps>(
       >
         {React.Children.map(children, (child) => {
           if (React.isValidElement(child) && child.type === RadioGroupItem) {
+            const item = child as React.ReactElement<RadioGroupItemProps>
             return React.cloneElement(child as React.ReactElement<RadioGroupItemProps>, {
               selectedValue,
-              onSelect: handleSelect,
-              disabled: disabled || child.props.disabled,
+              onItemSelect: handleSelect,
+              disabled: disabled || item.props.disabled,
             })
           }
           return child
@@ -52,12 +52,12 @@ interface RadioGroupItemProps extends React.HTMLAttributes<HTMLDivElement> {
   value: string
   id?: string
   selectedValue?: string
-  onSelect?: (value: string) => void
+  onItemSelect?: (value: string) => void
   disabled?: boolean
 }
 
 const RadioGroupItem = React.forwardRef<HTMLDivElement, RadioGroupItemProps>(
-  ({ className, value, id, selectedValue, onSelect, disabled, children, ...props }, ref) => {
+  ({ className, value, id, selectedValue, onItemSelect, disabled, children, ...props }, ref) => {
     const isSelected = selectedValue === value
     const itemId = id || value
 
@@ -71,7 +71,7 @@ const RadioGroupItem = React.forwardRef<HTMLDivElement, RadioGroupItemProps>(
           !isSelected && !disabled && "hover:bg-muted",
           className
         )}
-        onClick={() => onSelect?.(value)}
+        onClick={() => onItemSelect?.(value)}
         role="radio"
         aria-checked={isSelected}
         {...props}

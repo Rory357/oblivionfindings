@@ -33,7 +33,7 @@ type Schedule = {
     is_active: boolean;
 };
 
-type Record = {
+type InspectionRecord = {
     id: number;
     due_date: string;
     completed_at?: string;
@@ -46,7 +46,7 @@ type Props = {
     site: Site;
     schedules: Schedule[];
     records: {
-        data: Record[];
+        data: InspectionRecord[];
     };
 };
 

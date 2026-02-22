@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
@@ -14,6 +15,8 @@ use Inertia\Inertia;
 
 class ComplianceController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly ComplianceMatrixService $complianceMatrixService,
     ) {}
@@ -26,21 +29,25 @@ class ComplianceController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $search = trim((string) $request->query('q', ''));
         $statusFilter = $request->query('status');
         $requirementId = $request->query('requirement_id');
 
         // Requirements list for filter dropdown
-        $requirements = HrComplianceRequirement::where('is_active', true)
+        $requirements = HrComplianceRequirement::where('tenant_id', $tenantId)
+            ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name', 'check_type as type']);
 
         // Build per-staff compliance stats from hr_staff_compliance_status
-        $totalRequirements = HrComplianceRequirement::where('is_active', true)->count();
+        $totalRequirements = HrComplianceRequirement::where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->count();
 
         // Get active staff user IDs from employee profiles
-        $activeStaffQuery = HrEmployeeProfile::where('is_active', true);
+        $activeStaffQuery = HrEmployeeProfile::where('tenant_id', $tenantId)->where('is_active', true);
         $activeStaffUserIds = (clone $activeStaffQuery)->pluck('user_id');
 
         // Build paginated per-user compliance data
@@ -50,34 +57,34 @@ class ComplianceController extends Controller
                    ->orWhere('email', 'like', "%{$search}%");
             }))
             ->when($requirementId, fn ($q) => $q->whereHas('complianceStatuses', fn ($cs) =>
-                $cs->where('requirement_id', $requirementId)
+                $cs->where('tenant_id', $tenantId)->where('requirement_id', $requirementId)
             ));
 
         // Apply status filter
         if ($statusFilter === 'fully_compliant') {
             $staffQuery->whereDoesntHave('complianceStatuses', fn ($q) =>
-                $q->whereIn('status', ['expired', 'expiring_soon', 'not_started'])
+                $q->where('tenant_id', $tenantId)->whereIn('status', ['expired', 'expiring_soon', 'not_started'])
             );
         } elseif ($statusFilter === 'has_expired') {
             $staffQuery->whereHas('complianceStatuses', fn ($q) =>
-                $q->where('status', 'expired')
+                $q->where('tenant_id', $tenantId)->where('status', 'expired')
             );
         } elseif ($statusFilter === 'has_expiring') {
             $staffQuery->whereHas('complianceStatuses', fn ($q) =>
-                $q->where('status', 'expiring_soon')
+                $q->where('tenant_id', $tenantId)->where('status', 'expiring_soon')
             );
         } elseif ($statusFilter === 'incomplete') {
             $staffQuery->whereHas('complianceStatuses', fn ($q) =>
-                $q->where('status', 'not_started')
+                $q->where('tenant_id', $tenantId)->where('status', 'not_started')
             );
         }
 
         $staffPaginated = $staffQuery
             ->withCount([
-                'complianceStatuses as compliant_count'      => fn ($q) => $q->where('status', 'compliant'),
-                'complianceStatuses as expired_count'         => fn ($q) => $q->where('status', 'expired'),
-                'complianceStatuses as expiring_soon_count'   => fn ($q) => $q->where('status', 'expiring_soon'),
-                'complianceStatuses as not_started_count'     => fn ($q) => $q->where('status', 'not_started'),
+                'complianceStatuses as compliant_count' => fn ($q) => $q->where('tenant_id', $tenantId)->where('status', 'compliant'),
+                'complianceStatuses as expired_count' => fn ($q) => $q->where('tenant_id', $tenantId)->where('status', 'expired'),
+                'complianceStatuses as expiring_soon_count' => fn ($q) => $q->where('tenant_id', $tenantId)->where('status', 'expiring_soon'),
+                'complianceStatuses as not_started_count' => fn ($q) => $q->where('tenant_id', $tenantId)->where('status', 'not_started'),
             ])
             ->orderBy('name')
             ->paginate(20)
@@ -107,16 +114,16 @@ class ComplianceController extends Controller
         // Staff with no expired/expiring/not_started statuses = fully compliant
         $fullyCompliant = User::whereIn('id', $activeStaffUserIds)
             ->whereDoesntHave('complianceStatuses', fn ($q) =>
-                $q->whereIn('status', ['expired', 'expiring_soon', 'not_started'])
+                $q->where('tenant_id', $tenantId)->whereIn('status', ['expired', 'expiring_soon', 'not_started'])
             )
             ->count();
 
         $hasExpired = User::whereIn('id', $activeStaffUserIds)
-            ->whereHas('complianceStatuses', fn ($q) => $q->where('status', 'expired'))
+            ->whereHas('complianceStatuses', fn ($q) => $q->where('tenant_id', $tenantId)->where('status', 'expired'))
             ->count();
 
         $hasExpiring = User::whereIn('id', $activeStaffUserIds)
-            ->whereHas('complianceStatuses', fn ($q) => $q->where('status', 'expiring_soon'))
+            ->whereHas('complianceStatuses', fn ($q) => $q->where('tenant_id', $tenantId)->where('status', 'expiring_soon'))
             ->count();
 
         return Inertia::render('hr/compliance/index', [
@@ -147,8 +154,18 @@ class ComplianceController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.compliance.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $belongsToTenant = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $staff->id)
+            ->exists();
+        if (! $belongsToTenant) {
+            abort(404);
+        }
 
         $statuses = HrStaffComplianceStatus::where('user_id', $staff->id)
+            ->where('tenant_id', $tenantId)
             ->with('requirement:id,code,name,description,category,check_type,hard_stop,validity_months')
             ->orderBy('status')
             ->get();

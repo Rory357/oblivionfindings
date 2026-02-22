@@ -18,6 +18,9 @@ interface Props {
     complianceSummary: { compliant: number; expiring_soon: number; expired: number; not_started: number };
     complianceStatuses: Array<{ id: number; status: string; requirement: { name: string; category: string } }>;
     policiesDue: number;
+    pendingReviews: number;
+    activeGoals: number;
+    availableSurveys: number;
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -25,7 +28,7 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'My HR', href: '/hr/my' },
 ];
 
-export default function MyHrIndex({ profile, pendingLeave, leaveBalances, complianceSummary, policiesDue }: Props) {
+export default function MyHrIndex({ profile, pendingLeave, leaveBalances, complianceSummary, policiesDue, pendingReviews, activeGoals, availableSurveys }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My HR" />
@@ -119,6 +122,60 @@ export default function MyHrIndex({ profile, pendingLeave, leaveBalances, compli
                             )}
                             <Link href="/hr/my/policies">
                                 <Button variant="outline" size="sm" className="mt-2">My Policies</Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Performance Reviews</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {pendingReviews > 0 ? (
+                                <p className="text-sm">
+                                    <Badge variant="secondary">{pendingReviews}</Badge> review{pendingReviews !== 1 ? 's' : ''} awaiting your input
+                                </p>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No pending reviews.</p>
+                            )}
+                            <Link href="/hr/my/reviews">
+                                <Button variant="outline" size="sm" className="mt-2">My Reviews</Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Development Goals</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {activeGoals > 0 ? (
+                                <p className="text-sm">
+                                    <Badge variant="secondary">{activeGoals}</Badge> active goal{activeGoals !== 1 ? 's' : ''}
+                                </p>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No active goals.</p>
+                            )}
+                            <Link href="/hr/my/goals">
+                                <Button variant="outline" size="sm" className="mt-2">My Goals</Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">Surveys</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {availableSurveys > 0 ? (
+                                <p className="text-sm">
+                                    <Badge variant="secondary">{availableSurveys}</Badge> survey{availableSurveys !== 1 ? 's' : ''} available
+                                </p>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No open surveys.</p>
+                            )}
+                            <Link href="/hr/my/surveys">
+                                <Button variant="outline" size="sm" className="mt-2">My Surveys</Button>
                             </Link>
                         </CardContent>
                     </Card>
