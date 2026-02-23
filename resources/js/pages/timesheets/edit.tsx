@@ -143,6 +143,17 @@ export default function TimesheetEdit({ timesheet, clients, canApprove, canSubmi
                         </label>
                     </div>
 
+                    {Object.keys(form.errors).length > 0 && (
+                        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                            <p className="font-medium">Please fix the following errors:</p>
+                            <ul className="mt-1 list-disc pl-5">
+                                {Object.entries(form.errors).map(([field, message]) => (
+                                    <li key={field}>{message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
                     <div className="flex flex-wrap items-center gap-2">
                         <Button type="submit" disabled={form.processing || !editable}>Save</Button>
 
