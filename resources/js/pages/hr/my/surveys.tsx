@@ -1,6 +1,16 @@
 import { useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -122,10 +132,10 @@ function QuestionRenderer({
 function SurveyCard({ survey }: { survey: Survey }) {
     const [expanded, setExpanded] = useState(false);
     const [answers, setAnswers] = useState<Record<string, string>>({});
+    const [showConfirm, setShowConfirm] = useState(false);
     const form = useForm({ answers: {} as Record<string, string> });
 
     const handleSubmit = () => {
-        if (!confirm('Are you sure you want to submit this survey? You cannot change your answers after submission.')) return;
         form.transform(() => ({ answers }));
         form.post(`/hr/my/surveys/${survey.id}`, { preserveScroll: true });
     };
@@ -190,13 +200,28 @@ function SurveyCard({ survey }: { survey: Survey }) {
                         ))}
 
                         <div className="flex gap-2 border-t pt-4">
-                            <Button onClick={handleSubmit} disabled={!allRequiredAnswered || form.processing}>
+                            <Button onClick={() => setShowConfirm(true)} disabled={!allRequiredAnswered || form.processing}>
                                 Submit Survey
                             </Button>
                             <Button variant="outline" onClick={() => setExpanded(false)}>
                                 Cancel
                             </Button>
                         </div>
+
+                        <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                    <AlertDialogTitle>Submit survey?</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                        You cannot change your answers after submission. Are you sure you want to submit?
+                                    </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={handleSubmit}>Submit</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                     </div>
                 )}
             </CardContent>

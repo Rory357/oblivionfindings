@@ -185,7 +185,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.vetting.view')->group(function () {
         Route::get('/compliance/vetting', [VettingController::class, 'index'])->name('vetting.index');
-        Route::get('/compliance/vetting/{check}', [VettingController::class, 'show'])->name('vetting.show');
 
         Route::middleware('permission:hr.vetting.manage')->group(function () {
             Route::get('/compliance/vetting/create', [VettingController::class, 'create'])->name('vetting.create');
@@ -197,6 +196,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/compliance/vetting/{check}/renew', [VettingController::class, 'renew'])->name('vetting.renew');
             Route::post('/compliance/vetting/{check}/consent', [VettingController::class, 'captureConsent'])->name('vetting.consent');
         });
+
+        Route::get('/compliance/vetting/{check}', [VettingController::class, 'show'])->name('vetting.show');
     });
 
     /*

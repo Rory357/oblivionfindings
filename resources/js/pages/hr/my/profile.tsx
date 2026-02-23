@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ interface EmployeeProfile {
     emergency_contact_name: string | null;
     emergency_contact_phone: string | null;
     emergency_contact_relationship: string | null;
-    user: { id: number; name: string; email: string };
+    user: { id: number; name: string; email: string; avatar?: string | null };
     primary_site: { id: number; name: string } | null;
 }
 
@@ -72,7 +73,18 @@ export default function MyProfile({ profile }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Profile" />
             <div className="flex flex-col gap-6 p-6">
-                <h1 className="text-2xl font-bold">My Profile</h1>
+                <div className="flex items-center gap-4">
+                    <Avatar className="h-16 w-16">
+                        <AvatarImage src={profile.user.avatar ?? undefined} alt={profile.user.name} />
+                        <AvatarFallback className="text-lg">
+                            {profile.user.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
+                        </AvatarFallback>
+                    </Avatar>
+                    <div>
+                        <h1 className="text-2xl font-bold">{profile.user.name}</h1>
+                        <p className="text-sm text-muted-foreground">{profile.position_title}</p>
+                    </div>
+                </div>
 
                 {/* Read-Only Employment Info */}
                 <Card>

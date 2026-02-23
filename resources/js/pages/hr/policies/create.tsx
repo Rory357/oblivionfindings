@@ -282,22 +282,24 @@ export default function CreatePolicy({ existingCategories, defaultCategories }: 
                                     onValueChange={(value) => setData('content_mode', value as 'pdf_only' | 'pdf_and_summary')}
                                     className="grid grid-cols-1 md:grid-cols-2 gap-4"
                                 >
-                                    <RadioGroupItem value="pdf_only">
+                                    <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 hover:bg-muted">
+                                        <RadioGroupItem value="pdf_only" className="mt-0.5" />
                                         <div className="space-y-1">
-                                            <div className="font-medium">PDF Document Only</div>
+                                            <div className="font-medium text-sm">PDF Document Only</div>
                                             <p className="text-xs text-muted-foreground font-normal">
                                                 Upload a PDF document as the complete policy
                                             </p>
                                         </div>
-                                    </RadioGroupItem>
-                                    <RadioGroupItem value="pdf_and_summary">
+                                    </label>
+                                    <label className="flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 hover:bg-muted">
+                                        <RadioGroupItem value="pdf_and_summary" className="mt-0.5" />
                                         <div className="space-y-1">
-                                            <div className="font-medium">PDF + Content Summary</div>
+                                            <div className="font-medium text-sm">PDF + Content Summary</div>
                                             <p className="text-xs text-muted-foreground font-normal">
                                                 Upload PDF and provide a text summary for quick reference
                                             </p>
                                         </div>
-                                    </RadioGroupItem>
+                                    </label>
                                 </RadioGroup>
                             </div>
 

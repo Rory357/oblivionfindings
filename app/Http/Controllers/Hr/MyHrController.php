@@ -295,6 +295,7 @@ class MyHrController extends Controller
                 'id' => $profile->user->id,
                 'name' => $profile->user->name,
                 'email' => $profile->user->email,
+                'avatar' => $profile->user->avatar,
             ] : null,
             'primary_site' => $profile->primarySite ? [
                 'id' => $profile->primarySite->id,

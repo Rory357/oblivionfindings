@@ -1,4 +1,4 @@
-import { AlertTriangle, Ban, Clock, Pill, User, X, XCircle } from 'lucide-react';
+import { AlertTriangle, Clock, Pill, User } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';

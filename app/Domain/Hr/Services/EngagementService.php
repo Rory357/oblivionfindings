@@ -20,7 +20,7 @@ class EngagementService
     {
         return DB::transaction(function () use ($actor, $data) {
             $survey = HrEngagementSurvey::create([
-                'tenant_id' => $actor->tenant_id ?? null,
+                'tenant_id' => $data['tenant_id'] ?? $actor->tenant_id ?? null,
                 'title' => trim((string) $data['title']),
                 'description' => $data['description'] ?? null,
                 'survey_type' => $data['survey_type'] ?? 'pulse',

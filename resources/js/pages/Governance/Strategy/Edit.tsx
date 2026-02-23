@@ -19,7 +19,7 @@ interface Plan {
     values: string[] | null;
 }
 
-export default function EditStrategy({ auth, plan }: { auth: any; plan: Plan }) {
+export default function EditStrategy({ plan }: { plan: Plan }) {
     const { data, setData, transform, put, processing, errors } = useForm({
         title: plan.title,
         planning_horizon: plan.planning_horizon,
@@ -44,7 +44,6 @@ export default function EditStrategy({ auth, plan }: { auth: any; plan: Plan }) 
 
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Strategy', href: '/governance/strategy' },

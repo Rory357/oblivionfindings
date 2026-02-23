@@ -285,6 +285,6 @@ class TrainingCoursesSeeder extends Seeder
             );
         }
 
-        $this->command->info('Training courses seeded successfully.');
+        $this->command?->info('Training courses seeded successfully.');
     }
 }

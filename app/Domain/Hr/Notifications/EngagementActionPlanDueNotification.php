@@ -42,18 +42,29 @@ class EngagementActionPlanDueNotification extends Notification
 
     public function toArray(object $notifiable): array
     {
+        $message = $this->reminderKind === 'overdue'
+            ? 'This action plan is overdue by ' . abs($this->daysUntilDue) . ' day(s).'
+            : "This action plan is due in {$this->daysUntilDue} day(s).";
+
         return [
             'type' => 'hr_engagement_action_plan_due',
+            'title' => "Action Plan {$this->reminderKind}: {$this->plan->title}",
+            'message' => $message,
+            'url' => '/hr/wellbeing',
+            'context' => [
+                'Priority' => $this->plan->priority,
+                'Status' => $this->plan->status,
+                'Progress' => ((int) $this->plan->progress_percent) . '%',
+                'Due date' => optional($this->plan->due_date)->toDateString() ?? 'Not set',
+            ],
             'action_plan_id' => $this->plan->id,
             'survey_id' => $this->plan->survey_id,
-            'title' => $this->plan->title,
             'priority' => $this->plan->priority,
             'status' => $this->plan->status,
             'progress_percent' => (int) $this->plan->progress_percent,
             'due_date' => optional($this->plan->due_date)->toDateString(),
             'days_until_due' => $this->daysUntilDue,
             'reminder_kind' => $this->reminderKind,
-            'url' => '/hr/wellbeing',
         ];
     }
 }

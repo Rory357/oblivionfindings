@@ -1,7 +1,6 @@
-import { AlertCircle, AlertTriangle, Calendar, Clock, Package, Pill, ShieldAlert } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Calendar, Clock, Pill, ShieldAlert } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
 
 interface WidgetItem {
   id: number;

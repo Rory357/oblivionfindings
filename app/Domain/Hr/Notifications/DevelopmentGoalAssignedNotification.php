@@ -33,10 +33,15 @@ class DevelopmentGoalAssignedNotification extends Notification
     {
         return [
             'type' => 'hr_development_goal_assigned',
-            'goal_id' => $this->goal->id,
-            'title' => $this->goal->title,
-            'due_date' => optional($this->goal->due_date)->toDateString(),
+            'title' => "Development Goal: {$this->goal->title}",
+            'message' => 'A new development goal has been assigned to you.',
             'url' => '/hr/development/goals',
+            'context' => [
+                'Goal' => $this->goal->title,
+                'Due date' => optional($this->goal->due_date)->toDateString() ?? 'Not set',
+            ],
+            'goal_id' => $this->goal->id,
+            'due_date' => optional($this->goal->due_date)->toDateString(),
         ];
     }
 }

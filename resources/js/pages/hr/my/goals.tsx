@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -243,7 +243,7 @@ export default function MyGoals({ goals }: Props) {
                                 variant={link.active ? 'default' : 'outline'}
                                 size="sm"
                                 disabled={!link.url}
-                                onClick={() => link.url && window.location.assign(link.url)}
+                                onClick={() => link.url && router.get(link.url)}
                                 dangerouslySetInnerHTML={{ __html: link.label }}
                             />
                         ))}

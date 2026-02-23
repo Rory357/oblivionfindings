@@ -38,7 +38,7 @@ import {
     Calendar,
     X,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 type AuditLog = {
@@ -279,9 +279,8 @@ export default function MedicationsAudit({ filters, logs }: Props) {
                                     const hasMeta = log.meta && Object.keys(log.meta).length > 0;
                                     
                                     return (
-                                        <>
-                                            <TableRow 
-                                                key={log.id} 
+                                        <React.Fragment key={log.id}>
+                                            <TableRow
                                                 className={cn(
                                                     "cursor-pointer transition-colors",
                                                     isExpanded && "bg-muted/50"
@@ -363,7 +362,7 @@ export default function MedicationsAudit({ filters, logs }: Props) {
                                                     </TableCell>
                                                 </TableRow>
                                             )}
-                                        </>
+                                        </React.Fragment>
                                     );
                                 })}
                             </TableBody>

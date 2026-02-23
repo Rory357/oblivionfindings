@@ -1,16 +1,40 @@
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
-import { FormEvent, useMemo } from 'react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { ChevronDown, ChevronRight, Send, Lock, User } from 'lucide-react';
+import { FormEvent, useMemo, useState } from 'react';
 
 type SurveyQuestion = {
     id: number;
@@ -44,6 +68,14 @@ type SurveyPayload = {
     action_plans: SurveyActionPlan[];
 };
 
+type SurveyResponse = {
+    id: number;
+    respondent: string;
+    answers: Record<string, string | number | boolean>;
+    overall_score: number | null;
+    submitted_at: string | null;
+};
+
 type SummaryPayload = {
     response_count: number;
     average_overall_score: number | null;
@@ -61,6 +93,7 @@ type Props = {
     survey: SurveyPayload;
     existingResponse: { id: number; answers: Record<string, string | number | boolean>; submitted_at: string | null } | null;
     summary: SummaryPayload;
+    responses: SurveyResponse[];
     actionPlanOwners: Array<{ id: number; name: string }>;
     can: {
         manage: boolean;
@@ -68,7 +101,18 @@ type Props = {
     };
 };
 
-export default function WellbeingSurveyShow({ survey, existingResponse, summary, actionPlanOwners, can }: Props) {
+export default function WellbeingSurveyShow({ survey, existingResponse, summary, responses = [], actionPlanOwners, can }: Props) {
+    const [expandedResponse, setExpandedResponse] = useState<number | null>(null);
+    const [confirmAction, setConfirmAction] = useState<'publish' | 'close' | null>(null);
+
+    function handleStatusChange(action: 'publish' | 'close') {
+        const url = action === 'publish'
+            ? `/hr/wellbeing/surveys/${survey.id}/publish`
+            : `/hr/wellbeing/surveys/${survey.id}/close`;
+        router.post(url, {}, { preserveScroll: true });
+        setConfirmAction(null);
+    }
+
     const responseForm = useForm({
         answers: (existingResponse?.answers ?? {}) as Record<string, string | number | boolean>,
     });
@@ -126,9 +170,42 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                                 {survey.status}
                             </Badge>
                             <Badge variant="outline">{survey.survey_type.toUpperCase()}</Badge>
+                            {can.manage && survey.status === 'draft' && (
+                                <Button size="sm" onClick={() => setConfirmAction('publish')}>
+                                    <Send className="mr-1.5 h-3.5 w-3.5" />
+                                    Publish
+                                </Button>
+                            )}
+                            {can.manage && survey.status === 'published' && (
+                                <Button size="sm" variant="secondary" onClick={() => setConfirmAction('close')}>
+                                    <Lock className="mr-1.5 h-3.5 w-3.5" />
+                                    Close
+                                </Button>
+                            )}
                         </div>
                     }
                 />
+
+                <AlertDialog open={confirmAction !== null} onOpenChange={(open) => !open && setConfirmAction(null)}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>
+                                {confirmAction === 'publish' ? 'Publish survey?' : 'Close survey?'}
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                                {confirmAction === 'publish'
+                                    ? 'This will make the survey available for staff to respond. You can close it later to stop accepting responses.'
+                                    : 'This will stop accepting new responses. Existing responses will be preserved.'}
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction onClick={() => confirmAction && handleStatusChange(confirmAction)}>
+                                {confirmAction === 'publish' ? 'Publish' : 'Close'}
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
 
                 {summary && (
                     <div className="grid gap-4 md:grid-cols-3">
@@ -237,6 +314,114 @@ export default function WellbeingSurveyShow({ survey, existingResponse, summary,
                             {existingResponse
                                 ? `Response submitted${existingResponse.submitted_at ? ` at ${existingResponse.submitted_at}` : ''}.`
                                 : 'This survey is not currently open for responses.'}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {can.manage && summary && summary.question_stats.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Question Breakdown</CardTitle>
+                            <CardDescription>Per-question statistics across all responses</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Question</TableHead>
+                                        <TableHead className="w-[100px]">Type</TableHead>
+                                        <TableHead className="w-[100px] text-right">Responses</TableHead>
+                                        <TableHead className="w-[100px] text-right">Average</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {summary.question_stats.map((stat) => (
+                                        <TableRow key={stat.id}>
+                                            <TableCell className="text-sm">{stat.question_text}</TableCell>
+                                            <TableCell>
+                                                <Badge variant="outline" className="text-xs">{stat.question_type}</Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">{stat.responses}</TableCell>
+                                            <TableCell className="text-right font-medium">
+                                                {stat.average !== null ? stat.average : '-'}
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {can.manage && responses.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Individual Responses</CardTitle>
+                            <CardDescription>
+                                {responses.length} response{responses.length !== 1 ? 's' : ''}
+                                {survey.is_anonymous && ' (anonymous — names hidden)'}
+                            </CardDescription>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {responses.map((resp) => (
+                                <Collapsible
+                                    key={resp.id}
+                                    open={expandedResponse === resp.id}
+                                    onOpenChange={(open) => setExpandedResponse(open ? resp.id : null)}
+                                >
+                                    <CollapsibleTrigger asChild>
+                                        <button
+                                            type="button"
+                                            className="flex w-full items-center justify-between rounded-lg border p-3 text-left transition-colors hover:bg-muted"
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <User className="h-4 w-4 text-muted-foreground" />
+                                                <span className="text-sm font-medium">{resp.respondent}</span>
+                                                {resp.overall_score !== null && (
+                                                    <Badge variant="outline" className="text-xs">
+                                                        Score: {resp.overall_score}
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                {resp.submitted_at && (
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {new Date(resp.submitted_at).toLocaleString('en-NZ', {
+                                                            day: '2-digit',
+                                                            month: 'short',
+                                                            year: 'numeric',
+                                                            hour: '2-digit',
+                                                            minute: '2-digit',
+                                                        })}
+                                                    </span>
+                                                )}
+                                                {expandedResponse === resp.id ? (
+                                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                                                ) : (
+                                                    <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                                )}
+                                            </div>
+                                        </button>
+                                    </CollapsibleTrigger>
+                                    <CollapsibleContent>
+                                        <div className="mt-1 space-y-2 rounded-lg border bg-muted/30 p-4">
+                                            {sortedQuestions.map((question) => {
+                                                const answer = resp.answers[String(question.id)];
+                                                return (
+                                                    <div key={question.id} className="grid grid-cols-[1fr,auto] gap-4 border-b pb-2 last:border-0 last:pb-0">
+                                                        <p className="text-sm text-muted-foreground">{question.question_text}</p>
+                                                        <p className="text-sm font-medium text-right min-w-[80px]">
+                                                            {answer !== null && answer !== undefined && answer !== ''
+                                                                ? String(answer)
+                                                                : <span className="text-muted-foreground italic">No answer</span>}
+                                                        </p>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </CollapsibleContent>
+                                </Collapsible>
+                            ))}
                         </CardContent>
                     </Card>
                 )}

@@ -224,6 +224,17 @@ class WellbeingController extends Controller
                 'submitted_at' => optional($response->submitted_at)->toDateTimeString(),
             ] : null,
             'summary' => $canManage ? $this->engagementService->summary($survey) : null,
+            'responses' => $canManage ? $survey->responses()
+                ->with($survey->is_anonymous ? [] : ['user:id,name'])
+                ->orderByDesc('submitted_at')
+                ->get()
+                ->map(fn ($r, int $index) => [
+                    'id' => $r->id,
+                    'respondent' => $survey->is_anonymous ? ('Respondent ' . ($index + 1)) : ($r->user?->name ?? 'Unknown'),
+                    'answers' => $r->answers ?? [],
+                    'overall_score' => $r->overall_score,
+                    'submitted_at' => optional($r->submitted_at)->toDateTimeString(),
+                ])->values() : [],
             'actionPlanOwners' => $actionPlanOwners,
             'can' => [
                 'manage' => $canManage,
@@ -251,6 +262,8 @@ class WellbeingController extends Controller
             'questions.*.is_required' => ['nullable', 'boolean'],
             'questions.*.sort_order' => ['nullable', 'integer', 'min:1'],
         ]);
+
+        $validated['tenant_id'] = $this->resolveHrTenantIdForUser($user);
 
         $survey = $this->engagementService->createSurvey($user, $validated);
 

@@ -156,10 +156,6 @@ class PolicyController extends Controller
      */
     public function store(Request $request)
     {
-        // Attempt to increase upload limits at runtime
-        @ini_set('upload_max_filesize', '8M');
-        @ini_set('post_max_size', '8M');
-        
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);

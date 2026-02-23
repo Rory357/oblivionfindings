@@ -34,7 +34,8 @@ class EngagementSurveyInvitationNotification extends Notification
         return [
             'type' => 'hr_engagement_survey_invitation',
             'survey_id' => $this->survey->id,
-            'title' => $this->survey->title,
+            'title' => 'Engagement Survey: ' . $this->survey->title,
+            'message' => 'A new ' . strtoupper($this->survey->survey_type) . ' survey is available for you to complete.',
             'survey_type' => $this->survey->survey_type,
             'url' => '/hr/wellbeing/surveys/' . $this->survey->id,
         ];

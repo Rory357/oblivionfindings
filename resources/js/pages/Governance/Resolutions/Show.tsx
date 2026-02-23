@@ -259,24 +259,27 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
               </CardHeader>
               <CardContent>
                 <RadioGroup value={selectedVote} onValueChange={setSelectedVote} className="space-y-3">
-                  <RadioGroupItem value="for">
+                  <label className="flex items-center gap-3 rounded-md border p-3 cursor-pointer transition-colors [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 hover:bg-muted">
+                    <RadioGroupItem value="for" />
                     <span className="flex items-center gap-2">
                       <CheckCircle className="w-5 h-5 text-green-500" />
                       For
                     </span>
-                  </RadioGroupItem>
-                  <RadioGroupItem value="against">
+                  </label>
+                  <label className="flex items-center gap-3 rounded-md border p-3 cursor-pointer transition-colors [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 hover:bg-muted">
+                    <RadioGroupItem value="against" />
                     <span className="flex items-center gap-2">
                       <XCircle className="w-5 h-5 text-red-500" />
                       Against
                     </span>
-                  </RadioGroupItem>
-                  <RadioGroupItem value="abstain">
+                  </label>
+                  <label className="flex items-center gap-3 rounded-md border p-3 cursor-pointer transition-colors [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 hover:bg-muted">
+                    <RadioGroupItem value="abstain" />
                     <span className="flex items-center gap-2">
                       <MinusCircle className="w-5 h-5 text-gray-500" />
                       Abstain
                     </span>
-                  </RadioGroupItem>
+                  </label>
                 </RadioGroup>
 
                 <div className="mt-4">

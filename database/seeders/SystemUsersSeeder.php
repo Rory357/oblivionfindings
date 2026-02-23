@@ -151,7 +151,7 @@ class SystemUsersSeeder extends Seeder
             $boardUser->roles()->syncWithoutDetaching([$boardRole->id]);
         }
 
-        $this->command->info('Created ' . (count($users) + 8 + 1) . ' users with staff records.');
+        $this->command?->info('Created ' . (count($users) + 8 + 1) . ' users with staff records.');
     }
 
     private function upsertHrEmployeeProfile(User $user, ?Staff $staff): void
