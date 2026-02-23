@@ -76,9 +76,9 @@ class VotingService
         BoardMember $boardMember,
         string $type,
         string $description,
+        User $recordedBy,
         bool $withdrawFromVoting = true,
         bool $withdrawFromDiscussion = false,
-        User $recordedBy
     ): ConflictDeclaration {
         $conflict = ConflictDeclaration::create([
             'governance_meeting_id' => $resolution->governance_meeting_id,

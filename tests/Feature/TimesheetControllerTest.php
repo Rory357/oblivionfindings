@@ -350,6 +350,18 @@ class TimesheetControllerTest extends TestCase
         ]);
     }
 
+    public function test_store_can_mark_timesheet_as_residential_billable(): void
+    {
+        $response = $this->actingAs($this->staff)
+            ->post('/timesheets', $this->validTimesheetData(['is_residential_billable' => true]));
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('timesheets', [
+            'user_id' => $this->staff->id,
+            'is_residential_billable' => true,
+        ]);
+    }
+
     public function test_store_without_shift_id_creates_timesheet(): void
     {
         $response = $this->actingAs($this->staff)
@@ -427,6 +439,32 @@ class TimesheetControllerTest extends TestCase
             'id' => $timesheet->id,
             'notes' => 'Updated notes',
             'break_minutes' => 45,
+        ]);
+    }
+
+    public function test_update_can_change_residential_billable_flag(): void
+    {
+        $timesheet = Timesheet::factory()->create([
+            'user_id' => $this->staff->id,
+            'status' => 'draft',
+            'is_residential_billable' => false,
+        ]);
+
+        $response = $this->actingAs($this->staff)
+            ->put("/timesheets/{$timesheet->id}", [
+                'client_id' => $timesheet->client_id,
+                'work_date' => $timesheet->work_date->format('Y-m-d'),
+                'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
+                'ends_at' => $timesheet->ends_at->format('Y-m-d H:i:s'),
+                'break_minutes' => 0,
+                'notes' => $timesheet->notes,
+                'is_residential_billable' => true,
+            ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('timesheets', [
+            'id' => $timesheet->id,
+            'is_residential_billable' => true,
         ]);
     }
 

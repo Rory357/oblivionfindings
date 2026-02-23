@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Site extends Model
@@ -186,6 +187,7 @@ class Site extends Model
             'head_office' => 'Head Office',
             'house' => 'House',
             'facility' => 'Facilities',
+            'residential' => 'Residential',
             default => 'Site',
         };
     }
@@ -227,5 +229,27 @@ class Site extends Model
             return $query;
         }
         return $query->where('tenant_id', $tenantId);
+    }
+
+    // Site Damages & Ledger relationships
+
+    public function damages(): HasMany
+    {
+        return $this->hasMany(SiteDamage::class);
+    }
+
+    public function houseLedger(): HasOne
+    {
+        return $this->hasOne(HouseLedger::class);
+    }
+
+    public function checklistTemplates(): HasMany
+    {
+        return $this->hasMany(SiteChecklistTemplate::class, 'site_id');
+    }
+
+    public function isHouseType(): bool
+    {
+        return in_array($this->type, ['house', 'residential']);
     }
 }

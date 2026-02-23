@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 
 type Props = {
@@ -161,7 +162,7 @@ export default function IncidentsIndex({ filters, incidents, clients }: Props) {
                                             <div className="mt-1 text-xs text-slate-500">
                                                 {i.client?.first_name} {i.client?.last_name} • {i.status}
                                                 {i.shift_id ? <span className="ml-2">• Shift-linked</span> : <span className="ml-2">• Standalone</span>}
-                                                {i.occurred_at ? <span className="ml-2">• {i.occurred_at}</span> : null}
+                                                {i.occurred_at ? <span className="ml-2">• {formatDateTime(i.occurred_at)}</span> : null}
                                             </div>
                                         </div>
                                         <Link href={`/incidents/${i.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">

@@ -390,6 +390,7 @@ return new class extends Migration
             $table->string('source_key', 128)->nullable();
             $table->string('title');
             $table->text('summary')->nullable();
+            $table->text('triage_notes')->nullable();
             $table->json('raw_payload')->nullable();
             $table->string('dedupe_key', 191);
             $table->decimal('score_hint', 8, 2)->nullable();

@@ -27,15 +27,24 @@ class PerformanceReviewDueNotification extends Notification implements ShouldQue
 
     public function toArray(object $notifiable): array
     {
+        $reviewType = ucfirst(str_replace('_', ' ', $this->reviewType));
+
         return [
             'type'          => 'performance_review_due',
+            'title'         => "Performance Review Due: {$this->employeeName}",
+            'message'       => "A {$reviewType} review for {$this->employeeName} is due on {$this->dueDate}.",
             'review_type'   => $this->reviewType,
             'employee_name' => $this->employeeName,
             'due_date'      => $this->dueDate,
             'review_id'     => $this->reviewId,
-            'action_url'    => $this->reviewId
+            'url'           => $this->reviewId
                 ? "/hr/performance-reviews/{$this->reviewId}"
                 : '/hr/performance-reviews',
+            'context'       => [
+                'Review type' => $reviewType,
+                'Employee' => $this->employeeName,
+                'Due date' => $this->dueDate,
+            ],
         ];
     }
 }

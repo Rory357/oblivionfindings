@@ -191,6 +191,10 @@ class ComplianceEngineService
      */
     protected function escalateReminder(ComplianceReminder $reminder): void
     {
+        if ($reminder->escalation_level >= 3) {
+            return; // Maximum escalation level reached
+        }
+
         $obligation = $reminder->obligation;
         $nextLevel = $reminder->escalation_level + 1;
 

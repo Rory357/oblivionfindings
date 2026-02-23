@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
-import HeadingSmall from '@/components/heading-small';
+import PageHeader from '@/components/page-header';
+import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Head, useForm, usePage } from '@inertiajs/react';
@@ -38,8 +39,8 @@ export default function StaffAssignments({ user, clients, assignedIds }: Props) 
         >
             <Head title="Staff assignments" />
 
-            <div className="p-4 max-w-3xl space-y-6">
-                <HeadingSmall title={`Assign ${clientPlural}`} description={`Assign ${clientPlural.toLowerCase()} to ${user.name}.`} />
+            <PageShell>
+                <PageHeader title={`Assign ${clientPlural}`} description={`Assign ${clientPlural.toLowerCase()} to ${user.name}.`} />
 
                 <form
                     onSubmit={(e) => {
@@ -71,7 +72,7 @@ export default function StaffAssignments({ user, clients, assignedIds }: Props) 
                         <Button type="button" variant="outline" onClick={() => form.reset()}>Reset</Button>
                     </div>
                 </form>
-            </div>
+            </PageShell>
         </AppLayout>
     );
 }

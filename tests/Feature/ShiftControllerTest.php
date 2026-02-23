@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\ServiceContext;
+use App\Models\Site;
 use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -106,6 +107,22 @@ class ShiftControllerTest extends TestCase
     // ==========================================
     // STORE TESTS
     // ==========================================
+
+    public function test_create_includes_client_site_for_location_prefill(): void
+    {
+        $site = Site::factory()->create(['name' => 'Kauri House']);
+        $this->client->update(['site_id' => $site->id]);
+
+        $response = $this->actingAs($this->admin)->get('/shifts/create');
+
+        $response->assertOk();
+        $response->assertInertia(fn ($page) => $page
+            ->component('shifts/create')
+            ->where('clients.0.id', $this->client->id)
+            ->where('clients.0.site.id', $site->id)
+            ->where('clients.0.site.name', 'Kauri House')
+        );
+    }
 
     public function test_store_creates_shift_with_valid_data(): void
     {

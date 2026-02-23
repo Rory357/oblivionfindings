@@ -41,7 +41,9 @@ class GovernancePermissionsSeeder extends Seeder
             
             // Budgets
             ['key' => 'governance.budgets.view', 'description' => 'View Budgets'],
-            ['key' => 'governance.budgets.manage', 'description' => 'Manage Budgets'],
+            ['key' => 'governance.budgets.create', 'description' => 'Create & Edit Budgets'],
+            ['key' => 'governance.budgets.submit', 'description' => 'Submit Budgets for Board Approval'],
+            ['key' => 'governance.budgets.approve', 'description' => 'Approve Budgets on behalf of the Board'],
             
             // Board Packs
             ['key' => 'governance.packs.view', 'description' => 'View Board Packs'],
@@ -50,6 +52,38 @@ class GovernancePermissionsSeeder extends Seeder
             // Action Items
             ['key' => 'governance.actions.view', 'description' => 'View Action Items'],
             ['key' => 'governance.actions.manage', 'description' => 'Manage Action Items'],
+
+            // Governance Policies
+            ['key' => 'governance.policies.view', 'description' => 'View Governance Policies'],
+            ['key' => 'governance.policies.manage', 'description' => 'Manage Governance Policies'],
+
+            // CEO Board Reports
+            ['key' => 'governance.ceo-reports.view', 'description' => 'View CEO Board Reports'],
+            ['key' => 'governance.ceo-reports.manage', 'description' => 'Manage CEO Board Reports'],
+
+            // Board Interests Register
+            ['key' => 'governance.interests.view', 'description' => 'View Board Interests Register'],
+            ['key' => 'governance.interests.manage', 'description' => 'Manage Board Interests Register'],
+
+            // Board Evaluations
+            ['key' => 'governance.evaluations.view', 'description' => 'View Board Evaluations'],
+            ['key' => 'governance.evaluations.manage', 'description' => 'Manage Board Evaluations'],
+
+            // Governance Documents
+            ['key' => 'governance.documents.view', 'description' => 'View Governance Documents'],
+            ['key' => 'governance.documents.manage', 'description' => 'Manage Governance Documents'],
+
+            // Clinical Governance
+            ['key' => 'governance.clinical.view', 'description' => 'View Clinical Governance'],
+            ['key' => 'governance.clinical.manage', 'description' => 'Manage Clinical Governance'],
+
+            // Te Tiriti o Waitangi
+            ['key' => 'governance.te-tiriti.view', 'description' => 'View Te Tiriti Framework'],
+            ['key' => 'governance.te-tiriti.manage', 'description' => 'Manage Te Tiriti Framework'],
+
+            // Evidence Library
+            ['key' => 'governance.evidence.view', 'description' => 'View Evidence Library'],
+            ['key' => 'governance.evidence.manage', 'description' => 'Manage Evidence Library'],
         ];
 
         foreach ($permissions as $perm) {
@@ -106,6 +140,18 @@ class GovernancePermissionsSeeder extends Seeder
                 'governance.resolutions.manage',
                 'governance.actions.view',
                 'governance.actions.manage',
+                'governance.policies.view',
+                'governance.policies.manage',
+                'governance.ceo-reports.view',
+                'governance.interests.view',
+                'governance.interests.manage',
+                'governance.evaluations.view',
+                'governance.evaluations.manage',
+                'governance.documents.view',
+                'governance.documents.manage',
+                'governance.budgets.view',
+                'governance.budgets.create',
+                'governance.budgets.submit',
             ];
             foreach ($secretaryPerms as $key) {
                 $perm = Permission::where('key', $key)->first();
@@ -128,8 +174,18 @@ class GovernancePermissionsSeeder extends Seeder
                 'governance.performance.view',
                 'governance.strategy.view',
                 'governance.budgets.view',
+                'governance.budgets.approve',
                 'governance.packs.view',
                 'governance.actions.view',
+                'governance.policies.view',
+                'governance.ceo-reports.view',
+                'governance.interests.view',
+                'governance.interests.manage',
+                'governance.evaluations.view',
+                'governance.documents.view',
+                'governance.clinical.view',
+                'governance.te-tiriti.view',
+                'governance.evidence.view',
             ];
             foreach ($memberPerms as $key) {
                 $perm = Permission::where('key', $key)->first();
@@ -153,6 +209,12 @@ class GovernancePermissionsSeeder extends Seeder
                 'governance.budgets.view',
                 'governance.packs.view',
                 'governance.actions.view',
+                'governance.policies.view',
+                'governance.ceo-reports.view',
+                'governance.interests.view',
+                'governance.documents.view',
+                'governance.clinical.view',
+                'governance.te-tiriti.view',
             ];
             foreach ($observerPerms as $key) {
                 $perm = Permission::where('key', $key)->first();

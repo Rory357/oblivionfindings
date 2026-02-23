@@ -44,10 +44,36 @@ return new class extends Migration
             $table->index(['status', 'deadline']);
             $table->index(['governance_meeting_id', 'status']);
         });
+
+        Schema::table('meeting_agenda_items', function (Blueprint $table) {
+            $table->foreign('resolution_id')
+                ->references('id')
+                ->on('resolutions')
+                ->nullOnDelete();
+        });
+
+        Schema::table('meeting_minutes', function (Blueprint $table) {
+            $table->foreign('approval_resolution_id')
+                ->references('id')
+                ->on('resolutions')
+                ->nullOnDelete();
+        });
     }
 
     public function down(): void
     {
+        if (Schema::hasTable('meeting_agenda_items')) {
+            Schema::table('meeting_agenda_items', function (Blueprint $table) {
+                $table->dropForeign(['resolution_id']);
+            });
+        }
+
+        if (Schema::hasTable('meeting_minutes')) {
+            Schema::table('meeting_minutes', function (Blueprint $table) {
+                $table->dropForeign(['approval_resolution_id']);
+            });
+        }
+
         Schema::dropIfExists('resolutions');
     }
 };

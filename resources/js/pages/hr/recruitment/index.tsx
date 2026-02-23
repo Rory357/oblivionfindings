@@ -1,12 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
     Users,
     Search,
@@ -47,14 +48,24 @@ type Pipeline = Record<string, number>;
 type Props = {
     candidates: PaginatedCandidates;
     pipeline: Pipeline;
+    sourceBreakdown: Record<string, number>;
+    filters: {
+        search: string;
+        source: string;
+    };
     can: Record<string, boolean>;
 };
 
 const statusConfig: Record<string, { label: string; color: string; icon: React.ElementType }> = {
     new: { label: 'New', color: 'border-blue-500/30 text-blue-400 bg-blue-500/10', icon: UserPlus },
     screening: { label: 'Screening', color: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10', icon: FileText },
-    interviewing: { label: 'Interviewing', color: 'border-amber-500/30 text-amber-400 bg-amber-500/10', icon: PhoneCall },
-    offered: { label: 'Offered', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', icon: CheckCircle2 },
+    interview_scheduled: { label: 'Interview Scheduled', color: 'border-amber-500/30 text-amber-400 bg-amber-500/10', icon: PhoneCall },
+    interview_completed: { label: 'Interview Completed', color: 'border-amber-500/30 text-amber-400 bg-amber-500/10', icon: CheckCircle2 },
+    reference_check: { label: 'Reference Check', color: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', icon: FileText },
+    offer_pending: { label: 'Offer Pending', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', icon: CheckCircle2 },
+    offer_sent: { label: 'Offer Sent', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', icon: CheckCircle2 },
+    offer_accepted: { label: 'Offer Accepted', color: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', icon: CheckCircle2 },
+    onboarding: { label: 'Onboarding', color: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10', icon: Users },
     hired: { label: 'Hired', color: 'border-green-500/30 text-green-400 bg-green-500/10', icon: CheckCircle2 },
     withdrawn: { label: 'Withdrawn', color: 'border-slate-500/30 text-slate-400 bg-slate-500/10', icon: XCircle },
     rejected: { label: 'Rejected', color: 'border-red-500/30 text-red-400 bg-red-500/10', icon: XCircle },
@@ -75,12 +86,17 @@ function StatusBadge({ status }: { status: string }) {
     );
 }
 
-export default function RecruitmentIndex({ candidates, pipeline, can }: Props) {
-    const [search, setSearch] = useState('');
+export default function RecruitmentIndex({ candidates, pipeline, sourceBreakdown, filters, can }: Props) {
+    const [search, setSearch] = useState(filters.search ?? '');
+    const [source, setSource] = useState(filters.source ?? '');
 
     const handleSearch = (e: React.FormEvent) => {
         e.preventDefault();
-        router.get('/hr/recruitment', { search }, { preserveState: true, replace: true });
+        router.get(
+            '/hr/recruitment',
+            { search: search || undefined, source: source || undefined },
+            { preserveState: true, replace: true },
+        );
     };
 
     const pipelineEntries = Object.entries(pipeline);
@@ -100,12 +116,20 @@ export default function RecruitmentIndex({ candidates, pipeline, can }: Props) {
                     description="Track candidates through the hiring process."
                     actions={
                         can.manage ? (
-                            <Button asChild>
-                                <Link href="/hr/recruitment/candidates/create">
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Candidate
-                                </Link>
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" asChild>
+                                    <Link href="/hr/recruitment/jobs">Jobs</Link>
+                                </Button>
+                                <Button variant="outline" asChild>
+                                    <Link href="/hr/recruitment/kits">Interview Kits</Link>
+                                </Button>
+                                <Button asChild>
+                                    <Link href="/hr/recruitment/candidates/create">
+                                        <Plus className="w-4 h-4 mr-2" />
+                                        Add Candidate
+                                    </Link>
+                                </Button>
+                            </div>
                         ) : undefined
                     }
                 />
@@ -137,8 +161,21 @@ export default function RecruitmentIndex({ candidates, pipeline, can }: Props) {
                     </div>
                 )}
 
+                {Object.keys(sourceBreakdown).length > 0 && (
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                        {Object.entries(sourceBreakdown).slice(0, 8).map(([sourceKey, count]) => (
+                            <Card key={sourceKey}>
+                                <CardContent className="flex items-center justify-between py-3">
+                                    <p className="text-sm capitalize text-muted-foreground">{sourceKey.replace(/_/g, ' ')}</p>
+                                    <p className="text-lg font-semibold">{count}</p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+                )}
+
                 {/* Search */}
-                <form onSubmit={handleSearch} className="flex items-center gap-2">
+                <form onSubmit={handleSearch} className="flex flex-wrap items-center gap-2">
                     <div className="relative flex-1 max-w-sm">
                         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                         <Input
@@ -148,8 +185,32 @@ export default function RecruitmentIndex({ candidates, pipeline, can }: Props) {
                             className="pl-9"
                         />
                     </div>
+                    <Select value={source || 'all'} onValueChange={(value) => setSource(value === 'all' ? '' : value)}>
+                        <SelectTrigger className="w-[200px]">
+                            <SelectValue placeholder="All sources" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All sources</SelectItem>
+                            {Object.keys(sourceBreakdown).map((sourceKey) => (
+                                <SelectItem key={sourceKey} value={sourceKey}>
+                                    {sourceKey.replace(/_/g, ' ')}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Button type="submit" variant="secondary">
                         Search
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => {
+                            setSearch('');
+                            setSource('');
+                            router.get('/hr/recruitment', {}, { preserveState: true, replace: true });
+                        }}
+                    >
+                        Clear
                     </Button>
                 </form>
 
@@ -197,7 +258,7 @@ export default function RecruitmentIndex({ candidates, pipeline, can }: Props) {
                                             <StatusBadge status={candidate.status} />
                                         </td>
                                         <td className="px-4 py-3 text-muted-foreground capitalize">
-                                            {candidate.source?.replace(/_/g, ' ') || '—'}
+                                            {candidate.source?.replace(/_/g, ' ') || '-'}
                                         </td>
                                         <td className="px-4 py-3 text-muted-foreground">
                                             {new Date(candidate.created_at).toLocaleDateString()}
@@ -243,3 +304,4 @@ export default function RecruitmentIndex({ candidates, pipeline, can }: Props) {
         </AppLayout>
     );
 }
+

@@ -1,4 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
+import PageHeader from '@/components/page-header';
+import PageShell from '@/components/page-shell';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,14 +47,13 @@ export default function StaffAvailability({ user, availability, canManage }: Pro
         >
             <Head title={`Availability: ${user.name}`} />
 
-            <div className="p-4 space-y-6">
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <div className="text-lg font-semibold">Availability</div>
-                        <div className="text-sm text-muted-foreground">
-                            {user.name} • {user.email}
-                        </div>
-                    </div>
+            <PageShell>
+                <PageHeader
+                    title="Availability"
+                    description={`${user.name} • ${user.email}`}
+                />
+
+                <div className="flex items-center justify-end gap-2">
                     <Link href={`/staff/${user.id}`}>
                         <Button variant="outline">Back</Button>
                     </Link>
@@ -130,7 +131,7 @@ export default function StaffAvailability({ user, availability, canManage }: Pro
                         </div>
                     ))}
                 </div>
-            </div>
+            </PageShell>
         </AppLayout>
     );
 }

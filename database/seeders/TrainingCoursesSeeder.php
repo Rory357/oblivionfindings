@@ -279,9 +279,12 @@ class TrainingCoursesSeeder extends Seeder
         ];
 
         foreach ($courses as $course) {
-            TrainingCourse::create($course);
+            TrainingCourse::updateOrCreate(
+                ['code' => $course['code']],
+                $course
+            );
         }
 
-        $this->command->info('Training courses seeded successfully.');
+        $this->command?->info('Training courses seeded successfully.');
     }
 }

@@ -1,0 +1,119 @@
+import { Clock, History, User } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+
+interface PrnAdministration {
+  id: number;
+  administered_at: string;
+  dose_given?: string;
+  reason?: string;
+  administered_by?: string;
+}
+
+interface Props {
+  history: PrnAdministration[];
+  count24h: number;
+  maxPerDay?: string;
+  remainingToday?: number;
+}
+
+export default function PrnHistoryPanel({ history, count24h, maxPerDay, remainingToday }: Props) {
+  const maxCount = maxPerDay ? parseInt(maxPerDay.replace(/\D/g, ''), 10) : null;
+  const percentage = maxCount ? (count24h / maxCount) * 100 : 0;
+  
+  const getBarColor = () => {
+    if (percentage >= 100) return 'bg-red-500';
+    if (percentage >= 75) return 'bg-orange-500';
+    if (percentage >= 50) return 'bg-yellow-500';
+    return 'bg-green-500';
+  };
+
+  return (
+    <Card className="border-slate-200">
+      <CardHeader className="pb-3">
+        <CardTitle className="flex items-center gap-2 text-sm font-medium">
+          <History className="h-4 w-4" />
+          PRN History (Last 24h)
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Usage Bar */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-slate-600">Usage</span>
+            <span className="font-medium">
+              {count24h} / {maxPerDay || 'unlimited'}
+              {remainingToday !== null && remainingToday !== undefined && (
+                <span className="ml-2 text-slate-500">({remainingToday} remaining)</span>
+              )}
+            </span>
+          </div>
+          {maxCount && (
+            <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+              <div
+                className={`h-full transition-all duration-300 ${getBarColor()}`}
+                style={{ width: `${Math.min(percentage, 100)}%` }}
+              />
+            </div>
+          )}
+        </div>
+
+        {/* History List */}
+        {history.length === 0 ? (
+          <div className="text-center text-sm text-slate-500">
+            No PRN administrations in last 24 hours
+          </div>
+        ) : (
+          <div className="space-y-2 max-h-48 overflow-y-auto">
+            {history.map((admin) => (
+              <div
+                key={admin.id}
+                className="flex items-start gap-2 rounded-md border border-slate-100 bg-slate-50 p-2"
+              >
+                <Clock className="mt-0.5 h-3 w-3 shrink-0 text-slate-400" />
+                <div className="min-w-0 flex-1 text-xs">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">
+                      {new Date(admin.administered_at).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </span>
+                    {admin.dose_given && (
+                      <Badge variant="outline" className="text-xs">
+                        {admin.dose_given}
+                      </Badge>
+                    )}
+                  </div>
+                  {admin.reason && (
+                    <div className="mt-1 truncate text-slate-600">
+                      {admin.reason}
+                    </div>
+                  )}
+                  {admin.administered_by && (
+                    <div className="mt-1 flex items-center gap-1 text-slate-400">
+                      <User className="h-3 w-3" />
+                      {admin.administered_by}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Limit Warning */}
+        {maxCount && count24h >= maxCount && (
+          <div className="rounded-md border border-red-200 bg-red-50 p-2 text-center text-xs text-red-700">
+            ⚠️ PRN limit reached - cannot administer
+          </div>
+        )}
+        {maxCount && count24h >= maxCount * 0.75 && count24h < maxCount && (
+          <div className="rounded-md border border-orange-200 bg-orange-50 p-2 text-center text-xs text-orange-700">
+            ⚠️ Approaching PRN limit
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}

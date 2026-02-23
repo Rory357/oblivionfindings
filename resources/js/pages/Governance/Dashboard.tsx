@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { data as dashboardData } from '@/routes/governance/dashboard';
@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, Shield, Users, Vote, AlertOctagon } from 'lucide-react';
+import { Calendar, Shield, Users, Vote, AlertOctagon, BookOpen, FileText, ClipboardList, Star, FolderOpen, HeartPulse, Landmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
 
@@ -96,6 +96,8 @@ interface DashboardData {
   workflow?: WorkflowPayload;
 }
 
+type DecisionItem = NonNullable<DashboardWidget['decisions_required']>['items'][number];
+
 export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: PageProps & { isBoardMember: boolean; boardRole?: string }) {
   const [period, setPeriod] = useState('month');
   const [data, setData] = useState<DashboardData | null>(null);
@@ -148,7 +150,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
     }[priority];
   };
 
-  const decisionHref = (decision: DashboardWidget['decisions_required']['items'][number]) => {
+  const decisionHref = (decision: DecisionItem) => {
     if (decision.source === 'roadmap_decision_request') {
       return '/roadmap/decisions';
     }
@@ -156,7 +158,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
     return showResolution.url({ resolution: decision.id });
   };
 
-  const decisionActionLabel = (decision: DashboardWidget['decisions_required']['items'][number]) => {
+  const decisionActionLabel = (decision: DecisionItem) => {
     if (decision.source === 'roadmap_decision_request') {
       return 'Open Request';
     }
@@ -475,6 +477,32 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
                 </Button>
               </CardContent>
             </Card>
+          </div>
+
+          <div className="mt-8">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Governance Modules</h2>
+            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+              {[
+                { label: 'Policies', href: '/governance/policies', icon: <BookOpen className="w-5 h-5" />, color: 'text-blue-600 bg-blue-50' },
+                { label: 'CEO Reports', href: '/governance/ceo-reports', icon: <FileText className="w-5 h-5" />, color: 'text-indigo-600 bg-indigo-50' },
+                { label: 'Interests', href: '/governance/interests', icon: <ClipboardList className="w-5 h-5" />, color: 'text-purple-600 bg-purple-50' },
+                { label: 'Evaluations', href: '/governance/evaluations', icon: <Star className="w-5 h-5" />, color: 'text-amber-600 bg-amber-50' },
+                { label: 'Documents', href: '/governance/documents', icon: <FolderOpen className="w-5 h-5" />, color: 'text-emerald-600 bg-emerald-50' },
+                { label: 'Clinical Gov', href: '/governance/clinical', icon: <HeartPulse className="w-5 h-5" />, color: 'text-rose-600 bg-rose-50' },
+                { label: 'Te Tiriti', href: '/governance/te-tiriti', icon: <Landmark className="w-5 h-5" />, color: 'text-teal-600 bg-teal-50' },
+              ].map((tile) => (
+                <Link
+                  key={tile.href}
+                  href={tile.href}
+                  className="flex flex-col items-center gap-2 p-4 rounded-lg border border-gray-200 hover:border-gray-300 hover:shadow-sm transition-all text-center"
+                >
+                  <div className={cn('p-2 rounded-lg', tile.color)}>
+                    {tile.icon}
+                  </div>
+                  <span className="text-sm font-medium text-gray-700">{tile.label}</span>
+                </Link>
+              ))}
+            </div>
           </div>
       </div>
     </AppLayout>

@@ -12,21 +12,22 @@ type StaffBackgroundCheck = {
     check_type: string;
     status: string;
     reference_number: string | null;
-    issued_at: string | null;
+    check_date: string | null;
+    issue_date: string | null;
     expires_at: string | null;
-    requested_at: string | null;
-    completed_at: string | null;
-    consent_given: boolean;
-    consent_date: string | null;
+    verified_at: string | null;
+    created_at: string | null;
     notes: string | null;
-    disclosure_level: string | null;
+    disclosures_present: boolean;
     disclosure_details: string | null;
+    risk_decision: string | null;
+    risk_assessor?: { id: number; name: string } | null;
     user: {
         id: number;
         name: string;
         email?: string;
     };
-    verifiedBy: {
+    verified_by?: {
         id: number;
         name: string;
     } | null;
@@ -36,7 +37,7 @@ type Props = {
     check: StaffBackgroundCheck;
     can: {
         manage: boolean;
-        viewDisclosures: boolean;
+        viewDisclosures?: boolean;
     };
 };
 
@@ -50,33 +51,17 @@ const formatDate = (value?: string | null) => {
     });
 };
 
-const formatDateTime = (value?: string | null) => {
-    if (!value) return 'Not set';
-    const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-};
-
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'current':
-        case 'cleared':
+        case 'clear':
             return 'bg-green-100 text-green-800 border-green-200';
         case 'pending':
-        case 'in_progress':
+        case 'requested':
             return 'bg-blue-100 text-blue-800 border-blue-200';
-        case 'expiring':
+        case 'renewal_due':
             return 'bg-amber-100 text-amber-800 border-amber-200';
-        case 'expired':
-            return 'bg-red-100 text-red-800 border-red-200';
-        case 'not_started':
-            return 'bg-slate-100 text-slate-800 border-slate-200';
-        case 'failed':
+        case 'flagged':
+        case 'adverse':
             return 'bg-red-100 text-red-800 border-red-200';
         default:
             return 'bg-slate-100 text-slate-800 border-slate-200';
@@ -99,12 +84,14 @@ const isExpiringSoon = (expiresAt: string | null) => {
 export default function VettingShow({ check, can }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
-        { title: 'Vetting', href: '/hr/vetting' },
-        { title: `${check.user.name} - ${check.check_type.replace(/_/g, ' ')}`, href: `/hr/vetting/${check.id}` },
+        { title: 'Vetting', href: '/hr/compliance/vetting' },
+        { title: `${check.user.name} - ${check.check_type.replace(/_/g, ' ')}`, href: `/hr/compliance/vetting/${check.id}` },
     ];
 
     const expired = isExpired(check.expires_at);
     const expiringSoon = isExpiringSoon(check.expires_at);
+    const consentRecorded = typeof check.notes === 'string' && check.notes.includes('[Consent recorded');
+    const canViewDisclosures = Boolean(can.viewDisclosures ?? can.manage);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -136,32 +123,32 @@ export default function VettingShow({ check, can }: Props) {
                                     Expiring Soon
                                 </Badge>
                             )}
-                            {check.consent_given && (
+                            {consentRecorded && (
                                 <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700">
                                     <CheckCircle className="mr-1 h-3 w-3" />
-                                    Consent Given
+                                    Consent Recorded
                                 </Badge>
                             )}
                         </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        <Link href="/hr/vetting" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                        <Link href="/hr/compliance/vetting" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                             Back to list
                         </Link>
                         {can.manage && (
-                            <Link href={`/hr/vetting/${check.id}/edit`}>
+                            <Link href={`/hr/compliance/vetting/${check.id}/edit`}>
                                 <Button size="sm" variant="outline">
                                     <Edit className="mr-1.5 h-4 w-4" />
                                     Edit
                                 </Button>
                             </Link>
                         )}
-                        {can.manage && (check.status === 'pending' || check.status === 'in_progress') && (
+                        {can.manage && (check.status === 'pending' || check.status === 'requested') && (
                             <Button
                                 size="sm"
                                 onClick={() => {
                                     if (confirm('Mark this check as cleared?')) {
-                                        router.post(`/hr/vetting/${check.id}/clear`);
+                                        router.post(`/hr/compliance/vetting/${check.id}/clear`);
                                     }
                                 }}
                             >
@@ -193,8 +180,14 @@ export default function VettingShow({ check, can }: Props) {
                             )}
                             <div className="text-sm">
                                 <div className="text-xs text-slate-500">Verified By</div>
-                                <div className="font-medium">{check.verifiedBy?.name || 'Not verified'}</div>
+                                <div className="font-medium">{check.verified_by?.name || 'Not verified'}</div>
                             </div>
+                            {check.risk_assessor?.name && (
+                                <div className="text-sm">
+                                    <div className="text-xs text-slate-500">Risk Assessor</div>
+                                    <div className="font-medium">{check.risk_assessor.name}</div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -222,6 +215,12 @@ export default function VettingShow({ check, can }: Props) {
                                     </Badge>
                                 </div>
                             </div>
+                            {check.risk_decision && (
+                                <div className="text-sm">
+                                    <div className="text-xs text-slate-500">Risk Decision</div>
+                                    <div className="font-medium capitalize">{check.risk_decision.replace(/_/g, ' ')}</div>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -238,15 +237,15 @@ export default function VettingShow({ check, can }: Props) {
                             <div className="grid grid-cols-2 gap-3 text-sm">
                                 <div>
                                     <div className="text-xs text-slate-500">Requested</div>
-                                    <div>{formatDate(check.requested_at)}</div>
+                                    <div>{formatDate(check.created_at)}</div>
                                 </div>
                                 <div>
                                     <div className="text-xs text-slate-500">Completed</div>
-                                    <div>{formatDate(check.completed_at)}</div>
+                                    <div>{formatDate(check.verified_at)}</div>
                                 </div>
                                 <div>
                                     <div className="text-xs text-slate-500">Issued</div>
-                                    <div>{formatDate(check.issued_at)}</div>
+                                    <div>{formatDate(check.issue_date || check.check_date)}</div>
                                 </div>
                                 <div>
                                     <div className="text-xs text-slate-500">Expires</div>
@@ -273,9 +272,9 @@ export default function VettingShow({ check, can }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3">
                             <div className="text-sm">
-                                <div className="text-xs text-slate-500">Consent Given</div>
+                                <div className="text-xs text-slate-500">Consent Recorded</div>
                                 <div className="font-medium">
-                                    {check.consent_given ? (
+                                    {consentRecorded ? (
                                         <span className="flex items-center gap-1 text-green-600">
                                             <CheckCircle className="h-4 w-4" /> Yes
                                         </span>
@@ -284,12 +283,9 @@ export default function VettingShow({ check, can }: Props) {
                                     )}
                                 </div>
                             </div>
-                            {check.consent_date && (
-                                <div className="text-sm">
-                                    <div className="text-xs text-slate-500">Consent Date</div>
-                                    <div>{formatDate(check.consent_date)}</div>
-                                </div>
-                            )}
+                            <div className="text-xs text-muted-foreground">
+                                Consent events are logged in notes.
+                            </div>
                         </CardContent>
                     </Card>
                 </div>
@@ -305,7 +301,7 @@ export default function VettingShow({ check, can }: Props) {
                     </Card>
                 )}
 
-                {can.viewDisclosures && (check.disclosure_level || check.disclosure_details) && (
+                {canViewDisclosures && (check.disclosures_present || check.disclosure_details) && (
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
@@ -317,12 +313,10 @@ export default function VettingShow({ check, can }: Props) {
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {check.disclosure_level && (
-                                <div className="text-sm">
-                                    <div className="text-xs text-slate-500">Disclosure Level</div>
-                                    <div className="font-medium capitalize">{check.disclosure_level.replace(/_/g, ' ')}</div>
-                                </div>
-                            )}
+                            <div className="text-sm">
+                                <div className="text-xs text-slate-500">Disclosures Present</div>
+                                <div className="font-medium">{check.disclosures_present ? 'Yes' : 'No'}</div>
+                            </div>
                             {check.disclosure_details && (
                                 <div className="text-sm">
                                     <div className="text-xs text-slate-500">Disclosure Details</div>
@@ -341,16 +335,16 @@ export default function VettingShow({ check, can }: Props) {
                             <CardTitle className="text-base">Actions</CardTitle>
                         </CardHeader>
                         <CardContent className="flex flex-wrap gap-2">
-                            {check.status === 'expired' && (
+                            {expired && (
                                 <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => {
-                                        if (confirm('Request a renewal for this check?')) {
-                                            router.post(`/hr/vetting/${check.id}/renew`);
-                                        }
-                                    }}
-                                >
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                    if (confirm('Request a renewal for this check?')) {
+                                            router.post(`/hr/compliance/vetting/${check.id}/renew`);
+                                    }
+                                }}
+                            >
                                     Request Renewal
                                 </Button>
                             )}
@@ -360,7 +354,7 @@ export default function VettingShow({ check, can }: Props) {
                                 className="text-red-600 border-red-200 hover:bg-red-50"
                                 onClick={() => {
                                     if (confirm('Are you sure you want to delete this vetting record?')) {
-                                        router.delete(`/hr/vetting/${check.id}`);
+                                        router.delete(`/hr/compliance/vetting/${check.id}`);
                                     }
                                 }}
                             >

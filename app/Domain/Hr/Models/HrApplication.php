@@ -17,6 +17,8 @@ class HrApplication extends Model
     protected $fillable = [
         'tenant_id',
         'candidate_id',
+        'requisition_id',
+        'interview_kit_id',
         'position_title',
         'position_role',
         'target_site_id',
@@ -44,6 +46,16 @@ class HrApplication extends Model
     public function targetSite(): BelongsTo
     {
         return $this->belongsTo(Site::class, 'target_site_id');
+    }
+
+    public function requisition(): BelongsTo
+    {
+        return $this->belongsTo(HrJobRequisition::class, 'requisition_id');
+    }
+
+    public function interviewKit(): BelongsTo
+    {
+        return $this->belongsTo(HrInterviewKit::class, 'interview_kit_id');
     }
 
     public function interviews(): HasMany

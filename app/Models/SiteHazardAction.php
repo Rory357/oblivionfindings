@@ -13,6 +13,7 @@ class SiteHazardAction extends Model
     protected $table = 'site_hazard_actions';
 
     protected $fillable = [
+        'tenant_id',
         'hazard_id',
         'action_description',
         'status',

@@ -42,7 +42,8 @@ export default function ActionItemShow({ auth, action }: Props) {
     completion_notes: '',
   });
 
-  const canManage = auth?.can?.governance?.actions?.manage;
+  const permissions = auth?.can as { governance?: { actions?: { manage?: boolean } } } | undefined;
+  const canManage = permissions?.governance?.actions?.manage;
   const isAssignee = action.assigned_to?.id === auth.user?.id;
   const canComplete = (canManage || isAssignee) && action.status !== 'complete';
 

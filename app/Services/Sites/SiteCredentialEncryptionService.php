@@ -47,27 +47,29 @@ class SiteCredentialEncryptionService
     public function rotateAllCredentials(): int
     {
         $count = 0;
-        
+
         \App\Models\SiteCredential::chunk(100, function ($credentials) use (&$count) {
-            foreach ($credentials as $credential) {
-                try {
-                    $decrypted = $this->decrypt($credential->encrypted_value);
-                    $newEncrypted = $this->encrypt($decrypted);
-                    
-                    $credential->update([
-                        'encrypted_value' => $newEncrypted['value'],
-                        'last_rotated_at' => now(),
-                    ]);
-                    
-                    $count++;
-                } catch (\Exception $e) {
-                    // Log error but continue
-                    \Log::error('Failed to rotate credential', [
-                        'credential_id' => $credential->id,
-                        'error' => $e->getMessage(),
-                    ]);
+            \Illuminate\Support\Facades\DB::transaction(function () use ($credentials, &$count) {
+                foreach ($credentials as $credential) {
+                    try {
+                        $decrypted = $this->decrypt($credential->encrypted_value);
+                        $newEncrypted = $this->encrypt($decrypted);
+
+                        $credential->update([
+                            'encrypted_value' => $newEncrypted['value'],
+                            'last_rotated_at' => now(),
+                        ]);
+
+                        $count++;
+                    } catch (\Exception $e) {
+                        \Log::error('Failed to rotate credential', [
+                            'credential_id' => $credential->id,
+                            'error' => $e->getMessage(),
+                        ]);
+                        throw $e; // Re-throw to rollback the chunk transaction
+                    }
                 }
-            }
+            });
         });
 
         return $count;

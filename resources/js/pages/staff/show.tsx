@@ -1,4 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
+import PageHeader from '@/components/page-header';
+import PageShell from '@/components/page-shell';
 import { Head, Link, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -42,26 +44,22 @@ export default function StaffShow({ user, myDayItems, todayShifts, upcomingShift
         <AppLayout breadcrumbs={[{ title: staffLabel, href: '/staff' }, { title: user.name, href: `/staff/${user.id}` }]}>
             <Head title={`${staffLabel}: ${user.name}`} />
 
-            <div className="mb-6 flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                        <AvatarImage src={(user as any).avatar ?? (user as any).profile_photo_url ?? undefined} alt={user.name} />
-                        <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <div className="text-lg font-semibold">{user.name}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
-                    </div>
-                </div>
-            </div>
+            <PageShell>
+                <PageHeader
+                    title={user.name}
+                    description={user.email}
+                />
 
-            <div className="p-4 space-y-6">
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <div className="text-lg font-semibold">{user.name}</div>
-                        <div className="text-sm text-muted-foreground">{user.email}</div>
-                        <div className="text-xs text-muted-foreground mt-1">
-                            {user.roles?.length ? user.roles.map((r) => r.label).join(', ') : user.role ?? '—'}
+                <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                        <Avatar className="h-10 w-10">
+                            <AvatarImage src={(user as any).avatar ?? (user as any).profile_photo_url ?? undefined} alt={user.name} />
+                            <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                            <div className="text-sm text-muted-foreground">
+                                {user.roles?.length ? user.roles.map((r) => r.label).join(', ') : user.role ?? '—'}
+                            </div>
                         </div>
                     </div>
 
@@ -171,7 +169,7 @@ export default function StaffShow({ user, myDayItems, todayShifts, upcomingShift
                         </div>
                     </div>
                 </div>
-            </div>
+            </PageShell>
         </AppLayout>
     );
 }

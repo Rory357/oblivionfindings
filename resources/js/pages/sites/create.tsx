@@ -29,6 +29,7 @@ const siteTypes = [
     { value: 'head_office', label: 'Head Office', icon: Building2, description: 'Administrative headquarters with meeting rooms' },
     { value: 'house', label: 'House', icon: Home, description: 'Residential home with client bedrooms' },
     { value: 'facility', label: 'Facilities', icon: Warehouse, description: 'Workshop, cafe, or day programme space' },
+    { value: 'residential', label: 'Residential', icon: Home, description: 'Client home used for residential/home-support visits' },
 ];
 
 export default function CreateSite() {
@@ -38,7 +39,7 @@ export default function CreateSite() {
 
     const { data, setData, post, processing, errors } = useForm({
         name: '',
-        type: 'house' as 'head_office' | 'house' | 'facility',
+        type: 'house' as 'head_office' | 'house' | 'facility' | 'residential',
         phone: '',
         email: '',
         manager_name: '',
@@ -165,7 +166,7 @@ export default function CreateSite() {
                             <div>
                                 <Label htmlFor="primary_contact_user_id">Site Lead / Manager</Label>
                                 <Select
-                                    value={data.primary_contact_user_id}
+                                    value={data.primary_contact_user_id || undefined}
                                     onValueChange={(v) => setData('primary_contact_user_id', v)}
                                 >
                                     <SelectTrigger className="mt-1">

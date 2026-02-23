@@ -78,25 +78,26 @@ function notificationContext(n: { data: any }): Array<{ label: string; value: st
 
 export default function InboxMenus() {
     const inbox = (usePage().props as any).inbox as InboxPayload | null;
-    if (!inbox) return null;
 
     const [openNotifId, setOpenNotifId] = useState<string | null>(null);
     const [openAnnouncementId, setOpenAnnouncementId] = useState<number | null>(null);
 
     const openNotification = useMemo(
-        () => inbox.notifications.items.find((n) => n.id === openNotifId) ?? null,
-        [inbox.notifications.items, openNotifId],
+        () => inbox?.notifications.items.find((n) => n.id === openNotifId) ?? null,
+        [inbox?.notifications.items, openNotifId],
     );
     const openAnnouncement = useMemo(
-        () => inbox.announcements.items.find((a) => a.id === openAnnouncementId) ?? null,
-        [inbox.announcements.items, openAnnouncementId],
+        () => inbox?.announcements.items.find((a) => a.id === openAnnouncementId) ?? null,
+        [inbox?.announcements.items, openAnnouncementId],
     );
+
+    if (!inbox) return null;
 
     const mustAckBeforeClose = !!openNotification?.data?.must_ack_before_close && !!openNotification?.data?.ack_required && !openNotification?.acknowledged_at;
 
     const reloadInbox = () => {
         // Refresh just the inbox payload so counts / read state update immediately.
-        router.reload({ only: ['inbox'], preserveScroll: true });
+        router.reload({ only: ['inbox'] });
     };
 
     const markNotificationRead = (id: string) => {
@@ -375,13 +376,13 @@ export default function InboxMenus() {
                                 Acknowledge
                             </Button>
                         )}
-                        {openNotification?.data?.url && (
+                        {(openNotification?.data?.url || openNotification?.data?.action_url) && (
                             <Button
                                 type="button"
                                 onClick={() => {
-                                    const url = openNotification?.data?.url;
+                                    const url = openNotification?.data?.url || openNotification?.data?.action_url;
                                     if (typeof url === 'string' && url) {
-                                        window.location.href = url;
+                                        router.visit(url);
                                     }
                                 }}
                             >

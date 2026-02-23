@@ -3,12 +3,17 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrEngagementSurvey;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrLeaveBalance;
+use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Services\EngagementService;
 use App\Domain\Hr\Services\LeaveService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -16,27 +21,34 @@ use Inertia\Inertia;
 
 class MyHrController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly LeaveService $leaveService,
+        private readonly EngagementService $engagementService,
     ) {}
 
     public function index(Request $request)
     {
         $user = $request->user();
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $profile = HrEmployeeProfile::where('user_id', $user->id)
+        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
             ->first();
 
-        $pendingLeave = HrLeaveRequest::where('user_id', $user->id)
+        $pendingLeave = HrLeaveRequest::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
             ->where('status', 'pending')
             ->count();
 
-        $leaveBalances = HrLeaveBalance::where('user_id', $user->id)
+        $leaveBalances = HrLeaveBalance::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
             ->where('year', now()->year)
             ->get();
 
-        $complianceStatuses = HrStaffComplianceStatus::where('user_id', $user->id)
+        $complianceStatuses = HrStaffComplianceStatus::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
             ->with('requirement:id,code,name,category')
             ->get();
 
@@ -48,8 +60,24 @@ class MyHrController extends Controller
         ];
 
         $policiesDue = HrPolicy::active()
+            ->where('tenant_id', $tenantId)
             ->where('requires_attestation', true)
             ->whereDoesntHave('attestations', fn ($q) => $q->where('user_id', $user->id))
+            ->count();
+
+        $pendingReviews = HrPerformanceReview::where('tenant_id', $tenantId)
+            ->where('employee_user_id', $user->id)
+            ->whereIn('status', ['in_progress', 'completed'])
+            ->where(fn ($q) => $q->whereNull('employee_signed_off')->orWhere('employee_signed_off', false))
+            ->count();
+
+        $activeGoals = HrDevelopmentGoal::where('tenant_id', $tenantId)
+            ->where('employee_user_id', $user->id)
+            ->whereIn('status', ['not_started', 'in_progress', 'blocked'])
+            ->count();
+
+        $availableSurveys = HrEngagementSurvey::where('tenant_id', $tenantId)
+            ->where('status', 'published')
             ->count();
 
         return Inertia::render('hr/my/index', [
@@ -59,15 +87,19 @@ class MyHrController extends Controller
             'complianceSummary' => $complianceSummary,
             'complianceStatuses' => $complianceStatuses,
             'policiesDue' => $policiesDue,
+            'pendingReviews' => $pendingReviews,
+            'activeGoals' => $activeGoals,
+            'availableSurveys' => $availableSurveys,
         ]);
     }
 
     public function leave(Request $request)
     {
         $user = $request->user();
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $requests = HrLeaveRequest::where('user_id', $user->id)
+        $requests = HrLeaveRequest::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
             ->with('reviewer:id,name')
             ->orderByDesc('submitted_at')
             ->paginate(20)
@@ -84,7 +116,8 @@ class MyHrController extends Controller
             'created_at' => $r->submitted_at?->toDateString() ?? $r->created_at?->toDateString(),
         ]);
 
-        $balances = HrLeaveBalance::where('user_id', $user->id)
+        $balances = HrLeaveBalance::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
             ->where('year', now()->year)
             ->get()
             ->map(fn ($b) => [
@@ -109,7 +142,7 @@ class MyHrController extends Controller
             'leave_type' => ['required', 'string', Rule::in(LeaveService::LEAVE_TYPES)],
             'starts_at' => ['required', 'date', 'after_or_equal:today'],
             'ends_at' => ['required', 'date', 'after_or_equal:starts_at'],
-            'hours_requested' => ['required', 'numeric', 'min:0.5', 'max:999'],
+            'hours_requested' => ['nullable', 'numeric', 'min:0.5', 'max:999'],
             'reason' => ['nullable', 'string', 'max:2000'],
             'supporting_doc' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:5120'],
         ]);
@@ -134,11 +167,13 @@ class MyHrController extends Controller
     {
         $user = $request->user();
         abort_unless($leaveRequest->user_id === $user->id, 403);
-        abort_unless($leaveRequest->status === 'pending', 422);
+        abort_unless(in_array($leaveRequest->status, ['pending', 'approved'], true), 422);
 
-        $leaveRequest->update([
-            'status' => 'cancelled',
-        ]);
+        try {
+            $this->leaveService->cancelRequest($leaveRequest, $user->id);
+        } catch (\LogicException $exception) {
+            return redirect()->back()->withErrors(['leave_request' => $exception->getMessage()]);
+        }
 
         return redirect()->back()->with('success', 'Leave request cancelled.');
     }
@@ -146,12 +181,35 @@ class MyHrController extends Controller
     public function training(Request $request)
     {
         $user = $request->user();
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $complianceStatuses = HrStaffComplianceStatus::where('user_id', $user->id)
-            ->with('requirement:id,code,name,category,validity_months')
+        $complianceStatuses = HrStaffComplianceStatus::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->with('requirement:id,code,name,category,description,validity_months')
             ->orderBy('status')
-            ->get();
+            ->get()
+            ->map(function (HrStaffComplianceStatus $status) {
+                $normalizedStatus = match ($status->status) {
+                    'compliant' => 'compliant',
+                    'expiring_soon' => 'expiring_soon',
+                    'expired', 'non_compliant' => 'expired',
+                    default => 'not_started',
+                };
+
+                return [
+                    'id' => $status->id,
+                    'status' => $normalizedStatus,
+                    'expiry_date' => optional($status->expires_at)->toDateString(),
+                    'completed_at' => optional($status->valid_from)->toDateString(),
+                    'requirement' => [
+                        'id' => $status->requirement?->id,
+                        'name' => $status->requirement?->name ?? 'Untitled requirement',
+                        'category' => $status->requirement?->category ?? 'general',
+                        'description' => $status->requirement?->description,
+                    ],
+                ];
+            })
+            ->values();
 
         return Inertia::render('hr/my/training', [
             'complianceStatuses' => $complianceStatuses,
@@ -161,15 +219,17 @@ class MyHrController extends Controller
     public function policies(Request $request)
     {
         $user = $request->user();
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $policies = HrPolicy::active()
+            ->where('tenant_id', $tenantId)
             ->where('requires_attestation', true)
             ->with(['versions' => fn ($q) => $q->where('is_current', true)])
             ->orderBy('title')
             ->get()
-            ->map(function ($policy) use ($user) {
+            ->map(function ($policy) use ($user, $tenantId) {
                 $attestation = HrPolicyAttestation::where('policy_id', $policy->id)
+                    ->where('tenant_id', $tenantId)
                     ->where('user_id', $user->id)
                     ->orderByDesc('attested_at')
                     ->first();
@@ -190,9 +250,11 @@ class MyHrController extends Controller
         $user = $request->user();
         abort_unless($user->canDo('hr.policies.attest'), 403);
         abort_unless($policy->requires_attestation, 422);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         HrPolicyAttestation::create([
-            'tenant_id' => $user->tenant_id ?? $user->organization_id ?? 1,
+            'tenant_id' => $tenantId,
             'policy_id' => $policy->id,
             'policy_version_id' => $policy->currentVersion?->id,
             'user_id' => $user->id,
@@ -206,34 +268,297 @@ class MyHrController extends Controller
     public function profile(Request $request)
     {
         $user = $request->user();
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $profile = HrEmployeeProfile::where('user_id', $user->id)
+        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->with(['user:id,name,email', 'primarySite:id,name'])
             ->first();
 
+        $primaryEmergencyContact = collect($profile?->emergency_contacts ?? [])->first();
+
+        $profileData = $profile ? [
+            'id' => $profile->id,
+            'employee_number' => $profile->employee_number,
+            'position_title' => $profile->position_title,
+            'employment_type' => $profile->employment_type,
+            'start_date' => optional($profile->start_date)->toDateString(),
+            'end_date' => optional($profile->end_date)->toDateString(),
+            'is_active' => (bool) $profile->is_active,
+            'personal_email' => $profile->personal_email,
+            'phone' => $profile->personal_phone,
+            'home_address' => $profile->home_address,
+            'emergency_contact_name' => $primaryEmergencyContact['name'] ?? null,
+            'emergency_contact_phone' => $primaryEmergencyContact['phone'] ?? null,
+            'emergency_contact_relationship' => $primaryEmergencyContact['relationship'] ?? null,
+            'user' => $profile->user ? [
+                'id' => $profile->user->id,
+                'name' => $profile->user->name,
+                'email' => $profile->user->email,
+                'avatar' => $profile->user->avatar,
+            ] : null,
+            'primary_site' => $profile->primarySite ? [
+                'id' => $profile->primarySite->id,
+                'name' => $profile->primarySite->name,
+            ] : null,
+        ] : null;
+
         return Inertia::render('hr/my/profile', [
-            'profile' => $profile,
+            'profile' => $profileData,
         ]);
     }
 
     public function updateProfile(Request $request)
     {
         $user = $request->user();
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $profile = HrEmployeeProfile::where('user_id', $user->id)
+        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
             ->firstOrFail();
 
         $validated = $request->validate([
             'personal_email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
             'personal_phone' => ['nullable', 'string', 'max:50'],
             'home_address' => ['nullable', 'string', 'max:1000'],
+            'emergency_contact_name' => ['nullable', 'string', 'max:255'],
+            'emergency_contact_phone' => ['nullable', 'string', 'max:50'],
+            'emergency_contact_relationship' => ['nullable', 'string', 'max:100'],
             'emergency_contacts' => ['nullable', 'array'],
         ]);
 
-        $validated['updated_by'] = $user->id;
-        $profile->update($validated);
+        $phone = trim((string) ($validated['personal_phone'] ?? $validated['phone'] ?? ''));
+        $phone = $phone !== '' ? $phone : null;
+
+        $emergencyContacts = [];
+        if (is_array($validated['emergency_contacts'] ?? null)) {
+            $emergencyContacts = $validated['emergency_contacts'];
+        }
+
+        $name = trim((string) ($validated['emergency_contact_name'] ?? ''));
+        $contactPhone = trim((string) ($validated['emergency_contact_phone'] ?? ''));
+        $relationship = trim((string) ($validated['emergency_contact_relationship'] ?? ''));
+        if ($name !== '' || $contactPhone !== '' || $relationship !== '') {
+            $emergencyContacts = [[
+                'name' => $name !== '' ? $name : null,
+                'phone' => $contactPhone !== '' ? $contactPhone : null,
+                'relationship' => $relationship !== '' ? $relationship : null,
+            ]];
+        }
+
+        $profile->update([
+            'personal_email' => $validated['personal_email'] ?? null,
+            'personal_phone' => $phone,
+            'home_address' => $validated['home_address'] ?? null,
+            'emergency_contacts' => $emergencyContacts !== [] ? $emergencyContacts : null,
+            'updated_by' => $user->id,
+        ]);
 
         return redirect()->back()->with('success', 'Profile updated.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Performance Reviews                                                */
+    /* ------------------------------------------------------------------ */
+
+    public function reviews(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $reviews = HrPerformanceReview::where('tenant_id', $tenantId)
+            ->where('employee_user_id', $user->id)
+            ->with('reviewer:id,name')
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $reviews->through(fn (HrPerformanceReview $review) => [
+            'id' => $review->id,
+            'review_type' => $review->review_type,
+            'review_period_start' => $review->review_period_start?->toDateString(),
+            'review_period_end' => $review->review_period_end?->toDateString(),
+            'status' => $review->status,
+            'overall_rating' => $review->overall_rating,
+            'strengths' => $review->strengths,
+            'development_areas' => $review->development_areas,
+            'goals' => $review->goals,
+            'training_recommendations' => $review->training_recommendations,
+            'employee_comments' => $review->employee_comments,
+            'employee_signed_off' => (bool) $review->employee_signed_off,
+            'employee_signed_off_at' => $review->employee_signed_off_at?->toDateTimeString(),
+            'manager_signed_off' => (bool) $review->manager_signed_off,
+            'next_review_date' => $review->next_review_date?->toDateString(),
+            'reviewer' => $review->reviewer ? [
+                'id' => $review->reviewer->id,
+                'name' => $review->reviewer->name,
+            ] : null,
+        ]);
+
+        return Inertia::render('hr/my/reviews', [
+            'reviews' => $reviews,
+        ]);
+    }
+
+    public function updateReview(Request $request, HrPerformanceReview $review)
+    {
+        $user = $request->user();
+        abort_unless($review->employee_user_id === $user->id, 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
+
+        $validated = $request->validate([
+            'employee_comments' => ['nullable', 'string', 'max:5000'],
+            'employee_signed_off' => ['nullable', 'boolean'],
+        ]);
+
+        $data = ['employee_comments' => $validated['employee_comments'] ?? $review->employee_comments];
+
+        if (! empty($validated['employee_signed_off']) && ! $review->employee_signed_off) {
+            $data['employee_signed_off'] = true;
+            $data['employee_signed_off_at'] = now();
+        }
+
+        $review->update($data);
+
+        return redirect()->back()->with('success', 'Review updated.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Development Goals                                                  */
+    /* ------------------------------------------------------------------ */
+
+    public function goals(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $goals = HrDevelopmentGoal::where('tenant_id', $tenantId)
+            ->where('employee_user_id', $user->id)
+            ->with('manager:id,name')
+            ->orderByRaw("CASE WHEN status IN ('in_progress','not_started','blocked') THEN 0 ELSE 1 END")
+            ->orderBy('due_date')
+            ->paginate(20)
+            ->withQueryString();
+
+        $goals->through(fn (HrDevelopmentGoal $goal) => [
+            'id' => $goal->id,
+            'title' => $goal->title,
+            'description' => $goal->description,
+            'category' => $goal->category,
+            'competency_area' => $goal->competency_area,
+            'target_level' => $goal->target_level,
+            'current_level' => $goal->current_level,
+            'status' => $goal->status,
+            'progress_percent' => (int) $goal->progress_percent,
+            'start_date' => $goal->start_date?->toDateString(),
+            'due_date' => $goal->due_date?->toDateString(),
+            'completed_at' => $goal->completed_at?->toDateString(),
+            'review_notes' => $goal->review_notes,
+            'manager' => $goal->manager ? [
+                'id' => $goal->manager->id,
+                'name' => $goal->manager->name,
+            ] : null,
+        ]);
+
+        return Inertia::render('hr/my/goals', [
+            'goals' => $goals,
+        ]);
+    }
+
+    public function updateGoal(Request $request, HrDevelopmentGoal $goal)
+    {
+        $user = $request->user();
+        abort_unless($goal->employee_user_id === $user->id, 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $goal->tenant_id);
+
+        $validated = $request->validate([
+            'status' => ['sometimes', 'string', Rule::in(['not_started', 'in_progress', 'blocked', 'completed'])],
+            'progress_percent' => ['sometimes', 'integer', 'min:0', 'max:100'],
+            'review_notes' => ['nullable', 'string', 'max:5000'],
+            'current_level' => ['nullable', 'integer', 'min:1', 'max:5'],
+        ]);
+
+        if (($validated['status'] ?? null) === 'completed') {
+            $validated['completed_at'] = now();
+            $validated['progress_percent'] = 100;
+        }
+
+        $goal->update($validated);
+
+        return redirect()->back()->with('success', 'Goal updated.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Engagement Surveys                                                 */
+    /* ------------------------------------------------------------------ */
+
+    public function surveys(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $surveys = HrEngagementSurvey::where('tenant_id', $tenantId)
+            ->where('status', 'published')
+            ->with('questions')
+            ->get()
+            ->map(function (HrEngagementSurvey $survey) use ($user) {
+                $respondentHash = hash_hmac('sha256', $survey->id . ':' . $user->id, (string) config('app.key'));
+
+                $hasResponded = $survey->responses()
+                    ->where(function ($query) use ($survey, $user, $respondentHash) {
+                        if ($survey->is_anonymous) {
+                            $query->where('respondent_hash', $respondentHash);
+                        } else {
+                            $query->where('user_id', $user->id);
+                        }
+                    })
+                    ->exists();
+
+                return [
+                    'id' => $survey->id,
+                    'title' => $survey->title,
+                    'description' => $survey->description,
+                    'is_anonymous' => $survey->is_anonymous,
+                    'starts_at' => $survey->starts_at?->toDateString(),
+                    'ends_at' => $survey->ends_at?->toDateString(),
+                    'has_responded' => $hasResponded,
+                    'questions' => $survey->questions->sortBy('sort_order')->values()->map(fn ($q) => [
+                        'id' => $q->id,
+                        'question_type' => $q->question_type,
+                        'question_text' => $q->question_text,
+                        'options' => $q->options,
+                        'is_required' => $q->is_required,
+                        'sort_order' => $q->sort_order,
+                    ])->all(),
+                ];
+            })
+            ->values();
+
+        return Inertia::render('hr/my/surveys', [
+            'surveys' => $surveys,
+        ]);
+    }
+
+    public function submitSurvey(Request $request, HrEngagementSurvey $survey)
+    {
+        $user = $request->user();
+        abort_unless($user !== null, 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $survey->tenant_id);
+
+        $validated = $request->validate([
+            'answers' => ['required', 'array'],
+        ]);
+
+        try {
+            $this->engagementService->submitResponse($survey, $user, $validated['answers']);
+        } catch (\InvalidArgumentException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Survey response submitted.');
     }
 }

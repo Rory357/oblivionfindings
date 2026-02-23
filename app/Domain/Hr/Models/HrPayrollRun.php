@@ -23,11 +23,14 @@ class HrPayrollRun extends Model
         'locked_by',
         'exported_at',
         'exported_by',
+        'export_profile_id',
         'export_format',
         'export_path',
         'total_hours',
+        'total_gross',
         'total_staff',
         'notes',
+        'validation_errors',
         'created_by',
     ];
 
@@ -37,7 +40,10 @@ class HrPayrollRun extends Model
         'locked_at' => 'datetime',
         'exported_at' => 'datetime',
         'total_hours' => 'decimal:2',
+        'total_gross' => 'decimal:2',
         'total_staff' => 'integer',
+        'validation_errors' => 'array',
+        'export_profile_id' => 'integer',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -57,6 +63,11 @@ class HrPayrollRun extends Model
     public function exportedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'exported_by');
+    }
+
+    public function exportProfile(): BelongsTo
+    {
+        return $this->belongsTo(HrPayrollExportProfile::class, 'export_profile_id');
     }
 
     /* ------------------------------------------------------------------ */

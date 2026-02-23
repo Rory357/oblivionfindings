@@ -41,6 +41,7 @@ const typeColors: Record<string, string> = {
     policy: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
     certificate: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
     letter: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
+    offer: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10',
     other: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
 };
 
@@ -93,6 +94,7 @@ export default function DocumentsIndex({ documents, filters, can }: Props) {
                             <SelectItem value="policy">Policy</SelectItem>
                             <SelectItem value="certificate">Certificate</SelectItem>
                             <SelectItem value="letter">Letter</SelectItem>
+                            <SelectItem value="offer">Offer</SelectItem>
                             <SelectItem value="other">Other</SelectItem>
                         </SelectContent>
                     </Select>

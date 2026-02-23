@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use Illuminate\Http\Request;
@@ -10,6 +11,8 @@ use Inertia\Inertia;
 
 class PolicyAttestationController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * Show attestation status overview.
      *
@@ -20,8 +23,10 @@ class PolicyAttestationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.attest'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $attestations = HrPolicyAttestation::with(['user:id,name', 'policy:id,title', 'policyVersion'])
+            ->where('tenant_id', $tenantId)
             ->when($request->query('policy_id'), fn ($q, $id) => $q->where('policy_id', $id))
             ->when($request->query('q'), function ($q, $search) {
                 $q->where(function ($q) use ($search) {
@@ -51,6 +56,8 @@ class PolicyAttestationController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.attest'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         // Ensure the policy requires attestation
         if (! $policy->requires_attestation) {
@@ -78,7 +85,7 @@ class PolicyAttestationController extends Controller
         ]);
 
         HrPolicyAttestation::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'user_id' => $user->id,
             'policy_id' => $policy->id,
             'policy_version_id' => $currentVersion->id,

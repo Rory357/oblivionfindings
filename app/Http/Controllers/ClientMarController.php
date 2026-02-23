@@ -5,7 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
-use App\Services\MedicationMarService;
+use App\Services\EnhancedMarService;
+use App\Services\MedicationAlertService;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -30,7 +31,60 @@ class ClientMarController extends Controller
         $date = $request->query('date') ? Carbon::parse($request->query('date')) : now();
         $date = $date->startOfDay();
 
-        $payload = app(MedicationMarService::class)->build($client, $date);
+        $payload = app(EnhancedMarService::class)->build($client, $date);
+
+        // Transform enhanced format to legacy format for compatibility with existing view
+        $rows = [];
+        foreach ($payload['scheduled'] as $scheduled) {
+            $rows[] = [
+                'medication' => [
+                    'id' => $scheduled['client_medication_id'],
+                    'name' => $scheduled['medication']['name'],
+                    'dosage' => $scheduled['medication']['dosage'],
+                    'route' => $scheduled['medication']['route'],
+                    'form' => $scheduled['medication']['form'],
+                    'is_prn' => false,
+                    'prn_reason' => null,
+                    'controlled_drug' => $scheduled['medication']['controlled_drug'],
+                    'state' => $scheduled['medication']['state'],
+                ],
+                'scheduled_for' => $scheduled['scheduled_for'],
+                'scheduled_time' => $scheduled['scheduled_time'],
+                'schedule_state' => $scheduled['schedule_state'],
+                'record' => $scheduled['administration'] ? [
+                    'id' => $scheduled['administration']['id'],
+                    'status' => $scheduled['administration']['status'],
+                    'reason' => $scheduled['administration']['reason'],
+                    'notes' => $scheduled['administration']['notes'],
+                    'dose_given' => $scheduled['administration']['dose_given'],
+                    'administered_at' => $scheduled['administration']['administered_at'],
+                    'administered_by' => $scheduled['administration']['administered_by'] ? [
+                        'name' => $scheduled['administration']['administered_by'],
+                    ] : null,
+                    'is_correction' => $scheduled['administration']['is_correction'] ?? false,
+                    'correction_reason' => $scheduled['administration']['correction_reason'] ?? null,
+                ] : null,
+            ];
+        }
+        foreach ($payload['prn'] as $prn) {
+            $rows[] = [
+                'medication' => [
+                    'id' => $prn['client_medication_id'],
+                    'name' => $prn['medication']['name'],
+                    'dosage' => $prn['medication']['dosage'],
+                    'route' => $prn['medication']['route'],
+                    'form' => $prn['medication']['form'],
+                    'is_prn' => true,
+                    'prn_reason' => $prn['prn_reason'],
+                    'controlled_drug' => $prn['medication']['controlled_drug'],
+                    'state' => $prn['medication']['state'],
+                ],
+                'scheduled_for' => null,
+                'scheduled_time' => 'PRN',
+                'schedule_state' => 'prn',
+                'record' => null,
+            ];
+        }
 
         $activeBreakGlass = null;
         if ($user->canDo('medications.breakglass')) {
@@ -48,10 +102,27 @@ class ClientMarController extends Controller
             }
         }
 
-        $openControlledDiscrepancies = \App\Models\ClientControlledDrugDiscrepancy::query()
+        // Get controlled drug discrepancies with full details
+        $controlledDiscrepancies = \App\Models\ClientControlledDrugDiscrepancy::query()
             ->where('client_id', $client->id)
             ->whereIn('status', ['open', 'under_review'])
-            ->exists();
+            ->with(['medication', 'reportedBy'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($d) => [
+                'id' => $d->id,
+                'medication_name' => $d->medication?->name ?? 'Unknown',
+                'expected_balance' => $d->expected_balance,
+                'actual_balance' => $d->actual_balance,
+                'discrepancy_amount' => $d->discrepancy_amount,
+                'status' => $d->status,
+                'reported_by' => $d->reportedBy?->name ?? 'System',
+                'created_at' => $d->created_at?->toIso8601String(),
+            ]);
+
+        // Get active medication alerts
+        $alertService = app(MedicationAlertService::class);
+        $activeAlerts = $alertService->getActiveAlertsForClient($client->id);
 
         // Witness pick-list (for controlled drug administrations)
         $witnesses = User::staff()
@@ -64,10 +135,12 @@ class ClientMarController extends Controller
         return inertia('clients/mar', [
             'client' => $client->only(['id', 'first_name', 'last_name']),
             'date' => $date->toDateString(),
-            'rows' => $payload['rows'],
+            'rows' => $rows,
             'history' => $payload['history'],
             'break_glass' => $activeBreakGlass,
-            'has_open_controlled_discrepancy' => $openControlledDiscrepancies,
+            'has_open_controlled_discrepancy' => $controlledDiscrepancies->isNotEmpty(),
+            'controlled_discrepancies' => $controlledDiscrepancies,
+            'alerts' => $activeAlerts,
             'witnesses' => $witnesses,
             'can' => [
                 'record' => (bool) ($user->canDo('medications.administer.record') || $user->canDo('clients.update')),
@@ -87,24 +160,39 @@ class ClientMarController extends Controller
 
         $date = $request->query('date') ? Carbon::parse($request->query('date')) : now();
         $date = $date->startOfDay();
-        $payload = app(MedicationMarService::class)->build($client, $date);
+        $payload = app(EnhancedMarService::class)->build($client, $date);
 
         $filename = 'MAR_' . $client->id . '_' . $date->toDateString() . '.csv';
         return response()->streamDownload(function () use ($payload) {
             $out = fopen('php://output', 'w');
             fputcsv($out, ['Scheduled', 'Medication', 'Dosage', 'Route', 'Form', 'Status', 'Administered at', 'Reason', 'Notes']);
-            foreach ($payload['rows'] as $row) {
-                $rec = $row['record'];
+            // Export scheduled medications
+            foreach ($payload['scheduled'] as $row) {
+                $admin = $row['administration'];
                 fputcsv($out, [
-                    $row['scheduled_for'] ? Carbon::parse($row['scheduled_for'])->format('Y-m-d H:i') : 'PRN',
+                    $row['scheduled_for'] ? Carbon::parse($row['scheduled_for'])->format('Y-m-d H:i') : '',
                     $row['medication']['name'] ?? '',
                     $row['medication']['dosage'] ?? '',
                     $row['medication']['route'] ?? '',
                     $row['medication']['form'] ?? '',
-                    $rec['status'] ?? '',
-                    $rec['administered_at'] ? Carbon::parse($rec['administered_at'])->format('Y-m-d H:i') : '',
-                    $rec['reason'] ?? '',
-                    $rec['notes'] ?? '',
+                    $admin['status'] ?? 'not_recorded',
+                    $admin['administered_at'] ? Carbon::parse($admin['administered_at'])->format('Y-m-d H:i') : '',
+                    $admin['reason'] ?? '',
+                    $admin['notes'] ?? '',
+                ]);
+            }
+            // Export PRN medications (as separate rows)
+            foreach ($payload['prn'] as $prn) {
+                fputcsv($out, [
+                    'PRN',
+                    $prn['medication']['name'] ?? '',
+                    $prn['medication']['dosage'] ?? '',
+                    $prn['medication']['route'] ?? '',
+                    $prn['medication']['form'] ?? '',
+                    'prn',
+                    '',
+                    $prn['prn_reason'] ?? '',
+                    '',
                 ]);
             }
             fclose($out);

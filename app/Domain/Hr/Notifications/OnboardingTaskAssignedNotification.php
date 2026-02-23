@@ -41,13 +41,22 @@ class OnboardingTaskAssignedNotification extends Notification implements ShouldQ
 
     public function toArray(object $notifiable): array
     {
+        $employeeName = $this->task->checklist?->employeeProfile?->user?->name ?? 'a new employee';
+
         return [
             'type'          => 'onboarding_task_assigned',
+            'title'         => "Onboarding Task: {$this->task->title}",
+            'message'       => "You have been assigned an onboarding task for {$employeeName}.",
             'task_title'    => $this->task->title,
-            'employee_name' => $this->task->checklist?->employeeProfile?->user?->name,
+            'employee_name' => $employeeName,
             'task_id'       => $this->task->id,
             'checklist_id'  => $this->task->checklist_id,
-            'action_url'    => '/hr/onboarding',
+            'url'           => '/hr/onboarding',
+            'context'       => [
+                'Task' => $this->task->title,
+                'Employee' => $employeeName,
+                'Category' => ucfirst($this->task->category ?? 'General'),
+            ],
         ];
     }
 }

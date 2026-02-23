@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
+import type { ReactElement } from 'react';
 import { Star, Search, Plus } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -73,7 +74,7 @@ const renderRating = (rating: number | null) => {
     if (rating === null || rating === undefined) {
         return <span className="text-slate-400">Not rated</span>;
     }
-    const stars = [];
+    const stars: ReactElement[] = [];
     for (let i = 1; i <= 5; i++) {
         stars.push(
             <Star

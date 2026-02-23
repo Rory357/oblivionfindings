@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use Illuminate\Http\Request;
@@ -11,6 +13,8 @@ use Inertia\Inertia;
 
 class VettingController extends Controller
 {
+    use ResolvesHrTenant;
+
     /* ------------------------------------------------------------------ */
     /*  Index — vetting register                                           */
     /* ------------------------------------------------------------------ */
@@ -19,15 +23,18 @@ class VettingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.vetting.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $staffUserIds = $this->hrStaffUserIdsForTenant($tenantId);
 
         $status = $request->query('status'); // 'clear', 'pending', 'flagged', 'expired', etc.
         $search = trim((string) $request->query('q', ''));
 
-        // StaffBackgroundCheck is not tenant-aware; scoping is by user_id only
+        // StaffBackgroundCheck is not tenant-aware; scope by tenant staff user IDs.
         $checks = StaffBackgroundCheck::with([
                 'user:id,name,email',
                 'verifiedBy:id,name',
             ])
+            ->whereIn('user_id', $staffUserIds)
             ->when($status, fn ($q) => match ($status) {
                 'expired'  => $q->expired(),
                 'expiring' => $q->expiringSoon(60),
@@ -43,7 +50,7 @@ class VettingController extends Controller
             ->withQueryString();
 
         // Summary counts
-        $baseQuery = StaffBackgroundCheck::query();
+        $baseQuery = StaffBackgroundCheck::query()->whereIn('user_id', $staffUserIds);
         $summary = [
             'total'     => (clone $baseQuery)->count(),
             'clear'     => (clone $baseQuery)->where('status', 'clear')->count(),
@@ -74,6 +81,8 @@ class VettingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.vetting.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertStaffCheckTenantAccess($tenantId, $check);
         $check->load([
             'user:id,name,email',
             'riskAssessor:id,name',
@@ -98,8 +107,12 @@ class VettingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.vetting.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
-        $staff = User::orderBy('name')
+        $staff = User::staff()
+            ->whereIn('id', $staffIds)
+            ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
         return Inertia::render('hr/vetting/create', [
@@ -125,10 +138,15 @@ class VettingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.vetting.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertStaffCheckTenantAccess($tenantId, $check);
 
         $check->load(['user:id,name,email']);
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
-        $staff = User::orderBy('name')
+        $staff = User::staff()
+            ->whereIn('id', $staffIds)
+            ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
         return Inertia::render('hr/vetting/edit', [
@@ -168,6 +186,7 @@ class VettingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.vetting.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'user_id'          => ['required', 'integer', 'exists:users,id'],
@@ -182,8 +201,13 @@ class VettingController extends Controller
             'notes'            => ['nullable', 'string', 'max:5000'],
         ]);
 
-        // Verify the staff member exists
-        User::findOrFail($validated['user_id']);
+        $belongsToTenant = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $validated['user_id'])
+            ->exists();
+        if (! $belongsToTenant) {
+            return redirect()->back()->with('error', 'Selected staff member is not in your HR tenant scope.');
+        }
 
         StaffBackgroundCheck::create([
             ...$validated,
@@ -202,6 +226,8 @@ class VettingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.vetting.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertStaffCheckTenantAccess($tenantId, $check);
 
         $validated = $request->validate([
             'status'                => ['sometimes', 'required', 'string', Rule::in([
@@ -251,6 +277,8 @@ class VettingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.vetting.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertStaffCheckTenantAccess($tenantId, $check);
 
         $check->delete();
 
@@ -265,6 +293,8 @@ class VettingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.vetting.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertStaffCheckTenantAccess($tenantId, $check);
 
         $check->update([
             'status' => 'clear',
@@ -284,6 +314,8 @@ class VettingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.vetting.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertStaffCheckTenantAccess($tenantId, $check);
 
         $check->update([
             'status' => 'renewal_due',
@@ -301,6 +333,8 @@ class VettingController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.vetting.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertStaffCheckTenantAccess($tenantId, $check);
 
         $validated = $request->validate([
             'consent_given' => ['required', 'boolean', 'accepted'],
@@ -314,5 +348,17 @@ class VettingController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Consent recorded successfully.');
+    }
+
+    private function assertStaffCheckTenantAccess(int $tenantId, StaffBackgroundCheck $check): void
+    {
+        $belongsToTenant = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $check->user_id)
+            ->exists();
+
+        if (! $belongsToTenant) {
+            abort(404);
+        }
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -55,5 +56,15 @@ class HrDocument extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(HrDocumentTemplate::class, 'template_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function uploader(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'uploaded_by');
     }
 }

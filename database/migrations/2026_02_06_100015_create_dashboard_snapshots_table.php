@@ -32,10 +32,23 @@ return new class extends Migration
             $table->index(['period_type', 'period_start']);
             $table->index('captured_at');
         });
+
+        Schema::table('board_packs', function (Blueprint $table) {
+            $table->foreign('dashboard_snapshot_id')
+                ->references('id')
+                ->on('dashboard_snapshots')
+                ->onDelete('cascade');
+        });
     }
 
     public function down(): void
     {
+        if (Schema::hasTable('board_packs')) {
+            Schema::table('board_packs', function (Blueprint $table) {
+                $table->dropForeign(['dashboard_snapshot_id']);
+            });
+        }
+
         Schema::dropIfExists('dashboard_snapshots');
     }
 };

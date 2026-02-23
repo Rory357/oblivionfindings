@@ -10,6 +10,8 @@ use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteChecklistTemplateItem;
 use App\Models\SiteCredential;
+use App\Models\SiteInspectionSchedule;
+use App\Models\SiteVendor;
 use App\Models\User;
 use App\Services\Sites\SiteCredentialEncryptionService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -52,6 +54,69 @@ class SitesModuleIntegrationTest extends TestCase
                 ->has('sites')
                 ->has('events')
                 ->has('eventTypes')
+            );
+    }
+
+    public function test_sites_global_inspections_route_renders(): void
+    {
+        $site = Site::factory()->create([
+            'type' => 'house',
+            'is_active' => true,
+        ]);
+
+        SiteInspectionSchedule::create([
+            'site_id' => $site->id,
+            'inspection_type' => 'fire_safety',
+            'title' => 'Fire Exit Audit',
+            'frequency' => 'monthly',
+            'first_due_date' => now()->toDateString(),
+            'next_due_date' => now()->toDateString(),
+            'is_active' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/sites/inspections')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('sites/inspections/global')
+                ->has('schedules')
+                ->has('records')
+                ->has('sites')
+            );
+    }
+
+    public function test_sites_global_vendors_credentials_route_renders(): void
+    {
+        $site = Site::factory()->create([
+            'type' => 'house',
+            'is_active' => true,
+        ]);
+
+        SiteVendor::create([
+            'site_id' => $site->id,
+            'service_type' => 'maintenance',
+            'company_name' => 'Acme Maintenance',
+            'preferred_contact_method' => 'phone',
+            'is_active' => true,
+        ]);
+
+        $encrypted = app(SiteCredentialEncryptionService::class)->encrypt('Secret123');
+        SiteCredential::create([
+            'site_id' => $site->id,
+            'label' => 'Door Code',
+            'credential_type' => 'pin',
+            'encrypted_value' => $encrypted['value'],
+            'requires_reauth' => false,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/sites/vendors-credentials')
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('sites/vendors-credentials/global')
+                ->has('vendors')
+                ->has('credentials')
+                ->has('sites')
             );
     }
 

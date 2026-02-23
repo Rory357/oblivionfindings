@@ -4,7 +4,6 @@ namespace App\Domain\Hr\Jobs;
 
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Notifications\ComplianceExpiryNotification;
-use App\Models\User;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -29,32 +28,63 @@ class SendExpiryRemindersJob implements ShouldQueue
     public function handle(): void
     {
         $reminderDays = config('hr.expiry_reminder_days', $this->defaultReminderDays);
-        $now = now();
+        $sentCount = 0;
 
-        // TODO: Query HrStaffComplianceStatus records where expires_at falls on
-        // one of the configured reminder-day thresholds. For each match, check
-        // that a reminder hasn't already been sent for this interval (use a
-        // last_reminded_at or reminders_sent JSON column to track).
-        //
-        // Categories to check:
-        // - Credentials (qualifications, certifications)
-        // - Training records (mandatory training expiry)
-        // - Vetting / DBS checks
-        // - Professional licences / registrations
-        //
-        // For each expiring item:
-        //   $user = User::find($record->user_id);
-        //   $user->notify(new ComplianceExpiryNotification($user, [
-        //       'name'             => $record->requirement_name,
-        //       'requirement_code' => $record->requirement_code,
-        //       'expires_at'       => $record->expires_at,
-        //   ]));
-        //
-        // Also notify the user's line manager if configured.
+        foreach ($reminderDays as $days) {
+            $targetDate = now()->addDays((int) $days)->toDateString();
+
+            $query = HrStaffComplianceStatus::query()
+                ->with(['user:id,name,email', 'requirement:id,code,name,renewal_reminder_days'])
+                ->whereDate('expires_at', $targetDate)
+                ->whereIn('status', ['compliant', 'expiring_soon', 'not_started', 'non_compliant']);
+
+            if ($this->tenantId !== null) {
+                $query->where('tenant_id', $this->tenantId);
+            }
+
+            $query->chunkById(200, function ($records) use ($days, &$sentCount) {
+                foreach ($records as $record) {
+                    $user = $record->user;
+                    if (! $user || ! $record->requirement) {
+                        continue;
+                    }
+
+                    $alreadySent = $user->notifications()
+                        ->where('type', ComplianceExpiryNotification::class)
+                        ->where('data->requirement_code', $record->requirement->code)
+                        ->where('data->expires_at', optional($record->expires_at)->toDateString())
+                        ->where('data->reminder_days', (int) $days)
+                        ->exists();
+
+                    if ($alreadySent) {
+                        continue;
+                    }
+
+                    $payload = [
+                        'name' => $record->requirement->name,
+                        'requirement_code' => $record->requirement->code,
+                        'expires_at' => optional($record->expires_at)->toDateString(),
+                        'reminder_days' => (int) $days,
+                    ];
+
+                    try {
+                        $user->notify(new ComplianceExpiryNotification($user, $payload));
+                        $sentCount++;
+                    } catch (\Throwable $exception) {
+                        Log::warning('Failed to send compliance expiry notification', [
+                            'status_id' => $record->id,
+                            'user_id' => $user->id,
+                            'error' => $exception->getMessage(),
+                        ]);
+                    }
+                }
+            });
+        }
 
         Log::info('SendExpiryRemindersJob: Expiry reminder check completed.', [
             'tenant_id'     => $this->tenantId,
             'reminder_days' => $reminderDays,
+            'sent' => $sentCount,
         ]);
     }
 }

@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\ContactController;
+use App\Http\Controllers\Careers\CareerPortalController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\QualityChecklistController;
 use App\Http\Controllers\TodayDashboardController;
@@ -78,6 +79,11 @@ Route::get('/smart-monitoring', function () {
 
 Route::get('/contact', [ContactController::class, 'index'])->name('contact');
 Route::post('/contact', [ContactController::class, 'store']);
+Route::get('/careers', [CareerPortalController::class, 'index'])->name('careers.index');
+Route::get('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'showApply'])->name('careers.apply');
+Route::post('/careers/jobs/{job:slug}/apply', [CareerPortalController::class, 'submitApplication'])->name('careers.apply.submit');
+Route::get('/careers/offers/{token}', [CareerPortalController::class, 'showOffer'])->name('careers.offer.show');
+Route::post('/careers/offers/{token}', [CareerPortalController::class, 'respondToOffer'])->name('careers.offer.respond');
 
 // Authenticated routes
 Route::middleware(['auth', 'verified'])->group(function () {
@@ -117,3 +123,9 @@ require __DIR__.'/roadmap.php';
 
 // HR module
 require __DIR__.'/hr.php';
+
+// System module (Access Control, Users)
+require __DIR__.'/system.php';
+
+// API routes
+require __DIR__.'/api_medications.php';

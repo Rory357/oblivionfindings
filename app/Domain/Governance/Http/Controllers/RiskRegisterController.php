@@ -168,6 +168,10 @@ class RiskRegisterController extends Controller
             'resolution_id' => 'nullable|exists:resolutions,id',
         ]);
 
+        if (!$risk->within_appetite && empty($validated['resolution_id'])) {
+            return redirect()->back()->with('error', 'Above-appetite risks require a Board resolution for acceptance. Please create and link a resolution first.');
+        }
+
         $acceptance = $this->riskService->acceptRisk(
             $risk,
             $validated['resolution_id'] ? 'board_resolution' : 'delegated_authority',

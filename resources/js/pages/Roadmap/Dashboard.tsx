@@ -67,6 +67,18 @@ type RoadmapSummary = {
     budget: {
         forecast_total: number;
     };
+    governance_budget: null | {
+        id: number;
+        fiscal_year: string;
+        title: string | null;
+        total_budget: number;
+        total_allocated: number;
+        total_actual: number;
+        variance_pct: number;
+        remaining: number;
+        approved_at: string | null;
+        resolution: { id: number; reference: string; title: string } | null;
+    };
     assurance: {
         overdue: number;
         verified: number;
@@ -206,8 +218,6 @@ type Props = {
 };
 
 type PlanWorkflowAction =
-    | 'submit-manager'
-    | 'submit-executive'
     | 'approve'
     | 'publish'
     | 'revise';
@@ -267,8 +277,6 @@ function extractErrorMessage(error: unknown, fallback: string): string {
 
 function actionLabel(action: PlanWorkflowAction): string {
     return {
-        'submit-manager': 'Submit Manager',
-        'submit-executive': 'Submit Executive',
         approve: 'Approve',
         publish: 'Publish',
         revise: 'Revise',
@@ -548,19 +556,7 @@ export default function RoadmapDashboard({
         (plan: PlanRow): PlanWorkflowAction[] => {
             const actions: PlanWorkflowAction[] = [];
 
-            if (plan.status === 'draft' && can.manageRoadmap) {
-                actions.push('submit-manager');
-            }
-
-            if (plan.status === 'manager_review' && can.manageRoadmap) {
-                actions.push('submit-executive');
-            }
-
-            if (
-                (plan.status === 'manager_review' ||
-                    plan.status === 'exec_review') &&
-                can.approveRoadmap
-            ) {
+            if (plan.status === 'draft' && can.approveRoadmap) {
                 actions.push('approve');
             }
 
@@ -1053,8 +1049,6 @@ export default function RoadmapDashboard({
     const runPlanAction = useCallback(
         async (planId: number, action: PlanWorkflowAction) => {
             const endpoint = {
-                'submit-manager': `/roadmap/quarterly-plans/${planId}/submit-manager`,
-                'submit-executive': `/roadmap/quarterly-plans/${planId}/submit-executive`,
                 approve: `/roadmap/quarterly-plans/${planId}/approve`,
                 publish: `/roadmap/quarterly-plans/${planId}/publish`,
                 revise: `/roadmap/quarterly-plans/${planId}/revise`,
@@ -1204,16 +1198,48 @@ export default function RoadmapDashboard({
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm text-muted-foreground">
                                 <Wallet className="h-4 w-4" />
-                                Forecast Budget
+                                Budget
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-semibold">
-                                {currency(summary.budget.forecast_total)}
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                                {publishedLabel}
-                            </div>
+                            {summary.governance_budget ? (
+                                <>
+                                    <div className="text-2xl font-semibold">
+                                        {currency(summary.governance_budget.total_budget)}
+                                    </div>
+                                    <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                                        <div>
+                                            Approved FY{summary.governance_budget.fiscal_year}
+                                            {summary.governance_budget.approved_at && (
+                                                <> on {summary.governance_budget.approved_at}</>
+                                            )}
+                                        </div>
+                                        <div>
+                                            Actual: {currency(summary.governance_budget.total_actual)}
+                                            {' / '}
+                                            Remaining: {currency(summary.governance_budget.remaining)}
+                                        </div>
+                                        {summary.governance_budget.variance_pct !== 0 && (
+                                            <div className={summary.governance_budget.variance_pct > 5 ? 'text-destructive' : ''}>
+                                                Variance: {summary.governance_budget.variance_pct > 0 ? '+' : ''}
+                                                {summary.governance_budget.variance_pct}%
+                                            </div>
+                                        )}
+                                        <div className="mt-1 pt-1 border-t">
+                                            Initiative Forecast: {currency(summary.budget.forecast_total)}
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="text-2xl font-semibold">
+                                        {currency(summary.budget.forecast_total)}
+                                    </div>
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                        Initiative forecast only &mdash; no approved governance budget
+                                    </div>
+                                </>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -1280,8 +1306,7 @@ export default function RoadmapDashboard({
                                 to load and jump to plan detail.
                             </li>
                             <li>
-                                Run approvals in order: Submit Manager, Submit Executive,
-                                Approve, Publish.
+                                Run approvals in order: Approve, then Publish.
                             </li>
                             <li>
                                 Resolve funding/risk approvals in{' '}

@@ -80,7 +80,7 @@ export default function ClientsIndex({ clients }) {
                     actions={
                         canManage ? (
                             <Button asChild>
-                                <Link href="/clients/create">
+                                <Link href="/system/users/create?type=client">
                                     Add{' '}
                                     {labels?.['client.singular'] ?? 'Client'}
                                 </Link>
@@ -160,6 +160,11 @@ export default function ClientsIndex({ clients }) {
                                     <div className="text-sm font-medium">
                                         {client.first_name} {client.last_name}
                                     </div>
+                                    {client.nhi_number ? (
+                                        <div className="mt-0.5 text-xs font-mono text-slate-400">
+                                            NHI: {client.nhi_number}
+                                        </div>
+                                    ) : null}
                                     <div className="mt-1 flex flex-wrap items-center gap-2">
                                         <div className="text-xs text-slate-500">
                                             Status: {client.status}

@@ -106,7 +106,13 @@ class StrategicPlanController extends Controller
 
     public function approve(Request $request, StrategicPlan $plan)
     {
+        $validated = $request->validate([
+            'resolution_id' => 'required|exists:resolutions,id',
+            'notes' => 'nullable|string',
+        ]);
+
         $plan->update([
+            'approval_resolution_id' => $validated['resolution_id'],
             'approved_at' => now(),
             'approved_by' => $request->user()->id,
             'status' => 'active',

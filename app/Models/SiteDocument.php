@@ -11,6 +11,7 @@ class SiteDocument extends Model
     use AuditableChanges;
 
     protected $fillable = [
+        'tenant_id',
         'site_id',
         'uploaded_by_user_id',
         'title',

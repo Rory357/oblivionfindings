@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -15,12 +15,13 @@ interface Task {
     is_completed: boolean;
     completed_at: string | null;
     sort_order: number;
+    sign_off_required?: boolean;
 }
 
 interface Checklist {
     id: number;
     template_key: string;
-    status: 'not_started' | 'in_progress' | 'completed' | 'overdue';
+    status: 'pending' | 'in_progress' | 'completed' | 'overdue';
     started_at: string | null;
     completed_at: string | null;
     due_date: string | null;
@@ -39,9 +40,9 @@ interface Props {
 }
 
 const statusConfig: Record<string, { className: string; label: string }> = {
-    not_started: {
+    pending: {
         className: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
-        label: 'Not Started',
+        label: 'Pending',
     },
     in_progress: {
         className: 'border-blue-500/30 text-blue-400 bg-blue-500/10',
@@ -68,12 +69,17 @@ export default function OnboardingShow({ checklist, can }: Props) {
         ? Math.round((checklist.tasks_completed_count / checklist.tasks_count) * 100)
         : 0;
 
-    const config = statusConfig[checklist.status] || statusConfig.not_started;
+    const config = statusConfig[checklist.status] || statusConfig.pending;
+    const page = usePage();
+    const authUserId = Number((page.props as { auth?: { user?: { id?: number } } }).auth?.user?.id ?? 0);
 
     function toggleTask(task: Task) {
         if (!can.manage) return;
         if (task.is_completed) return;
-        router.post(`/hr/onboarding/tasks/${task.id}/complete`, {}, { preserveScroll: true });
+        if (task.sign_off_required && authUserId <= 0) return;
+
+        const payload = task.sign_off_required ? { signed_off_by: authUserId } : {};
+        router.post(`/hr/onboarding/tasks/${task.id}/complete`, payload, { preserveScroll: true });
     }
 
     return (
@@ -169,6 +175,9 @@ export default function OnboardingShow({ checklist, can }: Props) {
                                                     <p className="mt-1 text-xs text-muted-foreground">
                                                         Completed: {task.completed_at}
                                                     </p>
+                                                )}
+                                                {task.sign_off_required && (
+                                                    <p className="mt-1 text-xs text-muted-foreground">Sign-off required</p>
                                                 )}
                                             </div>
                                         </div>

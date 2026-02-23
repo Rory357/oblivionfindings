@@ -19,8 +19,14 @@ return new class extends Migration
                 ->default('support_worker')
                 ->index();
             $table->timestamp('email_verified_at')->nullable();
+            $table->timestamp('approved_at')->nullable()->index();
+            $table->foreignId('approved_by')->nullable()->index();
             $table->string('password');
+            $table->text('two_factor_secret')->nullable();
+            $table->text('two_factor_recovery_codes')->nullable();
+            $table->timestamp('two_factor_confirmed_at')->nullable();
             $table->rememberToken();
+            $table->string('profile_photo_path')->nullable();
             $table->timestamps();
         });
 

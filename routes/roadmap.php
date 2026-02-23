@@ -55,12 +55,6 @@ Route::middleware(['auth'])->prefix('roadmap')->name('roadmap.')->group(function
     Route::get('/quarterly-plans/{plan}', [QuarterlyPlanController::class, 'show'])
         ->name('plans.show')
         ->middleware('permission:roadmap.view');
-    Route::post('/quarterly-plans/{plan}/submit-manager', [QuarterlyPlanController::class, 'submitManagerReview'])
-        ->name('plans.submit-manager')
-        ->middleware('permission:roadmap.manage');
-    Route::post('/quarterly-plans/{plan}/submit-executive', [QuarterlyPlanController::class, 'submitExecutiveReview'])
-        ->name('plans.submit-executive')
-        ->middleware('permission:roadmap.manage');
     Route::post('/quarterly-plans/{plan}/approve', [QuarterlyPlanController::class, 'approve'])
         ->name('plans.approve')
         ->middleware('permission:roadmap.approve');
@@ -74,6 +68,9 @@ Route::middleware(['auth'])->prefix('roadmap')->name('roadmap.')->group(function
     Route::post('/budget/replan', [BudgetController::class, 'replan'])
         ->name('budget.replan')
         ->middleware('permission:roadmap.budget.manage');
+    Route::get('/budget/governance-envelope', [BudgetController::class, 'governanceBudget'])
+        ->name('budget.governance-envelope')
+        ->middleware('permission:roadmap.budget.manage|governance.budgets.view');
 
     Route::get('/decisions', [DecisionRequestController::class, 'index'])
         ->name('decisions.index')

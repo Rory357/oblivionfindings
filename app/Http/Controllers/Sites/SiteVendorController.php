@@ -3,12 +3,111 @@
 namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
 use App\Models\Site;
+use App\Models\SiteCredential;
 use App\Models\SiteVendor;
 use Illuminate\Http\Request;
 
 class SiteVendorController extends Controller
 {
+    use ResolvesAllowedSiteTypes;
+    public function globalIndex(Request $request)
+    {
+        abort_unless(
+            ($request->user()?->canDo('vendors.view') ?? false) || ($request->user()?->canDo('credentials.view') ?? false),
+            403
+        );
+
+        $allowedSiteTypes = $this->allowedSiteTypes($request);
+
+        $vendors = SiteVendor::query()
+            ->with('site:id,name,type')
+            ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
+            ->when($request->service_type, fn ($q) => $q->where('service_type', $request->service_type))
+            ->when($request->vendor_status === 'active', fn ($q) => $q->where('is_active', true))
+            ->when($request->vendor_status === 'inactive', fn ($q) => $q->where('is_active', false))
+            ->when($request->preferred === 'yes', fn ($q) => $q->where('is_preferred', true))
+            ->orderBy('service_type')
+            ->orderBy('company_name')
+            ->limit(1000)
+            ->get()
+            ->map(fn (SiteVendor $vendor) => [
+                'id' => $vendor->id,
+                'site_id' => $vendor->site_id,
+                'site_name' => $vendor->site?->name,
+                'site_type' => $vendor->site?->type,
+                'service_type' => $vendor->service_type,
+                'company_name' => $vendor->company_name,
+                'contact_name' => $vendor->contact_name,
+                'phone' => $vendor->phone,
+                'after_hours_phone' => $vendor->after_hours_phone,
+                'email' => $vendor->email,
+                'preferred_contact_method' => $vendor->preferred_contact_method,
+                'is_preferred' => (bool) $vendor->is_preferred,
+                'is_active' => (bool) $vendor->is_active,
+            ])
+            ->values();
+
+        $credentials = SiteCredential::query()
+            ->with(['site:id,name,type', 'vendor:id,company_name,service_type'])
+            ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
+            ->when($request->credential_type, fn ($q) => $q->where('credential_type', $request->credential_type))
+            ->when($request->requires_reauth === 'yes', fn ($q) => $q->where('requires_reauth', true))
+            ->when($request->requires_reauth === 'no', fn ($q) => $q->where('requires_reauth', false))
+            ->orderBy('label')
+            ->limit(1000)
+            ->get()
+            ->map(fn (SiteCredential $credential) => [
+                'id' => $credential->id,
+                'site_id' => $credential->site_id,
+                'site_name' => $credential->site?->name,
+                'site_type' => $credential->site?->type,
+                'label' => $credential->label,
+                'credential_type' => $credential->credential_type,
+                'vendor_name' => $credential->vendor?->company_name,
+                'vendor_service_type' => $credential->vendor?->service_type,
+                'requires_reauth' => (bool) $credential->requires_reauth,
+                'last_rotated_at' => $credential->last_rotated_at?->toDateTimeString(),
+                'value_preview' => '********',
+            ])
+            ->values();
+
+        $sites = Site::query()
+            ->active()
+            ->whereIn('type', $allowedSiteTypes)
+            ->select(['id', 'name', 'type'])
+            ->orderBy('name')
+            ->get();
+
+        $serviceTypes = SiteVendor::query()
+            ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            ->select('service_type')
+            ->distinct()
+            ->orderBy('service_type')
+            ->pluck('service_type')
+            ->values();
+
+        $credentialTypes = SiteCredential::query()
+            ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            ->select('credential_type')
+            ->distinct()
+            ->orderBy('credential_type')
+            ->pluck('credential_type')
+            ->values();
+
+        return inertia('sites/vendors-credentials/global', [
+            'vendors' => $vendors,
+            'credentials' => $credentials,
+            'sites' => $sites,
+            'serviceTypes' => $serviceTypes,
+            'credentialTypes' => $credentialTypes,
+            'filters' => $request->only(['site_id', 'service_type', 'vendor_status', 'preferred', 'credential_type', 'requires_reauth']),
+        ]);
+    }
+
     public function index(Request $request, Site $site)
     {
         $this->authorize('view', $site);
@@ -114,4 +213,5 @@ class SiteVendorController extends Controller
             ->route('sites.vendors.index', $site)
             ->with('success', 'Vendor deleted successfully.');
     }
+
 }

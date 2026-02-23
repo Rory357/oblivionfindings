@@ -15,14 +15,16 @@ import { type NavGroup, type NavItem } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
-    Building2,
     CalendarDays,
     ClipboardCheck,
     ClipboardList,
+    Clock3,
     FileQuestion,
     FileText,
     Folder,
     Gavel,
+    GraduationCap,
+    HeartPulse,
     Home,
     Landmark,
     LayoutGrid,
@@ -34,11 +36,13 @@ import {
     Settings,
     Shield,
     ShieldAlert,
+    ShieldCheck,
     Target,
     Truck,
+    UserMinus,
+    UserCog,
     Users,
     Vote,
-    Warehouse,
     Wrench,
 } from 'lucide-react';
 import AppLogo from './app-logo';
@@ -76,7 +80,6 @@ function buildNavigationGroups({
     activeSiteId?: number | null;
 }): NavGroup[] {
     const clientPlural = labels['client.plural'] ?? 'Clients';
-    const sitePlural = labels['site.plural'] ?? 'Sites';
     const staffPlural = labels['staff.plural'] ?? 'Staff';
     const shiftPlural = labels['shift.plural'] ?? 'Shifts';
     const timesheetPlural = labels['timesheet.plural'] ?? 'Timesheets';
@@ -147,21 +150,6 @@ function buildNavigationGroups({
             href: '/sites',
             icon: MapPin,
         });
-        sitesGroup.items.push({
-            title: 'Head Office',
-            href: '/sites?type=head_office',
-            icon: Building2,
-        });
-        sitesGroup.items.push({
-            title: 'Houses',
-            href: '/sites?type=house',
-            icon: Home,
-        });
-        sitesGroup.items.push({
-            title: 'Facilities',
-            href: '/sites?type=facility',
-            icon: Warehouse,
-        });
     }
 
     if (can?.calendar?.view) {
@@ -196,44 +184,52 @@ function buildNavigationGroups({
 
     sitesGroup.items.push({
         title: 'Documents & Notes',
-        href: '/sites?tab=documents',
+        href: activeSiteId ? `/sites/${activeSiteId}` : '/sites',
         icon: FileText,
     });
 
     if (can?.checklists?.view) {
         sitesGroup.items.push({
             title: 'Inspections & Maintenance',
-            href: '/sites?tab=inspections',
+            href: '/sites/inspections',
             icon: Wrench,
         });
     }
 
     if (can?.vendors?.view || can?.credentials?.view) {
-        const href = activeSiteId
-            ? can?.vendors?.view
-                ? `/sites/${activeSiteId}/vendors`
-                : `/sites/${activeSiteId}/credentials`
-            : '/sites';
-
         sitesGroup.items.push({
             title: 'Vendors & Credentials',
-            href,
+            href: '/sites/vendors-credentials',
             icon: Truck,
         });
     }
 
-    if (can?.assets?.viewAny) {
-        sitesGroup.items.push({
-            title: 'Assets',
-            href: '/assets',
-            icon: Package,
-        });
-    }
+    // My HR group — self-service items visible to all authenticated users
+    const myHrGroup: NavGroup = {
+        id: 'hr',
+        label: 'HR',
+        items: [
+            { title: 'My HR', href: '/hr/my', icon: Home },
+            { title: 'My Training', href: '/hr/my/training', icon: Target },
+            { title: 'My Reviews', href: '/hr/my/reviews', icon: ClipboardCheck },
+            { title: 'My Goals', href: '/hr/my/goals', icon: Target },
+            { title: 'My Surveys', href: '/hr/my/surveys', icon: MessageSquareText },
+        ],
+    };
 
     // Support Worker specific nav
     if (role === 'support_worker') {
+        operationsGroup.items.push({ title: 'My Shifts', href: '/shifts', icon: CalendarDays });
+
+        if (can?.timesheets?.viewAssigned || can?.timesheets?.create) {
+            operationsGroup.items.push({
+                title: 'Attendance',
+                href: '/attendance',
+                icon: Clock3,
+            });
+        }
+
         operationsGroup.items.push(
-            { title: 'My Shifts', href: '/shifts', icon: CalendarDays },
             {
                 title: timesheetPlural,
                 href: '/timesheets',
@@ -294,6 +290,7 @@ function buildNavigationGroups({
             ...(operationsGroup.items.length > 0 ? [operationsGroup] : []),
             ...(resourcesGroup.items.length > 0 ? [resourcesGroup] : []),
             ...(complianceGroup.items.length > 0 ? [complianceGroup] : []),
+            myHrGroup,
         ];
     }
 
@@ -318,6 +315,11 @@ function buildNavigationGroups({
             href: '/timesheets',
             icon: ClipboardList,
         });
+        operationsGroup.items.push({
+            title: 'Attendance',
+            href: '/attendance',
+            icon: Clock3,
+        });
     }
     if (can?.respite?.viewAny) {
         operationsGroup.items.push({
@@ -331,6 +333,11 @@ function buildNavigationGroups({
             title: medicationPlural,
             href: '/medications',
             icon: ClipboardList,
+        });
+        operationsGroup.items.push({
+            title: 'Medication Dashboard',
+            href: '/medications/dashboard',
+            icon: ShieldCheck,
         });
     }
     if (can?.medications?.breakGlass) {
@@ -408,27 +415,23 @@ function buildNavigationGroups({
         });
     }
 
-    // HR
-    const hrGroup: NavGroup = {
-        id: 'hr',
-        label: 'HR',
-        items: [],
-    };
-
-    // My HR is always visible to any authenticated user
-    hrGroup.items.push({ title: 'My HR', href: '/hr/my', icon: Home });
-    hrGroup.items.push({
-        title: 'My Training',
-        href: '/hr/my/training',
-        icon: Target,
-    });
+    // HR — start with self-service items already in myHrGroup
+    const hrGroup = myHrGroup;
 
     const hasAnyHr =
         can?.hr?.recruitment?.view ||
         can?.hr?.employees?.viewAny ||
         can?.hr?.compliance?.view ||
+        can?.hr?.training?.view ||
+        can?.hr?.vetting?.view ||
+        can?.hr?.driver?.view ||
+        can?.hr?.onboarding?.view ||
         can?.hr?.leave?.viewAny ||
         can?.hr?.performance?.view ||
+        can?.hr?.cases?.view ||
+        can?.hr?.documents?.view ||
+        can?.hr?.payroll?.view ||
+        can?.hr?.wellbeing?.view ||
         can?.hr?.reports?.view ||
         can?.hr?.policies?.view;
 
@@ -438,6 +441,11 @@ function buildNavigationGroups({
                 title: 'Recruitment',
                 href: '/hr/recruitment',
                 icon: Users,
+            });
+            hrGroup.items.push({
+                title: 'Careers Page',
+                href: '/careers',
+                icon: BookOpen,
             });
         }
         if (can?.hr?.employees?.viewAny) {
@@ -454,11 +462,44 @@ function buildNavigationGroups({
                 icon: Shield,
             });
         }
+        if (can?.hr?.training?.view) {
+            hrGroup.items.push({
+                title: 'Training',
+                href: '/hr/compliance/training',
+                icon: GraduationCap,
+            });
+        }
+        if (can?.hr?.vetting?.view) {
+            hrGroup.items.push({
+                title: 'Vetting',
+                href: '/hr/compliance/vetting',
+                icon: ShieldCheck,
+            });
+        }
+        if (can?.hr?.driver?.view) {
+            hrGroup.items.push({
+                title: 'Driver Eligibility',
+                href: '/hr/compliance/drivers',
+                icon: Truck,
+            });
+        }
         if (can?.hr?.leave?.viewAny) {
             hrGroup.items.push({
                 title: 'Leave & Rosters',
                 href: '/hr/leave',
                 icon: CalendarDays,
+            });
+        }
+        if (can?.hr?.onboarding?.view) {
+            hrGroup.items.push({
+                title: 'Onboarding',
+                href: '/hr/onboarding',
+                icon: ClipboardList,
+            });
+            hrGroup.items.push({
+                title: 'Offboarding',
+                href: '/hr/offboarding',
+                icon: UserMinus,
             });
         }
         if (can?.hr?.performance?.view) {
@@ -467,12 +508,45 @@ function buildNavigationGroups({
                 href: '/hr/performance',
                 icon: ClipboardCheck,
             });
+            hrGroup.items.push({
+                title: 'Development Goals',
+                href: '/hr/development/goals',
+                icon: Target,
+            });
+        }
+        if (can?.hr?.cases?.view) {
+            hrGroup.items.push({
+                title: 'Cases',
+                href: '/hr/cases',
+                icon: ShieldAlert,
+            });
+        }
+        if (can?.hr?.wellbeing?.view) {
+            hrGroup.items.push({
+                title: 'Wellbeing',
+                href: '/hr/wellbeing',
+                icon: HeartPulse,
+            });
         }
         if (can?.hr?.policies?.view) {
             hrGroup.items.push({
                 title: 'Policies',
                 href: '/hr/policies',
                 icon: FileText,
+            });
+        }
+        if (can?.hr?.documents?.view) {
+            hrGroup.items.push({
+                title: 'Documents',
+                href: '/hr/documents',
+                icon: FileText,
+            });
+        }
+        if (can?.hr?.payroll?.view) {
+            hrGroup.items.push({
+                title: 'Payroll',
+                href: '/hr/payroll',
+                icon: Landmark,
             });
         }
         if (can?.hr?.reports?.view) {
@@ -595,6 +669,21 @@ function buildNavigationGroups({
             icon: ShieldAlert,
         });
     }
+
+    // Access Control & Users (for admins)
+    if (can?.settings?.manageAccess) {
+        systemGroup.items.push({
+            title: 'Access Control',
+            href: '/system/access',
+            icon: ShieldCheck,
+        });
+        systemGroup.items.push({
+            title: 'Users',
+            href: '/system/users',
+            icon: UserCog,
+        });
+    }
+
     systemGroup.items.push({
         title: 'Settings',
         href: '/settings',
@@ -620,7 +709,18 @@ export function AppSidebar() {
     const role = auth.user?.role ?? null;
     const can = auth?.can;
 
-    const activeSiteId = page.props?.site?.id ?? null;
+    const normalizeSiteId = (value: unknown): number | null => {
+        const n = Number(value);
+        return Number.isInteger(n) && n > 0 ? n : null;
+    };
+
+    const siteIdFromProp = normalizeSiteId(page.props?.site?.id);
+    const siteIdFromUrl = (() => {
+        const m = String(page.url ?? '').match(/^\/sites\/(\d+)(?:\/|$)/);
+        return normalizeSiteId(m?.[1]);
+    })();
+
+    const activeSiteId = siteIdFromProp ?? siteIdFromUrl ?? null;
     const navigationGroups = buildNavigationGroups({
         role,
         can,

@@ -20,7 +20,7 @@ export default function AuthSimpleLayout({
                         className="absolute inset-0"
                         style={{
                             backgroundImage:
-                                "url('/images/auth/BackgroundImageOF5.jpg')",
+                                "url('/images/auth/BackgroundImageOF4.jpg')",
                             backgroundSize: 'cover',
                             backgroundPosition: 'center',
                         }}

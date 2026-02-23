@@ -6,6 +6,7 @@ import { useInitials } from '@/hooks/use-initials';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
 
 type StaffUser = {
     id: number;
@@ -47,8 +48,7 @@ export default function StaffIndex({ users, filters }: Props) {
                     description="Manage staff profiles, assignments, availability and access."
                 />
 
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-2">
                         <Input
                             defaultValue={filters?.q ?? ''}
@@ -79,6 +79,14 @@ export default function StaffIndex({ users, filters }: Props) {
                             Clear
                         </Button>
                     </div>
+                    {can?.staff?.create ? (
+                        <Link href="/system/users/create?type=staff">
+                            <Button>
+                                <Plus className="h-4 w-4" />
+                                Add staff
+                            </Button>
+                        </Link>
+                    ) : null}
                 </div>
 
                 <div className="overflow-x-auto rounded-md border">

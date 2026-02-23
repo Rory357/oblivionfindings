@@ -29,6 +29,7 @@ export default function TimesheetCreate({ clients, shift }: Props) {
         ends_at: end,
         break_minutes: 0,
         notes: '',
+        is_residential_billable: false,
     });
 
     return (
@@ -98,7 +99,28 @@ export default function TimesheetCreate({ clients, shift }: Props) {
                                 rows={4}
                             />
                         </div>
+
+                        <label className="flex items-center gap-2 text-sm">
+                            <Input
+                                type="checkbox"
+                                className="h-4 w-4"
+                                checked={form.data.is_residential_billable}
+                                onChange={(e) => form.setData('is_residential_billable', e.target.checked)}
+                            />
+                            Residential / home-support shift billable
+                        </label>
                     </div>
+
+                    {Object.keys(form.errors).length > 0 && (
+                        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                            <p className="font-medium">Please fix the following errors:</p>
+                            <ul className="mt-1 list-disc pl-5">
+                                {Object.entries(form.errors).map(([field, message]) => (
+                                    <li key={field}>{message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-2">
                         <Button type="submit" disabled={form.processing}>Create</Button>

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyVersion;
 use Illuminate\Http\Request;
@@ -13,6 +14,8 @@ use Illuminate\Support\Facades\Storage;
 
 class PolicyController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * List the policy library.
      */
@@ -21,7 +24,7 @@ class PolicyController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.view'), 403);
 
-        $tenantId = $user->tenant_id ?? $user->organization_id ?? 1;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $policies = HrPolicy::forTenant($tenantId)
             ->with('currentVersion')
@@ -58,9 +61,11 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         // Get existing categories for suggestions
-        $existingCategories = HrPolicy::selectRaw('DISTINCT category')
+        $existingCategories = HrPolicy::forTenant($tenantId)
+            ->selectRaw('DISTINCT category')
             ->pluck('category')
             ->filter()
             ->values();
@@ -87,10 +92,13 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         $policy->load(['versions' => fn ($q) => $q->orderByDesc('version_number')]);
 
-        $existingCategories = HrPolicy::selectRaw('DISTINCT category')
+        $existingCategories = HrPolicy::forTenant($tenantId)
+            ->selectRaw('DISTINCT category')
             ->pluck('category')
             ->filter()
             ->values();
@@ -118,6 +126,8 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         $policy->load([
             'currentVersion',
@@ -146,12 +156,9 @@ class PolicyController extends Controller
      */
     public function store(Request $request)
     {
-        // Attempt to increase upload limits at runtime
-        @ini_set('upload_max_filesize', '8M');
-        @ini_set('post_max_size', '8M');
-        
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -186,14 +193,11 @@ class PolicyController extends Controller
             $filename = Str::slug($data['title']) . '-' . time() . '.' . $file->getClientOriginalExtension();
             
             try {
-                $tenantId = $user->tenant_id ?? $user->organization_id ?? 1;
                 $documentPath = $file->storeAs('policies/' . $tenantId, $filename, 'private');
             } catch (\Exception $e) {
                 return redirect()->back()->withErrors(['document' => 'Failed to save the file: ' . $e->getMessage()]);
             }
         }
-
-        $tenantId = $user->tenant_id ?? $user->organization_id ?? 1;
         
         $policy = HrPolicy::create([
             'tenant_id' => $tenantId,
@@ -228,6 +232,8 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         $data = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
@@ -255,6 +261,8 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         $data = $request->validate([
             'content_summary' => ['nullable', 'string', 'max:5000'],
@@ -271,7 +279,6 @@ class PolicyController extends Controller
                 return redirect()->back()->withErrors(['document' => 'The file failed to upload.']);
             }
             
-            $tenantId = $user->tenant_id ?? $user->organization_id ?? 1;
             $filename = Str::slug($policy->title) . '-v' . ($policy->versions()->max('version_number') + 1) . '-' . time() . '.' . $file->getClientOriginalExtension();
             $documentPath = $file->storeAs('policies/' . $tenantId, $filename, 'private');
         }
@@ -302,6 +309,8 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         // Delete associated files
         foreach ($policy->versions as $version) {
@@ -322,6 +331,8 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user->canDo('hr.policies.view') || $user->canDo('hr.policies.attest'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
 
         $version = $policy->currentVersion;
         abort_if(!$version || !$version->document_path, 404, 'No document available for this policy.');
@@ -345,6 +356,9 @@ class PolicyController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.policies.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $policy->tenant_id);
+        abort_unless($version->policy_id === $policy->id, 404);
 
         // Don't allow deleting the current version
         if ($version->is_current) {

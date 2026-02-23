@@ -2,8 +2,11 @@
 
 use App\Domain\Hr\Jobs\ArchiveCandidateDataJob;
 use App\Domain\Hr\Jobs\CalculateWellbeingIndicatorsJob;
+use App\Domain\Hr\Jobs\EscalateLeaveApprovalsJob;
 use App\Domain\Hr\Jobs\EvaluateComplianceMatrixJob;
 use App\Domain\Hr\Jobs\ProcessLeaveBalanceAccrualJob;
+use App\Domain\Hr\Jobs\RunHrScheduledReportsJob;
+use App\Domain\Hr\Jobs\SendEngagementActionPlanRemindersJob;
 use App\Domain\Hr\Jobs\SendExpiryRemindersJob;
 use App\Domain\Roadmap\Jobs\DetectRoadmapTriageOverloadJob;
 use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
@@ -133,17 +136,43 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
 
+// Engagement action plan reminders and overdue escalations: daily at 07:15
+app(Schedule::class)
+    ->job(new SendEngagementActionPlanRemindersJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('07:15');
+
 // Leave balance accrual: monthly on the 1st at 00:30
 app(Schedule::class)
     ->job(new ProcessLeaveBalanceAccrualJob)
     ->timezone('Pacific/Auckland')
     ->monthlyOn(1, '00:30');
 
+// Leave approval SLA escalations: every 30 minutes
+app(Schedule::class)
+    ->job(new EscalateLeaveApprovalsJob)
+    ->timezone('Pacific/Auckland')
+    ->everyThirtyMinutes();
+
 // Archive expired candidate data per retention policy: weekly Sunday 03:00
 app(Schedule::class)
     ->job(new ArchiveCandidateDataJob)
     ->timezone('Pacific/Auckland')
     ->weeklyOn(0, '03:00');
+
+// Scheduled HR report subscriptions: every 15 minutes
+app(Schedule::class)
+    ->job(new RunHrScheduledReportsJob)
+    ->timezone('Pacific/Auckland')
+    ->everyFifteenMinutes();
+
+// Medical Module Scheduled Jobs
+
+// Clear stale medication alerts: hourly
+app(Schedule::class)
+    ->call(fn () => app(\App\Services\MedicationAlertService::class)->clearStaleAlerts())
+    ->timezone('Pacific/Auckland')
+    ->hourly();
 
 // Roadmap Module Scheduled Jobs
 

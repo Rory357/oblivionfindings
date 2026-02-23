@@ -194,3 +194,17 @@
 .of-calendar .fc .fc-event {
     border-radius: 0.5rem;
 }
+
+
+/* Instagram-style gradient hover for sidebar icons */
+.group\/item:hover .icon-gradient-bg {
+    background: linear-gradient(135deg, 
+        #6366f1 0%,    /* Indigo */
+        #a855f7 50%,   /* Purple */
+        #ec4899 100%   /* Pink */
+    );
+}
+
+.group\/item:hover .icon-gradient-bg svg {
+    color: white;
+}

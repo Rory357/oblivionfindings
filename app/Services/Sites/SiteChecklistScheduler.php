@@ -5,6 +5,7 @@ namespace App\Services\Sites;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class SiteChecklistScheduler
 {
@@ -23,9 +24,11 @@ class SiteChecklistScheduler
                   ->orWhere('end_date', '>=', now());
             })
             ->chunk(100, function ($assignments) use ($endDate, &$count) {
-                foreach ($assignments as $assignment) {
-                    $count += $this->generateRunsForAssignment($assignment, $endDate);
-                }
+                DB::transaction(function () use ($assignments, $endDate, &$count) {
+                    foreach ($assignments as $assignment) {
+                        $count += $this->generateRunsForAssignment($assignment, $endDate);
+                    }
+                });
             });
 
         return $count;
@@ -54,6 +57,7 @@ class SiteChecklistScheduler
                 SiteChecklistRun::create([
                     'assignment_id' => $assignment->id,
                     'site_id' => $assignment->site_id,
+                    'tenant_id' => $assignment->tenant_id,
                     'template_id' => $assignment->template_id,
                     'scheduled_date' => $currentDate->copy(),
                     'status' => 'scheduled',
@@ -111,6 +115,7 @@ class SiteChecklistScheduler
         $inProgress = $runs->where('status', 'in_progress')->count();
 
         $avgCompletionTime = $runs->where('status', 'completed')
+            ->filter(fn ($run) => $run->completed_at && $run->started_at)
             ->avg(function ($run) {
                 return $run->completed_at->diffInMinutes($run->started_at);
             });

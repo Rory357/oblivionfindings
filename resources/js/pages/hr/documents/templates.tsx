@@ -3,21 +3,34 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
 import { Plus } from 'lucide-react';
 
 interface Template {
     id: number;
     name: string;
-    description: string | null;
-    template_type: string;
-    placeholders: string[] | null;
+    category: string;
+    merge_fields: string[];
     is_active: boolean;
+    approval_required: boolean;
+    version: number;
     created_at: string;
+    updated_at: string;
 }
 
 interface Props {
-    templates: Template[];
+    templates: {
+        data: Template[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
+    };
+    categories: string[];
+    filters: { category: string | null; q: string };
     can: { manage: boolean };
 }
 
@@ -32,10 +45,15 @@ const typeColors: Record<string, string> = {
     letter: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
     policy: 'border-purple-500/30 text-purple-400 bg-purple-500/10',
     certificate: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
+    offer: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10',
     other: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
 };
 
-export default function DocumentTemplates({ templates, can }: Props) {
+export default function DocumentTemplates({ templates, categories, filters, can }: Props) {
+    function applyFilter(key: string, value: string | null) {
+        router.get('/hr/documents/templates', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
+    }
+
     function toggleActive(template: Template) {
         router.post(`/hr/documents/templates/${template.id}/toggle-active`, {}, { preserveScroll: true });
     }
@@ -56,42 +74,77 @@ export default function DocumentTemplates({ templates, can }: Props) {
                     )}
                 </div>
 
-                {/* Table */}
+                <div className="flex flex-wrap items-center gap-3">
+                    <Input
+                        placeholder="Search templates..."
+                        defaultValue={filters.q}
+                        className="w-64"
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                applyFilter('q', (e.target as HTMLInputElement).value);
+                            }
+                        }}
+                    />
+                    <Select
+                        value={filters.category || '__none__'}
+                        onValueChange={(v) => applyFilter('category', v === '__none__' ? null : v)}
+                    >
+                        <SelectTrigger className="w-48">
+                            <SelectValue placeholder="All categories" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="__none__">All categories</SelectItem>
+                            {categories.map((category) => (
+                                <SelectItem key={category} value={category}>
+                                    {category.replace('_', ' ')}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
                 <Card>
                     <CardContent className="p-0">
                         <table className="w-full text-sm">
                             <thead className="border-b bg-muted/50">
                                 <tr>
                                     <th className="px-4 py-3 text-left font-medium">Name</th>
-                                    <th className="px-4 py-3 text-left font-medium">Description</th>
-                                    <th className="px-4 py-3 text-left font-medium">Type</th>
+                                    <th className="px-4 py-3 text-left font-medium">Category</th>
+                                    <th className="px-4 py-3 text-left font-medium">Merge Fields</th>
                                     <th className="px-4 py-3 text-left font-medium">Status</th>
-                                    <th className="px-4 py-3 text-left font-medium">Created</th>
-                                    {can.manage && (
-                                        <th className="px-4 py-3 text-right font-medium">Actions</th>
-                                    )}
+                                    <th className="px-4 py-3 text-left font-medium">Version</th>
+                                    <th className="px-4 py-3 text-left font-medium">Updated</th>
+                                    {can.manage && <th className="px-4 py-3 text-right font-medium">Actions</th>}
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {templates.map((template) => {
-                                    const typeClass = typeColors[template.template_type] || typeColors.other;
+                                {templates.data.map((template) => {
+                                    const typeClass = typeColors[template.category] || typeColors.other;
                                     return (
                                         <tr key={template.id} className="hover:bg-muted/30">
                                             <td className="px-4 py-3 font-medium">{template.name}</td>
-                                            <td className="px-4 py-3 text-muted-foreground">
-                                                {template.description || '\u2014'}
-                                            </td>
                                             <td className="px-4 py-3">
                                                 <Badge variant="outline" className={typeClass}>
-                                                    {template.template_type}
+                                                    {template.category}
                                                 </Badge>
+                                            </td>
+                                            <td className="px-4 py-3 text-muted-foreground">
+                                                {template.merge_fields.length > 0
+                                                    ? template.merge_fields.slice(0, 3).join(', ')
+                                                    : '—'}
                                             </td>
                                             <td className="px-4 py-3">
-                                                <Badge variant={template.is_active ? 'default' : 'secondary'}>
-                                                    {template.is_active ? 'Active' : 'Inactive'}
-                                                </Badge>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge variant={template.is_active ? 'default' : 'secondary'}>
+                                                        {template.is_active ? 'Active' : 'Inactive'}
+                                                    </Badge>
+                                                    {template.approval_required && (
+                                                        <Badge variant="outline">Approval required</Badge>
+                                                    )}
+                                                </div>
                                             </td>
-                                            <td className="px-4 py-3 text-muted-foreground">{template.created_at}</td>
+                                            <td className="px-4 py-3 text-muted-foreground">v{template.version}</td>
+                                            <td className="px-4 py-3 text-muted-foreground">{template.updated_at}</td>
                                             {can.manage && (
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex items-center justify-end gap-2">
@@ -113,9 +166,9 @@ export default function DocumentTemplates({ templates, can }: Props) {
                                         </tr>
                                     );
                                 })}
-                                {templates.length === 0 && (
+                                {templates.data.length === 0 && (
                                     <tr>
-                                        <td colSpan={can.manage ? 6 : 5} className="px-4 py-8 text-center text-muted-foreground">
+                                        <td colSpan={can.manage ? 7 : 6} className="px-4 py-8 text-center text-muted-foreground">
                                             No document templates found.
                                         </td>
                                     </tr>
@@ -124,6 +177,29 @@ export default function DocumentTemplates({ templates, can }: Props) {
                         </table>
                     </CardContent>
                 </Card>
+
+                {templates.last_page > 1 && (
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                            Showing {(templates.current_page - 1) * templates.per_page + 1} to{' '}
+                            {Math.min(templates.current_page * templates.per_page, templates.total)} of{' '}
+                            {templates.total} templates
+                        </p>
+                        <div className="flex items-center gap-1">
+                            {templates.links.map((link, i) => (
+                                <Button
+                                    key={i}
+                                    variant={link.active ? 'default' : 'outline'}
+                                    size="sm"
+                                    disabled={!link.url}
+                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                >
+                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                </Button>
+                            ))}
+                        </div>
+                    </div>
+                )}
             </div>
         </AppLayout>
     );

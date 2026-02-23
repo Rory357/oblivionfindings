@@ -42,14 +42,24 @@ class LeaveRequestNotification extends Notification implements ShouldQueue
 
     public function toArray(object $notifiable): array
     {
+        $userName = $this->leaveRequest->user?->name ?? 'A staff member';
+        $leaveType = ucfirst(str_replace('_', ' ', $this->leaveRequest->leave_type));
+
         return [
             'type'             => 'leave_request',
+            'title'            => "Leave Request: {$userName}",
+            'message'          => "{$userName} has requested {$leaveType} leave and needs your approval.",
             'leave_type'       => $this->leaveRequest->leave_type,
             'starts_at'        => $this->leaveRequest->starts_at?->toIso8601String(),
             'ends_at'          => $this->leaveRequest->ends_at?->toIso8601String(),
-            'user_name'        => $this->leaveRequest->user?->name,
+            'user_name'        => $userName,
             'leave_request_id' => $this->leaveRequest->id,
-            'action_url'       => "/hr/leave/{$this->leaveRequest->id}",
+            'url'              => "/hr/leave/{$this->leaveRequest->id}",
+            'context'          => [
+                'Type' => $leaveType,
+                'From' => $this->leaveRequest->starts_at?->format('d M Y') ?? 'N/A',
+                'To' => $this->leaveRequest->ends_at?->format('d M Y') ?? 'N/A',
+            ],
         ];
     }
 }

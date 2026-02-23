@@ -29,6 +29,7 @@
         <env name="DB_DATABASE" value="oblivion_findings_test"/>
         <env name="DB_USERNAME" value="testUser"/>
         <env name="DB_PASSWORD" value="test101"/>
+        <env name="APP_URL" value="http://localhost"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

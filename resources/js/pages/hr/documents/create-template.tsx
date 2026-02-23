@@ -23,6 +23,7 @@ const categories = [
     { value: 'letter', label: 'Letter' },
     { value: 'policy', label: 'Policy' },
     { value: 'certificate', label: 'Certificate' },
+    { value: 'offer', label: 'Offer Letter' },
     { value: 'other', label: 'Other' },
 ];
 
