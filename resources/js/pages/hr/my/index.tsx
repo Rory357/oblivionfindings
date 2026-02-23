@@ -66,7 +66,7 @@ export default function MyHrIndex({ profile, pendingLeave, leaveBalances, compli
                                     {leaveBalances.slice(0, 3).map((b, i) => (
                                         <div key={i} className="flex justify-between text-sm">
                                             <span className="capitalize">{b.leave_type.replace('_', ' ')}</span>
-                                            <span className="font-medium">{b.remaining_hours}h left</span>
+                                            <span className="font-medium">{b.remaining_hours ?? 0}h left</span>
                                         </div>
                                     ))}
                                 </div>

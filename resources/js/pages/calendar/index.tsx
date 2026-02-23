@@ -30,7 +30,7 @@ import listPlugin from '@fullcalendar/list';
 import FullCalendar from '@fullcalendar/react';
 import timeGridPlugin from '@fullcalendar/timegrid';
 
-// FullCalendar styles are loaded via app.blade.php (CDN) to avoid Vite export-map issues.
+// FullCalendar v6 bundles CSS into JS automatically — no separate CSS import needed.
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 
