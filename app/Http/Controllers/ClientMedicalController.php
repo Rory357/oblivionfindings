@@ -194,6 +194,8 @@ class ClientMedicalController extends Controller
                 ->where('client_id', $client->id)
                 ->whereIn('status', ['open', 'under_review'])
                 ->exists(),
+            'disability_options' => ClientMedicalProfile::DISABILITY_OPTIONS,
+            'allergen_options' => ClientMedicalProfile::ALLERGEN_OPTIONS,
         ]);
     }
 
@@ -203,8 +205,10 @@ class ClientMedicalController extends Controller
 
         $data = $request->validate([
             'medical_history' => ['nullable', 'string'],
-            'disabilities' => ['nullable', 'string'],
-            'allergies' => ['nullable', 'string'],
+            'disabilities' => ['nullable', 'array'],
+            'disabilities.*' => ['string', 'max:255'],
+            'allergies' => ['nullable', 'array'],
+            'allergies.*' => ['string', 'max:255'],
             'notes' => ['nullable', 'string'],
         ]);
 

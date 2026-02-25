@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { formatDate } from '@/lib/date-format';
 import { useMemo, useState } from 'react';
 
 type Timesheet = {
@@ -259,7 +260,7 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                         </td>
                                     ) : null}
                                     <td className="p-3">
-                                        <div className="font-medium">{t.work_date}</div>
+                                        <div className="font-medium">{formatDate(t.work_date)}</div>
                                         <div className="text-xs text-muted-foreground">
                                             {new Date(t.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             {' – '}

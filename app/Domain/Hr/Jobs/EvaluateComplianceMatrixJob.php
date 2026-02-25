@@ -10,6 +10,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class EvaluateComplianceMatrixJob implements ShouldQueue
 {
@@ -28,15 +29,17 @@ class EvaluateComplianceMatrixJob implements ShouldQueue
             return;
         }
 
-        // All tenants
-        $tenants = User::select('tenant_id')
-            ->whereNotNull('tenant_id')
-            ->distinct()
-            ->pluck('tenant_id');
+        // All tenants (or global if tenant field is not present).
+        $tenants = Schema::hasColumn('users', 'tenant_id')
+            ? User::select('tenant_id')
+                ->whereNotNull('tenant_id')
+                ->distinct()
+                ->pluck('tenant_id')
+            : collect([null]);
 
         foreach ($tenants as $tenantId) {
             $count = $service->evaluateAllStaff($tenantId);
-            Log::info("Compliance matrix evaluated for tenant {$tenantId}: {$count} staff processed.");
+            Log::info("Compliance matrix evaluated for tenant " . ($tenantId ?? 'global') . ": {$count} staff processed.");
         }
     }
 }

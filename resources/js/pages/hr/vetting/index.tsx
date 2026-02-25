@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import { Shield, Search, Plus, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Search, Plus, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -16,7 +16,8 @@ type VettingCheck = {
     user: { id: number; name: string; email?: string };
     check_type: string;
     status: string;
-    issued_at: string | null;
+    check_date: string | null;
+    issue_date: string | null;
     expires_at: string | null;
     reference_number: string | null;
 };
@@ -24,13 +25,15 @@ type VettingCheck = {
 type Props = {
     checks: {
         data: VettingCheck[];
-        links: any[];
+        links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     summary: {
         total: number;
-        current: number;
+        clear: number;
         expiring: number;
         expired: number;
+        pending: number;
+        flagged: number;
     };
     filters: {
         status: string | null;
@@ -41,7 +44,7 @@ type Props = {
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
-    { title: 'Vetting', href: '/hr/vetting' },
+    { title: 'Vetting', href: '/hr/compliance/vetting' },
 ];
 
 const formatDate = (value?: string | null) => {
@@ -56,20 +59,16 @@ const formatDate = (value?: string | null) => {
 
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'current':
-        case 'cleared':
+        case 'clear':
             return 'bg-green-100 text-green-800 border-green-200';
         case 'pending':
-        case 'in_progress':
+        case 'requested':
             return 'bg-blue-100 text-blue-800 border-blue-200';
-        case 'expiring':
+        case 'flagged':
+        case 'adverse':
+            return 'bg-red-100 text-red-800 border-red-200';
+        case 'renewal_due':
             return 'bg-amber-100 text-amber-800 border-amber-200';
-        case 'expired':
-            return 'bg-red-100 text-red-800 border-red-200';
-        case 'not_started':
-            return 'bg-slate-100 text-slate-800 border-slate-200';
-        case 'failed':
-            return 'bg-red-100 text-red-800 border-red-200';
         default:
             return 'bg-slate-100 text-slate-800 border-slate-200';
     }
@@ -88,13 +87,23 @@ const isExpired = (expiresAt: string | null) => {
     return new Date(expiresAt) < new Date();
 };
 
-const statuses = ['current', 'cleared', 'pending', 'in_progress', 'expiring', 'expired', 'not_started', 'failed'];
+const statuses = [
+    'clear',
+    'pending',
+    'requested',
+    'flagged',
+    'adverse',
+    'renewal_due',
+    'expired',
+    'expiring',
+    'action',
+];
 
 export default function VettingIndex({ checks, summary, filters, can }: Props) {
     const NONE = '__none__';
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/vetting', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get('/hr/compliance/vetting', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
     };
 
     return (
@@ -112,7 +121,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
 
                     <div className="flex flex-wrap items-center gap-2">
                         {can.manage && (
-                            <Link href="/hr/vetting/create">
+                            <Link href="/hr/compliance/vetting/create">
                                 <Button size="sm">
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     Add Check
@@ -133,12 +142,12 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                     </Card>
                     <Card>
                         <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Current</CardTitle>
+                            <CardTitle className="text-sm font-medium text-slate-500">Clear</CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center gap-2">
                                 <CheckCircle className="h-5 w-5 text-green-500" />
-                                <div className="text-2xl font-bold text-green-600">{summary.current}</div>
+                                <div className="text-2xl font-bold text-green-600">{summary.clear}</div>
                             </div>
                         </CardContent>
                     </Card>
@@ -166,6 +175,22 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                                     {summary.expired}
                                 </div>
                             </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-sm font-medium text-slate-500">Pending</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold">{summary.pending}</div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-sm font-medium text-slate-500">Flagged</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="text-2xl font-bold text-red-600">{summary.flagged}</div>
                         </CardContent>
                     </Card>
                 </div>
@@ -216,12 +241,12 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                                     <TableHead>Staff Member</TableHead>
                                     <TableHead>Check Type</TableHead>
                                     <TableHead>Reference</TableHead>
-                                    <TableHead>Status</TableHead>
-                                    <TableHead>Issued</TableHead>
-                                    <TableHead>Expires</TableHead>
-                                    <TableHead className="w-20"></TableHead>
-                                </TableRow>
-                            </TableHeader>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead>Issued</TableHead>
+                                        <TableHead>Expires</TableHead>
+                                        <TableHead className="w-20"></TableHead>
+                                    </TableRow>
+                                </TableHeader>
                             <TableBody>
                                 {checks.data.map((check) => (
                                     <TableRow key={check.id}>
@@ -242,7 +267,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                                                 {check.status.replace(/_/g, ' ')}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell>{formatDate(check.issued_at)}</TableCell>
+                                        <TableCell>{formatDate(check.issue_date || check.check_date)}</TableCell>
                                         <TableCell>
                                             <span className={
                                                 isExpired(check.expires_at)
@@ -256,7 +281,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                                         </TableCell>
                                         <TableCell>
                                             <Link
-                                                href={`/hr/vetting/${check.id}`}
+                                                href={`/hr/compliance/vetting/${check.id}`}
                                                 className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
                                             >
                                                 View
@@ -278,7 +303,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
 
                 {checks?.links?.length ? (
                     <div className="flex flex-wrap gap-2">
-                        {checks.links.map((l: any) => (
+                        {checks.links.map((l) => (
                             <button
                                 key={l.label}
                                 disabled={!l.url}

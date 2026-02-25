@@ -10,8 +10,10 @@ use App\Models\SiteHouseRoom;
 use App\Models\SiteHoResource;
 use App\Models\SiteFacilityZone;
 use App\Models\SiteContact;
+use App\Models\SiteDocument;
 use App\Models\Asset;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 
 class SiteOnboardingController extends Controller
 {
@@ -59,6 +61,11 @@ class SiteOnboardingController extends Controller
             ->forType($site->type)
             ->get();
 
+        // Get existing documents for this site
+        $existingDocuments = SiteDocument::where('site_id', $site->id)
+            ->orderByDesc('created_at')
+            ->get(['id', 'title', 'category', 'expiry_date', 'notes', 'original_name', 'size_bytes']);
+
         return inertia('sites/onboarding/wizard', [
             'site' => [
                 'id' => $site->id,
@@ -77,6 +84,7 @@ class SiteOnboardingController extends Controller
             'currentStep' => $step,
             'typeSpecificData' => $typeSpecificData,
             'checklistTemplates' => $checklistTemplates,
+            'existingDocuments' => $existingDocuments,
             'steps' => $steps,
         ]);
     }
@@ -112,6 +120,64 @@ class SiteOnboardingController extends Controller
         return response()->json(['success' => true]);
     }
 
+    public function uploadDocument(Request $request, Site $site)
+    {
+        $this->authorize('update', $site);
+
+        $request->validate([
+            'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,jpg,jpeg,png,gif,webp'],
+            'title' => ['required', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'expiry_date' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->storeAs(
+            "site-documents/{$site->id}",
+            time() . '_' . preg_replace('/\s+/', '_', $file->getClientOriginalName()),
+            'private'
+        );
+
+        $document = SiteDocument::create([
+            'site_id' => $site->id,
+            'uploaded_by_user_id' => $request->user()->id,
+            'title' => $request->input('title'),
+            'category' => $request->input('category'),
+            'expiry_date' => $request->input('expiry_date'),
+            'notes' => $request->input('notes'),
+            'storage_disk' => 'private',
+            'storage_path' => $path,
+            'original_name' => $file->getClientOriginalName(),
+            'mime_type' => $file->getClientMimeType(),
+            'size_bytes' => $file->getSize(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'document' => [
+                'id' => $document->id,
+                'title' => $document->title,
+                'category' => $document->category,
+                'original_name' => $document->original_name,
+                'size_bytes' => $document->size_bytes,
+            ],
+        ]);
+    }
+
+    public function deleteDocument(Request $request, Site $site, SiteDocument $document)
+    {
+        $this->authorize('update', $site);
+
+        if ($document->storage_path && Storage::disk($document->storage_disk ?? 'private')->exists($document->storage_path)) {
+            Storage::disk($document->storage_disk ?? 'private')->delete($document->storage_path);
+        }
+
+        $document->delete();
+
+        return response()->json(['success' => true]);
+    }
+
     public function complete(Request $request, Site $site)
     {
         $this->authorize('update', $site);
@@ -137,7 +203,7 @@ class SiteOnboardingController extends Controller
         ];
 
         $typeSpecificStep = match ($type) {
-            'house' => ['key' => 'rooms', 'label' => 'Bedrooms', 'required' => true],
+            'house' => ['key' => 'rooms', 'label' => 'Rooms', 'required' => true],
             'head_office' => ['key' => 'resources', 'label' => 'Rooms & Resources', 'required' => false],
             'facility' => ['key' => 'zones', 'label' => 'Areas & Zones', 'required' => false],
             default => null,
@@ -262,13 +328,22 @@ class SiteOnboardingController extends Controller
     {
         if (!empty($data['resources'])) {
             foreach ($data['resources'] as $resourceData) {
+                $safe = [
+                    'name' => $resourceData['name'] ?? '',
+                    'resource_type' => $resourceData['resource_type'] ?? 'meeting_room',
+                    'capacity' => isset($resourceData['capacity']) ? (int) $resourceData['capacity'] : null,
+                ];
+
                 if (!empty($resourceData['id'])) {
-                    SiteHoResource::where('id', $resourceData['id'])->update($resourceData);
+                    $resource = SiteHoResource::where('id', $resourceData['id'])
+                        ->where('site_id', $site->id)
+                        ->first();
+                    $resource?->update($safe);
                 } else {
                     SiteHoResource::create([
                         'site_id' => $site->id,
                         'tenant_id' => $site->tenant_id,
-                        ...$resourceData,
+                        ...$safe,
                         'is_active' => true,
                     ]);
                 }
@@ -280,13 +355,21 @@ class SiteOnboardingController extends Controller
     {
         if (!empty($data['zones'])) {
             foreach ($data['zones'] as $zoneData) {
+                $safe = [
+                    'name' => $zoneData['name'] ?? '',
+                    'zone_type' => $zoneData['zone_type'] ?? null,
+                ];
+
                 if (!empty($zoneData['id'])) {
-                    SiteFacilityZone::where('id', $zoneData['id'])->update($zoneData);
+                    $zone = SiteFacilityZone::where('id', $zoneData['id'])
+                        ->where('site_id', $site->id)
+                        ->first();
+                    $zone?->update($safe);
                 } else {
                     SiteFacilityZone::create([
                         'site_id' => $site->id,
                         'tenant_id' => $site->tenant_id,
-                        ...$zoneData,
+                        ...$safe,
                         'is_active' => true,
                     ]);
                 }

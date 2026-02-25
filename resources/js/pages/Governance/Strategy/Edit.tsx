@@ -19,8 +19,8 @@ interface Plan {
     values: string[] | null;
 }
 
-export default function EditStrategy({ auth, plan }: { auth: any; plan: Plan }) {
-    const { data, setData, put, processing, errors } = useForm({
+export default function EditStrategy({ plan }: { plan: Plan }) {
+    const { data, setData, transform, put, processing, errors } = useForm({
         title: plan.title,
         planning_horizon: plan.planning_horizon,
         period_start: plan.period_start,
@@ -32,17 +32,18 @@ export default function EditStrategy({ auth, plan }: { auth: any; plan: Plan }) 
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(`/governance/strategy/${plan.id}`, {
-            data: {
-                ...data,
-                values: data.values.split('\n').map((v: string) => v.trim()).filter(Boolean),
-            },
-        });
+        transform((current) => ({
+            ...current,
+            values: current.values
+                .split('\n')
+                .map((v: string) => v.trim())
+                .filter(Boolean),
+        }));
+        put(`/governance/strategy/${plan.id}`);
     };
 
     return (
         <AppLayout
-            user={auth.user}
             breadcrumbs={[
                 { title: 'Governance', href: '/governance/dashboard' },
                 { title: 'Strategy', href: '/governance/strategy' },

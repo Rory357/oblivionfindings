@@ -13,6 +13,8 @@ class BudgetController extends Controller
 {
     public function index(Request $request)
     {
+        $this->authorize('viewAny', Budget::class);
+
         $budgets = Budget::query()
             ->withCount('lineItems')
             ->orderBy('fiscal_year', 'desc')
@@ -30,17 +32,20 @@ class BudgetController extends Controller
 
     public function create()
     {
+        $this->authorize('create', Budget::class);
+
         return Inertia::render('Governance/Budgets/Create');
     }
 
     public function show(Request $request, Budget $budget)
     {
+        $this->authorize('view', $budget);
         $budget->load([
             'lineItems',
             'adjustments.proposedBy',
             'adjustments.approvedBy',
             'adjustments.lineItem',
-            'approvalResolution',
+            'approvalResolution.votes',
             'proposedBy',
             'createdBy',
         ]);
@@ -55,15 +60,21 @@ class BudgetController extends Controller
             'other' => 'Other',
         ];
 
+        $user = $request->user();
+
         return Inertia::render('Governance/Budgets/Show', [
             'budget' => $budget,
             'categories' => $categories,
-            'canEdit' => $budget->isDrafting() || $budget->status === 'proposed',
+            'canEdit' => ($budget->isDrafting() || $budget->status === 'proposed') && $user->canDo('governance.budgets.create'),
+            'canPropose' => $budget->isDrafting() && $user->canDo('governance.budgets.submit'),
+            'canApprove' => $budget->isProposed() && $user->canDo('governance.budgets.approve'),
         ]);
     }
 
     public function store(Request $request)
     {
+        $this->authorize('create', Budget::class);
+
         $data = $request->validate([
             'fiscal_year' => ['required', 'integer', 'min:2000', 'max:2100'],
             'title' => ['nullable', 'string', 'max:255'],
@@ -87,29 +98,51 @@ class BudgetController extends Controller
 
     public function update(Request $request, Budget $budget)
     {
+        $this->authorize('update', $budget);
+
         $data = $request->validate([
             'fiscal_year' => ['sometimes', 'string', 'max:20'],
             'title' => ['sometimes', 'string', 'max:255'],
             'total_budget' => ['sometimes', 'numeric', 'min:0'],
             'description' => ['nullable', 'string'],
-            'notes' => ['nullable', 'string'],
-            'status' => ['sometimes', 'string', 'in:drafting,proposed,under_review,approved,rejected'],
         ]);
 
         $budget->update($data);
 
-        return redirect()->back()->with('success', 'Budget updated.');
+        return redirect()->route('governance.budgets.show', $budget)->with('success', 'Budget updated.');
     }
 
     public function propose(Request $request, Budget $budget)
     {
+        $this->authorize('propose', $budget);
+
         $budget->propose($request->user()->id);
 
         return redirect()->back()->with('success', 'Budget proposed to board.');
     }
 
+    public function approve(Request $request, Budget $budget)
+    {
+        $this->authorize('approve', $budget);
+
+        $resolution = $budget->approvalResolution;
+
+        if (! $resolution) {
+            return redirect()->back()->with('error', 'No linked resolution found. The budget must be proposed first.');
+        }
+
+        if ($resolution->outcome !== 'carried') {
+            return redirect()->back()->with('error', 'The board resolution has not been carried yet. Voting must be completed first.');
+        }
+
+        $budget->approve($resolution->id);
+
+        return redirect()->back()->with('success', 'Budget approved by board.');
+    }
+
     public function edit(Budget $budget)
     {
+        $this->authorize('update', $budget);
         $budget->load('lineItems');
 
         return Inertia::render('Governance/Budgets/Edit', [
@@ -121,6 +154,8 @@ class BudgetController extends Controller
 
     public function storeLineItem(Request $request, Budget $budget)
     {
+        $this->authorize('update', $budget);
+
         $data = $request->validate([
             'category' => ['required', 'string', 'max:50'],
             'description' => ['required', 'string', 'max:255'],
@@ -145,6 +180,8 @@ class BudgetController extends Controller
 
     public function updateLineItem(Request $request, Budget $budget, BudgetLineItem $lineItem)
     {
+        $this->authorize('update', $budget);
+
         $data = $request->validate([
             'category' => ['sometimes', 'string', 'max:50'],
             'description' => ['sometimes', 'string', 'max:255'],
@@ -166,6 +203,8 @@ class BudgetController extends Controller
 
     public function destroyLineItem(Request $request, Budget $budget, BudgetLineItem $lineItem)
     {
+        $this->authorize('update', $budget);
+
         $lineItem->delete();
 
         // Recalculate budget total
@@ -178,6 +217,8 @@ class BudgetController extends Controller
 
     public function requestAdjustment(Request $request, Budget $budget)
     {
+        $this->authorize('update', $budget);
+
         $data = $request->validate([
             'budget_line_item_id' => ['nullable', 'exists:budget_line_items,id'],
             'adjustment_type' => ['required', 'string', 'in:increase,decrease,reallocate'],
@@ -205,6 +246,8 @@ class BudgetController extends Controller
 
     public function approveAdjustment(Request $request, Budget $budget, BudgetAdjustment $adjustment)
     {
+        $this->authorize('update', $budget);
+
         $adjustment->approve($request->user()->id);
 
         return redirect()->back()->with('success', 'Adjustment approved and applied.');
@@ -212,6 +255,8 @@ class BudgetController extends Controller
 
     public function rejectAdjustment(Request $request, Budget $budget, BudgetAdjustment $adjustment)
     {
+        $this->authorize('update', $budget);
+
         $data = $request->validate([
             'review_notes' => ['required', 'string', 'max:1000'],
         ]);
@@ -225,6 +270,8 @@ class BudgetController extends Controller
 
     public function recordActuals(Request $request, Budget $budget)
     {
+        $this->authorize('update', $budget);
+
         $data = $request->validate([
             'actuals' => ['required', 'array'],
             'actuals.*.id' => ['required', 'exists:budget_line_items,id'],

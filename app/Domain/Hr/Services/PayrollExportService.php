@@ -3,76 +3,97 @@
 namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrPayRateRule;
+use App\Domain\Hr\Models\HrPayrollExportProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayrollRunItem;
 use App\Models\Timesheet;
-use App\Models\User;
 use Carbon\Carbon;
-use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
+use Illuminate\Support\Str;
 
 class PayrollExportService
 {
     /**
-     * Create a new payroll run for a pay period.
-     *
-     * Aggregates timesheet data for all active employees in the tenant
-     * within the given date range and creates HrPayrollRunItem records.
-     *
-     * @param  int     $tenantId
-     * @param  Carbon  $periodStart
-     * @param  Carbon  $periodEnd
-     * @param  int     $createdBy  User ID
-     * @return HrPayrollRun
-     *
-     * @throws \InvalidArgumentException If dates are invalid or an overlapping unlocked run exists
+     * @return array<string, string>
+     */
+    public function exportFieldCatalog(): array
+    {
+        return [
+            'employee_number' => 'Employee Number',
+            'name' => 'Employee Name',
+            'email' => 'Employee Email',
+            'position_title' => 'Position Title',
+            'period_start' => 'Period Start',
+            'period_end' => 'Period End',
+            'regular_hours' => 'Regular Hours',
+            'overtime_hours' => 'Overtime Hours',
+            'sleepover_count' => 'Sleepover Count',
+            'on_call_hours' => 'On Call Hours',
+            'public_holiday_hours' => 'Public Holiday Hours',
+            'mileage_km' => 'Mileage (KM)',
+            'base_hourly_rate' => 'Base Hourly Rate',
+            'overtime_multiplier' => 'Overtime Multiplier',
+            'public_holiday_multiplier' => 'Public Holiday Multiplier',
+            'sleepover_rate' => 'Sleepover Rate',
+            'on_call_rate' => 'On Call Rate',
+            'gross_pay' => 'Gross Pay',
+            'allowances_total' => 'Allowances Total',
+            'timesheet_ids' => 'Timesheet IDs',
+            'item_notes' => 'Item Notes',
+        ];
+    }
+
+    /**
+     * @throws \InvalidArgumentException
      */
     public function createRun(?int $tenantId, Carbon $periodStart, Carbon $periodEnd, int $createdBy): HrPayrollRun
     {
-        // TODO: Validate periodStart < periodEnd
-        // TODO: Check for overlapping payroll runs that are not yet exported
-        // TODO: Query all approved timesheets in the date range for the tenant
-        // TODO: Group timesheets by user_id and aggregate hours by type
-        //       (regular, overtime, sleepover, on_call, public_holiday, mileage)
-        // TODO: Look up each employee's hourly_rate from HrEmployeeProfile
-        // TODO: Calculate gross_pay = regular_hours * hourly_rate + overtime * 1.5 + allowances
-        // TODO: Create HrPayrollRun record with status 'draft'
-        // TODO: Create HrPayrollRunItem records for each employee
-        // TODO: Update run totals (total_hours, total_staff)
-        // TODO: Log audit trail entry
+        if ($periodStart->greaterThanOrEqualTo($periodEnd)) {
+            throw new \InvalidArgumentException('Payroll period start must be before period end.');
+        }
 
-        return DB::transaction(function () use ($tenantId, $periodStart, $periodEnd, $createdBy) {
-            $existing = HrPayrollRun::where('tenant_id', $tenantId)
-                ->where('period_start', $periodStart)
-                ->where('period_end', $periodEnd)
-                ->whereNull('locked_at')
-                ->first();
+        $resolvedTenantId = $this->resolveTenantId($tenantId, $createdBy);
 
-            if ($existing) {
-                throw new \InvalidArgumentException(
-                    "An unlocked payroll run already exists for this period (ID: {$existing->id})."
-                );
+        return DB::transaction(function () use ($resolvedTenantId, $periodStart, $periodEnd, $createdBy) {
+            $overlap = HrPayrollRun::query()
+                ->where('tenant_id', $resolvedTenantId)
+                ->whereIn('status', ['draft', 'locked'])
+                ->whereDate('period_start', '<=', $periodEnd->toDateString())
+                ->whereDate('period_end', '>=', $periodStart->toDateString())
+                ->exists();
+
+            if ($overlap) {
+                throw new \InvalidArgumentException('An overlapping draft/locked payroll run already exists.');
             }
 
             $run = HrPayrollRun::create([
-                'tenant_id' => $tenantId,
-                'period_start' => $periodStart,
-                'period_end' => $periodEnd,
+                'tenant_id' => $resolvedTenantId,
+                'period_start' => $periodStart->toDateString(),
+                'period_end' => $periodEnd->toDateString(),
                 'status' => 'draft',
                 'created_by' => $createdBy,
+                'validation_errors' => [],
             ]);
 
-            $items = $this->getRunItems($tenantId, $periodStart, $periodEnd);
-            $totalHours = 0;
+            $items = $this->getRunItems($resolvedTenantId, $periodStart, $periodEnd);
+            $totalHours = 0.0;
             $totalStaff = 0;
+            $totalGross = 0.0;
 
             foreach ($items as $userId => $aggregated) {
                 HrPayrollRunItem::create([
                     'payroll_run_id' => $run->id,
                     'user_id' => $userId,
                     'timesheet_ids' => $aggregated['timesheet_ids'],
+                    'base_hourly_rate' => $aggregated['base_hourly_rate'],
+                    'overtime_multiplier' => $aggregated['overtime_multiplier'],
+                    'public_holiday_multiplier' => $aggregated['public_holiday_multiplier'],
+                    'sleepover_rate' => $aggregated['sleepover_rate'],
+                    'on_call_rate' => $aggregated['on_call_rate'],
                     'regular_hours' => $aggregated['regular_hours'],
                     'overtime_hours' => $aggregated['overtime_hours'],
                     'sleepover_count' => $aggregated['sleepover_count'],
@@ -81,138 +102,123 @@ class PayrollExportService
                     'public_holiday_hours' => $aggregated['public_holiday_hours'],
                     'gross_pay' => $aggregated['gross_pay'],
                     'allowances' => $aggregated['allowances'],
+                    'rate_breakdown' => $aggregated['rate_breakdown'],
+                    'notes' => $aggregated['notes'] ?? null,
                 ]);
 
-                $totalHours += $aggregated['regular_hours'] + $aggregated['overtime_hours'];
+                $totalHours += (float) $aggregated['regular_hours'] + (float) $aggregated['overtime_hours'];
                 $totalStaff++;
+                $totalGross += (float) $aggregated['gross_pay'];
             }
 
             $run->update([
-                'total_hours' => $totalHours,
+                'total_hours' => round($totalHours, 2),
                 'total_staff' => $totalStaff,
+                'total_gross' => round($totalGross, 2),
             ]);
 
-            return $run->load('items');
+            $validationErrors = $this->validateRunConsistency($run->fresh(['items.user.hrEmployeeProfile']));
+            $run->update(['validation_errors' => $validationErrors]);
+
+            return $run->fresh('items');
         });
     }
 
     /**
-     * Lock a payroll run to prevent further edits.
-     *
-     * Once locked, no items can be added, removed, or modified.
-     * Locking is a prerequisite for export.
-     *
-     * @param  HrPayrollRun  $run
-     * @param  int           $lockedBy  User ID
-     * @return HrPayrollRun
-     *
-     * @throws \LogicException If run is already locked or has no items
+     * @throws \LogicException
+     * @throws ValidationException
      */
     public function lockRun(HrPayrollRun $run, int $lockedBy): HrPayrollRun
     {
-        // TODO: Verify run is not already locked
-        // TODO: Verify run has at least one item
-        // TODO: Verify all items have been reviewed (optional review step)
-        // TODO: Set locked_at, locked_by, and status = 'locked'
-        // TODO: Prevent any further modifications to run items
-        // TODO: Fire PayrollRunLocked event
-        // TODO: Log audit trail entry
-
         if ($run->locked_at !== null) {
             throw new \LogicException('This payroll run is already locked.');
+        }
+
+        if ($run->status === 'exported') {
+            throw new \LogicException('Exported payroll runs cannot be relocked.');
         }
 
         if ($run->items()->count() === 0) {
             throw new \LogicException('Cannot lock a payroll run with no items.');
         }
 
+        $validationErrors = $this->validateRunConsistency($run->fresh(['items.user.hrEmployeeProfile']));
+        if ($validationErrors !== []) {
+            $run->update(['validation_errors' => $validationErrors]);
+
+            throw ValidationException::withMessages([
+                'lock' => 'Payroll run validation failed. Resolve highlighted issues before locking.',
+            ]);
+        }
+
         $run->update([
             'status' => 'locked',
             'locked_at' => now(),
             'locked_by' => $lockedBy,
+            'validation_errors' => [],
         ]);
 
         return $run->fresh();
     }
 
     /**
-     * Generate a CSV export file for a locked payroll run.
-     *
-     * The CSV includes one row per employee with columns for all pay
-     * components. The file is stored on the configured disk and the
-     * path is recorded on the run.
-     *
-     * @param  HrPayrollRun  $run
-     * @param  int           $exportedBy  User ID
-     * @return string  Storage path of the generated CSV
-     *
-     * @throws \LogicException If run is not locked
+     * @throws \LogicException
      */
-    public function generateExport(HrPayrollRun $run, int $exportedBy): string
+    public function generateExport(HrPayrollRun $run, int $exportedBy, ?HrPayrollExportProfile $profile = null): string
     {
-        // TODO: Verify run is locked (locked_at is not null)
-        // TODO: Load all run items with user relationships
-        // TODO: Build CSV header row:
-        //       employee_number, name, position_title, regular_hours, overtime_hours,
-        //       sleepover_count, on_call_hours, public_holiday_hours, mileage_km,
-        //       gross_pay, allowances_total
-        // TODO: Build CSV data rows from HrPayrollRunItem records
-        // TODO: Store CSV file to 'private' disk under payroll-exports/
-        // TODO: Update run with exported_at, exported_by, export_format, export_path
-        // TODO: Fire PayrollExported event
-        // TODO: Log audit trail entry
-        // TODO: Return the storage path
-
         if ($run->locked_at === null) {
             throw new \LogicException('Cannot export an unlocked payroll run.');
         }
 
-        $items = $run->items()->with(['user.staffProfile'])->get();
-
-        $headers = [
-            'employee_number',
-            'name',
-            'position_title',
-            'regular_hours',
-            'overtime_hours',
-            'sleepover_count',
-            'on_call_hours',
-            'public_holiday_hours',
-            'mileage_km',
-            'gross_pay',
-            'allowances_total',
-        ];
-
-        $rows = [];
-        foreach ($items as $item) {
-            $profile = $item->user?->staffProfile;
-            $allowancesTotal = collect($item->allowances ?? [])->sum('amount');
-
-            $rows[] = [
-                $profile?->employee_number ?? '',
-                $item->user?->name ?? '',
-                $profile?->position_title ?? '',
-                $item->regular_hours,
-                $item->overtime_hours,
-                $item->sleepover_count,
-                $item->on_call_hours,
-                $item->public_holiday_hours,
-                $item->mileage_km,
-                $item->gross_pay,
-                number_format($allowancesTotal, 2, '.', ''),
-            ];
+        $items = $run->items()->with(['user.hrEmployeeProfile'])->orderBy('id')->get();
+        $resolvedProfile = $profile;
+        if (! $resolvedProfile) {
+            $resolvedProfile = HrPayrollExportProfile::query()
+                ->where('tenant_id', $run->tenant_id)
+                ->where('is_default', true)
+                ->orderByDesc('id')
+                ->first();
         }
 
-        $csv = implode(',', $headers) . "\n";
-        foreach ($rows as $row) {
-            $csv .= implode(',', array_map(fn($v) => '"' . str_replace('"', '""', (string) $v) . '"', $row)) . "\n";
+        if ($resolvedProfile && (int) $resolvedProfile->tenant_id !== (int) $run->tenant_id) {
+            throw new \LogicException('Selected export profile does not belong to this payroll run tenant.');
         }
+
+        $rows = $this->buildCanonicalRows($run, $items->all());
+
+        if ($resolvedProfile) {
+            $mappings = $this->normalizeMappings((array) ($resolvedProfile->mappings ?? []));
+            if ($mappings === []) {
+                throw new \LogicException('Export profile has no mappings configured.');
+            }
+
+            $csv = $this->buildCsvFromRows(
+                rows: $rows,
+                mappings: $mappings,
+                delimiter: (string) ($resolvedProfile->delimiter ?: ','),
+                enclosure: (string) ($resolvedProfile->enclosure ?: '"'),
+                lineEnding: (string) ($resolvedProfile->line_ending ?: "\n"),
+                includeHeaders: (bool) $resolvedProfile->include_headers,
+            );
+        } else {
+            $csv = $this->buildCsvFromRows(
+                rows: $rows,
+                mappings: $this->defaultExportMappings(),
+                delimiter: ',',
+                enclosure: '"',
+                lineEnding: "\n",
+                includeHeaders: true,
+            );
+        }
+
+        $profileSuffix = $resolvedProfile ? '_' . Str::slug($resolvedProfile->name) : '';
 
         $filename = sprintf(
-            'payroll-exports/%s_%s_%s.csv',
-            $run->tenant_id,
+            'payroll-exports/run-%d_%s_%s%s.csv',
+            $run->id,
             $run->period_start->format('Y-m-d'),
-            $run->period_end->format('Y-m-d')
+            $run->period_end->format('Y-m-d'),
+            $profileSuffix
         );
 
         Storage::disk('private')->put($filename, $csv);
@@ -221,6 +227,7 @@ class PayrollExportService
             'status' => 'exported',
             'exported_at' => now(),
             'exported_by' => $exportedBy,
+            'export_profile_id' => $resolvedProfile?->id,
             'export_format' => 'csv',
             'export_path' => $filename,
         ]);
@@ -229,70 +236,557 @@ class PayrollExportService
     }
 
     /**
-     * Aggregate timesheet data for a pay period, grouped by employee.
-     *
-     * Queries approved timesheets within the date range and aggregates
-     * hours by type for each user. Calculates gross pay using the
-     * employee's hourly rate.
-     *
-     * @param  int     $tenantId
-     * @param  Carbon  $periodStart
-     * @param  Carbon  $periodEnd
-     * @return array<int, array>  Keyed by user_id with aggregated pay components
+     * @return array<int, array<string, mixed>>
      */
     public function getRunItems(?int $tenantId, Carbon $periodStart, Carbon $periodEnd): array
     {
-        // TODO: Query Timesheet records for the tenant within the period
-        // TODO: Filter to approved timesheets only
-        // TODO: Group by user_id
-        // TODO: For each user, sum: regular_hours, overtime_hours, sleepover_count,
-        //       on_call_hours, mileage_km, public_holiday_hours
-        // TODO: Collect timesheet IDs for audit trail
-        // TODO: Look up employee hourly_rate from HrEmployeeProfile
-        // TODO: Calculate gross_pay:
-        //       regular_hours * hourly_rate
-        //       + overtime_hours * hourly_rate * 1.5
-        //       + sleepover_count * flat_sleepover_rate
-        //       + on_call_hours * on_call_rate
-        //       + public_holiday_hours * hourly_rate * 1.5
-        // TODO: Return aggregated array keyed by user_id
-
-        $timesheets = Timesheet::where('tenant_id', $tenantId)
+        $timesheetQuery = Timesheet::query()
+            ->with(['client:id,service_context_id', 'user:id,role'])
             ->where('status', 'approved')
-            ->whereBetween('date', [$periodStart, $periodEnd])
-            ->get();
+            ->whereBetween('work_date', [$periodStart->toDateString(), $periodEnd->toDateString()]);
 
+        $this->applyTenantScope($timesheetQuery, $tenantId);
+
+        $timesheets = $timesheetQuery->get();
         $grouped = $timesheets->groupBy('user_id');
         $results = [];
 
         foreach ($grouped as $userId => $userTimesheets) {
-            $profile = HrEmployeeProfile::where('user_id', $userId)->first();
-            $hourlyRate = $profile ? (float) $profile->hourly_rate : 0;
+            $profile = HrEmployeeProfile::query()
+                ->where('user_id', $userId)
+                ->first();
 
-            $regular = $userTimesheets->sum('regular_hours');
-            $overtime = $userTimesheets->sum('overtime_hours');
-            $sleepover = $userTimesheets->sum('sleepover_count');
-            $onCall = $userTimesheets->sum('on_call_hours');
-            $mileage = $userTimesheets->sum('mileage_km');
-            $publicHoliday = $userTimesheets->sum('public_holiday_hours');
+            $baseRate = (float) ($profile?->hourly_rate ?: 0);
+            $overtimeThreshold = (float) config('hr.payroll.overtime_daily_hours', 8);
 
-            $grossPay = ($regular * $hourlyRate)
-                + ($overtime * $hourlyRate * 1.5)
-                + ($publicHoliday * $hourlyRate * 1.5);
+            $regularHours = 0.0;
+            $overtimeHours = 0.0;
+            $onCallHours = 0.0;
+            $sleepoverCount = 0;
+            $publicHolidayHours = 0.0;
+            $mileageKm = 0.0;
+            $timesheetIds = [];
+
+            $regularPay = 0.0;
+            $overtimePay = 0.0;
+            $holidayLoading = 0.0;
+            $sleepoverPay = 0.0;
+            $onCallPay = 0.0;
+
+            $ruleBuckets = [];
+            $ruleUsageWeights = [];
+
+            foreach ($userTimesheets as $timesheet) {
+                $hours = $this->calculateTimesheetHours($timesheet);
+                $regularHours += $hours['regular_hours'];
+                $overtimeHours += $hours['overtime_hours'];
+                $publicHolidayHours += $hours['public_holiday_hours'];
+                $onCallHours += $hours['on_call_hours'];
+                $sleepoverCount += $hours['sleepover_count'];
+                $mileageKm += $hours['mileage_km'];
+                $timesheetIds[] = $timesheet->id;
+
+                $effectiveRule = $this->resolvePayRateRule($tenantId, $profile, $timesheet);
+                $rates = $this->resolveRateInputs($effectiveRule);
+
+                $timesheetRegularPay = $hours['regular_hours'] * $baseRate * $rates['regular_multiplier'];
+                $timesheetOvertimePay = $hours['overtime_hours'] * $baseRate * $rates['overtime_multiplier'];
+                $timesheetHolidayLoading = $hours['public_holiday_hours'] * $baseRate * max($rates['public_holiday_multiplier'] - $rates['regular_multiplier'], 0);
+                $timesheetSleepoverPay = $hours['sleepover_count'] * $rates['sleepover_rate'];
+                $timesheetOnCallPay = $hours['on_call_hours'] * $rates['on_call_rate'];
+
+                $regularPay += $timesheetRegularPay;
+                $overtimePay += $timesheetOvertimePay;
+                $holidayLoading += $timesheetHolidayLoading;
+                $sleepoverPay += $timesheetSleepoverPay;
+                $onCallPay += $timesheetOnCallPay;
+
+                $bucketKey = $effectiveRule ? "rule:{$effectiveRule->id}" : 'default';
+                if (! isset($ruleBuckets[$bucketKey])) {
+                    $ruleBuckets[$bucketKey] = [
+                        'rule_id' => $effectiveRule?->id,
+                        'rule_name' => $effectiveRule?->name ?? 'Default rates',
+                        'regular_multiplier' => $rates['regular_multiplier'],
+                        'overtime_multiplier' => $rates['overtime_multiplier'],
+                        'public_holiday_multiplier' => $rates['public_holiday_multiplier'],
+                        'sleepover_rate' => $rates['sleepover_rate'],
+                        'on_call_rate' => $rates['on_call_rate'],
+                        'timesheet_ids' => [],
+                        'regular_hours' => 0.0,
+                        'overtime_hours' => 0.0,
+                        'public_holiday_hours' => 0.0,
+                        'sleepover_count' => 0,
+                        'on_call_hours' => 0.0,
+                        'gross_pay' => 0.0,
+                    ];
+                }
+
+                $ruleBuckets[$bucketKey]['timesheet_ids'][] = $timesheet->id;
+                $ruleBuckets[$bucketKey]['regular_hours'] += $hours['regular_hours'];
+                $ruleBuckets[$bucketKey]['overtime_hours'] += $hours['overtime_hours'];
+                $ruleBuckets[$bucketKey]['public_holiday_hours'] += $hours['public_holiday_hours'];
+                $ruleBuckets[$bucketKey]['sleepover_count'] += $hours['sleepover_count'];
+                $ruleBuckets[$bucketKey]['on_call_hours'] += $hours['on_call_hours'];
+                $ruleBuckets[$bucketKey]['gross_pay'] += ($timesheetRegularPay + $timesheetOvertimePay + $timesheetHolidayLoading + $timesheetSleepoverPay + $timesheetOnCallPay);
+
+                $ruleUsageWeights[$bucketKey] = ($ruleUsageWeights[$bucketKey] ?? 0)
+                    + $hours['regular_hours']
+                    + $hours['overtime_hours']
+                    + $hours['public_holiday_hours'];
+            }
+
+            $dominantRuleKey = collect($ruleUsageWeights)->sortDesc()->keys()->first();
+            $dominantRule = $dominantRuleKey ? ($ruleBuckets[$dominantRuleKey] ?? null) : null;
+            $dominantRates = $this->resolveRateInputs(
+                $dominantRule && isset($dominantRule['rule_id']) && $dominantRule['rule_id']
+                    ? HrPayRateRule::query()->find($dominantRule['rule_id'])
+                    : null
+            );
+
+            $grossPay = round($regularPay + $overtimePay + $holidayLoading + $sleepoverPay + $onCallPay, 2);
+            $bucketLines = collect($ruleBuckets)
+                ->map(function (array $bucket) {
+                    return [
+                        'rule_id' => $bucket['rule_id'],
+                        'rule_name' => $bucket['rule_name'],
+                        'timesheet_count' => count($bucket['timesheet_ids']),
+                        'regular_multiplier' => round((float) $bucket['regular_multiplier'], 2),
+                        'overtime_multiplier' => round((float) $bucket['overtime_multiplier'], 2),
+                        'public_holiday_multiplier' => round((float) $bucket['public_holiday_multiplier'], 2),
+                        'sleepover_rate' => round((float) $bucket['sleepover_rate'], 2),
+                        'on_call_rate' => round((float) $bucket['on_call_rate'], 2),
+                        'regular_hours' => round((float) $bucket['regular_hours'], 2),
+                        'overtime_hours' => round((float) $bucket['overtime_hours'], 2),
+                        'public_holiday_hours' => round((float) $bucket['public_holiday_hours'], 2),
+                        'sleepover_count' => (int) $bucket['sleepover_count'],
+                        'on_call_hours' => round((float) $bucket['on_call_hours'], 2),
+                        'gross_pay' => round((float) $bucket['gross_pay'], 2),
+                    ];
+                })
+                ->values()
+                ->all();
 
             $results[$userId] = [
-                'timesheet_ids' => $userTimesheets->pluck('id')->toArray(),
-                'regular_hours' => $regular,
-                'overtime_hours' => $overtime,
-                'sleepover_count' => $sleepover,
-                'on_call_hours' => $onCall,
-                'mileage_km' => $mileage,
-                'public_holiday_hours' => $publicHoliday,
-                'gross_pay' => round($grossPay, 2),
+                'timesheet_ids' => $timesheetIds,
+                'base_hourly_rate' => round($baseRate, 2),
+                'regular_hours' => round($regularHours, 2),
+                'overtime_hours' => round($overtimeHours, 2),
+                'sleepover_count' => $sleepoverCount,
+                'on_call_hours' => round($onCallHours, 2),
+                'mileage_km' => round($mileageKm, 2),
+                'public_holiday_hours' => round($publicHolidayHours, 2),
+                'overtime_multiplier' => round($dominantRates['overtime_multiplier'], 2),
+                'public_holiday_multiplier' => round($dominantRates['public_holiday_multiplier'], 2),
+                'sleepover_rate' => round($dominantRates['sleepover_rate'], 2),
+                'on_call_rate' => round($dominantRates['on_call_rate'], 2),
+                'gross_pay' => $grossPay,
                 'allowances' => [],
+                'rate_breakdown' => [
+                    'rule_id' => $dominantRule['rule_id'] ?? null,
+                    'rule_name' => $dominantRule['rule_name'] ?? 'Default rates',
+                    'regular_pay' => round($regularPay, 2),
+                    'overtime_pay' => round($overtimePay, 2),
+                    'holiday_loading' => round($holidayLoading, 2),
+                    'sleepover_pay' => round($sleepoverPay, 2),
+                    'on_call_pay' => round($onCallPay, 2),
+                    'overtime_threshold_daily_hours' => $overtimeThreshold,
+                    'line_items' => $bucketLines,
+                ],
             ];
         }
 
         return $results;
+    }
+
+    /**
+     * @return array{regular_hours: float, overtime_hours: float, on_call_hours: float, public_holiday_hours: float, sleepover_count: int, mileage_km: float}
+     */
+    protected function calculateTimesheetHours(Timesheet $timesheet): array
+    {
+        $totalHours = max((float) $timesheet->total_hours, 0);
+        $overtimeThreshold = (float) config('hr.payroll.overtime_daily_hours', 8);
+        $overtimeHours = max(0, $totalHours - $overtimeThreshold);
+        $regularHours = max($totalHours - $overtimeHours, 0);
+
+        $isPublicHoliday = (bool) ($timesheet->public_holiday ?? false);
+        $isOnCall = (bool) ($timesheet->on_call ?? false);
+        $isSleepover = (bool) ($timesheet->sleepover ?? false);
+
+        return [
+            'regular_hours' => round($regularHours, 2),
+            'overtime_hours' => round($overtimeHours, 2),
+            'on_call_hours' => $isOnCall ? round($totalHours, 2) : 0.0,
+            'public_holiday_hours' => $isPublicHoliday ? round($totalHours, 2) : 0.0,
+            'sleepover_count' => $isSleepover ? 1 : 0,
+            'mileage_km' => (float) ($timesheet->mileage_km ?: 0),
+        ];
+    }
+
+    protected function resolvePayRateRule(?int $tenantId, ?HrEmployeeProfile $profile, Timesheet $timesheet): ?HrPayRateRule
+    {
+        $positionRole = $profile?->position_role ?? $timesheet->user?->role;
+        $siteId = $profile?->primary_site_id ?? null;
+        $serviceContextId = $timesheet->client?->service_context_id ?? null;
+        $isPublicHoliday = (bool) ($timesheet->public_holiday ?? false);
+        $isSleepover = (bool) ($timesheet->sleepover ?? false);
+        $isOnCall = (bool) ($timesheet->on_call ?? false);
+
+        $query = HrPayRateRule::query()
+            ->active()
+            ->when($tenantId !== null, fn ($builder) => $builder->where('tenant_id', $tenantId))
+            ->where(function ($builder) use ($positionRole) {
+                $builder->whereNull('position_role')
+                    ->orWhere('position_role', $positionRole);
+            })
+            ->where(function ($builder) use ($siteId) {
+                $builder->whereNull('site_id');
+                if ($siteId) {
+                    $builder->orWhere('site_id', $siteId);
+                }
+            })
+            ->where(function ($builder) use ($serviceContextId) {
+                $builder->whereNull('service_context_id');
+                if ($serviceContextId) {
+                    $builder->orWhere('service_context_id', $serviceContextId);
+                }
+            })
+            ->where(function ($builder) use ($isPublicHoliday) {
+                $builder->whereNull('applies_on_public_holiday')
+                    ->orWhere('applies_on_public_holiday', $isPublicHoliday);
+            })
+            ->where(function ($builder) use ($isSleepover) {
+                $builder->whereNull('applies_on_sleepover')
+                    ->orWhere('applies_on_sleepover', $isSleepover);
+            })
+            ->where(function ($builder) use ($isOnCall) {
+                $builder->whereNull('applies_on_call')
+                    ->orWhere('applies_on_call', $isOnCall);
+            })
+            ->where(function ($builder) use ($timesheet) {
+                $builder->whereNull('effective_from')
+                    ->orWhere('effective_from', '<=', $timesheet->work_date);
+            })
+            ->where(function ($builder) use ($timesheet) {
+                $builder->whereNull('effective_to')
+                    ->orWhere('effective_to', '>=', $timesheet->work_date);
+            })
+            ->orderBy('priority')
+            ->orderByDesc('id');
+
+        return $query->first();
+    }
+
+    /**
+     * @return array{regular_multiplier: float, overtime_multiplier: float, public_holiday_multiplier: float, sleepover_rate: float, on_call_rate: float}
+     */
+    protected function resolveRateInputs(?HrPayRateRule $rule): array
+    {
+        return [
+            'regular_multiplier' => (float) ($rule?->regular_multiplier ?? config('hr.payroll.default_regular_multiplier', 1.00)),
+            'overtime_multiplier' => (float) ($rule?->overtime_multiplier ?? config('hr.payroll.default_overtime_multiplier', 1.50)),
+            'public_holiday_multiplier' => (float) ($rule?->public_holiday_multiplier ?? config('hr.payroll.default_public_holiday_multiplier', 1.50)),
+            'sleepover_rate' => (float) ($rule?->sleepover_flat_rate ?? config('hr.payroll.default_sleepover_flat_rate', 0)),
+            'on_call_rate' => (float) ($rule?->on_call_hourly_rate ?? config('hr.payroll.default_on_call_hourly_rate', 0)),
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    protected function validateRunConsistency(HrPayrollRun $run): array
+    {
+        $run->loadMissing(['items.user.hrEmployeeProfile']);
+
+        $errors = [];
+
+        if ($run->items->isEmpty()) {
+            $errors[] = 'No payroll items generated for this run.';
+        }
+
+        $timesheetToItem = [];
+        $itemById = [];
+
+        foreach ($run->items as $item) {
+            $itemById[$item->id] = $item;
+
+            if ($item->user_id === null) {
+                $errors[] = "Run item #{$item->id} has no employee assigned.";
+                continue;
+            }
+
+            $profile = $item->user?->hrEmployeeProfile;
+            if (! $profile) {
+                $errors[] = "Run item #{$item->id} has no HR employee profile for user #{$item->user_id}.";
+            } elseif (trim((string) $profile->employee_number) === '') {
+                $errors[] = "Run item #{$item->id} is missing an employee number.";
+            }
+
+            $timesheetIds = collect($item->timesheet_ids ?? [])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            if ($timesheetIds->isEmpty()) {
+                $errors[] = "Run item #{$item->id} has no linked timesheets.";
+            }
+
+            foreach ($timesheetIds as $timesheetId) {
+                if (isset($timesheetToItem[$timesheetId])) {
+                    $errors[] = "Timesheet #{$timesheetId} is duplicated across run items #{$timesheetToItem[$timesheetId]['item_id']} and #{$item->id}.";
+                    continue;
+                }
+
+                $timesheetToItem[$timesheetId] = [
+                    'item_id' => $item->id,
+                    'user_id' => (int) $item->user_id,
+                ];
+            }
+
+            if ((float) $item->gross_pay < 0) {
+                $errors[] = "Run item #{$item->id} has a negative gross pay.";
+            }
+        }
+
+        if ($timesheetToItem !== []) {
+            $timesheets = Timesheet::query()
+                ->whereIn('id', array_keys($timesheetToItem))
+                ->get()
+                ->keyBy('id');
+
+            foreach ($timesheetToItem as $timesheetId => $meta) {
+                /** @var Timesheet|null $timesheet */
+                $timesheet = $timesheets->get($timesheetId);
+                if (! $timesheet) {
+                    $errors[] = "Timesheet #{$timesheetId} linked to item #{$meta['item_id']} does not exist.";
+                    continue;
+                }
+
+                if ($timesheet->status !== 'approved') {
+                    $errors[] = "Timesheet #{$timesheetId} is '{$timesheet->status}' (must be approved).";
+                }
+
+                if ((int) $timesheet->user_id !== (int) $meta['user_id']) {
+                    $errors[] = "Timesheet #{$timesheetId} staff user does not match payroll run item #{$meta['item_id']}.";
+                }
+
+                if ($timesheet->work_date?->lt($run->period_start) || $timesheet->work_date?->gt($run->period_end)) {
+                    $errors[] = "Timesheet #{$timesheetId} work date is outside payroll period.";
+                }
+            }
+        }
+
+        $itemGrossTotal = round((float) $run->items->sum(fn ($item) => (float) $item->gross_pay), 2);
+        if (abs($itemGrossTotal - (float) $run->total_gross) > 0.01) {
+            $errors[] = 'Run total gross does not match payroll item gross totals.';
+        }
+
+        return array_values(array_unique($errors));
+    }
+
+    protected function resolveTenantId(?int $tenantId, int $userId): int
+    {
+        if ($tenantId !== null) {
+            return $tenantId;
+        }
+
+        $profileTenantId = HrEmployeeProfile::query()
+            ->where('user_id', $userId)
+            ->value('tenant_id');
+
+        if (is_numeric($profileTenantId)) {
+            return (int) $profileTenantId;
+        }
+
+        $fallbackTenantId = HrPayrollRun::query()
+            ->orderByDesc('id')
+            ->value('tenant_id')
+            ?? HrEmployeeProfile::query()->orderBy('id')->value('tenant_id');
+
+        return (int) ($fallbackTenantId ?? 1);
+    }
+
+    protected function applyTenantScope($query, ?int $tenantId): void
+    {
+        if ($tenantId === null) {
+            return;
+        }
+
+        if (Schema::hasColumn('timesheets', 'tenant_id')) {
+            $query->where('tenant_id', $tenantId);
+            return;
+        }
+
+        if (Schema::hasColumn('users', 'tenant_id')) {
+            $query->whereHas('user', fn ($userQuery) => $userQuery->where('tenant_id', $tenantId));
+        }
+    }
+
+    /**
+     * @param array<int, HrPayrollRunItem> $items
+     * @return array<int, array<string, scalar|null>>
+     */
+    protected function buildCanonicalRows(HrPayrollRun $run, array $items): array
+    {
+        return collect($items)
+            ->map(function (HrPayrollRunItem $item) use ($run) {
+                $profile = $item->user?->hrEmployeeProfile;
+                $allowancesTotal = collect($item->allowances ?? [])->sum('amount');
+
+                return [
+                    'employee_number' => $profile?->employee_number ?? '',
+                    'name' => $item->user?->name ?? '',
+                    'email' => $item->user?->email ?? '',
+                    'position_title' => $profile?->position_title ?? '',
+                    'period_start' => optional($run->period_start)->toDateString(),
+                    'period_end' => optional($run->period_end)->toDateString(),
+                    'regular_hours' => (float) $item->regular_hours,
+                    'overtime_hours' => (float) $item->overtime_hours,
+                    'sleepover_count' => (int) $item->sleepover_count,
+                    'on_call_hours' => (float) $item->on_call_hours,
+                    'public_holiday_hours' => (float) $item->public_holiday_hours,
+                    'mileage_km' => (float) $item->mileage_km,
+                    'base_hourly_rate' => (float) $item->base_hourly_rate,
+                    'overtime_multiplier' => (float) $item->overtime_multiplier,
+                    'public_holiday_multiplier' => (float) $item->public_holiday_multiplier,
+                    'sleepover_rate' => (float) $item->sleepover_rate,
+                    'on_call_rate' => (float) $item->on_call_rate,
+                    'gross_pay' => (float) $item->gross_pay,
+                    'allowances_total' => round((float) $allowancesTotal, 2),
+                    'timesheet_ids' => collect($item->timesheet_ids ?? [])->join('|'),
+                    'item_notes' => $item->notes ?? '',
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array{header: string, source: string, value?: mixed}>
+     */
+    protected function defaultExportMappings(): array
+    {
+        return [
+            ['header' => 'employee_number', 'source' => 'employee_number'],
+            ['header' => 'name', 'source' => 'name'],
+            ['header' => 'position_title', 'source' => 'position_title'],
+            ['header' => 'regular_hours', 'source' => 'regular_hours'],
+            ['header' => 'overtime_hours', 'source' => 'overtime_hours'],
+            ['header' => 'sleepover_count', 'source' => 'sleepover_count'],
+            ['header' => 'on_call_hours', 'source' => 'on_call_hours'],
+            ['header' => 'public_holiday_hours', 'source' => 'public_holiday_hours'],
+            ['header' => 'mileage_km', 'source' => 'mileage_km'],
+            ['header' => 'base_hourly_rate', 'source' => 'base_hourly_rate'],
+            ['header' => 'gross_pay', 'source' => 'gross_pay'],
+            ['header' => 'allowances_total', 'source' => 'allowances_total'],
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $mappings
+     * @return array<int, array{header: string, source: string, value?: mixed}>
+     */
+    protected function normalizeMappings(array $mappings): array
+    {
+        $catalog = $this->exportFieldCatalog();
+
+        return collect($mappings)
+            ->filter(fn ($mapping) => is_array($mapping))
+            ->map(function (array $mapping) use ($catalog) {
+                $header = trim((string) ($mapping['header'] ?? ''));
+                $source = trim((string) ($mapping['source'] ?? ''));
+
+                if ($header === '' || $source === '') {
+                    return null;
+                }
+
+                if ($source !== 'static' && ! array_key_exists($source, $catalog)) {
+                    return null;
+                }
+
+                $normalized = [
+                    'header' => $header,
+                    'source' => $source,
+                ];
+
+                if ($source === 'static') {
+                    $normalized['value'] = $mapping['value'] ?? '';
+                }
+
+                return $normalized;
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param array<int, array<string, scalar|null>> $rows
+     * @param array<int, array{header: string, source: string, value?: mixed}> $mappings
+     */
+    protected function buildCsvFromRows(
+        array $rows,
+        array $mappings,
+        string $delimiter,
+        string $enclosure,
+        string $lineEnding,
+        bool $includeHeaders = true,
+    ): string {
+        $safeDelimiter = mb_substr($delimiter !== '' ? $delimiter : ',', 0, 1);
+        $safeEnclosure = mb_substr($enclosure !== '' ? $enclosure : '"', 0, 1);
+        $safeLineEnding = $this->normalizeLineEnding($lineEnding);
+
+        $lines = [];
+        if ($includeHeaders) {
+            $headers = collect($mappings)->map(fn (array $mapping) => $mapping['header'])->all();
+            $lines[] = $this->encodeCsvRow($headers, $safeDelimiter, $safeEnclosure);
+        }
+
+        foreach ($rows as $row) {
+            $values = [];
+            foreach ($mappings as $mapping) {
+                if ($mapping['source'] === 'static') {
+                    $values[] = $mapping['value'] ?? '';
+                    continue;
+                }
+
+                $values[] = $row[$mapping['source']] ?? '';
+            }
+
+            $lines[] = $this->encodeCsvRow($values, $safeDelimiter, $safeEnclosure);
+        }
+
+        return implode($safeLineEnding, $lines) . $safeLineEnding;
+    }
+
+    /**
+     * @param array<int, mixed> $values
+     */
+    protected function encodeCsvRow(array $values, string $delimiter, string $enclosure): string
+    {
+        return collect($values)
+            ->map(function ($value) use ($enclosure) {
+                $stringValue = (string) ($value ?? '');
+                $escaped = str_replace($enclosure, $enclosure . $enclosure, $stringValue);
+
+                return $enclosure . $escaped . $enclosure;
+            })
+            ->implode($delimiter);
+    }
+
+    protected function normalizeLineEnding(string $lineEnding): string
+    {
+        $trimmed = trim($lineEnding);
+        if ($trimmed === '\r\n') {
+            return "\r\n";
+        }
+        if ($trimmed === '\r') {
+            return "\r";
+        }
+        if ($trimmed === '\n' || $trimmed === '') {
+            return "\n";
+        }
+
+        return $lineEnding;
     }
 }

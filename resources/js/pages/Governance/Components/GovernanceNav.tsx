@@ -12,6 +12,13 @@ import {
   Wallet,
   Compass,
   Users,
+  BookOpen,
+  FileText,
+  ClipboardList,
+  Star,
+  FolderOpen,
+  HeartPulse,
+  Landmark,
 } from 'lucide-react';
 
 interface NavItem {
@@ -87,6 +94,41 @@ export default function GovernanceNav() {
       label: 'Actions',
       href: '/governance/actions',
       icon: <CheckSquare className="w-5 h-5" />,
+    },
+    {
+      label: 'Policies',
+      href: '/governance/policies',
+      icon: <BookOpen className="w-5 h-5" />,
+    },
+    {
+      label: 'CEO Reports',
+      href: '/governance/ceo-reports',
+      icon: <FileText className="w-5 h-5" />,
+    },
+    {
+      label: 'Interests Register',
+      href: '/governance/interests',
+      icon: <ClipboardList className="w-5 h-5" />,
+    },
+    {
+      label: 'Board Evaluations',
+      href: '/governance/evaluations',
+      icon: <Star className="w-5 h-5" />,
+    },
+    {
+      label: 'Documents',
+      href: '/governance/documents',
+      icon: <FolderOpen className="w-5 h-5" />,
+    },
+    {
+      label: 'Clinical Governance',
+      href: '/governance/clinical',
+      icon: <HeartPulse className="w-5 h-5" />,
+    },
+    {
+      label: 'Te Tiriti',
+      href: '/governance/te-tiriti',
+      icon: <Landmark className="w-5 h-5" />,
     },
   ];
 

@@ -194,6 +194,7 @@ class RbacSeeder extends Seeder
             ['key' => 'calendar.view', 'description' => 'View calendars', 'group' => 'calendar', 'module' => 'Operations'],
             ['key' => 'calendar.create', 'description' => 'Create calendar events', 'group' => 'calendar', 'module' => 'Operations'],
             ['key' => 'calendar.approve', 'description' => 'Approve calendar events', 'group' => 'calendar', 'module' => 'Operations'],
+            ['key' => 'calendar.manage', 'description' => 'Edit and delete calendar events', 'group' => 'calendar', 'module' => 'Operations'],
             ['key' => 'calendar.manage_recurring', 'description' => 'Manage recurring events', 'group' => 'calendar', 'module' => 'Operations'],
 
             // Shifts
@@ -381,6 +382,7 @@ class RbacSeeder extends Seeder
             ['key' => 'hazards.create', 'description' => 'Log new hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.assign', 'description' => 'Assign hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.close', 'description' => 'Close/resolve hazards', 'group' => 'hazards', 'module' => 'Compliance'],
+            ['key' => 'hazards.manage', 'description' => 'Edit and update hazards', 'group' => 'hazards', 'module' => 'Compliance'],
             ['key' => 'hazards.manage_types', 'description' => 'Manage hazard type catalog', 'group' => 'hazards', 'module' => 'Compliance'],
 
             // Checklists
@@ -397,6 +399,16 @@ class RbacSeeder extends Seeder
             ['key' => 'credentials.view', 'description' => 'View credential list', 'group' => 'credentials', 'module' => 'Operations'],
             ['key' => 'credentials.reveal', 'description' => 'Reveal credential values', 'group' => 'credentials', 'module' => 'Operations'],
             ['key' => 'credentials.manage', 'description' => 'Manage credentials', 'group' => 'credentials', 'module' => 'Operations'],
+
+            // Site Damages
+            ['key' => 'sites.damages.view', 'description' => 'View site damage reports', 'group' => 'sites', 'module' => 'Operations'],
+            ['key' => 'sites.damages.create', 'description' => 'Create site damage reports', 'group' => 'sites', 'module' => 'Operations'],
+            ['key' => 'sites.damages.manage', 'description' => 'Manage site damage reports (update, delete)', 'group' => 'sites', 'module' => 'Operations'],
+
+            // House Ledger
+            ['key' => 'sites.ledger.view', 'description' => 'View house ledger', 'group' => 'sites', 'module' => 'Operations'],
+            ['key' => 'sites.ledger.create', 'description' => 'Create house ledger entries', 'group' => 'sites', 'module' => 'Operations'],
+            ['key' => 'sites.ledger.manage', 'description' => 'Manage house ledger (reconcile, adjust)', 'group' => 'sites', 'module' => 'Operations'],
 
             // Reports - Sites
             ['key' => 'reports.sites.view', 'description' => 'View site reports', 'group' => 'reports', 'module' => 'System'],
@@ -482,6 +494,8 @@ class RbacSeeder extends Seeder
             'hr.documents.view', 'hr.documents.manage', 'hr.payroll.view', 'hr.payroll.export',
             'hr.reports.view', 'hr.reports.export', 'hr.driver.view', 'hr.driver.manage',
             'hr.wellbeing.view', 'hr.onboarding.view', 'hr.onboarding.manage',
+            'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
+            'sites.ledger.view', 'sites.ledger.create', 'sites.ledger.manage',
         ]);
 
         // Coordinator
@@ -517,6 +531,8 @@ class RbacSeeder extends Seeder
             'hr.employees.viewAny', 'hr.compliance.view', 'hr.training.view',
             'hr.vetting.view', 'hr.leave.viewAny', 'hr.leave.approve',
             'hr.performance.view', 'hr.policies.view', 'hr.policies.attest', 'hr.onboarding.view',
+            'sites.damages.view', 'sites.damages.create',
+            'sites.ledger.view', 'sites.ledger.create',
         ]);
 
         // Support Worker
@@ -539,6 +555,8 @@ class RbacSeeder extends Seeder
             'assets.alerts.view', 'assets.scan.record',
             'safeguarding.create',
             'hr.employees.viewOwn', 'hr.leave.viewOwn', 'hr.policies.view', 'hr.policies.attest',
+            'sites.damages.view', 'sites.damages.create',
+            'sites.ledger.view',
         ]);
 
         // Finance
@@ -583,20 +601,22 @@ class RbacSeeder extends Seeder
 
         // Team Lead
         $syncPermissions($teamLead, [
-            'sites.viewAny', 'sites.update', 'calendar.view', 'calendar.create', 'calendar.approve',
-            'hazards.view', 'hazards.create', 'hazards.assign',
+            'sites.viewAny', 'sites.update', 'calendar.view', 'calendar.create', 'calendar.manage', 'calendar.approve',
+            'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign',
             'checklists.view', 'checklists.run', 'checklists.schedule',
             'vendors.view', 'credentials.view', 'reports.sites.view',
             'siteHardware.view', 'controlRoom.alerts.view',
             'hr.employees.viewAny', 'hr.compliance.view', 'hr.training.view',
             'hr.leave.viewAny', 'hr.leave.approve', 'hr.performance.view', 'hr.performance.manage',
             'hr.policies.view', 'hr.policies.attest', 'hr.onboarding.view',
+            'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
+            'sites.ledger.view', 'sites.ledger.create',
         ]);
 
         // Health & Safety Officer
         $syncPermissions($healthSafetyOfficer, [
             'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
-            'calendar.view', 'hazards.view', 'hazards.create', 'hazards.assign', 'hazards.close',
+            'calendar.view', 'hazards.view', 'hazards.create', 'hazards.manage', 'hazards.assign', 'hazards.close',
             'checklists.view', 'checklists.run', 'checklists.manage_templates',
             'vendors.view', 'credentials.view', 'reports.sites.view',
         ]);
@@ -604,11 +624,13 @@ class RbacSeeder extends Seeder
         // Maintenance Coordinator
         $syncPermissions($maintenanceCoordinator, [
             'sites.viewAny', 'sites.type.head_office.view', 'sites.type.house.view', 'sites.type.facility.view',
-            'calendar.view', 'calendar.create', 'hazards.view',
+            'calendar.view', 'calendar.create', 'calendar.manage', 'hazards.view',
             'checklists.view', 'checklists.run', 'checklists.schedule',
             'assets.view_register', 'assets.manage_register',
             'vendors.view', 'vendors.manage', 'credentials.view', 'credentials.reveal',
             'reports.sites.view',
+            'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
+            'sites.ledger.view', 'sites.ledger.create', 'sites.ledger.manage',
         ]);
 
         // Board Trustee

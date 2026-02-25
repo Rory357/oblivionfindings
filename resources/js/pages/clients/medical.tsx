@@ -52,6 +52,7 @@ import { cn } from '@/lib/utils';
 import MedicationVersionHistory from '@/components/medications/MedicationVersionHistory';
 import ScheduledStockCounts from '@/components/medications/ScheduledStockCounts';
 import DrugInteractionManager from '@/components/medications/DrugInteractionManager';
+import { MultiSelectCombobox, type MultiSelectOption } from '@/components/ui/multi-select-combobox';
 
 interface Medication {
     id: number;
@@ -111,7 +112,7 @@ interface EmergencyContact {
     notes?: string;
 }
 
-interface PageProps {
+interface MedicalPageProps {
     client: {
         id: number;
         first_name: string;
@@ -124,8 +125,8 @@ interface PageProps {
     can_controlled_view: boolean;
     profile: {
         medical_history?: string;
-        disabilities?: string;
-        allergies?: string;
+        disabilities?: string[];
+        allergies?: string[];
         notes?: string;
     };
     medications: Medication[];
@@ -136,6 +137,9 @@ interface PageProps {
     controlled_entries: any[];
     controlled_discrepancies: any[];
     med_charts: any[];
+    disability_options: MultiSelectOption[];
+    allergen_options: MultiSelectOption[];
+    [key: string]: unknown;
 }
 
 function StatusBadge({ state, active }: { state: string; active?: boolean }) {
@@ -322,7 +326,9 @@ export default function Medical() {
         controlled_entries,
         controlled_discrepancies,
         med_charts,
-    } = usePage<PageProps>().props;
+        disability_options,
+        allergen_options,
+    } = usePage<MedicalPageProps>().props;
 
         // Safety checks for arrays
     const safeConditions = conditions || [];
@@ -342,8 +348,8 @@ export default function Medical() {
 
     const profileForm = useForm({
         medical_history: profile?.medical_history ?? '',
-        disabilities: profile?.disabilities ?? '',
-        allergies: profile?.allergies ?? '',
+        disabilities: (profile?.disabilities ?? []) as string[],
+        allergies: (profile?.allergies ?? []) as string[],
         notes: profile?.notes ?? '',
     });
 
@@ -425,7 +431,7 @@ export default function Medical() {
     const controlledMeds = safeMedications.filter(m => m.controlled_drug);
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Clients', href: '/clients' }, { title: `${client.first_name} ${client.last_name}`, href: `/clients/${client.id}` }, { title: 'Medical' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Clients', href: '/clients' }, { title: `${client.first_name} ${client.last_name}`, href: `/clients/${client.id}` }, { title: 'Medical', href: `/clients/${client.id}/medical` }]}>
             <Head title={`Medical - ${client.first_name} ${client.last_name}`} />
 
             <div className="space-y-6 p-6">
@@ -563,10 +569,16 @@ export default function Medical() {
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
-                                    {profile?.allergies ? (
+                                    {(profile?.allergies ?? []).length > 0 ? (
                                         <div className="rounded-md bg-red-50 border border-red-200 p-3">
                                             <div className="text-sm font-medium text-red-800">Allergies</div>
-                                            <div className="text-sm text-red-700 mt-1">{profile.allergies}</div>
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {(profile?.allergies ?? []).map((a: string) => (
+                                                    <Badge key={a} variant="destructive" className="text-xs">
+                                                        {allergen_options.find((o) => o.value === a)?.label ?? a}
+                                                    </Badge>
+                                                ))}
+                                            </div>
                                         </div>
                                     ) : (
                                         <div className="text-sm text-muted-foreground">No allergies recorded</div>
@@ -577,10 +589,16 @@ export default function Medical() {
                                             <div className="text-sm text-muted-foreground mt-1 line-clamp-3">{profile.medical_history}</div>
                                         </div>
                                     )}
-                                    {profile?.disabilities && (
+                                    {(profile?.disabilities ?? []).length > 0 && (
                                         <div>
                                             <div className="text-sm font-medium">Disabilities</div>
-                                            <div className="text-sm text-muted-foreground mt-1 line-clamp-3">{profile.disabilities}</div>
+                                            <div className="flex flex-wrap gap-1 mt-1">
+                                                {(profile?.disabilities ?? []).map((d: string) => (
+                                                    <Badge key={d} variant="secondary" className="text-xs">
+                                                        {disability_options.find((o) => o.value === d)?.label ?? d}
+                                                    </Badge>
+                                                ))}
+                                            </div>
                                         </div>
                                     )}
                                 </CardContent>
@@ -915,11 +933,24 @@ export default function Medical() {
                                     </div>
                                     <div>
                                         <Label>Disabilities</Label>
-                                        <Textarea
-                                            value={profileForm.data.disabilities}
-                                            onChange={(e) => profileForm.setData('disabilities', e.target.value)}
+                                        <MultiSelectCombobox
+                                            options={disability_options}
+                                            selected={profileForm.data.disabilities}
+                                            onChange={(val) => profileForm.setData('disabilities', val)}
+                                            placeholder="Search disabilities..."
+                                            allowCustom
                                             disabled={!can_edit}
-                                            className="min-h-[100px]"
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>Allergies / Allergens</Label>
+                                        <MultiSelectCombobox
+                                            options={allergen_options}
+                                            selected={profileForm.data.allergies}
+                                            onChange={(val) => profileForm.setData('allergies', val)}
+                                            placeholder="Search allergens..."
+                                            allowCustom
+                                            disabled={!can_edit}
                                         />
                                     </div>
                                     <div>

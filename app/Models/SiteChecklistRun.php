@@ -65,6 +65,11 @@ class SiteChecklistRun extends Model
         return $this->hasMany(SiteChecklistResponse::class, 'run_id');
     }
 
+    public function damages(): HasMany
+    {
+        return $this->hasMany(SiteDamage::class, 'checklist_run_id');
+    }
+
     // Scopes
     public function scopeScheduled($query)
     {

@@ -11,9 +11,10 @@ interface Props {
     profiles: {
         data: Array<{
             id: number;
+            profile_id: number | null;
             employee_number: string | null;
-            position_title: string;
-            employment_type: string;
+            position_title: string | null;
+            employment_type: string | null;
             is_active: boolean;
             start_date: string | null;
             user: { id: number; name: string; email: string };
@@ -91,14 +92,20 @@ export default function EmployeesIndex({ profiles, sites, filters, can }: Props)
                                 {profiles.data.map((p) => (
                                     <tr key={p.id} className="hover:bg-muted/30">
                                         <td className="px-4 py-3">
-                                            <Link href={`/hr/people/${p.id}`} className="font-medium text-primary hover:underline">
-                                                {p.user.name}
-                                            </Link>
+                                            {p.profile_id ? (
+                                                <Link href={`/hr/people/${p.profile_id}`} className="font-medium text-primary hover:underline">
+                                                    {p.user.name}
+                                                </Link>
+                                            ) : (
+                                                <span className="font-medium">{p.user.name}</span>
+                                            )}
                                             <div className="text-xs text-muted-foreground">{p.user.email}</div>
                                         </td>
                                         <td className="px-4 py-3 text-muted-foreground">{p.employee_number || '\u2014'}</td>
-                                        <td className="px-4 py-3">{p.position_title}</td>
-                                        <td className="px-4 py-3"><Badge variant="outline">{p.employment_type?.replace('_', ' ')}</Badge></td>
+                                        <td className="px-4 py-3">{p.position_title || '\u2014'}</td>
+                                        <td className="px-4 py-3">
+                                            <Badge variant="outline">{p.employment_type ? p.employment_type.replace('_', ' ') : '\u2014'}</Badge>
+                                        </td>
                                         <td className="px-4 py-3">{p.primary_site?.name || '\u2014'}</td>
                                         <td className="px-4 py-3">
                                             <Badge variant={p.is_active ? 'default' : 'secondary'}>

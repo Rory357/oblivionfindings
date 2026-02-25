@@ -2,6 +2,10 @@
 
 use App\Http\Controllers\Hr\RecruitmentController;
 use App\Http\Controllers\Hr\CandidateController;
+use App\Http\Controllers\Hr\RecruitmentJobController;
+use App\Http\Controllers\Hr\InterviewKitController;
+use App\Http\Controllers\Hr\WellbeingController;
+use App\Http\Controllers\Hr\DevelopmentGoalController;
 use App\Http\Controllers\Hr\EmployeeProfileController;
 use App\Http\Controllers\Hr\ComplianceController;
 use App\Http\Controllers\Hr\ComplianceMatrixController;
@@ -10,6 +14,7 @@ use App\Http\Controllers\Hr\VettingController;
 use App\Http\Controllers\Hr\DriverEligibilityController;
 use App\Http\Controllers\Hr\LeaveController;
 use App\Http\Controllers\Hr\OnboardingController;
+use App\Http\Controllers\Hr\OffboardingController;
 use App\Http\Controllers\Hr\SupervisionController;
 use App\Http\Controllers\Hr\PerformanceReviewController;
 use App\Http\Controllers\Hr\HrCaseController;
@@ -19,6 +24,8 @@ use App\Http\Controllers\Hr\PolicyAttestationController;
 use App\Http\Controllers\Hr\HrDocumentController;
 use App\Http\Controllers\Hr\PayrollExportController;
 use App\Http\Controllers\Hr\HrReportController;
+use App\Http\Controllers\Hr\HrWebhookController;
+use App\Http\Controllers\Hr\HrAutomationController;
 use App\Http\Controllers\Hr\MyHrController;
 use Illuminate\Support\Facades\Route;
 
@@ -27,6 +34,8 @@ use Illuminate\Support\Facades\Route;
  */
 
 Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
+    // HR module landing page for shared breadcrumbs/navigation.
+    Route::redirect('/', '/hr/my')->name('index');
 
     /*
     |--------------------------------------------------------------------------
@@ -43,6 +52,12 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/policies/{policy}/attest', [MyHrController::class, 'attestPolicy'])->name('policies.attest');
         Route::get('/profile', [MyHrController::class, 'profile'])->name('profile');
         Route::put('/profile', [MyHrController::class, 'updateProfile'])->name('profile.update');
+        Route::get('/reviews', [MyHrController::class, 'reviews'])->name('reviews');
+        Route::put('/reviews/{review}', [MyHrController::class, 'updateReview'])->name('reviews.update');
+        Route::get('/goals', [MyHrController::class, 'goals'])->name('goals');
+        Route::put('/goals/{goal}', [MyHrController::class, 'updateGoal'])->name('goals.update');
+        Route::get('/surveys', [MyHrController::class, 'surveys'])->name('surveys');
+        Route::post('/surveys/{survey}', [MyHrController::class, 'submitSurvey'])->name('surveys.submit');
     });
 
     /*
@@ -52,6 +67,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.recruitment.view')->group(function () {
         Route::get('/recruitment', [RecruitmentController::class, 'index'])->name('recruitment.index');
+        Route::get('/recruitment/candidates', [RecruitmentController::class, 'index'])->name('candidates.index');
+        Route::get('/recruitment/jobs', [RecruitmentJobController::class, 'index'])->name('jobs.index');
+        Route::get('/recruitment/kits', [InterviewKitController::class, 'index'])->name('kits.index');
 
         Route::get('/recruitment/candidates/create', [CandidateController::class, 'create'])->name('candidates.create')
             ->middleware('permission:hr.recruitment.manage');
@@ -60,15 +78,21 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/recruitment/candidates/{candidate}', [CandidateController::class, 'show'])->name('candidates.show');
         Route::put('/recruitment/candidates/{candidate}', [CandidateController::class, 'update'])->name('candidates.update')
             ->middleware('permission:hr.recruitment.manage');
-        Route::post('/recruitment/candidates/{candidate}/advance', [CandidateController::class, 'advance'])->name('candidates.advance')
+        Route::post('/recruitment/applications/{application}/advance', [CandidateController::class, 'advanceApplication'])->name('applications.advance')
             ->middleware('permission:hr.recruitment.manage');
 
         // Interviews
         Route::post('/recruitment/applications/{application}/interviews', [CandidateController::class, 'storeInterview'])->name('interviews.store')
             ->middleware('permission:hr.recruitment.manage');
+        Route::put('/recruitment/interviews/{interview}', [CandidateController::class, 'updateInterview'])->name('interviews.update')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/interviews/{interview}/score', [CandidateController::class, 'scoreInterview'])->name('interviews.score')
+            ->middleware('permission:hr.recruitment.manage');
 
         // Reference Checks
         Route::post('/recruitment/applications/{application}/references', [CandidateController::class, 'storeReference'])->name('references.store')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::put('/recruitment/references/{reference}', [CandidateController::class, 'updateReference'])->name('references.update')
             ->middleware('permission:hr.recruitment.manage');
 
         // Application Actions
@@ -76,13 +100,39 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
 
         // Offers
-        Route::get('/recruitment/offers/create/{application}', [CandidateController::class, 'createOffer'])->name('offers.create')
+        Route::get('/recruitment/applications/{application}/offer/create', [CandidateController::class, 'createOffer'])->name('offers.create')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers', [CandidateController::class, 'storeOffer'])->name('offers.store')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/send', [CandidateController::class, 'sendOffer'])->name('offers.send')
             ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/approve', [CandidateController::class, 'approveOffer'])->name('offers.approve')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/offers/{offer}/respond', [CandidateController::class, 'respondOffer'])->name('offers.respond')
+            ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/convert', [CandidateController::class, 'convertToEmployee'])->name('offers.convert')
+            ->middleware('permission:hr.recruitment.manage');
+
+        // Jobs & ATS setup
+        Route::post('/recruitment/jobs', [RecruitmentJobController::class, 'store'])->name('jobs.store')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::put('/recruitment/jobs/{job}', [RecruitmentJobController::class, 'update'])->name('jobs.update')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/jobs/{job}/publish', [RecruitmentJobController::class, 'publish'])->name('jobs.publish')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/jobs/{job}/close', [RecruitmentJobController::class, 'close'])->name('jobs.close')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/jobs/{job}/sync-posting', [RecruitmentJobController::class, 'syncPosting'])->name('jobs.sync-posting')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/jobs/{job}/unpublish-posting', [RecruitmentJobController::class, 'unpublishPosting'])->name('jobs.unpublish-posting')
+            ->middleware('permission:hr.recruitment.manage');
+
+        // Interview kits
+        Route::post('/recruitment/kits', [InterviewKitController::class, 'store'])->name('kits.store')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::put('/recruitment/kits/{kit}', [InterviewKitController::class, 'update'])->name('kits.update')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::post('/recruitment/kits/{kit}/toggle-active', [InterviewKitController::class, 'toggleActive'])->name('kits.toggleActive')
             ->middleware('permission:hr.recruitment.manage');
     });
 
@@ -135,7 +185,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.vetting.view')->group(function () {
         Route::get('/compliance/vetting', [VettingController::class, 'index'])->name('vetting.index');
-        Route::get('/compliance/vetting/{check}', [VettingController::class, 'show'])->name('vetting.show');
 
         Route::middleware('permission:hr.vetting.manage')->group(function () {
             Route::get('/compliance/vetting/create', [VettingController::class, 'create'])->name('vetting.create');
@@ -147,6 +196,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/compliance/vetting/{check}/renew', [VettingController::class, 'renew'])->name('vetting.renew');
             Route::post('/compliance/vetting/{check}/consent', [VettingController::class, 'captureConsent'])->name('vetting.consent');
         });
+
+        Route::get('/compliance/vetting/{check}', [VettingController::class, 'show'])->name('vetting.show');
     });
 
     /*
@@ -183,6 +234,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/leave/{leaveRequest}', [LeaveController::class, 'show'])->name('leave.show');
             Route::post('/leave/{leaveRequest}/approve', [LeaveController::class, 'approve'])->name('leave.approve');
             Route::post('/leave/{leaveRequest}/decline', [LeaveController::class, 'decline'])->name('leave.decline');
+            Route::post('/leave/bulk-approve', [LeaveController::class, 'bulkApprove'])->name('leave.bulk-approve');
+            Route::post('/leave/bulk-decline', [LeaveController::class, 'bulkDecline'])->name('leave.bulk-decline');
+            Route::post('/leave/escalate-now', [LeaveController::class, 'escalateNow'])->name('leave.escalate-now');
+            Route::post('/leave/{leaveRequest}/sla-due', [LeaveController::class, 'setSlaDue'])->name('leave.sla-due');
         });
     });
 
@@ -193,7 +248,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.onboarding.view')->group(function () {
         Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding.index');
-        Route::get('/onboarding/{checklist}', [OnboardingController::class, 'show'])->name('onboarding.show');
 
         Route::middleware('permission:hr.onboarding.manage')->group(function () {
             Route::get('/onboarding/create', [OnboardingController::class, 'create'])->name('onboarding.create');
@@ -201,6 +255,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/onboarding/tasks/{task}/complete', [OnboardingController::class, 'completeTask'])->name('onboarding.tasks.complete');
             Route::put('/onboarding/templates', [OnboardingController::class, 'updateTemplates'])->name('onboarding.templates.update');
         });
+
+        Route::get('/onboarding/{checklist}', [OnboardingController::class, 'show'])->name('onboarding.show');
     });
 
     /*
@@ -261,6 +317,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.disciplinary.manage');
         Route::post('/{case}/disciplinary', [DisciplinaryController::class, 'store'])->name('disciplinary.store')
             ->middleware('permission:hr.disciplinary.manage');
+        Route::get('/disciplinary/{action}/edit', [DisciplinaryController::class, 'edit'])->name('disciplinary.edit')
+            ->middleware('permission:hr.disciplinary.manage');
         Route::put('/disciplinary/{action}', [DisciplinaryController::class, 'update'])->name('disciplinary.update')
             ->middleware('permission:hr.disciplinary.manage');
         Route::post('/disciplinary/{action}/advance', [DisciplinaryController::class, 'advanceStage'])->name('disciplinary.advance')
@@ -301,8 +359,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.documents.view')->group(function () {
         Route::get('/documents', [HrDocumentController::class, 'index'])->name('documents.index');
+        Route::get('/documents/{document}/download', [HrDocumentController::class, 'download'])->name('documents.download');
 
         Route::middleware('permission:hr.documents.manage')->group(function () {
+            Route::get('/documents/upload', [HrDocumentController::class, 'createUpload'])->name('documents.upload');
             Route::post('/documents', [HrDocumentController::class, 'store'])->name('documents.store');
             Route::post('/documents/generate', [HrDocumentController::class, 'generate'])->name('documents.generate');
             Route::delete('/documents/{document}', [HrDocumentController::class, 'destroy'])->name('documents.destroy');
@@ -311,6 +371,60 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/documents/templates', [HrDocumentController::class, 'storeTemplate'])->name('documents.templates.store');
             Route::get('/documents/templates/{template}/edit', [HrDocumentController::class, 'editTemplate'])->name('documents.templates.edit');
             Route::put('/documents/templates/{template}', [HrDocumentController::class, 'updateTemplate'])->name('documents.templates.update');
+            Route::post('/documents/templates/{template}/toggle-active', [HrDocumentController::class, 'toggleTemplateActive'])->name('documents.templates.toggleActive');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Offboarding
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.onboarding.view')->prefix('offboarding')->name('offboarding.')->group(function () {
+        Route::get('/', [OffboardingController::class, 'index'])->name('index');
+
+        Route::middleware('permission:hr.onboarding.manage')->group(function () {
+            Route::get('/create', [OffboardingController::class, 'create'])->name('create');
+            Route::post('/', [OffboardingController::class, 'store'])->name('store');
+            Route::post('/tasks/{task}/complete', [OffboardingController::class, 'completeTask'])->name('tasks.complete');
+        });
+
+        Route::get('/{checklist}', [OffboardingController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Wellbeing & Engagement
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('wellbeing')->name('wellbeing.')->group(function () {
+        Route::get('/', [WellbeingController::class, 'index'])->name('index')
+            ->middleware('permission:hr.wellbeing.view');
+        Route::get('/surveys/{survey}', [WellbeingController::class, 'showSurvey'])->name('surveys.show');
+        Route::post('/surveys/{survey}/responses', [WellbeingController::class, 'submitResponse'])->name('surveys.responses.store');
+
+        Route::middleware('permission:hr.performance.manage')->group(function () {
+            Route::post('/surveys', [WellbeingController::class, 'storeSurvey'])->name('surveys.store');
+            Route::put('/surveys/{survey}', [WellbeingController::class, 'updateSurvey'])->name('surveys.update');
+            Route::post('/surveys/{survey}/publish', [WellbeingController::class, 'publishSurvey'])->name('surveys.publish');
+            Route::post('/surveys/{survey}/close', [WellbeingController::class, 'closeSurvey'])->name('surveys.close');
+            Route::post('/surveys/{survey}/action-plans', [WellbeingController::class, 'storeActionPlan'])->name('action-plans.store');
+        });
+
+        Route::put('/action-plans/{plan}', [WellbeingController::class, 'updateActionPlan'])->name('action-plans.update');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Development Goals
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('development')->name('development.')->group(function () {
+        Route::get('/goals', [DevelopmentGoalController::class, 'index'])->name('goals.index');
+        Route::put('/goals/{goal}', [DevelopmentGoalController::class, 'update'])->name('goals.update');
+
+        Route::middleware('permission:hr.performance.manage')->group(function () {
+            Route::post('/goals', [DevelopmentGoalController::class, 'store'])->name('goals.store');
         });
     });
 
@@ -326,6 +440,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/payroll/runs', [PayrollExportController::class, 'createRun'])->name('payroll.runs.store');
             Route::post('/payroll/runs/{run}/lock', [PayrollExportController::class, 'lockRun'])->name('payroll.runs.lock');
             Route::post('/payroll/runs/{run}/export', [PayrollExportController::class, 'export'])->name('payroll.runs.export');
+            Route::post('/payroll/export-profiles', [PayrollExportController::class, 'storeProfile'])->name('payroll.profiles.store');
+            Route::put('/payroll/export-profiles/{profile}', [PayrollExportController::class, 'updateProfile'])->name('payroll.profiles.update');
+            Route::post('/payroll/export-profiles/{profile}/set-default', [PayrollExportController::class, 'setDefaultProfile'])->name('payroll.profiles.set-default');
         });
     });
 
@@ -336,10 +453,24 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.reports.view')->group(function () {
         Route::get('/reports', [HrReportController::class, 'index'])->name('reports.index');
-        Route::post('/reports/generate', [HrReportController::class, 'generate'])->name('reports.generate');
+        Route::match(['get', 'post'], '/reports/generate', [HrReportController::class, 'generate'])->name('reports.generate');
+        Route::get('/reports/exports/{export}', [HrReportController::class, 'showExport'])->name('reports.exports.show');
+        Route::get('/reports/webhooks', [HrWebhookController::class, 'index'])->name('reports.webhooks.index');
+        Route::get('/reports/automations', [HrAutomationController::class, 'index'])->name('reports.automations.index');
 
         Route::middleware('permission:hr.reports.export')->group(function () {
-            Route::post('/reports/export', [HrReportController::class, 'export'])->name('reports.export');
+            Route::match(['get', 'post'], '/reports/export', [HrReportController::class, 'export'])->name('reports.export');
+            Route::get('/reports/exports/{export}/download', [HrReportController::class, 'downloadExport'])->name('reports.exports.download');
+            Route::post('/reports/subscriptions', [HrReportController::class, 'storeSubscription'])->name('reports.subscriptions.store');
+            Route::put('/reports/subscriptions/{subscription}', [HrReportController::class, 'updateSubscription'])->name('reports.subscriptions.update');
+            Route::post('/reports/subscriptions/{subscription}/toggle-active', [HrReportController::class, 'toggleSubscription'])->name('reports.subscriptions.toggleActive');
+            Route::post('/reports/webhooks', [HrWebhookController::class, 'store'])->name('reports.webhooks.store');
+            Route::put('/reports/webhooks/{endpoint}', [HrWebhookController::class, 'update'])->name('reports.webhooks.update');
+            Route::post('/reports/webhooks/{endpoint}/toggle-active', [HrWebhookController::class, 'toggle'])->name('reports.webhooks.toggleActive');
+            Route::post('/reports/webhooks/deliveries/{delivery}/retry', [HrWebhookController::class, 'retryDelivery'])->name('reports.webhooks.deliveries.retry');
+            Route::post('/reports/automations', [HrAutomationController::class, 'store'])->name('reports.automations.store');
+            Route::put('/reports/automations/{rule}', [HrAutomationController::class, 'update'])->name('reports.automations.update');
+            Route::post('/reports/automations/{rule}/toggle-active', [HrAutomationController::class, 'toggle'])->name('reports.automations.toggleActive');
         });
     });
 });

@@ -3,65 +3,95 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
-import { Users, GraduationCap, AlertTriangle, Clock, CheckCircle2, BookOpen } from 'lucide-react';
+import { Users, GraduationCap, AlertTriangle, Clock, CheckCircle2, BookOpen, MapPin } from 'lucide-react';
 
 interface Stats {
-    total_staff: number;
-    fully_trained: number;
-    partial: number;
-    untrained: number;
+    totalRecords: number;
+    expiredCount: number;
+    dueSoonCount: number;
+    completedThisMonth: number;
 }
 
-interface UpcomingExpiry {
-    id: number;
-    user_name: string;
-    user_email: string;
-    requirement_name: string;
-    expiry_date: string;
-    days_until_expiry: number;
-}
-
-interface RecentCompletion {
-    id: number;
-    user_name: string;
-    requirement_name: string;
-    completed_date: string;
-}
-
-interface RequirementStat {
+interface StaffUser {
     id: number;
     name: string;
-    type: string;
-    total_applicable: number;
-    compliant_count: number;
-    expired_count: number;
-    completion_rate: number;
+    email: string;
+}
+
+interface TrainingCourse {
+    id: number;
+    name: string;
+    code?: string | null;
+    category?: string | null;
+}
+
+interface TrainingRecord {
+    id: number;
+    user?: StaffUser | null;
+    training_course?: TrainingCourse | null;
+    check_date?: string | null;
+    completed_at?: string | null;
+    expires_at?: string | null;
+    status?: string | null;
+}
+
+interface SiteSummary {
+    site_id: number;
+    site_name: string;
+    total: number;
+    expired: number;
+}
+
+interface MatrixEntry {
+    course_id: number;
+    course_name: string;
+    category: string | null;
+    count: number;
+}
+
+interface RenewalCourse {
+    id: number;
+    name: string;
+    code?: string | null;
+    category?: string | null;
+    training_records_count?: number;
 }
 
 interface Props {
     stats: Stats;
-    upcomingExpiries: UpcomingExpiry[];
-    recentCompletions: RecentCompletion[];
-    requirementStats: RequirementStat[];
-    filters: { q: string; type: string | null };
+    overdue: TrainingRecord[];
+    dueSoon: TrainingRecord[];
+    bySite: SiteSummary[];
+    matrix: MatrixEntry[];
+    renewalNeeded: RenewalCourse[];
+    filters: { site_id: string | null };
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/people' },
-    { title: 'Training', href: '/hr/training' },
+    { title: 'HR', href: '/hr' },
+    { title: 'Training', href: '/hr/compliance/training' },
 ];
 
-export default function TrainingIndex({ stats, upcomingExpiries, recentCompletions, requirementStats, filters }: Props) {
-    function applyFilter(key: string, value: string | null) {
-        router.get('/hr/training', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
-    }
+function formatDate(value?: string | null): string {
+    if (!value) return '--';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-NZ');
+}
 
-    const trainingRate = stats.total_staff > 0
-        ? Math.round((stats.fully_trained / stats.total_staff) * 100)
-        : 0;
+function daysUntil(value?: string | null): number | null {
+    if (!value) return null;
+    const target = new Date(value);
+    if (Number.isNaN(target.getTime())) return null;
+    const diff = target.getTime() - Date.now();
+    return Math.ceil(diff / (1000 * 60 * 60 * 24));
+}
+
+export default function TrainingIndex({ stats, overdue, dueSoon, bySite, matrix, renewalNeeded, filters }: Props) {
+    function applyFilter(key: string, value: string | null) {
+        router.get('/hr/compliance/training', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
+    }
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -70,21 +100,20 @@ export default function TrainingIndex({ stats, upcomingExpiries, recentCompletio
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold">Training Dashboard</h1>
-                        <p className="text-muted-foreground">Monitor staff training compliance and upcoming renewals</p>
+                        <p className="text-muted-foreground">Monitor training renewals and overdue records</p>
                     </div>
                     <Button variant="outline" asChild>
                         <Link href="/hr/compliance">Compliance Dashboard</Link>
                     </Button>
                 </div>
 
-                {/* Summary Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Total Staff</p>
-                                    <p className="text-3xl font-bold">{stats.total_staff}</p>
+                                    <p className="text-sm text-muted-foreground">Total Records</p>
+                                    <p className="text-3xl font-bold">{stats.totalRecords}</p>
                                 </div>
                                 <Users className="h-8 w-8 text-muted-foreground" />
                             </div>
@@ -94,9 +123,8 @@ export default function TrainingIndex({ stats, upcomingExpiries, recentCompletio
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Fully Trained</p>
-                                    <p className="text-3xl font-bold text-green-600">{stats.fully_trained}</p>
-                                    <p className="text-xs text-muted-foreground">{trainingRate}% of staff</p>
+                                    <p className="text-sm text-muted-foreground">Completed This Month</p>
+                                    <p className="text-3xl font-bold text-green-600">{stats.completedThisMonth}</p>
                                 </div>
                                 <GraduationCap className="h-8 w-8 text-green-500" />
                             </div>
@@ -106,8 +134,8 @@ export default function TrainingIndex({ stats, upcomingExpiries, recentCompletio
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Partially Trained</p>
-                                    <p className="text-3xl font-bold text-yellow-600">{stats.partial}</p>
+                                    <p className="text-sm text-muted-foreground">Due Soon (60 days)</p>
+                                    <p className="text-3xl font-bold text-yellow-600">{stats.dueSoonCount}</p>
                                 </div>
                                 <Clock className="h-8 w-8 text-yellow-500" />
                             </div>
@@ -117,8 +145,8 @@ export default function TrainingIndex({ stats, upcomingExpiries, recentCompletio
                         <CardContent className="pt-6">
                             <div className="flex items-center justify-between">
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Untrained</p>
-                                    <p className="text-3xl font-bold text-destructive">{stats.untrained}</p>
+                                    <p className="text-sm text-muted-foreground">Expired</p>
+                                    <p className="text-3xl font-bold text-destructive">{stats.expiredCount}</p>
                                 </div>
                                 <AlertTriangle className="h-8 w-8 text-destructive" />
                             </div>
@@ -127,48 +155,38 @@ export default function TrainingIndex({ stats, upcomingExpiries, recentCompletio
                 </div>
 
                 <div className="grid gap-6 lg:grid-cols-2">
-                    {/* Upcoming Expiries */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <AlertTriangle className="h-5 w-5 text-yellow-500" />
-                                Upcoming Expiries
+                                Overdue Training
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
-                            {upcomingExpiries.length === 0 ? (
+                            {overdue.length === 0 ? (
                                 <div className="px-4 py-8 text-center text-muted-foreground">
                                     <CheckCircle2 className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                                    <p className="text-sm">No upcoming expiries in the next 60 days.</p>
+                                    <p className="text-sm">No overdue training records.</p>
                                 </div>
                             ) : (
                                 <table className="w-full text-sm">
                                     <thead className="border-b bg-muted/50">
                                         <tr>
                                             <th className="px-4 py-2 text-left font-medium">Staff</th>
-                                            <th className="px-4 py-2 text-left font-medium">Requirement</th>
-                                            <th className="px-4 py-2 text-left font-medium">Expires</th>
+                                            <th className="px-4 py-2 text-left font-medium">Course</th>
+                                            <th className="px-4 py-2 text-left font-medium">Expired</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
-                                        {upcomingExpiries.map((expiry) => (
-                                            <tr key={expiry.id} className="hover:bg-muted/30">
+                                        {overdue.map((record) => (
+                                            <tr key={record.id} className="hover:bg-muted/30">
                                                 <td className="px-4 py-2">
-                                                    <div className="font-medium">{expiry.user_name}</div>
-                                                    <div className="text-xs text-muted-foreground">{expiry.user_email}</div>
+                                                    <div className="font-medium">{record.user?.name ?? 'Unknown'}</div>
+                                                    <div className="text-xs text-muted-foreground">{record.user?.email ?? '--'}</div>
                                                 </td>
-                                                <td className="px-4 py-2">{expiry.requirement_name}</td>
+                                                <td className="px-4 py-2">{record.training_course?.name ?? '--'}</td>
                                                 <td className="px-4 py-2">
-                                                    <div className={`font-medium ${expiry.days_until_expiry <= 14 ? 'text-destructive' : 'text-yellow-600'}`}>
-                                                        {expiry.expiry_date}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {expiry.days_until_expiry <= 0
-                                                            ? 'Expired'
-                                                            : expiry.days_until_expiry === 1
-                                                                ? '1 day left'
-                                                                : `${expiry.days_until_expiry} days left`}
-                                                    </div>
+                                                    <div className="font-medium text-destructive">{formatDate(record.expires_at)}</div>
                                                 </td>
                                             </tr>
                                         ))}
@@ -178,37 +196,46 @@ export default function TrainingIndex({ stats, upcomingExpiries, recentCompletio
                         </CardContent>
                     </Card>
 
-                    {/* Recent Completions */}
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2">
                                 <CheckCircle2 className="h-5 w-5 text-green-500" />
-                                Recent Completions
+                                Due Soon (Next 60 Days)
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="p-0">
-                            {recentCompletions.length === 0 ? (
+                            {dueSoon.length === 0 ? (
                                 <div className="px-4 py-8 text-center text-muted-foreground">
                                     <BookOpen className="mx-auto mb-2 h-8 w-8 opacity-50" />
-                                    <p className="text-sm">No recent training completions.</p>
+                                    <p className="text-sm">No records expiring soon.</p>
                                 </div>
                             ) : (
                                 <table className="w-full text-sm">
                                     <thead className="border-b bg-muted/50">
                                         <tr>
                                             <th className="px-4 py-2 text-left font-medium">Staff</th>
-                                            <th className="px-4 py-2 text-left font-medium">Requirement</th>
-                                            <th className="px-4 py-2 text-left font-medium">Completed</th>
+                                            <th className="px-4 py-2 text-left font-medium">Course</th>
+                                            <th className="px-4 py-2 text-left font-medium">Expires</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y">
-                                        {recentCompletions.map((completion) => (
-                                            <tr key={completion.id} className="hover:bg-muted/30">
-                                                <td className="px-4 py-2 font-medium">{completion.user_name}</td>
-                                                <td className="px-4 py-2">{completion.requirement_name}</td>
-                                                <td className="px-4 py-2 text-muted-foreground">{completion.completed_date}</td>
-                                            </tr>
-                                        ))}
+                                        {dueSoon.map((record) => {
+                                            const days = daysUntil(record.expires_at);
+                                            return (
+                                                <tr key={record.id} className="hover:bg-muted/30">
+                                                    <td className="px-4 py-2 font-medium">{record.user?.name ?? 'Unknown'}</td>
+                                                    <td className="px-4 py-2">{record.training_course?.name ?? '--'}</td>
+                                                    <td className="px-4 py-2 text-muted-foreground">
+                                                        {formatDate(record.expires_at)}
+                                                        {days !== null && (
+                                                            <span className="ml-2 text-xs">
+                                                                ({days <= 0 ? 'expired' : `${days}d`})
+                                                            </span>
+                                                        )}
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
                                     </tbody>
                                 </table>
                             )}
@@ -216,91 +243,48 @@ export default function TrainingIndex({ stats, upcomingExpiries, recentCompletio
                     </Card>
                 </div>
 
-                {/* Requirement-Level Completion Rates */}
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2">
                                 <GraduationCap className="h-5 w-5" />
-                                Training Requirement Completion Rates
+                                Course Renewal Pressure
                             </CardTitle>
-                            <div className="flex items-center gap-2">
-                                <Input
-                                    placeholder="Search requirements..."
-                                    defaultValue={filters.q}
-                                    className="w-48"
-                                    onKeyDown={(e) => {
-                                        if (e.key === 'Enter') applyFilter('q', (e.target as HTMLInputElement).value);
-                                    }}
-                                />
-                                <Select value={filters.type || '__none__'} onValueChange={(v) => applyFilter('type', v === '__none__' ? null : v)}>
-                                    <SelectTrigger className="w-40"><SelectValue placeholder="Type" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="__none__">All Types</SelectItem>
-                                        <SelectItem value="certification">Certification</SelectItem>
-                                        <SelectItem value="training">Training</SelectItem>
-                                        <SelectItem value="document">Document</SelectItem>
-                                        <SelectItem value="check">Background Check</SelectItem>
-                                        <SelectItem value="license">License</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                            <Select value={filters.site_id || '__all__'} onValueChange={(value) => applyFilter('site_id', value === '__all__' ? null : value)}>
+                                <SelectTrigger className="w-56"><SelectValue placeholder="All sites" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__all__">All sites</SelectItem>
+                                    {bySite.map((site) => (
+                                        <SelectItem key={site.site_id} value={String(site.site_id)}>{site.site_name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
                         <table className="w-full text-sm">
                             <thead className="border-b bg-muted/50">
                                 <tr>
-                                    <th className="px-4 py-3 text-left font-medium">Requirement</th>
-                                    <th className="px-4 py-3 text-left font-medium">Type</th>
-                                    <th className="px-4 py-3 text-center font-medium">Applicable</th>
-                                    <th className="px-4 py-3 text-center font-medium">Compliant</th>
-                                    <th className="px-4 py-3 text-center font-medium">Expired</th>
-                                    <th className="px-4 py-3 text-left font-medium">Completion Rate</th>
+                                    <th className="px-4 py-3 text-left font-medium">Course</th>
+                                    <th className="px-4 py-3 text-left font-medium">Category</th>
+                                    <th className="px-4 py-3 text-center font-medium">Expiring Soon Count</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y">
-                                {requirementStats.map((req) => (
-                                    <tr key={req.id} className="hover:bg-muted/30">
-                                        <td className="px-4 py-3 font-medium">{req.name}</td>
+                                {matrix.map((entry) => (
+                                    <tr key={entry.course_id} className="hover:bg-muted/30">
+                                        <td className="px-4 py-3 font-medium">{entry.course_name}</td>
                                         <td className="px-4 py-3">
-                                            <Badge variant="outline" className="capitalize text-xs">{req.type.replace('_', ' ')}</Badge>
+                                            <Badge variant="outline" className="capitalize text-xs">{entry.category || '--'}</Badge>
                                         </td>
-                                        <td className="px-4 py-3 text-center">{req.total_applicable}</td>
-                                        <td className="px-4 py-3 text-center">
-                                            <span className="font-medium text-green-600">{req.compliant_count}</span>
-                                        </td>
-                                        <td className="px-4 py-3 text-center">
-                                            {req.expired_count > 0 ? (
-                                                <span className="font-medium text-destructive">{req.expired_count}</span>
-                                            ) : (
-                                                <span className="text-muted-foreground">0</span>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="h-2 w-24 overflow-hidden rounded-full bg-muted">
-                                                    <div
-                                                        className={`h-full rounded-full transition-all ${
-                                                            req.completion_rate === 100
-                                                                ? 'bg-green-500'
-                                                                : req.completion_rate >= 70
-                                                                    ? 'bg-yellow-500'
-                                                                    : 'bg-destructive'
-                                                        }`}
-                                                        style={{ width: `${req.completion_rate}%` }}
-                                                    />
-                                                </div>
-                                                <span className="text-xs font-medium">{req.completion_rate}%</span>
-                                            </div>
-                                        </td>
+                                        <td className="px-4 py-3 text-center font-medium">{entry.count}</td>
                                     </tr>
                                 ))}
-                                {requirementStats.length === 0 && (
+                                {matrix.length === 0 && (
                                     <tr>
-                                        <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                                        <td colSpan={3} className="px-4 py-8 text-center text-muted-foreground">
                                             <GraduationCap className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                            <p>No training requirements found.</p>
+                                            <p>No courses currently under renewal pressure.</p>
                                         </td>
                                     </tr>
                                 )}
@@ -308,6 +292,60 @@ export default function TrainingIndex({ stats, upcomingExpiries, recentCompletio
                         </table>
                     </CardContent>
                 </Card>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <MapPin className="h-5 w-5" />
+                                By Site
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {bySite.map((site) => (
+                                <div key={site.site_id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                                    <div>
+                                        <p className="font-medium">{site.site_name}</p>
+                                        <p className="text-xs text-muted-foreground">{site.total} records</p>
+                                    </div>
+                                    <Badge variant={site.expired > 0 ? 'destructive' : 'secondary'}>
+                                        {site.expired} expired
+                                    </Badge>
+                                </div>
+                            ))}
+                            {bySite.length === 0 && (
+                                <p className="text-sm text-muted-foreground">No site breakdown available.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <BookOpen className="h-5 w-5" />
+                                Courses Needing Renewal
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {renewalNeeded.map((course) => (
+                                <div key={course.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                                    <div>
+                                        <p className="font-medium">{course.name}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {course.category || '--'} {course.code ? `- ${course.code}` : ''}
+                                        </p>
+                                    </div>
+                                    <Badge variant="outline">
+                                        {course.training_records_count ?? 0} expired
+                                    </Badge>
+                                </div>
+                            ))}
+                            {renewalNeeded.length === 0 && (
+                                <p className="text-sm text-muted-foreground">No courses currently need renewal.</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         </AppLayout>
     );

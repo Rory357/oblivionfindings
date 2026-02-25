@@ -16,6 +16,11 @@ class HrPayrollRunItem extends Model
         'payroll_run_id',
         'user_id',
         'timesheet_ids',
+        'base_hourly_rate',
+        'overtime_multiplier',
+        'public_holiday_multiplier',
+        'sleepover_rate',
+        'on_call_rate',
         'regular_hours',
         'overtime_hours',
         'sleepover_count',
@@ -24,11 +29,17 @@ class HrPayrollRunItem extends Model
         'public_holiday_hours',
         'gross_pay',
         'allowances',
+        'rate_breakdown',
         'notes',
     ];
 
     protected $casts = [
         'timesheet_ids' => 'array',
+        'base_hourly_rate' => 'decimal:2',
+        'overtime_multiplier' => 'decimal:2',
+        'public_holiday_multiplier' => 'decimal:2',
+        'sleepover_rate' => 'decimal:2',
+        'on_call_rate' => 'decimal:2',
         'regular_hours' => 'decimal:2',
         'overtime_hours' => 'decimal:2',
         'sleepover_count' => 'integer',
@@ -37,6 +48,7 @@ class HrPayrollRunItem extends Model
         'public_holiday_hours' => 'decimal:2',
         'gross_pay' => 'decimal:2',
         'allowances' => 'array',
+        'rate_breakdown' => 'array',
     ];
 
     /* ------------------------------------------------------------------ */

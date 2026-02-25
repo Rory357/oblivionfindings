@@ -166,7 +166,7 @@ export default function CreateSite() {
                             <div>
                                 <Label htmlFor="primary_contact_user_id">Site Lead / Manager</Label>
                                 <Select
-                                    value={data.primary_contact_user_id}
+                                    value={data.primary_contact_user_id || undefined}
                                     onValueChange={(v) => setData('primary_contact_user_id', v)}
                                 >
                                     <SelectTrigger className="mt-1">

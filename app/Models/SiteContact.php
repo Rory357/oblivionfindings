@@ -11,6 +11,7 @@ class SiteContact extends Model
     use AuditableChanges;
 
     protected $fillable = [
+        'tenant_id',
         'site_id',
         'type',
         'name',

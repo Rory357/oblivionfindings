@@ -1,14 +1,19 @@
-import { AlertCircle, AlertTriangle, Calendar, Clock, Package, Pill, ShieldAlert } from 'lucide-react';
+import { AlertCircle, AlertTriangle, Calendar, Clock, Pill, ShieldAlert } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
 
 interface WidgetItem {
   id: number;
   client?: { id: number; name: string };
   client_id?: number;
-  message: string;
+  message?: string;
   severity?: string;
+  medication?: string;
+  difference?: number;
+  status?: string;
+  expiry_date?: string;
+  days_remaining?: number;
+  dosage?: string;
   [key: string]: unknown;
 }
 
@@ -101,7 +106,9 @@ function WidgetCard({ title, count, severity, items, icon: Icon }: Widget & { ic
                 Client #{item.client_id}
               </Link>
             ) : null}
-            <div className="mt-0.5 truncate">{item.message}</div>
+            <div className="mt-0.5 truncate">
+              {item.message ?? item.medication ?? `Item #${item.id}`}
+            </div>
           </div>
         ))}
         {items.length > 3 && (

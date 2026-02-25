@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 import {
@@ -32,6 +33,11 @@ import {
     Settings,
     PlayCircle,
     Circle,
+    Hammer,
+    BookOpen,
+    ListChecks,
+    ChevronDown,
+    RotateCcw,
 } from 'lucide-react';
 
 type Site = {
@@ -232,94 +238,109 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                     )}
                 </div>
 
-                {/* Setup completeness */}
-                <Card className={isOnboardingComplete ? 'border-emerald-500/30 bg-emerald-500/5' : ''}>
-                    <CardHeader className="pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2">
-                                {isOnboardingComplete ? (
-                                    <>
-                                        <CheckCircle2 className="w-5 h-5 text-emerald-400" />
-                                        <span>Setup Complete</span>
-                                    </>
-                                ) : (
-                                    'Setup Completeness'
-                                )}
-                            </CardTitle>
-                            <div className="flex items-center gap-3">
-                                <span className={`text-sm font-medium ${isOnboardingComplete ? 'text-emerald-400' : 'text-slate-300'}`}>
-                                    {percent}%
-                                </span>
-                                {isOnboardingComplete && (
-                                    <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
-                                        Ready
-                                    </Badge>
-                                )}
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {/* Progress bar */}
-                            <div className="w-full">
-                                <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-                                    <div 
-                                        className={`h-full rounded-full transition-all duration-500 ${
-                                            percent === 100 
-                                                ? 'bg-emerald-500' 
-                                                : percent >= 70 
-                                                    ? 'bg-indigo-500' 
-                                                    : percent >= 40 
-                                                        ? 'bg-amber-500' 
-                                                        : 'bg-slate-500'
-                                        }`} 
-                                        style={{ width: `${percent}%` }} 
-                                    />
+                {/* Setup completeness — collapsible */}
+                <Collapsible defaultOpen={!isOnboardingComplete}>
+                    <Card className={isOnboardingComplete ? 'border-emerald-500/30 bg-emerald-500/5' : ''}>
+                        <CardHeader className="pb-3">
+                            <div className="flex items-center justify-between">
+                                <CollapsibleTrigger className="group flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                                    <CardTitle className="flex items-center gap-2">
+                                        {isOnboardingComplete ? (
+                                            <>
+                                                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                                                <span>Setup Complete</span>
+                                            </>
+                                        ) : (
+                                            'Setup Completeness'
+                                        )}
+                                    </CardTitle>
+                                    <ChevronDown className="w-4 h-4 text-muted-foreground transition-transform group-data-[state=open]:rotate-180" />
+                                </CollapsibleTrigger>
+                                <div className="flex items-center gap-3">
+                                    <span className={`text-sm font-medium ${isOnboardingComplete ? 'text-emerald-400' : 'text-slate-300'}`}>
+                                        {percent}%
+                                    </span>
+                                    {isOnboardingComplete && (
+                                        <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
+                                            Ready
+                                        </Badge>
+                                    )}
                                 </div>
                             </div>
-                            
-                            {/* Checklist items */}
-                            <div className="grid gap-2 sm:grid-cols-2">
-                                {checklist.map((item) => (
-                                    <div 
-                                        key={item.key} 
-                                        className={`flex items-center gap-2 text-sm ${
-                                            item.done ? 'text-emerald-300' : 'text-slate-500'
-                                        }`}
-                                    >
-                                        <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
-                                            item.done 
-                                                ? 'bg-emerald-500/20 text-emerald-400' 
-                                                : 'bg-muted text-muted-foreground'
-                                        }`}>
-                                            {item.done ? (
-                                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                            ) : (
-                                                <Circle className="w-3.5 h-3.5" />
-                                            )}
+                        </CardHeader>
+                        <CollapsibleContent>
+                            <CardContent>
+                                <div className="space-y-4">
+                                    {/* Progress bar */}
+                                    <div className="w-full">
+                                        <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                                            <div
+                                                className={`h-full rounded-full transition-all duration-500 ${
+                                                    percent === 100
+                                                        ? 'bg-emerald-500'
+                                                        : percent >= 70
+                                                            ? 'bg-indigo-500'
+                                                            : percent >= 40
+                                                                ? 'bg-amber-500'
+                                                                : 'bg-slate-500'
+                                                }`}
+                                                style={{ width: `${percent}%` }}
+                                            />
                                         </div>
-                                        <span className={item.done ? '' : 'line-through opacity-60'}>
-                                            {item.label}
-                                        </span>
                                     </div>
-                                ))}
-                            </div>
-                            
-                            {/* Summary */}
-                            <div className="pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
-                                <span>
-                                    {checklist.filter((c) => c.done).length} of {checklist.length} items completed
-                                </span>
-                                {isOnboardingComplete && (
-                                    <span className="text-emerald-400 flex items-center gap-1">
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                        Site is fully configured
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
+
+                                    {/* Checklist items */}
+                                    <div className="grid gap-2 sm:grid-cols-2">
+                                        {checklist.map((item) => (
+                                            <div
+                                                key={item.key}
+                                                className={`flex items-center gap-2 text-sm ${
+                                                    item.done ? 'text-emerald-300' : 'text-slate-500'
+                                                }`}
+                                            >
+                                                <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                                                    item.done
+                                                        ? 'bg-emerald-500/20 text-emerald-400'
+                                                        : 'bg-muted text-muted-foreground'
+                                                }`}>
+                                                    {item.done ? (
+                                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    ) : (
+                                                        <Circle className="w-3.5 h-3.5" />
+                                                    )}
+                                                </div>
+                                                <span className={item.done ? '' : 'line-through opacity-60'}>
+                                                    {item.label}
+                                                </span>
+                                            </div>
+                                        ))}
+                                    </div>
+
+                                    {/* Summary + Rerun button */}
+                                    <div className="pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
+                                        <span>
+                                            {checklist.filter((c) => c.done).length} of {checklist.length} items completed
+                                        </span>
+                                        <div className="flex items-center gap-3">
+                                            {isOnboardingComplete && (
+                                                <span className="text-emerald-400 flex items-center gap-1">
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                    Site is fully configured
+                                                </span>
+                                            )}
+                                            <Button variant="outline" size="sm" asChild>
+                                                <Link href={`/sites/${site.id}/onboarding?step=1`}>
+                                                    <RotateCcw className="w-3.5 h-3.5 mr-1.5" />
+                                                    Rerun Onboarding
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </CollapsibleContent>
+                    </Card>
+                </Collapsible>
 
                 {/* Main Tabs */}
                 <Tabs defaultValue="overview" className="space-y-4">
@@ -352,6 +373,10 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             <ClipboardCheck className="w-4 h-4" />
                             Checklists
                         </TabsTrigger>
+                        <TabsTrigger value="inspections" className="flex items-center gap-1">
+                            <Settings className="w-4 h-4" />
+                            Inspections
+                        </TabsTrigger>
                         <TabsTrigger value="hazards" className="flex items-center gap-1">
                             <ShieldAlert className="w-4 h-4" />
                             Hazards
@@ -375,6 +400,22 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             {site.type === 'facility' && <LayoutGrid className="w-4 h-4" />}
                             {site.type === 'house' || site.type === 'residential' ? 'Rooms' : site.type === 'head_office' ? 'Resources' : 'Zones'}
                         </TabsTrigger>
+                        <TabsTrigger value="damages" className="flex items-center gap-1">
+                            <Hammer className="w-4 h-4" />
+                            Damages
+                        </TabsTrigger>
+                        {(site.type === 'house' || site.type === 'residential') && (
+                            <TabsTrigger value="ledger" className="flex items-center gap-1">
+                                <BookOpen className="w-4 h-4" />
+                                Ledger
+                            </TabsTrigger>
+                        )}
+                        {(site.type === 'house' || site.type === 'residential') && (
+                            <TabsTrigger value="daily-checklists" className="flex items-center gap-1">
+                                <ListChecks className="w-4 h-4" />
+                                Daily Checklists
+                            </TabsTrigger>
+                        )}
                     </TabsList>
 
                     {/* Overview Tab */}
@@ -631,6 +672,27 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                         </Card>
                     </TabsContent>
 
+                    {/* Inspections Tab */}
+                    <TabsContent value="inspections">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle>Inspections & Maintenance</CardTitle>
+                                <Button asChild>
+                                    <Link href={`/sites/${site.id}/inspections`}>View All Inspections</Link>
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-center py-8 text-slate-400">
+                                    <Settings className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                    <p>Scheduled inspections and completed records</p>
+                                    <Button asChild variant="outline" className="mt-4">
+                                        <Link href={`/sites/${site.id}/inspections`}>Manage Inspections</Link>
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
                     {/* Hazards Tab */}
                     <TabsContent value="hazards">
                         <Card>
@@ -770,6 +832,82 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                     <TabsContent value="type-specific">
                         <TypeSpecificTab site={site} data={typeSpecificData} />
                     </TabsContent>
+
+                    {/* Damages Tab */}
+                    <TabsContent value="damages">
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle className="flex items-center gap-2">
+                                    <Hammer className="w-5 h-5" />
+                                    Damage Register
+                                </CardTitle>
+                                <Button asChild>
+                                    <Link href={`/sites/${site.id}/damages`}>View All Damages</Link>
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="text-center py-8 text-slate-400">
+                                    <Hammer className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                    <p>Track property damage, repairs, and insurance claims</p>
+                                    <Button asChild variant="outline" className="mt-4">
+                                        <Link href={`/sites/${site.id}/damages`}>Manage Damages</Link>
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+
+                    {/* Ledger Tab (house/residential only) */}
+                    {(site.type === 'house' || site.type === 'residential') && (
+                        <TabsContent value="ledger">
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <CardTitle className="flex items-center gap-2">
+                                        <BookOpen className="w-5 h-5" />
+                                        House Ledger
+                                    </CardTitle>
+                                    <Button asChild>
+                                        <Link href={`/sites/${site.id}/ledger`}>View Full Ledger</Link>
+                                    </Button>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-center py-8 text-slate-400">
+                                        <BookOpen className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                        <p>Track house income, expenses, and running balance</p>
+                                        <Button asChild variant="outline" className="mt-4">
+                                            <Link href={`/sites/${site.id}/ledger`}>Open Ledger</Link>
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    )}
+
+                    {/* Daily Checklists Tab (house/residential only) */}
+                    {(site.type === 'house' || site.type === 'residential') && (
+                        <TabsContent value="daily-checklists">
+                            <Card>
+                                <CardHeader className="flex flex-row items-center justify-between">
+                                    <CardTitle className="flex items-center gap-2">
+                                        <ListChecks className="w-5 h-5" />
+                                        Daily Checklists
+                                    </CardTitle>
+                                    <Button asChild>
+                                        <Link href={`/sites/${site.id}/house-checklists`}>View All Checklists</Link>
+                                    </Button>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="text-center py-8 text-slate-400">
+                                        <ListChecks className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                                        <p>House-specific daily checklists and completion tracking</p>
+                                        <Button asChild variant="outline" className="mt-4">
+                                            <Link href={`/sites/${site.id}/house-checklists`}>Manage Checklists</Link>
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+                    )}
                 </Tabs>
             </PageShell>
         </AppLayout>

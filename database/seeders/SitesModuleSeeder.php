@@ -4,7 +4,9 @@ namespace Database\Seeders;
 
 use Illuminate\Database\Seeder;
 use App\Models\AppSetting;
+use App\Models\Site;
 use App\Models\SiteChecklistTemplate;
+use App\Models\SiteHouseRoom;
 
 class SitesModuleSeeder extends Seeder
 {
@@ -13,6 +15,7 @@ class SitesModuleSeeder extends Seeder
         $this->seedEventTypes();
         $this->seedHazardTypes();
         $this->seedChecklistTemplates();
+        $this->seedHouseRooms();
     }
 
     private function seedEventTypes(): void
@@ -94,7 +97,7 @@ class SitesModuleSeeder extends Seeder
         }
 
         // House: New Home Walkthrough
-        SiteChecklistTemplate::firstOrCreate(
+        $walkthroughTemplate = SiteChecklistTemplate::firstOrCreate(
             ['key' => 'new_home_walkthrough'],
             [
                 'name' => 'New Home Walkthrough',
@@ -103,6 +106,31 @@ class SitesModuleSeeder extends Seeder
                 'frequency' => 'once',
             ]
         );
+
+        $walkthroughItems = [
+            ['question' => 'All rooms clean and ready for occupancy', 'response_type' => 'yes_no'],
+            ['question' => 'All windows and doors lock properly', 'response_type' => 'yes_no'],
+            ['question' => 'Hot water system tested and working', 'response_type' => 'yes_no'],
+            ['question' => 'Heating/cooling systems operational', 'response_type' => 'yes_no'],
+            ['question' => 'Smoke alarms installed and tested', 'response_type' => 'yes_no'],
+            ['question' => 'Fire extinguisher present and tagged', 'response_type' => 'yes_no'],
+            ['question' => 'Emergency exits clearly marked', 'response_type' => 'yes_no'],
+            ['question' => 'Kitchen appliances clean and working', 'response_type' => 'yes_no'],
+            ['question' => 'Bathroom fixtures working (taps, toilet, shower)', 'response_type' => 'yes_no'],
+            ['question' => 'Power points and light switches functional', 'response_type' => 'yes_no'],
+            ['question' => 'Internet/phone connectivity available', 'response_type' => 'yes_no_na'],
+            ['question' => 'Outdoor areas safe (fencing, paths, lighting)', 'response_type' => 'yes_no'],
+            ['question' => 'Medication storage area secured', 'response_type' => 'yes_no'],
+            ['question' => 'Client welcome pack prepared', 'response_type' => 'yes_no'],
+            ['question' => 'Additional notes or issues found', 'response_type' => 'text'],
+        ];
+
+        foreach ($walkthroughItems as $i => $item) {
+            $walkthroughTemplate->items()->firstOrCreate(
+                ['sort_order' => $i],
+                array_merge($item, ['is_required' => true])
+            );
+        }
 
         // Facility: Safety Walkthrough
         $facilityTemplate = SiteChecklistTemplate::firstOrCreate(
@@ -141,5 +169,32 @@ class SitesModuleSeeder extends Seeder
                 'frequency' => 'monthly',
             ]
         );
+    }
+
+    private function seedHouseRooms(): void
+    {
+        $defaultRooms = [
+            'Bedroom 1', 'Bedroom 2', 'Bedroom 3',
+            'Kitchen', 'Lounge', 'Bathroom',
+            'Laundry', 'Hallway', 'Garage', 'Garden/Exterior',
+        ];
+
+        $houses = Site::whereIn('type', ['house', 'residential'])->get();
+
+        foreach ($houses as $site) {
+            if ($site->houseRooms()->count() > 0) {
+                continue;
+            }
+
+            foreach ($defaultRooms as $i => $name) {
+                SiteHouseRoom::create([
+                    'site_id' => $site->id,
+                    'tenant_id' => $site->tenant_id,
+                    'name' => $name,
+                    'is_active' => true,
+                    'sort_order' => $i,
+                ]);
+            }
+        }
     }
 }

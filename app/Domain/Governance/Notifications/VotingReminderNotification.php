@@ -28,7 +28,7 @@ class VotingReminderNotification extends Notification
             ->line('')
             ->line("**{$this->resolution->title}**")
             ->line("Reference: {$this->resolution->resolution_reference}")
-            ->line("Deadline: {$this->resolution->deadline?->format('j F Y g:i A') ?? 'No deadline'}")
+            ->line('Deadline: ' . ($this->resolution->deadline?->format('j F Y g:i A') ?? 'No deadline'))
             ->action('Cast Your Vote', url("/governance/resolutions/{$this->resolution->id}"))
             ->line('If you have any conflicts of interest, please declare them before voting.');
     }
@@ -37,6 +37,12 @@ class VotingReminderNotification extends Notification
     {
         return [
             'type' => 'voting_reminder',
+            'title' => "Voting Reminder: {$this->resolution->resolution_reference}",
+            'message' => 'A resolution requires your vote.',
+            'url' => "/governance/resolutions/{$this->resolution->id}",
+            'context' => [
+                'Reference' => $this->resolution->resolution_reference,
+            ],
             'resolution_id' => $this->resolution->id,
             'resolution_reference' => $this->resolution->resolution_reference,
         ];

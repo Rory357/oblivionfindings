@@ -151,7 +151,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                                                 <Button
                                                     variant="outline"
                                                     size="sm"
-                                                    onClick={() => router.post(`/checklists/runs/${run.id}/start`)}
+                                                    onClick={() => router.post(`/checklists/runs/${run.id}/start`, {}, { preserveScroll: true })}
                                                 >
                                                     <PlayCircle className="w-4 h-4 mr-1" />
                                                     Start

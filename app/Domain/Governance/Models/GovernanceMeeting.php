@@ -35,6 +35,10 @@ class GovernanceMeeting extends Model
         'minutes_signed_at',
         'minutes_signed_by',
         'created_by',
+        'recurring_schedule_id',
+        'rsvp_deadline',
+        'preread_deadline',
+        'ceo_report_deadline',
     ];
 
     protected $casts = [
@@ -43,6 +47,9 @@ class GovernanceMeeting extends Model
         'minutes_approved_at' => 'datetime',
         'minutes_signed_at' => 'datetime',
         'quorum_met' => 'boolean',
+        'rsvp_deadline' => 'datetime',
+        'preread_deadline' => 'datetime',
+        'ceo_report_deadline' => 'datetime',
     ];
 
     public function committee(): BelongsTo
@@ -93,6 +100,21 @@ class GovernanceMeeting extends Model
     public function conflictDeclarations(): HasMany
     {
         return $this->hasMany(ConflictDeclaration::class);
+    }
+
+    public function recurringSchedule(): BelongsTo
+    {
+        return $this->belongsTo(RecurringMeetingSchedule::class, 'recurring_schedule_id');
+    }
+
+    public function rsvps(): HasMany
+    {
+        return $this->hasMany(MeetingRsvp::class);
+    }
+
+    public function ceoReport(): HasOne
+    {
+        return $this->hasOne(CeoBoardReport::class);
     }
 
     public function scopeUpcoming($query)
@@ -194,5 +216,36 @@ class GovernanceMeeting extends Model
 
         $this->update(['status' => $newStatus]);
         return true;
+    }
+
+    public function generateMinutesSkeleton(): array
+    {
+        $blocks = [];
+        $blocks[] = ['type' => 'heading', 'content' => 'Minutes: ' . $this->title];
+        $blocks[] = ['type' => 'meta', 'content' => 'Date: ' . $this->scheduled_at?->format('d M Y H:i')];
+
+        foreach ($this->agendaItems()->orderBy('order')->get() as $item) {
+            $blocks[] = ['type' => 'agenda_heading', 'content' => $item->order . '. ' . $item->title];
+            $blocks[] = ['type' => 'discussion', 'content' => ''];
+            if ($item->item_type === 'decision') {
+                $blocks[] = ['type' => 'decision', 'content' => ''];
+            }
+            $blocks[] = ['type' => 'action', 'content' => ''];
+        }
+
+        return $blocks;
+    }
+
+    public function autoAdvanceStatus(): bool
+    {
+        return match($this->status) {
+            'scheduled' => $this->agendaItems()->count() > 0 ? $this->advanceStatus('agenda_draft') : false,
+            'agenda_draft' => false, // Manual: secretary marks agenda final
+            'agenda_final' => $this->scheduled_at?->isPast() ? $this->advanceStatus('in_progress') : false,
+            'in_progress' => $this->minutes !== null ? $this->advanceStatus('minutes_draft') : false,
+            'minutes_draft' => $this->minutes?->status === 'approved' ? $this->advanceStatus('minutes_approved') : false,
+            'minutes_approved' => $this->minutes?->status === 'signed' ? $this->advanceStatus('archived') : false,
+            default => false,
+        };
     }
 }

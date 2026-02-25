@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
@@ -201,7 +201,8 @@ export default function ClientMar() {
       administered_at: fromLocalDateTimeInput(adminForm.data.administered_at as any),
       witnessed_by: adminForm.data.witnessed_by === '__none__' ? null : adminForm.data.witnessed_by,
     };
-    adminForm.transform(() => payload).post(`/clients/${client.id}/medical/medications/${mId}/administrations`, {
+    adminForm.transform(() => payload);
+    adminForm.post(`/clients/${client.id}/medical/medications/${mId}/administrations`, {
       preserveScroll: true,
       onSuccess: () => {
         setAdminOpen(false);
@@ -227,7 +228,8 @@ export default function ClientMar() {
       ...corrForm.data,
       administered_at: fromLocalDateTimeInput(corrForm.data.administered_at as any),
     };
-    corrForm.transform(() => payload).post(`/clients/${client.id}/mar/administrations/${corrRecord.id}/corrections`, {
+    corrForm.transform(() => payload);
+    corrForm.post(`/clients/${client.id}/mar/administrations/${corrRecord.id}/corrections`, {
       preserveScroll: true,
       onSuccess: () => {
         setCorrOpen(false);

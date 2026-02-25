@@ -5,12 +5,10 @@ namespace App\Domain\Hr\Services;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrOffer;
-use App\Domain\Hr\Models\HrReferenceCheck;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Str;
 
 class RecruitmentService
 {
@@ -40,143 +38,146 @@ class RecruitmentService
     ) {}
 
     /**
-     * Create a new candidate with privacy consent recorded.
-     *
-     * @param  array  $data  Candidate attributes (first_name, last_name, personal_email, etc.)
-     * @param  int    $tenantId
-     * @param  int    $createdBy  User ID of the recruiter
-     * @return HrCandidate
+     * @throws \InvalidArgumentException
      */
-    public function createCandidate(array $data, ?int $tenantId, int $createdBy): HrCandidate
+    public function createCandidate(array $data, ?int $tenantId, ?int $createdBy = null): HrCandidate
     {
-        // TODO: Validate required fields (first_name, last_name, personal_email)
-        // TODO: Check for duplicate candidates by email within tenant
-        // TODO: Record privacy consent timestamp and IP from request
+        $firstName = trim((string) ($data['first_name'] ?? ''));
+        $lastName = trim((string) ($data['last_name'] ?? ''));
+        $email = strtolower(trim((string) ($data['personal_email'] ?? '')));
 
-        return DB::transaction(function () use ($data, $tenantId, $createdBy) {
-            $candidate = HrCandidate::create([
-                'tenant_id' => $tenantId,
-                'first_name' => $data['first_name'],
-                'last_name' => $data['last_name'],
-                'preferred_name' => $data['preferred_name'] ?? null,
-                'personal_email' => $data['personal_email'],
-                'personal_phone' => $data['personal_phone'] ?? null,
-                'source' => $data['source'] ?? 'direct',
-                'source_detail' => $data['source_detail'] ?? null,
-                'status' => 'new',
-                'current_stage_entered_at' => now(),
-                'privacy_consent_given_at' => $data['privacy_consent_given_at'] ?? now(),
-                'privacy_consent_ip' => $data['privacy_consent_ip'] ?? request()?->ip(),
-                'tags' => $data['tags'] ?? [],
-                'created_by' => $createdBy,
-            ]);
+        if ($firstName === '' || $lastName === '' || $email === '') {
+            throw new \InvalidArgumentException('First name, last name, and personal email are required.');
+        }
 
-            // TODO: Create initial HrApplication if position details are provided in $data
-            // TODO: Fire CandidateCreated event for notification listeners
-            // TODO: Log audit trail entry
+        $duplicate = HrCandidate::query()
+            ->where('tenant_id', $tenantId)
+            ->where('personal_email', $email)
+            ->whereNotIn('status', ['withdrawn', 'rejected'])
+            ->exists();
 
-            return $candidate;
-        });
+        if ($duplicate) {
+            throw new \InvalidArgumentException('A candidate with this email already exists in the active pipeline.');
+        }
+
+        return HrCandidate::create([
+            'tenant_id' => $tenantId,
+            'first_name' => $firstName,
+            'last_name' => $lastName,
+            'preferred_name' => $data['preferred_name'] ?? null,
+            'personal_email' => $email,
+            'personal_phone' => $data['personal_phone'] ?? null,
+            'source' => $data['source'] ?? 'direct',
+            'source_detail' => $data['source_detail'] ?? null,
+            'status' => 'new',
+            'current_stage_entered_at' => now(),
+            'privacy_consent_given_at' => $data['privacy_consent_given_at'] ?? now(),
+            'privacy_consent_ip' => $data['privacy_consent_ip'] ?? request()?->ip(),
+            'notes' => $data['notes'] ?? null,
+            'tags' => $data['tags'] ?? [],
+            'created_by' => $createdBy,
+        ])->fresh();
     }
 
     /**
-     * Create an application for an existing candidate.
-     *
-     * @param  HrCandidate  $candidate
-     * @param  array        $data  Application attributes (position_title, position_role, target_site_id, etc.)
-     * @return HrApplication
+     * @throws \LogicException
+     * @throws \InvalidArgumentException
      */
     public function createApplication(HrCandidate $candidate, array $data): HrApplication
     {
-        // TODO: Validate that candidate is not in a terminal status
-        // TODO: Check for duplicate active applications for the same position
-        // TODO: Handle CV file upload and store path
+        if (in_array($candidate->status, self::TERMINAL, true)) {
+            throw new \LogicException("Cannot create an application for candidate in '{$candidate->status}' status.");
+        }
+
+        $positionTitle = trim((string) ($data['position_title'] ?? ''));
+        if ($positionTitle === '') {
+            throw new \InvalidArgumentException('Position title is required for applications.');
+        }
+
+        $duplicate = HrApplication::query()
+            ->where('candidate_id', $candidate->id)
+            ->where('position_title', $positionTitle)
+            ->where('target_site_id', $data['target_site_id'] ?? null)
+            ->whereNotIn('status', ['rejected', 'withdrawn', 'hired'])
+            ->exists();
+
+        if ($duplicate) {
+            throw new \InvalidArgumentException('An active application already exists for this position.');
+        }
 
         return HrApplication::create([
             'tenant_id' => $candidate->tenant_id,
             'candidate_id' => $candidate->id,
-            'position_title' => $data['position_title'],
-            'position_role' => $data['position_role'] ?? null,
+            'requisition_id' => $data['requisition_id'] ?? null,
+            'interview_kit_id' => $data['interview_kit_id'] ?? null,
+            'position_title' => $positionTitle,
+            'position_role' => $data['position_role'] ?? 'support_worker',
             'target_site_id' => $data['target_site_id'] ?? null,
             'cv_storage_path' => $data['cv_storage_path'] ?? null,
             'cv_original_name' => $data['cv_original_name'] ?? null,
             'cover_letter' => $data['cover_letter'] ?? null,
             'answers' => $data['answers'] ?? null,
-            'status' => 'new',
+            'status' => 'active',
         ]);
     }
 
     /**
-     * Advance candidate to the next recruitment stage.
-     *
-     * Enforces ordered stage progression via STAGES constant.
-     * Prevents advancement from terminal statuses.
-     *
-     * @param  HrCandidate  $candidate
-     * @param  string|null  $targetStage  Explicit stage to advance to (must be after current). If null, advances to next sequential stage.
-     * @param  int          $advancedBy   User ID performing the advancement
-     * @return HrCandidate
-     *
-     * @throws \InvalidArgumentException If target stage is invalid or behind current stage
-     * @throws \LogicException           If candidate is in a terminal status
+     * @throws \InvalidArgumentException
+     * @throws \LogicException
      */
     public function advanceStage(HrCandidate $candidate, ?string $targetStage, int $advancedBy): HrCandidate
     {
-        // TODO: Verify candidate is not in a terminal status (withdrawn/rejected/hired)
-        // TODO: If targetStage is null, determine next sequential stage from STAGES
-        // TODO: Validate that targetStage is ahead of current stage in the pipeline
-        // TODO: Check stage-specific prerequisites:
-        //       - 'interview_completed' requires at least one completed interview record
-        //       - 'reference_check' requires at least one reference check initiated
-        //       - 'offer_pending' requires all reference checks completed
-        //       - 'offer_sent' requires an approved HrOffer record
-        //       - 'offer_accepted' requires offer response = 'accepted'
-        // TODO: Update candidate status and current_stage_entered_at
-        // TODO: Update associated application status to match
-        // TODO: Fire StageAdvanced event for notification listeners
-        // TODO: Log audit trail entry with old -> new stage transition
-
-        $currentIndex = array_search($candidate->status, self::STAGES);
-        $targetIndex = $targetStage
-            ? array_search($targetStage, self::STAGES)
-            : ($currentIndex !== false ? $currentIndex + 1 : false);
-
-        if ($targetIndex === false || $targetIndex <= $currentIndex) {
-            throw new \InvalidArgumentException(
-                "Cannot advance from '{$candidate->status}' to '{$targetStage}'."
-            );
-        }
-
         if (in_array($candidate->status, self::TERMINAL, true)) {
-            throw new \LogicException(
-                "Cannot advance candidate in terminal status '{$candidate->status}'."
-            );
+            throw new \LogicException("Cannot advance candidate in terminal status '{$candidate->status}'.");
         }
 
-        $candidate->update([
-            'status' => self::STAGES[$targetIndex],
-            'current_stage_entered_at' => now(),
-            'updated_by' => $advancedBy,
-        ]);
+        $currentIndex = array_search($candidate->status, self::STAGES, true);
+        if ($currentIndex === false) {
+            throw new \InvalidArgumentException("Unknown current stage '{$candidate->status}'.");
+        }
 
-        return $candidate->fresh();
+        $resolvedTarget = $targetStage ?? (self::STAGES[$currentIndex + 1] ?? null);
+        $targetIndex = array_search($resolvedTarget, self::STAGES, true);
+
+        if ($resolvedTarget === null || $targetIndex === false) {
+            throw new \InvalidArgumentException('Target stage is invalid.');
+        }
+
+        if ($targetIndex <= $currentIndex) {
+            throw new \InvalidArgumentException("Cannot move candidate backward from '{$candidate->status}' to '{$resolvedTarget}'.");
+        }
+
+        $this->assertStagePrerequisites($candidate, $resolvedTarget);
+
+        return DB::transaction(function () use ($candidate, $resolvedTarget, $advancedBy) {
+            $candidate->update([
+                'status' => $resolvedTarget,
+                'current_stage_entered_at' => now(),
+                'updated_by' => $advancedBy,
+            ]);
+
+            $applicationStatus = match ($resolvedTarget) {
+                'offer_sent', 'offer_accepted' => 'offered',
+                'hired' => 'hired',
+                default => 'active',
+            };
+
+            $candidate->applications()
+                ->whereNotIn('status', ['rejected', 'withdrawn', 'hired'])
+                ->update(['status' => $applicationStatus]);
+
+            return $candidate->fresh();
+        });
     }
 
     /**
-     * Reject a candidate with a reason.
-     *
-     * @param  HrCandidate  $candidate
-     * @param  string       $reason
-     * @param  int          $rejectedBy  User ID
-     * @return HrCandidate
+     * @throws \LogicException
      */
     public function rejectCandidate(HrCandidate $candidate, string $reason, int $rejectedBy): HrCandidate
     {
-        // TODO: Validate candidate is not already in a terminal status
-        // TODO: Update all active applications to 'rejected' with rejection_reason
-        // TODO: Fire CandidateRejected event for notification (e.g. email to candidate)
-        // TODO: Log audit trail entry
-        // TODO: Schedule GDPR/privacy data retention reminder
+        if (in_array($candidate->status, self::TERMINAL, true)) {
+            throw new \LogicException("Candidate already in terminal status '{$candidate->status}'.");
+        }
 
         $candidate->update([
             'status' => 'rejected',
@@ -195,79 +196,71 @@ class RecruitmentService
     }
 
     /**
-     * Convert an accepted candidate into an employee (User + HrEmployeeProfile).
-     *
-     * Creates a User account, employee profile, and triggers onboarding checklist
-     * generation. Links back to the candidate and offer records.
-     *
-     * @param  HrCandidate  $candidate
-     * @param  HrOffer      $offer
-     * @param  int          $convertedBy  User ID performing the conversion
-     * @return HrEmployeeProfile
-     *
-     * @throws \LogicException If candidate status is not 'offer_accepted' or offer is not accepted
+     * @throws \LogicException
      */
     public function convertToEmployee(HrCandidate $candidate, HrOffer $offer, int $convertedBy): HrEmployeeProfile
     {
-        // TODO: Validate candidate is at 'offer_accepted' stage
-        // TODO: Validate offer response is 'accepted'
-        // TODO: Create User account with appropriate role (from offer position_role)
-        // TODO: Provision work email if not already done on the offer
-        // TODO: Create HrEmployeeProfile linked to user, candidate, and offer
-        // TODO: Copy relevant fields from offer (position_title, hours_per_week, hourly_rate, etc.)
-        // TODO: Generate onboarding checklist via OnboardingService
-        // TODO: Advance candidate to 'hired' terminal status
-        // TODO: Fire EmployeeCreated event
-        // TODO: Log audit trail entry
+        if (! in_array($candidate->status, ['offer_accepted', 'onboarding'], true)) {
+            throw new \LogicException('Candidate must be in offer_accepted/onboarding stage before conversion.');
+        }
+
+        if ($offer->response !== 'accepted') {
+            throw new \LogicException('Offer response must be accepted before conversion.');
+        }
 
         return DB::transaction(function () use ($candidate, $offer, $convertedBy) {
-            $user = User::create([
-                'tenant_id' => $candidate->tenant_id,
-                'name' => $candidate->full_name,
-                'email' => $offer->work_email ?? $candidate->personal_email,
-                'password' => bcrypt(str()->random(32)),
-            ]);
+            $workEmail = $offer->work_email ?: $candidate->personal_email;
+            $user = User::query()->firstOrCreate(
+                ['email' => $workEmail],
+                [
+                    'name' => $candidate->full_name,
+                    'role' => $offer->position_role ?: 'support_worker',
+                    'password' => bcrypt(Str::random(40)),
+                    'approved_at' => now(),
+                    'approved_by' => $convertedBy,
+                ]
+            );
 
-            $profile = HrEmployeeProfile::create([
-                'tenant_id' => $candidate->tenant_id,
-                'user_id' => $user->id,
-                'position_title' => $offer->position_title,
-                'position_role' => $offer->position_role,
-                'employment_type' => $offer->employment_type,
-                'hours_per_week' => $offer->hours_per_week,
-                'hourly_rate' => $offer->hourly_rate,
-                'annual_salary' => $offer->annual_salary,
-                'primary_site_id' => $offer->primary_site_id,
-                'start_date' => $offer->proposed_start_date,
-                'personal_email' => $candidate->personal_email,
-                'personal_phone' => $candidate->personal_phone,
-                'is_active' => true,
-                'offer_id' => $offer->id,
-                'candidate_id' => $candidate->id,
-                'created_by' => $convertedBy,
-            ]);
+            $profile = HrEmployeeProfile::query()->updateOrCreate(
+                ['user_id' => $user->id],
+                [
+                    'tenant_id' => $candidate->tenant_id,
+                    'employee_number' => $this->generateEmployeeNumber(),
+                    'position_title' => $offer->position_title,
+                    'position_role' => $offer->position_role ?: 'support_worker',
+                    'employment_type' => $offer->employment_type,
+                    'hours_per_week' => $offer->hours_per_week,
+                    'hourly_rate' => $offer->hourly_rate,
+                    'annual_salary' => $offer->annual_salary,
+                    'primary_site_id' => $offer->primary_site_id,
+                    'start_date' => $offer->proposed_start_date,
+                    'personal_email' => $candidate->personal_email,
+                    'personal_phone' => $candidate->personal_phone,
+                    'work_email' => $workEmail,
+                    'is_active' => true,
+                    'offer_id' => $offer->id,
+                    'candidate_id' => $candidate->id,
+                    'created_by' => $convertedBy,
+                    'updated_by' => $convertedBy,
+                ]
+            );
 
             $this->advanceStage($candidate, 'hired', $convertedBy);
+            $offer->application()->update(['status' => 'hired']);
 
             $this->onboardingService->generateChecklist($profile, $convertedBy);
 
-            return $profile;
+            return $profile->fresh();
         });
     }
 
     /**
-     * Get pipeline summary counts for a tenant.
-     *
-     * @param  int  $tenantId
-     * @return array<string, int>  Stage => count mapping
+     * @return array<string, int>
      */
     public function getPipelineSummary(?int $tenantId): array
     {
-        // TODO: Query candidates grouped by status for the tenant
-        // TODO: Include terminal statuses in a separate section
-        // TODO: Optionally filter by date range for active pipeline vs. historical
-
-        $counts = HrCandidate::where('tenant_id', $tenantId)
+        $counts = HrCandidate::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status')
@@ -275,12 +268,83 @@ class RecruitmentService
 
         $summary = [];
         foreach (self::STAGES as $stage) {
-            $summary[$stage] = $counts[$stage] ?? 0;
+            $summary[$stage] = (int) ($counts[$stage] ?? 0);
         }
         foreach (self::TERMINAL as $status) {
-            $summary[$status] = $counts[$status] ?? 0;
+            $summary[$status] = (int) ($counts[$status] ?? 0);
         }
 
         return $summary;
+    }
+
+    /**
+     * @throws \LogicException
+     */
+    protected function assertStagePrerequisites(HrCandidate $candidate, string $targetStage): void
+    {
+        $application = $candidate->applications()->with(['interviews', 'referenceChecks', 'offer'])->latest('id')->first();
+
+        if (! $application && ! in_array($targetStage, ['screening'], true)) {
+            throw new \LogicException('Candidate has no application record for stage advancement.');
+        }
+
+        match ($targetStage) {
+            'interview_completed' => $this->assertCompletedInterview($application),
+            'reference_check' => $this->assertReferenceRequested($application),
+            'offer_pending' => $this->assertReferencesComplete($application),
+            'offer_sent' => $this->assertOfferApproved($application),
+            'offer_accepted', 'onboarding', 'hired' => $this->assertOfferAccepted($application),
+            default => null,
+        };
+    }
+
+    protected function assertCompletedInterview(?HrApplication $application): void
+    {
+        $hasCompletedInterview = $application?->interviews
+            ->where('status', 'completed')
+            ->isNotEmpty();
+
+        if (! $hasCompletedInterview) {
+            throw new \LogicException('At least one completed interview is required.');
+        }
+    }
+
+    protected function assertReferenceRequested(?HrApplication $application): void
+    {
+        if ($application?->referenceChecks?->isEmpty() ?? true) {
+            throw new \LogicException('At least one reference check must be requested.');
+        }
+    }
+
+    protected function assertReferencesComplete(?HrApplication $application): void
+    {
+        $references = $application?->referenceChecks ?? collect();
+        if ($references->isEmpty() || $references->where('status', '!=', 'completed')->isNotEmpty()) {
+            throw new \LogicException('All reference checks must be completed before offer stage.');
+        }
+    }
+
+    protected function assertOfferApproved(?HrApplication $application): void
+    {
+        $offer = $application?->offer;
+        if (! $offer || $offer->approval_status !== 'approved') {
+            throw new \LogicException('An approved offer is required before offer_sent stage.');
+        }
+    }
+
+    protected function assertOfferAccepted(?HrApplication $application): void
+    {
+        $offer = $application?->offer;
+        if (! $offer || $offer->response !== 'accepted') {
+            throw new \LogicException('Offer must be accepted before this stage.');
+        }
+    }
+
+    protected function generateEmployeeNumber(): string
+    {
+        $prefix = (string) config('hr.employee_number_prefix', 'EMP');
+        $latestId = (int) (HrEmployeeProfile::query()->max('id') ?? 0) + 1;
+
+        return $prefix . str_pad((string) $latestId, 5, '0', STR_PAD_LEFT);
     }
 }

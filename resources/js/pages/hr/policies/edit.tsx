@@ -88,15 +88,7 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
     const handleVersionSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        const formData = new FormData();
-        formData.append('content_summary', versionData.content_summary);
-        formData.append('effective_from', versionData.effective_from);
-        if (versionData.document) {
-            formData.append('document', versionData.document);
-        }
-
         postVersion(`/hr/policies/${policy.id}/versions`, {
-            data: formData,
             forceFormData: true,
             onSuccess: () => {
                 setShowNewVersionForm(false);
@@ -144,8 +136,6 @@ export default function EditPolicy({ policy, existingCategories, defaultCategori
         { title: policy.title, href: `/hr/policies/${policy.id}` },
         { title: 'Edit', href: `/hr/policies/${policy.id}/edit` },
     ];
-
-    const currentVersion = policy.versions.find(v => v.is_current);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>

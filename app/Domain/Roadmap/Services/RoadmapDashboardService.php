@@ -2,6 +2,7 @@
 
 namespace App\Domain\Roadmap\Services;
 
+use App\Domain\Governance\Models\Budget;
 use App\Domain\Roadmap\Models\DecisionRequest;
 use App\Domain\Roadmap\Models\Initiative;
 use App\Domain\Roadmap\Models\QuarterlyRoadmapPlan;
@@ -51,6 +52,8 @@ class RoadmapDashboardService
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->count();
 
+        $governanceBudget = $this->getGovernanceBudget();
+
         return [
             'published_plan' => $latestPlan ? [
                 'id' => $latestPlan->id,
@@ -82,6 +85,7 @@ class RoadmapDashboardService
             'budget' => [
                 'forecast_total' => round((float) $totalBudget, 2),
             ],
+            'governance_budget' => $governanceBudget,
             'assurance' => [
                 'overdue' => $initiatives->sum(function (Initiative $initiative) {
                     return $initiative->assurancePlans
@@ -134,6 +138,41 @@ class RoadmapDashboardService
         ];
     }
 
+    protected function getGovernanceBudget(): ?array
+    {
+        if (! Schema::hasTable('budgets')) {
+            return null;
+        }
+
+        $budget = Budget::approved()
+            ->latest('approved_by_board_at')
+            ->with('approvalResolution:id,resolution_reference,title')
+            ->first();
+
+        if (! $budget) {
+            return null;
+        }
+
+        $budget->loadMissing('lineItems');
+
+        return [
+            'id' => $budget->id,
+            'fiscal_year' => $budget->fiscal_year,
+            'title' => $budget->title,
+            'total_budget' => round((float) $budget->total_budget, 2),
+            'total_allocated' => round($budget->getTotalAllocated(), 2),
+            'total_actual' => round($budget->getTotalActual(), 2),
+            'variance_pct' => round($budget->getVariancePercentage(), 1),
+            'remaining' => round($budget->getRemainingBudget(), 2),
+            'approved_at' => $budget->approved_by_board_at?->toDateString(),
+            'resolution' => $budget->approvalResolution ? [
+                'id' => $budget->approvalResolution->id,
+                'reference' => $budget->approvalResolution->resolution_reference,
+                'title' => $budget->approvalResolution->title,
+            ] : null,
+        ];
+    }
+
     protected function schemaReady(): bool
     {
         return Schema::hasTable('roadmap_quarterly_plans')
@@ -157,6 +196,7 @@ class RoadmapDashboardService
             'budget' => [
                 'forecast_total' => 0.0,
             ],
+            'governance_budget' => $this->getGovernanceBudget(),
             'assurance' => [
                 'overdue' => 0,
                 'verified' => 0,

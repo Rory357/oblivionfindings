@@ -373,6 +373,10 @@ class SiteController extends Controller
             ->orderBy('name')
             ->get();
 
+        $documents = \App\Models\SiteDocument::where('site_id', $site->id)
+            ->orderByDesc('created_at')
+            ->get(['id', 'title', 'category', 'expiry_date', 'notes', 'original_name', 'size_bytes']);
+
         return inertia('sites/edit', [
             'site' => [
                 'id' => $site->id,
@@ -404,6 +408,7 @@ class SiteController extends Controller
                 'primary_contact_user_id' => $site->primary_contact_user_id,
             ],
             'users' => $users,
+            'documents' => $documents,
         ]);
     }
 

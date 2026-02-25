@@ -31,12 +31,17 @@ class ActionItem extends Model
         'escalation_reason',
         'priority',
         'created_by',
+        'progress_pct',
+        'progress_notes',
+        'blocked_at',
+        'blocked_reason',
     ];
 
     protected $casts = [
         'due_date' => 'date',
         'completed_at' => 'datetime',
         'escalated_at' => 'datetime',
+        'blocked_at' => 'datetime',
         'evidence_attachments' => 'array',
         'evidence_required' => 'boolean',
     ];
@@ -87,7 +92,12 @@ class ActionItem extends Model
 
     public function scopeOpen($query)
     {
-        return $query->whereIn('status', ['open', 'in_progress']);
+        return $query->whereIn('status', ['open', 'in_progress', 'blocked']);
+    }
+
+    public function scopeBlocked($query)
+    {
+        return $query->where('status', 'blocked');
     }
 
     public function scopeOverdue($query)
@@ -119,6 +129,36 @@ class ActionItem extends Model
     public function daysUntilDue(): int
     {
         return now()->diffInDays($this->due_date, false);
+    }
+
+    public function updateProgress(int $pct, ?string $notes = null): void
+    {
+        $this->update([
+            'progress_pct' => $pct,
+            'progress_notes' => $notes,
+        ]);
+
+        if ($pct >= 100) {
+            $this->markComplete(auth()->id());
+        }
+    }
+
+    public function block(string $reason): void
+    {
+        $this->update([
+            'blocked_at' => now(),
+            'blocked_reason' => $reason,
+            'status' => 'blocked',
+        ]);
+    }
+
+    public function unblock(): void
+    {
+        $this->update([
+            'blocked_at' => null,
+            'blocked_reason' => null,
+            'status' => 'in_progress',
+        ]);
     }
 
     public function markComplete(int $userId, ?string $notes = null): void

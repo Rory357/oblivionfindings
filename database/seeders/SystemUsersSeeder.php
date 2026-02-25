@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
 use App\Models\Staff;
 use App\Models\User;
@@ -10,6 +11,8 @@ use Illuminate\Support\Facades\Hash;
 
 class SystemUsersSeeder extends Seeder
 {
+    private const DEFAULT_TENANT_ID = 1;
+
     public function run(): void
     {
         $password = Hash::make('password');
@@ -72,7 +75,7 @@ class SystemUsersSeeder extends Seeder
 
             // Create staff record for staff users
             if (!empty($u['staff_data'])) {
-                Staff::updateOrCreate(
+                $staff = Staff::updateOrCreate(
                     ['user_id' => $user->id],
                     [
                         'employee_id' => strtoupper(substr($u['role'], 0, 3)) . str_pad($user->id, 3, '0', STR_PAD_LEFT),
@@ -82,6 +85,8 @@ class SystemUsersSeeder extends Seeder
                         'hire_date' => now()->subYears(rand(1, 5)),
                     ]
                 );
+
+                $this->upsertHrEmployeeProfile($user, $staff);
             }
         }
 
@@ -104,7 +109,7 @@ class SystemUsersSeeder extends Seeder
                 }
 
                 // Create staff record for support worker
-                Staff::create([
+                $staff = Staff::create([
                     'user_id' => $w->id,
                     'employee_id' => 'SW' . str_pad($i, 3, '0', STR_PAD_LEFT),
                     'job_title' => 'Support Worker',
@@ -112,8 +117,23 @@ class SystemUsersSeeder extends Seeder
                     'status' => 'active',
                     'hire_date' => now()->subMonths(rand(1, 24)),
                 ]);
+
+                $this->upsertHrEmployeeProfile($w, $staff);
+            }
+        } else {
+            foreach ($workers as $worker) {
+                $staff = Staff::query()->where('user_id', $worker->id)->first();
+                $this->upsertHrEmployeeProfile($worker, $staff);
             }
         }
+
+        // Ensure every staff user has an HR profile, even if the legacy staff
+        // record is missing or incomplete.
+        User::staff()->with('staffProfile')->get()->each(function (User $staffUser): void {
+            /** @var Staff|null $staff */
+            $staff = $staffUser->staffProfile;
+            $this->upsertHrEmployeeProfile($staffUser, $staff);
+        });
 
         // Create a board member
         $boardUser = User::updateOrCreate(
@@ -131,6 +151,44 @@ class SystemUsersSeeder extends Seeder
             $boardUser->roles()->syncWithoutDetaching([$boardRole->id]);
         }
 
-        $this->command->info('Created ' . (count($users) + 8 + 1) . ' users with staff records.');
+        $this->command?->info('Created ' . (count($users) + 8 + 1) . ' users with staff records.');
+    }
+
+    private function upsertHrEmployeeProfile(User $user, ?Staff $staff): void
+    {
+        $employeeNumber = trim((string) (($staff?->employee_id) ?: 'EMP' . str_pad((string) $user->id, 4, '0', STR_PAD_LEFT)));
+        $positionTitle = trim((string) (($staff?->job_title) ?: $this->defaultJobTitleForRole($user->role)));
+        $positionRole = trim((string) ($user->role ?: 'support_worker'));
+        $startDate = $staff?->hire_date ? $staff->hire_date->toDateString() : now()->subMonths(6)->toDateString();
+
+        HrEmployeeProfile::updateOrCreate(
+            ['user_id' => $user->id],
+            [
+                'tenant_id' => self::DEFAULT_TENANT_ID,
+                'employee_number' => $employeeNumber,
+                'work_email' => $user->email,
+                'position_title' => $positionTitle,
+                'position_role' => $positionRole,
+                'employment_type' => 'full_time',
+                'contract_type' => 'permanent',
+                'start_date' => $startDate,
+                'is_active' => ($staff?->status ?? 'active') !== 'terminated',
+                'updated_by' => $user->id,
+                'created_by' => $user->id,
+            ]
+        );
+    }
+
+    private function defaultJobTitleForRole(?string $role): string
+    {
+        return match ($role) {
+            'admin' => 'System Administrator',
+            'provider_manager' => 'Provider Manager',
+            'coordinator' => 'Care Coordinator',
+            'finance' => 'Finance Officer',
+            'hr' => 'HR Manager',
+            'auditor' => 'Internal Auditor',
+            default => 'Support Worker',
+        };
     }
 }

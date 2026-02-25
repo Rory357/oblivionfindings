@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -33,7 +33,7 @@ type Schedule = {
     is_active: boolean;
 };
 
-type Record = {
+type InspectionRecord = {
     id: number;
     due_date: string;
     completed_at?: string;
@@ -46,7 +46,7 @@ type Props = {
     site: Site;
     schedules: Schedule[];
     records: {
-        data: Record[];
+        data: InspectionRecord[];
     };
 };
 

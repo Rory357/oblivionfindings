@@ -3,6 +3,10 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrEngagementActionPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Models\User;
@@ -11,6 +15,8 @@ use Inertia\Inertia;
 
 class SupervisionController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * Supervision & performance overview.
      */
@@ -19,11 +25,14 @@ class SupervisionController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.view'), 403);
 
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $search = trim((string) $request->query('q', ''));
         $staffId = $request->query('staff_id');
 
         // Paginated supervision notes
-        $notes = HrSupervisionNote::with(['employee:id,name', 'supervisor:id,name'])
+        $notes = HrSupervisionNote::query()
+            ->forTenant($tenantId)
+            ->with(['employee:id,name', 'supervisor:id,name'])
             ->when($staffId, fn ($q) => $q->where('employee_user_id', $staffId))
             ->when($search !== '', fn ($q) => $q->where(function ($q2) use ($search) {
                 $q2->where('topics_discussed', 'like', "%{$search}%")
@@ -44,7 +53,10 @@ class SupervisionController extends Controller
         ]);
 
         // Upcoming / overdue reviews
-        $upcomingReviews = HrPerformanceReview::whereIn('status', ['draft', 'scheduled', 'in_progress'])
+        $upcomingReviews = HrPerformanceReview::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', ['draft', 'scheduled', 'in_progress'])
+            ->when($staffId, fn ($query) => $query->where('employee_user_id', (int) $staffId))
             ->with(['employee:id,name', 'reviewer:id,name'])
             ->orderBy('next_review_date')
             ->limit(10)
@@ -58,8 +70,11 @@ class SupervisionController extends Controller
             ]);
 
         // Recent notes this month for summary card
-        $recentNotes = HrSupervisionNote::with(['employee:id,name', 'supervisor:id,name'])
+        $recentNotes = HrSupervisionNote::query()
+            ->forTenant($tenantId)
+            ->with(['employee:id,name', 'supervisor:id,name'])
             ->where('session_date', '>=', now()->startOfMonth())
+            ->when($staffId, fn ($query) => $query->where('employee_user_id', (int) $staffId))
             ->orderByDesc('session_date')
             ->limit(50)
             ->get()
@@ -71,10 +86,85 @@ class SupervisionController extends Controller
                 'summary' => $note->topics_discussed ? str($note->topics_discussed)->limit(120)->toString() : '',
             ]);
 
+        $oneToOneDueRows = HrSupervisionNote::query()
+            ->forTenant($tenantId)
+            ->whereNotNull('next_session_date')
+            ->when($staffId, fn ($query) => $query->where('employee_user_id', (int) $staffId))
+            ->with(['employee:id,name', 'supervisor:id,name'])
+            ->orderBy('next_session_date')
+            ->limit(15)
+            ->get();
+
+        $oneToOneDueSoon = $oneToOneDueRows
+            ->filter(fn (HrSupervisionNote $note) => $note->next_session_date?->between(now()->startOfDay(), now()->addDays(7)->endOfDay()))
+            ->values();
+        $oneToOneOverdue = $oneToOneDueRows
+            ->filter(fn (HrSupervisionNote $note) => $note->next_session_date?->isBefore(now()->startOfDay()))
+            ->values();
+
+        $competencyGaps = HrDevelopmentGoal::query()
+            ->where('tenant_id', $tenantId)
+            ->whereNotIn('status', ['completed', 'cancelled'])
+            ->whereNotNull('target_level')
+            ->whereNotNull('current_level')
+            ->whereRaw('target_level > current_level')
+            ->when($staffId, fn ($query) => $query->where('employee_user_id', (int) $staffId))
+            ->with('employee:id,name')
+            ->orderByRaw('(target_level - current_level) DESC')
+            ->limit(10)
+            ->get()
+            ->map(fn (HrDevelopmentGoal $goal) => [
+                'id' => $goal->id,
+                'title' => $goal->title,
+                'employee_name' => $goal->employee?->name ?? 'Unknown',
+                'competency_area' => $goal->competency_area,
+                'current_level' => $goal->current_level,
+                'target_level' => $goal->target_level,
+                'gap' => (int) $goal->target_level - (int) $goal->current_level,
+                'status' => $goal->status,
+                'due_date' => optional($goal->due_date)->toDateString(),
+            ])
+            ->values();
+
+        $engagementOpen = HrEngagementActionPlan::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', ['open', 'in_progress'])
+            ->when($staffId, fn ($query) => $query->where('owner_user_id', (int) $staffId))
+            ->get();
+
+        $engagementActionPlanSla = [
+            'open_total' => $engagementOpen->count(),
+            'overdue' => $engagementOpen->filter(fn (HrEngagementActionPlan $plan) => $plan->due_date && $plan->due_date->isBefore(now()->startOfDay()))->count(),
+            'due_next_7_days' => $engagementOpen->filter(fn (HrEngagementActionPlan $plan) => $plan->due_date
+                && $plan->due_date->isBetween(now()->startOfDay(), now()->addDays(7)->endOfDay()))->count(),
+        ];
+
+        $staffQuery = User::query()->staff();
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
+        $staffQuery->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds));
+
+        $staff = $staffQuery
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return Inertia::render('hr/performance/index', [
             'supervisionNotes' => $notes,
             'upcomingReviews' => $upcomingReviews,
             'recentNotes' => $recentNotes,
+            'staff' => $staff,
+            'oneToOneSla' => [
+                'due_soon_count' => $oneToOneDueSoon->count(),
+                'overdue_count' => $oneToOneOverdue->count(),
+                'due_rows' => $oneToOneDueRows->map(fn (HrSupervisionNote $note) => [
+                    'id' => $note->id,
+                    'employee_name' => $note->employee?->name ?? 'Unknown',
+                    'supervisor_name' => $note->supervisor?->name ?? 'Unknown',
+                    'next_session_date' => optional($note->next_session_date)->toDateString(),
+                    'is_overdue' => $note->next_session_date?->isBefore(now()->startOfDay()) ?? false,
+                ])->values(),
+            ],
+            'competencyGaps' => $competencyGaps,
+            'engagementActionPlanSla' => $engagementActionPlanSla,
             'filters' => [
                 'q' => $search,
                 'staff_id' => $staffId,
@@ -92,8 +182,11 @@ class SupervisionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
         $staff = User::staff()
+            ->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds))
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
@@ -117,6 +210,8 @@ class SupervisionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $note->tenant_id);
 
         $note->load(['employee:id,name', 'supervisor:id,name']);
 
@@ -135,6 +230,7 @@ class SupervisionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'employee_user_id' => ['required', 'integer', 'exists:users,id'],
@@ -148,8 +244,15 @@ class SupervisionController extends Controller
             'is_visible_to_employee' => ['boolean'],
         ]);
 
+        $employeeTenantId = HrEmployeeProfile::query()
+            ->where('user_id', (int) $data['employee_user_id'])
+            ->value('tenant_id');
+        if (is_numeric($employeeTenantId) && (int) $employeeTenantId !== $tenantId) {
+            abort(404);
+        }
+
         HrSupervisionNote::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'supervisor_user_id' => $user->id,
             'created_by' => $user->id,
             ...$data,
@@ -165,10 +268,14 @@ class SupervisionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $note->tenant_id);
 
         $note->load(['employee:id,name', 'supervisor:id,name']);
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
         $staff = User::staff()
+            ->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds))
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
@@ -193,6 +300,8 @@ class SupervisionController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $note->tenant_id);
 
         $data = $request->validate([
             'session_date' => ['sometimes', 'date'],

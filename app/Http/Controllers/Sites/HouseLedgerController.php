@@ -1,0 +1,141 @@
+<?php
+
+namespace App\Http\Controllers\Sites;
+
+use App\Http\Controllers\Controller;
+use App\Models\HouseLedgerEntry;
+use App\Models\Site;
+use App\Services\Sites\HouseLedgerService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
+use Inertia\Inertia;
+
+class HouseLedgerController extends Controller
+{
+    public function __construct(private HouseLedgerService $ledgerService) {}
+
+    public function index(Request $request, Site $site)
+    {
+        // Guard: house/residential only
+        if (!in_array($site->type, ['house', 'residential'])) {
+            abort(404, 'Ledger is only available for house/residential sites.');
+        }
+
+        $user = $request->user();
+        // Permission check
+        if (!$user->canDo('sites.ledger.view')) {
+            abort(403);
+        }
+
+        $ledger = $this->ledgerService->getOrCreateLedger($site);
+
+        $entries = $ledger->entries()
+            ->with(['recordedBy:id,name', 'approvedBy:id,name'])
+            ->orderByDesc('entry_date')
+            ->orderByDesc('id')
+            ->paginate(50);
+
+        return Inertia::render('sites/ledger/index', [
+            'site' => $site,
+            'ledger' => $ledger,
+            'entries' => $entries,
+            'canCreate' => $user->canDo('sites.ledger.create'),
+            'canManage' => $user->canDo('sites.ledger.manage'),
+        ]);
+    }
+
+    public function store(Request $request, Site $site)
+    {
+        if (!in_array($site->type, ['house', 'residential'])) {
+            abort(404);
+        }
+
+        if (!$request->user()->canDo('sites.ledger.create')) {
+            abort(403);
+        }
+
+        $data = $request->validate([
+            'entry_type' => ['required', 'string', 'in:income,expense,adjustment,transfer'],
+            'category' => ['required', 'string', 'max:50'],
+            'description' => ['required', 'string', 'max:255'],
+            'reference' => ['nullable', 'string', 'max:255'],
+            'amount' => ['required', 'numeric', 'min:0.01'],
+            'entry_date' => ['required', 'date'],
+            'notes' => ['nullable', 'string'],
+            'attachment' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpg,jpeg,png,gif,webp'],
+        ]);
+
+        // Handle file upload
+        if ($request->hasFile('attachment')) {
+            $file = $request->file('attachment');
+            $path = $file->storeAs(
+                "house-ledger/{$site->id}",
+                time() . '_' . preg_replace('/\s+/', '_', $file->getClientOriginalName()),
+                'private'
+            );
+            $data['attachments'] = [[
+                'path' => $path,
+                'disk' => 'private',
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getClientMimeType(),
+                'size' => $file->getSize(),
+            ]];
+        }
+        unset($data['attachment']);
+
+        $ledger = $this->ledgerService->getOrCreateLedger($site);
+        $this->ledgerService->addEntry($ledger, $data, $request->user()->id);
+
+        return redirect()->back()->with('success', 'Ledger entry recorded.');
+    }
+
+    public function downloadAttachment(Request $request, Site $site, HouseLedgerEntry $entry)
+    {
+        if (!in_array($site->type, ['house', 'residential'])) {
+            abort(404);
+        }
+
+        // Verify entry belongs to this site's ledger
+        $ledger = $this->ledgerService->getOrCreateLedger($site);
+        abort_unless($entry->house_ledger_id === $ledger->id, 404);
+
+        if (!$request->user()->canDo('sites.ledger.view')) {
+            abort(403);
+        }
+
+        $attachments = $entry->attachments;
+        if (empty($attachments) || !isset($attachments[0])) {
+            abort(404, 'No attachment found.');
+        }
+
+        $attachment = $attachments[0];
+        $disk = $attachment['disk'] ?? 'private';
+
+        abort_unless(
+            Storage::disk($disk)->exists($attachment['path']),
+            404,
+            'Attachment file is missing from storage.'
+        );
+
+        return Storage::disk($disk)->download(
+            $attachment['path'],
+            $attachment['original_name'] ?? basename($attachment['path'])
+        );
+    }
+
+    public function reconcile(Request $request, Site $site)
+    {
+        if (!in_array($site->type, ['house', 'residential'])) {
+            abort(404);
+        }
+
+        if (!$request->user()->canDo('sites.ledger.manage')) {
+            abort(403);
+        }
+
+        $ledger = $this->ledgerService->getOrCreateLedger($site);
+        $this->ledgerService->reconcile($ledger, $request->user()->id);
+
+        return redirect()->back()->with('success', 'Ledger reconciled.');
+    }
+}

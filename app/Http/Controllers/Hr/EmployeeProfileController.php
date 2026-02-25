@@ -8,6 +8,7 @@ use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Site;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -23,24 +24,65 @@ class EmployeeProfileController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
 
-        $tenantId = null;
         $search = trim((string) $request->query('q', ''));
         $status = $request->query('status'); // 'active', 'inactive', or null for all
         $siteId = $request->query('site_id');
 
-        $profiles = HrEmployeeProfile::with([
-                'user:id,name,email',
-                'primarySite:id,name',
+        $profiles = User::query()
+            ->staff()
+            ->with([
+                'hrEmployeeProfile.primarySite:id,name',
             ])
-            ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) =>
-                $u->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%")
-            ))
-            ->when($status === 'active', fn ($q) => $q->active())
-            ->when($status === 'inactive', fn ($q) => $q->where('is_active', false))
-            ->when($siteId, fn ($q) => $q->atSite((int) $siteId))
-            ->orderBy('created_at', 'desc')
+            ->when($search !== '', fn ($q) =>
+                $q->where(function ($inner) use ($search) {
+                    $inner->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
+                })
+            )
+            ->when($status === 'active', fn ($q) =>
+                $q->where(function ($statusQuery) {
+                    $statusQuery
+                        ->whereDoesntHave('hrEmployeeProfile')
+                        ->orWhereHas('hrEmployeeProfile', fn ($profile) => $profile->where('is_active', true));
+                })
+            )
+            ->when($status === 'inactive', fn ($q) =>
+                $q->whereHas('hrEmployeeProfile', fn ($profile) => $profile->where('is_active', false))
+            )
+            ->when($siteId, fn ($q) =>
+                $q->whereHas('hrEmployeeProfile', function ($profileQuery) use ($siteId) {
+                    $profileQuery->where(function ($siteQuery) use ($siteId) {
+                        $siteQuery
+                            ->where('primary_site_id', (int) $siteId)
+                            ->orWhereJsonContains('secondary_site_ids', (int) $siteId);
+                    });
+                })
+            )
+            ->orderBy('name')
             ->paginate(20)
+            ->through(function (User $staffUser) {
+                $profile = $staffUser->hrEmployeeProfile;
+                $primarySite = $profile?->primarySite;
+
+                return [
+                    'id' => $staffUser->id,
+                    'profile_id' => $profile?->id,
+                    'employee_number' => $profile?->employee_number,
+                    'position_title' => $profile?->position_title,
+                    'employment_type' => $profile?->employment_type,
+                    'is_active' => $profile ? (bool) $profile->is_active : true,
+                    'start_date' => $profile?->start_date?->toDateString(),
+                    'user' => [
+                        'id' => $staffUser->id,
+                        'name' => $staffUser->name,
+                        'email' => $staffUser->email,
+                    ],
+                    'primary_site' => $primarySite ? [
+                        'id' => $primarySite->id,
+                        'name' => $primarySite->name,
+                    ] : null,
+                ];
+            })
             ->withQueryString();
 
         $sites = Site::orderBy('name')

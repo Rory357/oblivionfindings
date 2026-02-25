@@ -11,6 +11,7 @@ type BreadcrumbItem = { title: string; href: string };
 type PolicyVersion = {
     id: number;
     version_number: string;
+    document_path?: string | null;
     effective_from: string;
     content: string;
     change_summary: string | null;

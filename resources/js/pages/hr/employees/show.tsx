@@ -335,7 +335,7 @@ export default function EmployeeShow({ profile, complianceStatuses, complianceSu
                                                         <td className="px-4 py-3 text-muted-foreground">{doc.category || '\u2014'}</td>
                                                         <td className="px-4 py-3 text-muted-foreground">{doc.created_at}</td>
                                                         <td className="px-4 py-3 text-right">
-                                                            <Link href={`/hr/people/${profile.id}/documents/${doc.id}/download`} className="text-primary hover:underline">
+                                                            <Link href={`/hr/documents/${doc.id}/download`} className="text-primary hover:underline">
                                                                 Download
                                                             </Link>
                                                         </td>

@@ -3,91 +3,174 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
-use App\Domain\Hr\Models\HrCase;
-use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Domain\Hr\Models\HrLeaveRequest;
-use App\Domain\Hr\Models\HrPerformanceReview;
-use App\Domain\Hr\Models\HrSupervisionNote;
-use App\Domain\Hr\Models\HrWellbeingIndicator;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrReportExport;
+use App\Domain\Hr\Models\HrReportSubscription;
+use App\Domain\Hr\Services\HrReportingService;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class HrReportController extends Controller
 {
-    /**
-     * Available report types and their descriptions.
-     */
-    private const REPORT_TYPES = [
-        'headcount' => ['title' => 'Headcount Summary', 'description' => 'Staff headcount and demographics summary', 'category' => 'headcount'],
-        'turnover' => ['title' => 'Turnover Analysis', 'description' => 'Employee turnover analysis by period', 'category' => 'turnover'],
-        'leave_summary' => ['title' => 'Leave Summary', 'description' => 'Leave usage and balance summary', 'category' => 'leave'],
-        'performance' => ['title' => 'Performance Reviews', 'description' => 'Performance review completion and ratings', 'category' => 'compliance'],
-        'supervision' => ['title' => 'Supervision Report', 'description' => 'Supervision session frequency and compliance', 'category' => 'compliance'],
-        'cases' => ['title' => 'HR Cases', 'description' => 'HR cases by type, severity, and status', 'category' => 'compliance'],
-        'wellbeing' => ['title' => 'Wellbeing Indicators', 'description' => 'Staff wellbeing indicators and flags', 'category' => 'compliance'],
-        'compliance' => ['title' => 'Compliance Overview', 'description' => 'Compliance requirement status overview', 'category' => 'compliance'],
-    ];
+    use ResolvesHrTenant;
 
-    /**
-     * Show the report dashboard with available report types.
-     */
+    public function __construct(
+        private readonly HrReportingService $reportingService,
+    ) {}
+
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
 
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $reportTypes = $this->reportingService->reportTypes();
+        $allowedRecipientIds = collect($this->hrStaffUserIdsForTenant($tenantId))
+            ->push($user->id)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        $subscriptions = HrReportSubscription::query()
+            ->forTenant($tenantId)
+            ->orderByDesc('is_active')
+            ->orderBy('next_run_at')
+            ->orderByDesc('id')
+            ->limit(50)
+            ->get();
+
+        $recipientIds = $subscriptions
+            ->pluck('recipient_user_ids')
+            ->filter()
+            ->flatten()
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $recipientNames = User::query()
+            ->whereIn('id', $recipientIds->all())
+            ->pluck('name', 'id');
+
+        $recentExports = HrReportExport::query()
+            ->forTenant($tenantId)
+            ->with('generator:id,name')
+            ->orderByDesc('generated_at')
+            ->limit(25)
+            ->get()
+            ->map(fn (HrReportExport $export) => [
+                'id' => $export->id,
+                'report_type' => $export->report_type,
+                'period_start' => optional($export->period_start)->toDateString(),
+                'period_end' => optional($export->period_end)->toDateString(),
+                'row_count' => (int) $export->row_count,
+                'generated_at' => optional($export->generated_at)->toDateTimeString(),
+                'generated_by' => $export->generator?->name,
+                'subscription_id' => $export->subscription_id,
+            ])
+            ->values();
+
+        $recipientOptions = User::query()
+            ->whereIn('id', $allowedRecipientIds)
+            ->orderBy('name')
+            ->limit(200)
+            ->get(['id', 'name', 'email'])
+            ->map(fn (User $recipient) => [
+                'id' => $recipient->id,
+                'name' => $recipient->name,
+                'email' => $recipient->email,
+            ])
+            ->values();
+
         return Inertia::render('hr/reports/index', [
-            'availableReports' => collect(self::REPORT_TYPES)->map(fn ($meta, $key) => [
+            'availableReports' => collect($reportTypes)->map(fn ($meta, $key) => [
                 'key' => $key,
                 'title' => $meta['title'],
                 'description' => $meta['description'],
                 'category' => $meta['category'],
             ])->values(),
-            'recentReports' => [],
+            'recentExports' => $recentExports,
+            'subscriptions' => $subscriptions->map(fn (HrReportSubscription $subscription) => [
+                'id' => $subscription->id,
+                'report_type' => $subscription->report_type,
+                'cadence' => $subscription->cadence,
+                'day_of_week' => $subscription->day_of_week,
+                'day_of_month' => $subscription->day_of_month,
+                'run_at' => $subscription->run_at,
+                'timezone' => $subscription->timezone,
+                'is_active' => (bool) $subscription->is_active,
+                'next_run_at' => optional($subscription->next_run_at)->toDateTimeString(),
+                'last_run_at' => optional($subscription->last_run_at)->toDateTimeString(),
+                'last_status' => $subscription->last_status,
+                'last_error' => $subscription->last_error,
+                'recipient_user_ids' => collect($subscription->recipient_user_ids ?? [])
+                    ->filter(fn ($id) => is_numeric($id))
+                    ->map(fn ($id) => (int) $id)
+                    ->values(),
+                'recipient_names' => collect($subscription->recipient_user_ids ?? [])
+                    ->map(fn ($id) => $recipientNames[(int) $id] ?? null)
+                    ->filter()
+                    ->values(),
+                'filters' => [
+                    'date_from' => $subscription->filters['date_from'] ?? null,
+                    'date_to' => $subscription->filters['date_to'] ?? null,
+                ],
+            ])->values(),
+            'recipientOptions' => $recipientOptions,
+            'defaultFilters' => [
+                'date_from' => now()->subMonth()->toDateString(),
+                'date_to' => now()->toDateString(),
+            ],
             'can' => [
                 'export_data' => $user->canDo('hr.reports.export'),
             ],
         ]);
     }
 
-    /**
-     * Generate and return a report.
-     */
     public function generate(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.view'), 403);
 
-        $data = $request->validate([
-            'report_type' => ['required', 'string', 'in:' . implode(',', array_keys(self::REPORT_TYPES))],
+        $validated = $request->validate([
+            'report_type' => ['required', 'string', Rule::in(array_keys($this->reportingService->reportTypes()))],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
 
-        $tenantId = null;
-        $dateFrom = $data['date_from'] ?? now()->subYear()->toDateString();
-        $dateTo = $data['date_to'] ?? now()->toDateString();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $filters = $this->parseFilters($validated);
+        $report = $this->reportingService->generate(
+            reportType: $validated['report_type'],
+            tenantId: $tenantId,
+            dateFrom: $filters['date_from'] ?? null,
+            dateTo: $filters['date_to'] ?? null,
+        );
 
-        $reportData = match ($data['report_type']) {
-            'headcount' => $this->generateHeadcount($tenantId),
-            'turnover' => $this->generateTurnover($tenantId, $dateFrom, $dateTo),
-            'leave_summary' => $this->generateLeaveSummary($tenantId, $dateFrom, $dateTo),
-            'performance' => $this->generatePerformanceReport($tenantId, $dateFrom, $dateTo),
-            'supervision' => $this->generateSupervisionReport($tenantId, $dateFrom, $dateTo),
-            'cases' => $this->generateCasesReport($tenantId, $dateFrom, $dateTo),
-            'wellbeing' => $this->generateWellbeingReport($tenantId),
-            'compliance' => $this->generateComplianceReport($tenantId),
-            default => [],
-        };
+        $export = null;
+        if ($user->canDo('hr.reports.export')) {
+            $export = $this->reportingService->createExport(
+                reportType: $validated['report_type'],
+                tenantId: $tenantId,
+                filters: $filters,
+                generatedBy: $user->id,
+            );
+        }
 
         return Inertia::render('hr/reports/show', [
-            'reportType' => $data['report_type'],
-            'reportTitle' => self::REPORT_TYPES[$data['report_type']]['title'] ?? $data['report_type'],
-            'reportData' => $reportData,
+            'reportType' => $report['report_type'],
+            'reportTitle' => $report['report_title'],
+            'reportData' => $report['data'],
+            'generatedAt' => now()->toDateTimeString(),
+            'exportId' => $export?->id,
             'filters' => [
-                'date_from' => $dateFrom,
-                'date_to' => $dateTo,
+                'date_from' => $report['date_from'],
+                'date_to' => $report['date_to'],
             ],
             'can' => [
                 'export' => $user->canDo('hr.reports.export'),
@@ -95,203 +178,276 @@ class HrReportController extends Controller
         ]);
     }
 
-    /**
-     * Export a report as CSV download.
-     */
     public function export(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $data = $request->validate([
-            'report_type' => ['required', 'string', 'in:' . implode(',', array_keys(self::REPORT_TYPES))],
+        $validated = $request->validate([
+            'report_type' => ['required', 'string', Rule::in(array_keys($this->reportingService->reportTypes()))],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
 
-        $tenantId = null;
-        $dateFrom = $data['date_from'] ?? now()->subYear()->toDateString();
-        $dateTo = $data['date_to'] ?? now()->toDateString();
+        $filters = $this->parseFilters($validated);
+        $export = $this->reportingService->createExport(
+            reportType: $validated['report_type'],
+            tenantId: $tenantId,
+            filters: $filters,
+            generatedBy: $user->id,
+        );
 
-        $reportData = match ($data['report_type']) {
-            'headcount' => $this->generateHeadcount($tenantId),
-            'turnover' => $this->generateTurnover($tenantId, $dateFrom, $dateTo),
-            'leave_summary' => $this->generateLeaveSummary($tenantId, $dateFrom, $dateTo),
-            'performance' => $this->generatePerformanceReport($tenantId, $dateFrom, $dateTo),
-            'supervision' => $this->generateSupervisionReport($tenantId, $dateFrom, $dateTo),
-            'cases' => $this->generateCasesReport($tenantId, $dateFrom, $dateTo),
-            'wellbeing' => $this->generateWellbeingReport($tenantId),
-            'compliance' => $this->generateComplianceReport($tenantId),
-            default => [],
-        };
+        abort_unless(Storage::disk('private')->exists($export->storage_path), 404);
+        $filename = basename($export->storage_path);
 
-        $csv = $this->buildCsv($reportData);
-
-        $filename = sprintf('hr-report-%s-%s.csv', $data['report_type'], now()->format('Y-m-d'));
-        $path = 'hr-reports/' . $filename;
-
-        Storage::disk('private')->put($path, $csv);
-
-        return Storage::disk('private')->download($path, $filename, [
+        return Storage::disk('private')->download($export->storage_path, $filename, [
             'Content-Type' => 'text/csv',
         ]);
     }
 
-    /* ------------------------------------------------------------------
-     *  Report generators
-     * ------------------------------------------------------------------ */
-
-    private function generateHeadcount(?int $tenantId): array
+    public function showExport(Request $request, HrReportExport $export)
     {
-        $profiles = HrEmployeeProfile::active()->get();
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.reports.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $export->tenant_id);
 
-        return [
-            'total_active' => $profiles->count(),
-            'by_employment_type' => $profiles->groupBy('employment_type')
-                ->map(fn ($g) => $g->count()),
-            'by_contract_type' => $profiles->groupBy('contract_type')
-                ->map(fn ($g) => $g->count()),
-        ];
+        $filters = array_merge((array) ($export->filters ?? []), [
+            'date_from' => optional($export->period_start)->toDateString(),
+            'date_to' => optional($export->period_end)->toDateString(),
+        ]);
+
+        $report = $this->reportingService->generate(
+            reportType: $export->report_type,
+            tenantId: $export->tenant_id,
+            dateFrom: $filters['date_from'] ?? null,
+            dateTo: $filters['date_to'] ?? null,
+        );
+
+        return Inertia::render('hr/reports/show', [
+            'reportType' => $report['report_type'],
+            'reportTitle' => $report['report_title'],
+            'reportData' => $report['data'],
+            'generatedAt' => optional($export->generated_at)->toDateTimeString(),
+            'exportId' => $export->id,
+            'filters' => [
+                'date_from' => $report['date_from'],
+                'date_to' => $report['date_to'],
+            ],
+            'can' => [
+                'export' => $user->canDo('hr.reports.export'),
+            ],
+        ]);
     }
 
-    private function generateTurnover(?int $tenantId, string $dateFrom, string $dateTo): array
+    public function downloadExport(Request $request, HrReportExport $export)
     {
-        $leavers = HrEmployeeProfile::whereNotNull('end_date')
-            ->whereBetween('end_date', [$dateFrom, $dateTo])
-            ->get();
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $export->tenant_id);
+        abort_unless(Storage::disk('private')->exists($export->storage_path), 404);
 
-        $starters = HrEmployeeProfile::whereBetween('start_date', [$dateFrom, $dateTo])
-            ->get();
+        $filename = basename($export->storage_path);
 
-        $totalActive = HrEmployeeProfile::active()->count();
-
-        return [
-            'starters' => $starters->count(),
-            'leavers' => $leavers->count(),
-            'turnover_rate' => $totalActive > 0
-                ? round(($leavers->count() / $totalActive) * 100, 1)
-                : 0,
-            'by_reason' => $leavers->groupBy('termination_reason')
-                ->map(fn ($g) => $g->count()),
-        ];
+        return Storage::disk('private')->download($export->storage_path, $filename, [
+            'Content-Type' => 'text/csv',
+        ]);
     }
 
-    private function generateLeaveSummary(?int $tenantId, string $dateFrom, string $dateTo): array
+    public function storeSubscription(Request $request)
     {
-        $requests = HrLeaveRequest::whereBetween('starts_at', [$dateFrom, $dateTo])
-            ->get();
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $allowedRecipientIds = collect($this->hrStaffUserIdsForTenant($tenantId))
+            ->push($user->id)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $recipientRule = Rule::in($allowedRecipientIds);
 
-        return [
-            'total_requests' => $requests->count(),
-            'by_status' => $requests->groupBy('status')
-                ->map(fn ($g) => $g->count()),
-            'by_type' => $requests->groupBy('leave_type')
-                ->map(fn ($g) => [
-                    'count' => $g->count(),
-                    'total_hours' => $g->sum('hours_requested'),
-                ]),
-            'total_hours_requested' => $requests->sum('hours_requested'),
-        ];
-    }
+        $validated = $request->validate([
+            'report_type' => ['required', 'string', Rule::in(array_keys($this->reportingService->reportTypes()))],
+            'cadence' => ['required', 'string', Rule::in(['daily', 'weekly', 'monthly'])],
+            'day_of_week' => ['nullable', 'integer', 'min:0', 'max:6'],
+            'day_of_month' => ['nullable', 'integer', 'min:1', 'max:28'],
+            'run_at' => ['nullable', 'date_format:H:i'],
+            'timezone' => ['nullable', 'string', 'max:64'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'recipient_user_ids' => ['nullable', 'array'],
+            'recipient_user_ids.*' => ['integer', $recipientRule],
+            'is_active' => ['nullable', 'boolean'],
+        ]);
 
-    private function generatePerformanceReport(?int $tenantId, string $dateFrom, string $dateTo): array
-    {
-        $reviews = HrPerformanceReview::whereBetween('created_at', [$dateFrom, $dateTo])
-            ->get();
-
-        return [
-            'total_reviews' => $reviews->count(),
-            'by_status' => $reviews->groupBy('status')
-                ->map(fn ($g) => $g->count()),
-            'by_type' => $reviews->groupBy('review_type')
-                ->map(fn ($g) => $g->count()),
-            'average_rating' => $reviews->whereNotNull('overall_rating')->avg('overall_rating'),
-            'signed_off_count' => $reviews->where('employee_signed_off', true)->count(),
-        ];
-    }
-
-    private function generateSupervisionReport(?int $tenantId, string $dateFrom, string $dateTo): array
-    {
-        $notes = HrSupervisionNote::whereBetween('session_date', [$dateFrom, $dateTo])
-            ->get();
-
-        return [
-            'total_sessions' => $notes->count(),
-            'by_type' => $notes->groupBy('session_type')
-                ->map(fn ($g) => $g->count()),
-            'average_duration' => round($notes->avg('duration_minutes') ?? 0),
-            'employees_supervised' => $notes->pluck('employee_user_id')->unique()->count(),
-            'acknowledged_count' => $notes->where('employee_acknowledged', true)->count(),
-        ];
-    }
-
-    private function generateCasesReport(?int $tenantId, string $dateFrom, string $dateTo): array
-    {
-        $cases = HrCase::whereBetween('opened_at', [$dateFrom, $dateTo])
-            ->get();
-
-        return [
-            'total_cases' => $cases->count(),
-            'by_status' => $cases->groupBy('status')
-                ->map(fn ($g) => $g->count()),
-            'by_type' => $cases->groupBy('case_type')
-                ->map(fn ($g) => $g->count()),
-            'by_severity' => $cases->groupBy('severity')
-                ->map(fn ($g) => $g->count()),
-            'average_days_to_close' => $cases->whereNotNull('closed_at')
-                ->avg(fn ($c) => $c->opened_at?->diffInDays($c->closed_at)),
-        ];
-    }
-
-    private function generateWellbeingReport(?int $tenantId): array
-    {
-        $indicators = HrWellbeingIndicator::orderByDesc('calculated_at')
-            ->limit(500)
-            ->get();
-
-        return [
-            'total_assessed' => $indicators->pluck('user_id')->unique()->count(),
-            'by_flag_level' => $indicators->groupBy('flag_level')
-                ->map(fn ($g) => $g->count()),
-            'avg_overtime_hours' => round($indicators->avg('overtime_hours') ?? 0, 1),
-            'avg_consecutive_days' => round($indicators->avg('consecutive_days_worked') ?? 0, 1),
-        ];
-    }
-
-    private function generateComplianceReport(?int $tenantId): array
-    {
-        // Provides a summary; compliance details are in the ComplianceController
-        $profiles = HrEmployeeProfile::active()->count();
-
-        return [
-            'total_active_staff' => $profiles,
-            'report_generated_at' => now()->toIso8601String(),
-        ];
-    }
-
-    /* ------------------------------------------------------------------
-     *  CSV builder
-     * ------------------------------------------------------------------ */
-
-    private function buildCsv(array $reportData): string
-    {
-        $lines = [];
-        $lines[] = 'Metric,Value';
-
-        foreach ($reportData as $key => $value) {
-            if (is_array($value) || $value instanceof \Illuminate\Support\Collection) {
-                $collection = collect($value);
-                foreach ($collection as $subKey => $subValue) {
-                    $displayValue = is_array($subValue)
-                        ? json_encode($subValue)
-                        : (string) $subValue;
-                    $lines[] = '"' . str_replace('"', '""', $key . '.' . $subKey) . '","' . str_replace('"', '""', $displayValue) . '"';
-                }
-            } else {
-                $lines[] = '"' . str_replace('"', '""', (string) $key) . '","' . str_replace('"', '""', (string) ($value ?? '')) . '"';
-            }
+        $timezone = (string) ($validated['timezone'] ?? 'Pacific/Auckland');
+        if (! in_array($timezone, timezone_identifiers_list(), true)) {
+            return redirect()->back()->withErrors(['timezone' => 'Timezone is not supported.']);
         }
 
-        return implode("\n", $lines) . "\n";
+        $recipientUserIds = collect($validated['recipient_user_ids'] ?? [])
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($recipientUserIds->isEmpty()) {
+            $recipientUserIds = collect([$user->id]);
+        }
+
+        $subscription = new HrReportSubscription([
+            'tenant_id' => $tenantId,
+            'report_type' => $validated['report_type'],
+            'cadence' => $validated['cadence'],
+            'day_of_week' => $validated['cadence'] === 'weekly' ? (int) ($validated['day_of_week'] ?? 1) : null,
+            'day_of_month' => $validated['cadence'] === 'monthly' ? (int) ($validated['day_of_month'] ?? 1) : null,
+            'run_at' => $this->normalizeRunAt((string) ($validated['run_at'] ?? '08:00')),
+            'timezone' => $timezone,
+            'filters' => $this->parseFilters($validated),
+            'recipient_user_ids' => $recipientUserIds->all(),
+            'is_active' => (bool) ($validated['is_active'] ?? true),
+            'created_by' => $user->id,
+            'updated_by' => $user->id,
+        ]);
+
+        $subscription->next_run_at = $subscription->is_active
+            ? $this->reportingService->calculateNextRunAt($subscription, now())
+            : null;
+        $subscription->save();
+
+        return redirect()->back()->with('success', 'Report subscription created.');
     }
+
+    public function updateSubscription(Request $request, HrReportSubscription $subscription)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $subscription->tenant_id);
+        $allowedRecipientIds = collect($this->hrStaffUserIdsForTenant($tenantId))
+            ->push($user->id)
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+        $recipientRule = Rule::in($allowedRecipientIds);
+
+        $validated = $request->validate([
+            'report_type' => ['sometimes', 'string', Rule::in(array_keys($this->reportingService->reportTypes()))],
+            'cadence' => ['sometimes', 'string', Rule::in(['daily', 'weekly', 'monthly'])],
+            'day_of_week' => ['nullable', 'integer', 'min:0', 'max:6'],
+            'day_of_month' => ['nullable', 'integer', 'min:1', 'max:28'],
+            'run_at' => ['sometimes', 'date_format:H:i'],
+            'timezone' => ['sometimes', 'string', 'max:64'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'recipient_user_ids' => ['nullable', 'array'],
+            'recipient_user_ids.*' => ['integer', $recipientRule],
+            'is_active' => ['sometimes', 'boolean'],
+        ]);
+
+        if (array_key_exists('timezone', $validated)) {
+            if (! in_array((string) $validated['timezone'], timezone_identifiers_list(), true)) {
+                return redirect()->back()->withErrors(['timezone' => 'Timezone is not supported.']);
+            }
+            $subscription->timezone = (string) $validated['timezone'];
+        }
+
+        if (array_key_exists('report_type', $validated)) {
+            $subscription->report_type = $validated['report_type'];
+        }
+
+        if (array_key_exists('cadence', $validated)) {
+            $subscription->cadence = $validated['cadence'];
+        }
+
+        if (array_key_exists('day_of_week', $validated) || $subscription->cadence === 'weekly') {
+            $subscription->day_of_week = $subscription->cadence === 'weekly'
+                ? (int) ($validated['day_of_week'] ?? $subscription->day_of_week ?? 1)
+                : null;
+        }
+
+        if (array_key_exists('day_of_month', $validated) || $subscription->cadence === 'monthly') {
+            $subscription->day_of_month = $subscription->cadence === 'monthly'
+                ? (int) ($validated['day_of_month'] ?? $subscription->day_of_month ?? 1)
+                : null;
+        }
+
+        if (array_key_exists('run_at', $validated)) {
+            $subscription->run_at = $this->normalizeRunAt((string) $validated['run_at']);
+        }
+
+        if (array_key_exists('is_active', $validated)) {
+            $subscription->is_active = (bool) $validated['is_active'];
+        }
+
+        if (array_key_exists('recipient_user_ids', $validated)) {
+            $recipientUserIds = collect($validated['recipient_user_ids'] ?? [])
+                ->filter(fn ($id) => is_numeric($id))
+                ->map(fn ($id) => (int) $id)
+                ->unique()
+                ->values();
+
+            $subscription->recipient_user_ids = $recipientUserIds->isEmpty()
+                ? [$user->id]
+                : $recipientUserIds->all();
+        }
+
+        $subscription->filters = array_merge((array) ($subscription->filters ?? []), $this->parseFilters($validated));
+        $subscription->updated_by = $user->id;
+        $subscription->next_run_at = $subscription->is_active
+            ? $this->reportingService->calculateNextRunAt($subscription, now())
+            : null;
+
+        $subscription->save();
+
+        return redirect()->back()->with('success', 'Report subscription updated.');
+    }
+
+    public function toggleSubscription(Request $request, HrReportSubscription $subscription)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.reports.export'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $subscription->tenant_id);
+
+        $subscription->is_active = ! $subscription->is_active;
+        $subscription->next_run_at = $subscription->is_active
+            ? $this->reportingService->calculateNextRunAt($subscription, now())
+            : null;
+        $subscription->updated_by = $user->id;
+        $subscription->save();
+
+        return redirect()->back()->with('success', $subscription->is_active ? 'Subscription resumed.' : 'Subscription paused.');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function parseFilters(array $payload): array
+    {
+        $filters = [];
+
+        if (! empty($payload['date_from'])) {
+            $filters['date_from'] = (string) $payload['date_from'];
+        }
+
+        if (! empty($payload['date_to'])) {
+            $filters['date_to'] = (string) $payload['date_to'];
+        }
+
+        return $filters;
+    }
+
+    private function normalizeRunAt(string $runAt): string
+    {
+        return strlen($runAt) === 5 ? "{$runAt}:00" : $runAt;
+    }
+
 }

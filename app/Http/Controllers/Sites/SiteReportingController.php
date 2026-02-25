@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
 use App\Models\Asset;
 use App\Models\Site;
 use App\Models\SiteChecklistResponse;
@@ -16,6 +17,7 @@ use Carbon\Carbon;
 
 class SiteReportingController extends Controller
 {
+    use ResolvesAllowedSiteTypes;
     public function index(Request $request)
     {
         abort_unless($request->user()?->canDo('reports.sites.view'), 403);
@@ -545,21 +547,4 @@ class SiteReportingController extends Controller
         })->all();
     }
 
-    private function allowedSiteTypes(Request $request): array
-    {
-        $user = $request->user();
-        $map = [
-            'head_office' => 'sites.type.head_office.view',
-            'house' => 'sites.type.house.view',
-            'facility' => 'sites.type.facility.view',
-        ];
-
-        $allowed = collect($map)
-            ->filter(fn (string $permission) => $user?->canDo($permission))
-            ->keys()
-            ->values()
-            ->all();
-
-        return $allowed !== [] ? $allowed : array_keys($map);
-    }
 }

@@ -135,6 +135,17 @@ export default function IncidentCreate({ clients, templates }: Props) {
                             <Textarea value={form.data.witnesses} onChange={(e) => form.setData('witnesses', e.target.value)} />
                         </div>
 
+                        {Object.keys(form.errors).length > 0 && (
+                            <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                                <p className="font-medium">Please fix the following errors:</p>
+                                <ul className="mt-1 list-disc pl-5">
+                                    {Object.entries(form.errors).map(([field, message]) => (
+                                        <li key={field}>{message}</li>
+                                    ))}
+                                </ul>
+                            </div>
+                        )}
+
                         <div className="flex items-center justify-end">
                             <Button
                                 disabled={form.processing}

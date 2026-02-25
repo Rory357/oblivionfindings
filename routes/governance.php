@@ -196,6 +196,7 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
             Route::post('/budgets', [BudgetController::class, 'store'])->name('budgets.store');
             Route::put('/budgets/{budget}', [BudgetController::class, 'update'])->name('budgets.update');
             Route::post('/budgets/{budget}/propose', [BudgetController::class, 'propose'])->name('budgets.propose');
+            Route::post('/budgets/{budget}/approve', [BudgetController::class, 'approve'])->name('budgets.approve');
             Route::post('/budgets/{budget}/adjust', [BudgetController::class, 'requestAdjustment'])->name('budgets.adjust');
 
             // Line items
@@ -219,5 +220,110 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::get('/actions', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'index'])->name('actions.index');
         Route::get('/actions/{action}', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'show'])->name('actions.show');
         Route::post('/actions/{action}/complete', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'complete'])->name('actions.complete');
+    });
+
+    // Governance Policies
+    Route::middleware('permission:governance.view')->group(function () {
+        Route::get('/policies', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'index'])->name('policies.index');
+        Route::get('/policies/create', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'create'])->name('policies.create');
+        Route::get('/policies/{policy}', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'show'])->name('policies.show');
+        Route::get('/policies/{policy}/edit', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'edit'])->name('policies.edit');
+
+        Route::middleware('permission:governance.meetings.manage')->group(function () {
+            Route::post('/policies', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'store'])->name('policies.store');
+            Route::put('/policies/{policy}', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'update'])->name('policies.update');
+            Route::post('/policies/{policy}/approve', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'approve'])->name('policies.approve');
+            Route::post('/policies/{policy}/attest', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'attest'])->name('policies.attest');
+            Route::post('/policies/{policy}/version', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'newVersion'])->name('policies.version');
+        });
+    });
+
+    // CEO Board Reports
+    Route::middleware('permission:governance.view')->group(function () {
+        Route::get('/ceo-reports', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'index'])->name('ceo-reports.index');
+        Route::get('/ceo-reports/create', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'create'])->name('ceo-reports.create');
+        Route::get('/ceo-reports/{report}', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'show'])->name('ceo-reports.show');
+
+        Route::middleware('permission:governance.meetings.manage')->group(function () {
+            Route::post('/ceo-reports', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'store'])->name('ceo-reports.store');
+            Route::put('/ceo-reports/{report}', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'update'])->name('ceo-reports.update');
+            Route::post('/ceo-reports/{report}/submit', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'submit'])->name('ceo-reports.submit');
+        });
+    });
+
+    // Board Interests Register
+    Route::middleware('permission:governance.view')->group(function () {
+        Route::get('/interests', [\App\Domain\Governance\Http\Controllers\BoardInterestController::class, 'index'])->name('interests.index');
+        Route::get('/interests/mine', [\App\Domain\Governance\Http\Controllers\BoardInterestController::class, 'myInterests'])->name('interests.mine');
+
+        Route::middleware('permission:governance.meetings.manage')->group(function () {
+            Route::post('/interests', [\App\Domain\Governance\Http\Controllers\BoardInterestController::class, 'store'])->name('interests.store');
+            Route::put('/interests/{interest}', [\App\Domain\Governance\Http\Controllers\BoardInterestController::class, 'update'])->name('interests.update');
+        });
+    });
+
+    // Board Evaluations
+    Route::middleware('permission:governance.view')->group(function () {
+        Route::get('/evaluations', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'index'])->name('evaluations.index');
+        Route::get('/evaluations/create', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'create'])->name('evaluations.create');
+        Route::get('/evaluations/{evaluation}', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'show'])->name('evaluations.show');
+        Route::get('/evaluations/{evaluation}/results', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'results'])->name('evaluations.results');
+
+        Route::middleware('permission:governance.meetings.manage')->group(function () {
+            Route::post('/evaluations', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'store'])->name('evaluations.store');
+            Route::post('/evaluations/{evaluation}/launch', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'launch'])->name('evaluations.launch');
+            Route::post('/evaluations/{evaluation}/respond', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'respond'])->name('evaluations.respond');
+            Route::post('/evaluations/{evaluation}/close', [\App\Domain\Governance\Http\Controllers\BoardEvaluationController::class, 'close'])->name('evaluations.close');
+        });
+    });
+
+    // Governance Documents
+    Route::middleware('permission:governance.view')->group(function () {
+        Route::get('/documents', [\App\Domain\Governance\Http\Controllers\GovernanceDocumentController::class, 'index'])->name('documents.index');
+        Route::get('/documents/{document}/download', [\App\Domain\Governance\Http\Controllers\GovernanceDocumentController::class, 'download'])->name('documents.download');
+
+        Route::middleware('permission:governance.meetings.manage')->group(function () {
+            Route::post('/documents', [\App\Domain\Governance\Http\Controllers\GovernanceDocumentController::class, 'store'])->name('documents.store');
+            Route::delete('/documents/{document}', [\App\Domain\Governance\Http\Controllers\GovernanceDocumentController::class, 'destroy'])->name('documents.destroy');
+        });
+    });
+
+    // Clinical Governance
+    Route::middleware('permission:governance.view')->group(function () {
+        Route::get('/clinical', [\App\Domain\Governance\Http\Controllers\ClinicalGovernanceController::class, 'dashboard'])->name('clinical.dashboard');
+        Route::get('/clinical/trends', [\App\Domain\Governance\Http\Controllers\ClinicalGovernanceController::class, 'trends'])->name('clinical.trends');
+
+        Route::middleware('permission:governance.meetings.manage')->group(function () {
+            Route::post('/clinical/indicators', [\App\Domain\Governance\Http\Controllers\ClinicalGovernanceController::class, 'storeIndicator'])->name('clinical.indicators.store');
+            Route::post('/clinical/snapshots', [\App\Domain\Governance\Http\Controllers\ClinicalGovernanceController::class, 'recordSnapshot'])->name('clinical.snapshots.store');
+        });
+    });
+
+    // Te Tiriti o Waitangi Framework
+    Route::middleware('permission:governance.view')->group(function () {
+        Route::get('/te-tiriti', [\App\Domain\Governance\Http\Controllers\TeTiritiController::class, 'index'])->name('te-tiriti.index');
+
+        Route::middleware('permission:governance.meetings.manage')->group(function () {
+            Route::post('/te-tiriti', [\App\Domain\Governance\Http\Controllers\TeTiritiController::class, 'store'])->name('te-tiriti.store');
+            Route::put('/te-tiriti/{obligation}', [\App\Domain\Governance\Http\Controllers\TeTiritiController::class, 'update'])->name('te-tiriti.update');
+        });
+    });
+
+    // Meeting RSVP & Status Advance
+    Route::middleware('permission:governance.meetings.view')->group(function () {
+        Route::post('/meetings/{meeting}/rsvp', [GovernanceMeetingController::class, 'submitRsvp'])->name('meetings.rsvp');
+
+        Route::middleware('permission:governance.meetings.manage')->group(function () {
+            Route::post('/meetings/{meeting}/advance-status', [GovernanceMeetingController::class, 'advanceStatus'])->name('meetings.advance-status');
+        });
+    });
+
+    // Action Item progress management
+    Route::middleware('permission:governance.actions.view')->group(function () {
+        Route::post('/actions', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'store'])->name('actions.store');
+        Route::post('/actions/{action}/progress', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'updateProgress'])->name('actions.progress');
+        Route::post('/actions/{action}/block', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'block'])->name('actions.block');
+        Route::post('/actions/{action}/unblock', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'unblock'])->name('actions.unblock');
+        Route::post('/actions/{action}/escalate', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'escalate'])->name('actions.escalate');
     });
 });

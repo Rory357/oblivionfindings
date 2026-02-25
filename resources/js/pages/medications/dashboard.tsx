@@ -22,35 +22,37 @@ interface Alert {
   status: string;
 }
 
+type WidgetSeverity = 'critical' | 'warning' | 'caution' | 'info';
+
 interface DashboardData {
   overdue_meds: {
     title: string;
     count: number;
-    severity: string;
+    severity: WidgetSeverity;
     items: Array<{ id: number; client?: { id: number; name: string }; client_id?: number; message: string }>;
   };
   prn_near_limits: {
     title: string;
     count: number;
-    severity: string;
+    severity: WidgetSeverity;
     items: Array<{ id: number; client?: { id: number; name: string }; client_id?: number; message: string; severity?: string }>;
   };
   controlled_discrepancies: {
     title: string;
     count: number;
-    severity: string;
+    severity: WidgetSeverity;
     items: Array<{ id: number; client?: { id: number; name: string }; client_id?: number; medication?: string; difference?: number; status?: string }>;
   };
   expiring_medications: {
     title: string;
     count: number;
-    severity: string;
+    severity: WidgetSeverity;
     items: Array<{ id: number; client?: { id: number; name: string }; client_id?: number; medication?: string; expiry_date?: string; days_remaining?: number }>;
   };
   high_risk_medications: {
     title: string;
     count: number;
-    severity: string;
+    severity: WidgetSeverity;
     items: Array<{ id: number; client?: { id: number; name: string }; client_id?: number; medication?: string; dosage?: string }>;
   };
   todays_summary: {

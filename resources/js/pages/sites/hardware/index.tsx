@@ -531,6 +531,7 @@ export default function SiteHardware({
     }
 
     function deleteHardware(id: number) {
+        if (!confirm('Are you sure you want to delete this hardware item?')) return;
         router.delete(`/sites/${site.id}/hardware/${id}`, { preserveScroll: true });
     }
 

@@ -2,7 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { show as showResolution, vote as voteResolution, open as openResolution, close as closeResolution } from '@/routes/governance/resolutions';
-import { declare as declareConflict } from '@/routes/governance/resolutions/conflict';
+import { declare as declareConflictRoute } from '@/routes/governance/resolutions/conflict';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -96,7 +96,8 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
   const [finalNotes, setFinalNotes] = useState('');
   const [finalizing, setFinalizing] = useState(false);
 
-  const canManage = auth?.can?.governance?.resolutions?.manage;
+  const permissions = auth?.can as { governance?: { resolutions?: { manage?: boolean } } } | undefined;
+  const canManage = permissions?.governance?.resolutions?.manage;
   const options = resolution.options ?? [];
   const isOpen = resolution.status === 'open';
   const isClosed = ['closed', 'implemented', 'archived'].includes(resolution.status);
@@ -124,10 +125,10 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
     }
   };
 
-  const declareConflict = async () => {
+  const handleDeclareConflict = async () => {
     setDeclaringConflict(true);
     try {
-      await axios.post(declareConflict.url({ resolution: resolution.id }), {
+      await axios.post(declareConflictRoute.url({ resolution: resolution.id }), {
         type: 'material',
         description: conflictNote,
         withdraw_from_voting: true,
@@ -258,24 +259,27 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
               </CardHeader>
               <CardContent>
                 <RadioGroup value={selectedVote} onValueChange={setSelectedVote} className="space-y-3">
-                  <RadioGroupItem value="for">
+                  <label className="flex items-center gap-3 rounded-md border p-3 cursor-pointer transition-colors [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 hover:bg-muted">
+                    <RadioGroupItem value="for" />
                     <span className="flex items-center gap-2">
                       <CheckCircle className="w-5 h-5 text-green-500" />
                       For
                     </span>
-                  </RadioGroupItem>
-                  <RadioGroupItem value="against">
+                  </label>
+                  <label className="flex items-center gap-3 rounded-md border p-3 cursor-pointer transition-colors [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 hover:bg-muted">
+                    <RadioGroupItem value="against" />
                     <span className="flex items-center gap-2">
                       <XCircle className="w-5 h-5 text-red-500" />
                       Against
                     </span>
-                  </RadioGroupItem>
-                  <RadioGroupItem value="abstain">
+                  </label>
+                  <label className="flex items-center gap-3 rounded-md border p-3 cursor-pointer transition-colors [&:has([data-state=checked])]:border-primary [&:has([data-state=checked])]:bg-primary/5 hover:bg-muted">
+                    <RadioGroupItem value="abstain" />
                     <span className="flex items-center gap-2">
                       <MinusCircle className="w-5 h-5 text-gray-500" />
                       Abstain
                     </span>
-                  </RadioGroupItem>
+                  </label>
                 </RadioGroup>
 
                 <div className="mt-4">
@@ -300,7 +304,7 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
                   </Button>
                   <Button 
                     variant="outline" 
-                    onClick={declareConflict}
+                    onClick={handleDeclareConflict}
                     disabled={declaringConflict}
                   >
                     Declare Conflict & Abstain

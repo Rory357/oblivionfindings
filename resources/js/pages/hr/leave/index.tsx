@@ -13,6 +13,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { CalendarDays, Plus, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type LeaveRequest = {
     id: number;
@@ -25,6 +26,9 @@ type LeaveRequest = {
     status: 'pending' | 'approved' | 'declined' | 'cancelled';
     reason?: string | null;
     reviewed_by?: string | null;
+    approval_due_at?: string | null;
+    is_overdue?: boolean;
+    due_within_24h?: boolean;
 };
 
 type PaginatedRequests = {
@@ -41,7 +45,24 @@ type Props = {
     filters: {
         status?: string;
         leave_type?: string;
+        sla?: string | null;
     };
+    sla: {
+        pending_total: number;
+        overdue_count: number;
+        due_within_24h_count: number;
+        oldest_pending_hours: number;
+        avg_decision_hours_30d: number;
+        pending_by_type: Record<string, number>;
+    };
+    pendingAging: Array<{
+        id: number;
+        staff_name: string;
+        leave_type: string;
+        submitted_at: string | null;
+        approval_due_at: string | null;
+        hours_waiting: number;
+    }>;
     can: {
         approve?: boolean;
         manage?: boolean;
@@ -73,9 +94,14 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     },
 };
 
-export default function LeaveIndex({ requests, filters, can }: Props) {
+export default function LeaveIndex({ requests, filters, sla, pendingAging, can }: Props) {
     const pendingRequests = requests.data.filter((r) => r.status === 'pending');
     const allRequests = requests.data;
+    const [selectedRequestIds, setSelectedRequestIds] = useState<number[]>([]);
+    const selectedPendingIds = useMemo(
+        () => selectedRequestIds.filter((id) => pendingRequests.some((request) => request.id === id)),
+        [selectedRequestIds, pendingRequests],
+    );
 
     const updateFilter = (key: string, value: string | null) => {
         const newFilters = { ...filters, [key]: value };
@@ -90,7 +116,64 @@ export default function LeaveIndex({ requests, filters, can }: Props) {
     }
 
     function handleDecline(requestId: number) {
-        router.post(`/hr/leave/${requestId}/decline`, {}, { preserveScroll: true });
+        const reviewNotes = window.prompt('Decline note (required):', 'Declined after review.');
+        if (!reviewNotes || reviewNotes.trim() === '') {
+            return;
+        }
+        router.post(`/hr/leave/${requestId}/decline`, { review_notes: reviewNotes.trim() }, { preserveScroll: true });
+    }
+
+    function toggleRequestSelection(requestId: number, checked: boolean) {
+        setSelectedRequestIds((current) => {
+            if (checked) {
+                return current.includes(requestId) ? current : [...current, requestId];
+            }
+            return current.filter((id) => id !== requestId);
+        });
+    }
+
+    function toggleSelectAllPending(checked: boolean) {
+        setSelectedRequestIds(checked ? pendingRequests.map((request) => request.id) : []);
+    }
+
+    function handleBulkApprove() {
+        if (selectedPendingIds.length === 0) {
+            return;
+        }
+
+        router.post('/hr/leave/bulk-approve', {
+            request_ids: selectedPendingIds,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => setSelectedRequestIds([]),
+        });
+    }
+
+    function handleBulkDecline() {
+        if (selectedPendingIds.length === 0) {
+            return;
+        }
+
+        const reviewNotes = window.prompt('Decline note for selected requests (required):', 'Declined after review.');
+        if (!reviewNotes || reviewNotes.trim() === '') {
+            return;
+        }
+
+        router.post('/hr/leave/bulk-decline', {
+            request_ids: selectedPendingIds,
+            review_notes: reviewNotes.trim(),
+        }, {
+            preserveScroll: true,
+            onSuccess: () => setSelectedRequestIds([]),
+        });
+    }
+
+    function extendSlaByHours(requestId: number, hours: number) {
+        router.post(`/hr/leave/${requestId}/sla-due`, { hours }, { preserveScroll: true });
+    }
+
+    function escalateNow() {
+        router.post('/hr/leave/escalate-now', {}, { preserveScroll: true });
     }
 
     return (
@@ -102,47 +185,139 @@ export default function LeaveIndex({ requests, filters, can }: Props) {
                     title="Leave Requests"
                     description="Manage leave requests and approvals for all staff."
                     actions={
-                        can.create ? (
-                            <Button asChild>
-                                <Link href="/hr/leave/create">
-                                    <Plus className="h-4 w-4 mr-2" />
-                                    New Request
-                                </Link>
+                        <div className="flex items-center gap-2">
+                            <Button variant="outline" asChild>
+                                <Link href="/hr/leave/balances">Balances</Link>
                             </Button>
-                        ) : undefined
+                            {can.approve && (
+                                <Button variant="outline" onClick={escalateNow}>
+                                    Escalate Overdue Now
+                                </Button>
+                            )}
+                            {can.create && (
+                                <Button asChild>
+                                    <Link href="/hr/leave/create">
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        New Request
+                                    </Link>
+                                </Button>
+                            )}
+                        </div>
                     }
                 />
+
+                <div className="grid gap-4 md:grid-cols-4">
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm text-muted-foreground">Pending Queue</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-2xl font-semibold">{sla.pending_total}</p>
+                        </CardContent>
+                    </Card>
+                    <Card className={sla.overdue_count > 0 ? 'border-red-500/40' : ''}>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm text-muted-foreground">Overdue</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className={`text-2xl font-semibold ${sla.overdue_count > 0 ? 'text-red-500' : ''}`}>
+                                {sla.overdue_count}
+                            </p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm text-muted-foreground">Due in 24h</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-2xl font-semibold">{sla.due_within_24h_count}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm text-muted-foreground">Avg Decision (30d)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <p className="text-2xl font-semibold">{sla.avg_decision_hours_30d.toFixed(1)}h</p>
+                        </CardContent>
+                    </Card>
+                </div>
 
                 {/* Pending Approval Section */}
                 {can.approve && pendingRequests.length > 0 && (
                     <Card className="border-yellow-500/20 bg-yellow-500/5">
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Clock className="h-5 w-5 text-yellow-400" />
-                                Pending Approval ({pendingRequests.length})
-                            </CardTitle>
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <CardTitle className="flex items-center gap-2">
+                                    <Clock className="h-5 w-5 text-yellow-400" />
+                                    Pending Approval ({pendingRequests.length})
+                                </CardTitle>
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={handleBulkApprove}
+                                        disabled={selectedPendingIds.length === 0}
+                                    >
+                                        Approve Selected ({selectedPendingIds.length})
+                                    </Button>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                        onClick={handleBulkDecline}
+                                        disabled={selectedPendingIds.length === 0}
+                                    >
+                                        Decline Selected
+                                    </Button>
+                                </div>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             <div className="overflow-hidden rounded-xl border">
                                 <table className="w-full text-sm">
                                     <thead className="border-b bg-slate-50/5">
                                         <tr>
+                                            <th className="px-4 py-3 text-left font-medium">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={pendingRequests.length > 0 && selectedPendingIds.length === pendingRequests.length}
+                                                    onChange={(event) => toggleSelectAllPending(event.target.checked)}
+                                                />
+                                            </th>
                                             <th className="px-4 py-3 text-left font-medium">Staff Name</th>
                                             <th className="px-4 py-3 text-left font-medium">Leave Type</th>
                                             <th className="px-4 py-3 text-left font-medium">Dates</th>
                                             <th className="px-4 py-3 text-left font-medium">Hours</th>
+                                            <th className="px-4 py-3 text-left font-medium">SLA Due</th>
                                             <th className="px-4 py-3 text-right font-medium">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         {pendingRequests.map((request) => (
                                             <tr key={request.id} className="border-b last:border-b-0 hover:bg-muted/50">
+                                                <td className="px-4 py-3">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedPendingIds.includes(request.id)}
+                                                        onChange={(event) => toggleRequestSelection(request.id, event.target.checked)}
+                                                    />
+                                                </td>
                                                 <td className="px-4 py-3 font-medium">{request.staff_name}</td>
                                                 <td className="px-4 py-3 text-muted-foreground">{request.leave_type}</td>
                                                 <td className="px-4 py-3 text-muted-foreground">
                                                     {request.start_date} - {request.end_date}
                                                 </td>
                                                 <td className="px-4 py-3 text-muted-foreground">{request.hours}h</td>
+                                                <td className="px-4 py-3 text-muted-foreground">
+                                                    {request.approval_due_at || '-'}
+                                                    {request.is_overdue && (
+                                                        <Badge variant="destructive" className="ml-2">Overdue</Badge>
+                                                    )}
+                                                    {!request.is_overdue && request.due_within_24h && (
+                                                        <Badge variant="secondary" className="ml-2">Due in 24h</Badge>
+                                                    )}
+                                                </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex items-center justify-end gap-2">
                                                         <Button
@@ -162,6 +337,13 @@ export default function LeaveIndex({ requests, filters, can }: Props) {
                                                         >
                                                             <XCircle className="h-3 w-3 mr-1" />
                                                             Decline
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => extendSlaByHours(request.id, 24)}
+                                                        >
+                                                            +24h SLA
                                                         </Button>
                                                     </div>
                                                 </td>
@@ -209,6 +391,20 @@ export default function LeaveIndex({ requests, filters, can }: Props) {
                         </SelectContent>
                     </Select>
 
+                    <Select
+                        value={filters.sla ?? 'all'}
+                        onValueChange={(v) => updateFilter('sla', v === 'all' ? null : v)}
+                    >
+                        <SelectTrigger className="w-[170px]">
+                            <SelectValue placeholder="All SLA Windows" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All SLA Windows</SelectItem>
+                            <SelectItem value="overdue">Overdue only</SelectItem>
+                            <SelectItem value="due_24h">Due within 24h</SelectItem>
+                        </SelectContent>
+                    </Select>
+
                     <Button
                         variant="ghost"
                         size="sm"
@@ -249,9 +445,15 @@ export default function LeaveIndex({ requests, filters, can }: Props) {
                                                 <tr key={request.id} className="border-b last:border-b-0 hover:bg-muted/50">
                                                     <td className="px-4 py-3 font-medium">{request.staff_name}</td>
                                                     <td className="px-4 py-3 text-muted-foreground">{request.leave_type}</td>
-                                                    <td className="px-4 py-3 text-muted-foreground">
-                                                        {request.start_date} - {request.end_date}
-                                                    </td>
+                                                <td className="px-4 py-3 text-muted-foreground">
+                                                    {request.start_date} - {request.end_date}
+                                                    {request.is_overdue && (
+                                                        <Badge variant="destructive" className="ml-2">Overdue</Badge>
+                                                    )}
+                                                    {!request.is_overdue && request.due_within_24h && (
+                                                        <Badge variant="secondary" className="ml-2">Due in 24h</Badge>
+                                                    )}
+                                                </td>
                                                     <td className="px-4 py-3 text-muted-foreground">{request.hours}h</td>
                                                     <td className="px-4 py-3">
                                                         <Badge variant="outline" className={config.className}>
@@ -294,6 +496,32 @@ export default function LeaveIndex({ requests, filters, can }: Props) {
                         )}
                     </CardContent>
                 </Card>
+
+                {pendingAging.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Longest Waiting Pending Requests</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {pendingAging.map((row) => (
+                                <div key={row.id} className="flex items-center justify-between rounded-md border p-2 text-sm">
+                                    <div>
+                                        <p className="font-medium">{row.staff_name}</p>
+                                        <p className="text-xs text-muted-foreground capitalize">
+                                            {row.leave_type.replace('_', ' ')} · submitted {row.submitted_at || '-'}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <p className="font-medium">{row.hours_waiting.toFixed(1)}h waiting</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Due: {row.approval_due_at || '-'}
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Pagination */}
                 {requests.last_page > 1 && (

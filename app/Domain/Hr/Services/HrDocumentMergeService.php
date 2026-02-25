@@ -6,9 +6,9 @@ use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDocumentTemplate;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffer;
-use App\Models\User;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 class HrDocumentMergeService
 {
@@ -66,27 +66,23 @@ class HrDocumentMergeService
      */
     public function mergeTemplate(HrDocumentTemplate $template, HrEmployeeProfile $profile, ?HrOffer $offer = null, array $extra = []): string
     {
-        // TODO: Load employee profile with user and primarySite relationships
-        // TODO: Build the merge data map from profile, offer, and extras
-        // TODO: Replace all {{placeholder}} tokens in the template content
-        // TODO: Handle missing/null values gracefully (replace with empty string or '[NOT SET]')
-        // TODO: Validate that no unreplaced placeholders remain
-        // TODO: Log a warning if any placeholders were not resolved
-
         $profile->loadMissing(['user', 'primarySite']);
         $content = $template->content ?? '';
 
         $mergeData = $this->buildMergeData($profile, $offer, $extra);
 
         foreach ($mergeData as $placeholder => $value) {
-            $content = str_replace($placeholder, (string) ($value ?? ''), $content);
+            $content = str_replace($placeholder, $this->normalizeValue($value), $content);
         }
 
-        // Check for unresolved placeholders
-        if (preg_match_all('/\{\{(\w+)\}\}/', $content, $matches)) {
+        if (preg_match_all('/\{\{\s*([a-zA-Z0-9_.-]+)\s*\}\}/', $content, $matches)) {
+            $unresolved = array_values(array_unique($matches[0]));
+            $content = str_replace($unresolved, '', $content);
+
             Log::warning('Unresolved merge fields in template', [
                 'template_id' => $template->id,
-                'unresolved' => $matches[1],
+                'employee_profile_id' => $profile->id,
+                'unresolved' => $unresolved,
             ]);
         }
 
@@ -108,34 +104,14 @@ class HrDocumentMergeService
      */
     public function generateDocument(HrDocumentTemplate $template, HrEmployeeProfile $profile, int $generatedBy, ?HrOffer $offer = null, array $extra = []): HrDocument
     {
-        // TODO: Call mergeTemplate() to produce the merged content
-        // TODO: Determine the output format (HTML, PDF, or plain text) based on template category
-        // TODO: If PDF generation is needed, use a PDF library (or fall back to HTML)
-        // TODO: Store the file on the 'private' disk under hr-documents/{tenant_id}/{employee_id}/
-        // TODO: Create an HrDocument record with:
-        //       - employee_profile_id
-        //       - template_id
-        //       - title (template name + date)
-        //       - category (from template)
-        //       - storage_disk, storage_path, original_name, mime_type, size_bytes
-        //       - generated_from_template = true
-        //       - created_by = generatedBy
-        // TODO: Fire DocumentGenerated event
-        // TODO: Log audit trail entry
-        // TODO: Return the HrDocument
-
         $mergedContent = $this->mergeTemplate($template, $profile, $offer, $extra);
+        $slug = Str::slug((string) ($template->name ?: 'template'));
+        $stamp = now()->format('Ymd_His');
 
-        $filename = sprintf(
-            'hr-documents/%d/%d/%s_%s.html',
-            $profile->tenant_id,
-            $profile->id,
-            str($template->name)->slug(),
-            now()->format('Y-m-d_His')
-        );
+        $filename = "hr-documents/{$profile->tenant_id}/{$profile->id}/generated_{$slug}_{$stamp}.html";
 
         Storage::disk('private')->put($filename, $mergedContent);
-        $sizeBytes = Storage::disk('private')->size($filename);
+        $sizeBytes = (int) (Storage::disk('private')->size($filename) ?: strlen($mergedContent));
 
         return HrDocument::create([
             'tenant_id' => $profile->tenant_id,
@@ -180,14 +156,11 @@ class HrDocumentMergeService
      */
     public function getAvailableFields(string $category): array
     {
-        // TODO: Filter MERGE_FIELDS based on category
-        // TODO: 'offer_letter' category includes all fields
-        // TODO: 'general' excludes offer-specific fields
-        // TODO: Add any custom fields defined on the template
-
         $fields = self::MERGE_FIELDS;
 
-        if ($category !== 'offer_letter') {
+        $offerCategories = ['offer', 'offer_letter', 'employment_offer'];
+
+        if (! in_array($category, $offerCategories, true)) {
             $fields = array_filter($fields, function ($key) {
                 return ! str_starts_with($key, '{{offer_');
             }, ARRAY_FILTER_USE_KEY);
@@ -203,6 +176,10 @@ class HrDocumentMergeService
      */
     protected function buildMergeData(HrEmployeeProfile $profile, ?HrOffer $offer, array $extra): array
     {
+        $profile->loadMissing(['user', 'primarySite']);
+
+        $currentDate = now()->format('d F Y');
+
         $data = [
             '{{employee_name}}' => $profile->user?->name,
             '{{employee_number}}' => $profile->employee_number,
@@ -221,7 +198,8 @@ class HrDocumentMergeService
             '{{site_name}}' => $profile->primarySite?->name,
             '{{site_address}}' => $profile->primarySite?->address,
             '{{company_name}}' => config('app.name'),
-            '{{current_date}}' => now()->format('d F Y'),
+            '{{current_date}}' => $currentDate,
+            '{{date}}' => $currentDate,
             '{{current_year}}' => (string) now()->year,
         ];
 
@@ -233,10 +211,39 @@ class HrDocumentMergeService
         }
 
         foreach ($extra as $key => $value) {
-            $placeholder = str_starts_with($key, '{{') ? $key : '{{' . $key . '}}';
-            $data[$placeholder] = $value;
+            $normalizedKey = trim((string) $key);
+            if ($normalizedKey === '') {
+                continue;
+            }
+
+            $placeholder = str_starts_with($normalizedKey, '{{') ? $normalizedKey : '{{' . $normalizedKey . '}}';
+            $data[$placeholder] = $this->normalizeValue($value);
         }
 
         return $data;
+    }
+
+    /**
+     * @param  mixed  $value
+     */
+    protected function normalizeValue($value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        if (is_bool($value)) {
+            return $value ? 'Yes' : 'No';
+        }
+
+        if (is_array($value)) {
+            return implode(', ', array_map(fn ($item) => $this->normalizeValue($item), $value));
+        }
+
+        if (is_scalar($value)) {
+            return (string) $value;
+        }
+
+        return json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '';
     }
 }

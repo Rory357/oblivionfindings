@@ -2,10 +2,28 @@
 
 namespace App\Domain\Roadmap\Services;
 
+use App\Domain\Governance\Models\Budget;
 use App\Domain\Roadmap\Models\Initiative;
+use Illuminate\Support\Facades\Schema;
 
 class RoadmapBudgetReplanService
 {
+    /**
+     * Get the approved governance budget envelope amount, or null if unavailable.
+     */
+    public function getGovernanceBudgetEnvelope(): ?float
+    {
+        if (! Schema::hasTable('budgets')) {
+            return null;
+        }
+
+        $budget = Budget::approved()
+            ->latest('approved_by_board_at')
+            ->first();
+
+        return $budget ? (float) $budget->total_budget : null;
+    }
+
     public function replanForBudgetCut(float $newEnvelope, ?int $tenantId = null): array
     {
         $initiatives = Initiative::query()

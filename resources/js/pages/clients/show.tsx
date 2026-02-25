@@ -1,6 +1,7 @@
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -870,19 +871,28 @@ export default function ClientShow({
                                                     <div className="font-medium">
                                                         Disabilities
                                                     </div>
-                                                    <div className="whitespace-pre-wrap text-slate-600">
-                                                        {medical.profile
-                                                            ?.disabilities ||
-                                                            '-'}
+                                                    <div className="mt-1">
+                                                        {Array.isArray(medical.profile?.disabilities) && medical.profile.disabilities.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {medical.profile.disabilities.map((d: string) => (
+                                                                    <Badge key={d} variant="secondary" className="text-xs">{d}</Badge>
+                                                                ))}
+                                                            </div>
+                                                        ) : '-'}
                                                     </div>
                                                 </div>
                                                 <div>
                                                     <div className="font-medium">
                                                         Allergies
                                                     </div>
-                                                    <div className="whitespace-pre-wrap text-slate-600">
-                                                        {medical.profile
-                                                            ?.allergies || '-'}
+                                                    <div className="mt-1">
+                                                        {Array.isArray(medical.profile?.allergies) && medical.profile.allergies.length > 0 ? (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                {medical.profile.allergies.map((a: string) => (
+                                                                    <Badge key={a} variant="destructive" className="text-xs">{a}</Badge>
+                                                                ))}
+                                                            </div>
+                                                        ) : '-'}
                                                     </div>
                                                 </div>
                                                 <div>
@@ -1335,8 +1345,9 @@ export default function ClientShow({
                                                     `/clients/${client.id}/notes`,
                                                     {
                                                         preserveScroll: true,
-                                                        onSuccess: () =>
-                                                            noteForm.reset({
+                                                        onSuccess: () => {
+                                                            noteForm.reset();
+                                                            noteForm.setData({
                                                                 type: 'note',
                                                                 subject: '',
                                                                 goal: '',
@@ -1344,7 +1355,8 @@ export default function ClientShow({
                                                                 visibility:
                                                                     'internal',
                                                                 pin: false,
-                                                            }),
+                                                            });
+                                                        },
                                                     },
                                                 )
                                             }
