@@ -64,7 +64,7 @@ class FeedController extends Controller
             ],
             'kudosCategories' => FeedService::KUDOS_CATEGORIES,
             'postTypes' => FeedService::POST_TYPES,
-            'employees' => \App\Models\User::where('tenant_id', $tenantId)
+            'employees' => \App\Models\User::query()
                 ->select('id', 'name')
                 ->orderBy('name')
                 ->get(),

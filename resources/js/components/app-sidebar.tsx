@@ -380,6 +380,7 @@ function buildNavigationGroups({
         }
         if (can?.hr?.performance?.view) {
             hrGroup.items.push({ title: 'Performance', href: '/hr/performance', icon: ClipboardCheck });
+            hrGroup.items.push({ title: '360 Feedback', href: '/hr/feedback', icon: Users });
         }
         if (can?.hr?.compensation?.view) {
             hrGroup.items.push({ title: 'Compensation', href: '/hr/compensation/bands', icon: DollarSign });
@@ -396,9 +397,11 @@ function buildNavigationGroups({
         if (can?.hr?.assets?.view) {
             hrGroup.items.push({ title: 'Assets', href: '/hr/assets', icon: Package });
         }
+        hrGroup.items.push({ title: 'Community Feed', href: '/hr/feed', icon: MessageSquareText });
         hrGroup.items.push({ title: 'Time Off Calendar', href: '/hr/calendar/time-off', icon: CalendarDays });
         if (can?.hr?.analytics?.view) {
             hrGroup.items.push({ title: 'Analytics', href: '/hr/analytics', icon: LayoutGrid });
+            hrGroup.items.push({ title: 'Wellbeing', href: '/hr/wellbeing', icon: Target });
         }
         if (can?.hr?.surveys?.view) {
             hrGroup.items.push({ title: 'Surveys', href: '/hr/surveys', icon: ClipboardList });
@@ -411,6 +414,9 @@ function buildNavigationGroups({
         }
         if (can?.hr?.calendar?.view) {
             hrGroup.items.push({ title: 'Calendar', href: '/hr/calendar', icon: CalendarDays });
+        }
+        if (can?.hr?.recruitment?.view) {
+            hrGroup.items.push({ title: 'Job Postings', href: '/hr/job-postings', icon: Briefcase });
         }
         if (can?.hr?.announcements?.view) {
             hrGroup.items.push({ title: 'Announcements', href: '/hr/announcements', icon: MessageSquareText });
