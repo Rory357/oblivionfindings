@@ -322,9 +322,136 @@ class DashboardController extends Controller
             ];
         }
 
+        // Determine dashboard mode
+        $mode = 'staff';
+        if ($user->canDo('shifts.manageAny') || $user->canDo('timesheets.manageAny')) {
+            $mode = 'manager';
+        }
+        // HR Admin override - if user primarily has HR permissions
+        if ($user->canDo('hr.analytics.view') && !$user->canDo('shifts.manageAny')) {
+            $mode = 'hr_admin';
+        }
+
+        // HR Admin dashboard data
+        $hrAdmin = null;
+        if ($mode === 'hr_admin') {
+            $headcount = HrEmployeeProfile::where('is_active', true)->count();
+
+            // Headcount trend sparkline (last 12 months of start_date counts)
+            $headcountTrend = [];
+            $headcountSeries = [];
+            for ($m = 11; $m >= 0; $m--) {
+                $monthStart = now()->subMonths($m)->startOfMonth();
+                $monthEnd = (clone $monthStart)->endOfMonth();
+                $monthLabel = $monthStart->format('M Y');
+                $activeAtMonth = HrEmployeeProfile::where('is_active', true)
+                    ->where('start_date', '<=', $monthEnd)
+                    ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $monthStart))
+                    ->count();
+                $headcountTrend[] = $activeAtMonth;
+                $headcountSeries[] = ['month' => $monthLabel, 'count' => $activeAtMonth];
+            }
+
+            $vacancies = HrPosition::where('is_active', true)
+                ->whereColumn('current_headcount', '<', 'headcount_budget')
+                ->count();
+
+            $pendingLeave = HrLeaveRequest::where('status', 'pending')->count();
+
+            // Compliance score: % of compliance statuses that are 'compliant'
+            $totalCompliance = HrStaffComplianceStatus::count();
+            $compliantCount = HrStaffComplianceStatus::where('status', 'compliant')->count();
+            $complianceScore = $totalCompliance > 0
+                ? (int) round(($compliantCount / $totalCompliance) * 100)
+                : 100;
+
+            // Department breakdown
+            $departmentBreakdown = HrEmployeeProfile::where('is_active', true)
+                ->select('department', DB::raw('COUNT(*) as c'))
+                ->groupBy('department')
+                ->orderByDesc('c')
+                ->get()
+                ->map(fn ($r) => [
+                    'department' => (string) ($r->department ?? 'Unassigned'),
+                    'count' => (int) $r->c,
+                ])
+                ->values();
+
+            // Recent feed posts
+            $recentFeedPosts = HrFeedPost::with('user:id,name')
+                ->orderByDesc('created_at')
+                ->limit(10)
+                ->get()
+                ->map(fn ($p) => [
+                    'id' => $p->id,
+                    'post_type' => $p->post_type,
+                    'content' => $p->content,
+                    'created_at' => $p->created_at?->toISOString(),
+                    'user' => $p->user ? ['id' => $p->user->id, 'name' => $p->user->name] : null,
+                ])
+                ->values();
+
+            // Expiring compliance items
+            $expiringCompliance = HrStaffComplianceStatus::where('status', 'expiring_soon')
+                ->with(['user:id,name', 'requirement:id,name'])
+                ->orderBy('expires_at')
+                ->limit(10)
+                ->get()
+                ->map(fn ($s) => [
+                    'user_id' => $s->user_id,
+                    'user_name' => $s->user?->name ?? 'Unknown',
+                    'requirement_name' => $s->requirement?->name ?? 'Unknown',
+                    'expires_at' => $s->expires_at?->toISOString(),
+                ])
+                ->values();
+
+            $hrAdmin = [
+                'headcount' => $headcount,
+                'headcountTrend' => $headcountTrend,
+                'vacancies' => $vacancies,
+                'pendingLeave' => $pendingLeave,
+                'complianceScore' => $complianceScore,
+                'headcountSeries' => $headcountSeries,
+                'departmentBreakdown' => $departmentBreakdown,
+                'recentFeedPosts' => $recentFeedPosts,
+                'expiringCompliance' => $expiringCompliance,
+            ];
+        }
+
+        // Staff-specific KPIs
+        $staffKpis = null;
+        if ($mode === 'staff') {
+            $myShiftsToday = Shift::where('user_id', $user->id)
+                ->whereBetween('starts_at', [$today, $tomorrow])
+                ->count();
+
+            // Leave balance from HrLeaveBalance if available
+            $leaveBalance = null;
+            $hrLeaveBalance = \App\Domain\Hr\Models\HrLeaveBalance::where('user_id', $user->id)->first();
+            if ($hrLeaveBalance) {
+                $leaveBalance = (float) ($hrLeaveBalance->balance_hours ?? $hrLeaveBalance->balance ?? 0);
+            }
+
+            // Compliance percentage for this user
+            $userCompTotal = HrStaffComplianceStatus::where('user_id', $user->id)->count();
+            $userCompCompliant = HrStaffComplianceStatus::where('user_id', $user->id)->where('status', 'compliant')->count();
+            $compliancePercent = $userCompTotal > 0
+                ? (int) round(($userCompCompliant / $userCompTotal) * 100)
+                : null;
+
+            $staffKpis = [
+                'myShiftsToday' => $myShiftsToday,
+                'leaveBalance' => $leaveBalance,
+                'compliancePercent' => $compliancePercent,
+                'pendingTasks' => $myDayItems->count(),
+            ];
+        }
+
         return inertia('dashboard', [
-            'mode' => $user->canDo('shifts.manageAny') || $user->canDo('timesheets.manageAny') ? 'manager' : 'staff',
+            'mode' => $mode,
             'hrWidgets' => $hrWidgets,
+            'hrAdmin' => $hrAdmin,
+            'staffKpis' => $staffKpis,
             'filters' => [
                 'range' => $range,
                 'status' => $status ?? 'all',

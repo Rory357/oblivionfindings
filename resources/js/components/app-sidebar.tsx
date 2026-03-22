@@ -108,13 +108,13 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     return -1;
 }
 
-function isIconActive(currentUrl: string, item: IconNavItem, hrSubPanelGroups?: SubPanelGroup[]): boolean {
+function isIconActive(currentUrl: string, item: IconNavItem, subPanelGroups?: SubPanelGroup[]): boolean {
     if (item.href) {
         return matchScore(currentUrl, item.href) > 0;
     }
-    // For sub-panel items (HR, governance, etc.), check if any child is active
-    if (item.subPanel && item.id === 'hr' && hrSubPanelGroups) {
-        return hrSubPanelGroups.some(group =>
+    // For sub-panel items, check if any child is active
+    if (item.subPanel && subPanelGroups) {
+        return subPanelGroups.some(group =>
             group.items.some(sub => matchScore(currentUrl, sub.href) > 0)
         );
     }
@@ -139,45 +139,22 @@ function buildIconNavItems({
         { id: 'today', icon: ClipboardList, label: 'Today', href: '/today', dividerAfter: true },
     ];
 
-    // Sites
+    // Sites & Locations
     if (can?.sites?.viewAny) {
-        items.push({ id: 'sites', icon: Building2, label: 'Sites', href: '/sites' });
+        items.push({ id: 'sites', icon: Building2, label: 'Sites & Locations', subPanel: true });
     }
 
-    // Clients
-    if (can?.clients?.viewAny || role === 'support_worker') {
-        items.push({ id: 'clients', icon: Users, label: 'Clients', href: '/clients' });
+    // Operations (Clients, Shifts, Timesheets, Rostering)
+    const hasOps = can?.clients?.viewAny || can?.shifts?.viewAny || can?.timesheets?.viewAny || can?.timesheets?.viewAssigned || role === 'support_worker';
+    if (hasOps) {
+        items.push({ id: 'operations', icon: Users, label: 'Operations', subPanel: true });
     }
 
-    // Shifts
-    if (can?.shifts?.viewAny || role === 'support_worker') {
-        items.push({ id: 'shifts', icon: CalendarDays, label: 'Shifts', href: '/shifts' });
-    }
-
-    // Timesheets
-    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned || role === 'support_worker') {
-        items.push({ id: 'timesheets', icon: Clock, label: 'Timesheets', href: '/timesheets' });
-    }
-
-    // Rostering
-    if (can?.rostering?.viewAny) {
-        items.push({ id: 'rostering', icon: CalendarDays, label: 'Rostering', href: '/rostering', dividerAfter: true });
-    } else {
-        // add divider to last item
-        if (items.length > 0) {
-            items[items.length - 1].dividerAfter = true;
-        }
-    }
-
-    // Incidents
-    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned) {
-        items.push({ id: 'incidents', icon: ShieldAlert, label: 'Incidents', href: '/incidents' });
-    }
-
-    // Compliance
-    if (can?.compliance?.view) {
-        items.push({ id: 'compliance', icon: Shield, label: 'Compliance', href: '/compliance', dividerAfter: true });
-    } else if (items.length > 0 && (can?.incidents?.viewAny || can?.incidents?.viewAssigned)) {
+    // Compliance & Safety
+    const hasSafety = can?.incidents?.viewAny || can?.incidents?.viewAssigned || can?.compliance?.view || can?.hazards?.view;
+    if (hasSafety) {
+        items.push({ id: 'safety', icon: ShieldAlert, label: 'Compliance & Safety', subPanel: true, dividerAfter: true });
+    } else if (items.length > 0) {
         items[items.length - 1].dividerAfter = true;
     }
 
@@ -186,18 +163,77 @@ function buildIconNavItems({
 
     // Governance
     if (can?.governance?.view) {
-        items.push({ id: 'governance', icon: Landmark, label: 'Governance', href: '/governance/dashboard', dividerAfter: true });
+        items.push({ id: 'governance', icon: Landmark, label: 'Governance', subPanel: true, dividerAfter: true });
     }
 
-    // Reports
-    if (can?.reports?.viewAny) {
-        items.push({ id: 'reports', icon: FileText, label: 'Reports', href: '/reports' });
+    // System
+    const hasSystem = can?.reports?.viewAny || can?.audit?.viewAny || can?.settings?.manageAccess;
+    if (hasSystem) {
+        items.push({ id: 'system', icon: FileText, label: 'System', subPanel: true });
     }
 
     return items;
 }
 
-// ── Build HR sub-panel groups ──────────────────────────────────────────────
+// ── Build sub-panel groups for each section ──────────────────────────────
+
+function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    const items: NavItem[] = [
+        { title: 'All Sites', href: '/sites', icon: Building2 },
+    ];
+    if (can?.sites?.types?.houseView) items.push({ title: 'Houses', href: '/sites?type=house', icon: Home });
+    if (can?.calendar?.viewAny) items.push({ title: 'Calendars', href: '/calendar', icon: CalendarDays });
+    if (can?.checklists?.view) items.push({ title: 'Checklists', href: '/checklists', icon: ClipboardCheck });
+    if (can?.hazards?.view) items.push({ title: 'Hazards', href: '/hazards', icon: ShieldAlert });
+    if (can?.vendors?.view) items.push({ title: 'Vendors', href: '/vendors', icon: Package });
+    return [{ label: 'Sites & Locations', items }];
+}
+
+function buildOperationsSubPanelGroups({ can, role }: { can?: any; role?: string | null }): SubPanelGroup[] {
+    const items: NavItem[] = [];
+    if (can?.clients?.viewAny || role === 'support_worker') items.push({ title: 'Clients', href: '/clients', icon: Users });
+    if (can?.shifts?.viewAny || role === 'support_worker') items.push({ title: 'Shifts', href: '/shifts', icon: CalendarDays });
+    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned || role === 'support_worker') items.push({ title: 'Timesheets', href: '/timesheets', icon: Clock });
+    if (can?.rostering?.viewAny) items.push({ title: 'Rostering', href: '/rostering', icon: CalendarDays });
+    if (can?.medications?.view) items.push({ title: 'Medications', href: '/medications', icon: Shield });
+    if (can?.fleet?.viewAny) items.push({ title: 'Fleet', href: '/fleet', icon: Package });
+    return [{ label: 'Operations', items }];
+}
+
+function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    const items: NavItem[] = [];
+    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned) items.push({ title: 'Incidents', href: '/incidents', icon: ShieldAlert });
+    if (can?.safeguarding?.viewAny) items.push({ title: 'Safeguarding', href: '/safeguarding', icon: Shield });
+    if (can?.compliance?.view) items.push({ title: 'Compliance', href: '/compliance', icon: Shield });
+    if (can?.hazards?.view) items.push({ title: 'Hazards', href: '/hazards', icon: ShieldAlert });
+    if (can?.risks?.viewAny) items.push({ title: 'Risks', href: '/risks', icon: Target });
+    return [{ label: 'Compliance & Safety', items }];
+}
+
+function buildGovernanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    const items: NavItem[] = [
+        { title: 'Dashboard', href: '/governance/dashboard', icon: Landmark },
+        { title: 'Meetings', href: '/governance/meetings', icon: CalendarDays },
+    ];
+    if (can?.governance?.meetings?.manage) items.push({ title: 'Admin', href: '/governance/admin/board-members', icon: Users });
+    items.push({ title: 'Risks', href: '/governance/risks', icon: Target });
+    items.push({ title: 'Resolutions', href: '/governance/resolutions', icon: ClipboardCheck });
+    items.push({ title: 'Compliance', href: '/governance/compliance', icon: Shield });
+    items.push({ title: 'Strategy', href: '/governance/strategy', icon: Target });
+    items.push({ title: 'Budgets', href: '/governance/budgets', icon: DollarSign });
+    items.push({ title: 'Action Items', href: '/governance/actions', icon: ClipboardList });
+    return [{ label: 'Governance', items }];
+}
+
+function buildSystemSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    const items: NavItem[] = [];
+    if (can?.reports?.viewAny) items.push({ title: 'Reports', href: '/reports', icon: FileText });
+    if (can?.calendar?.viewAny) items.push({ title: 'Calendar', href: '/calendar', icon: CalendarDays });
+    if (can?.timeline?.viewAny) items.push({ title: 'Timeline', href: '/timeline', icon: Clock });
+    if (can?.audit?.viewAny) items.push({ title: 'Audit Logs', href: '/audit', icon: FileText });
+    if (can?.settings?.manageAccess) items.push({ title: 'Settings', href: '/settings', icon: Settings });
+    return [{ label: 'System', items }];
+}
 
 function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const groups: SubPanelGroup[] = [];
@@ -333,10 +369,12 @@ function SubPanel({
     groups,
     currentUrl,
     onClose,
+    title = '',
 }: {
     groups: SubPanelGroup[];
     currentUrl: string;
     onClose: () => void;
+    title?: string;
 }) {
     const panelRef = useRef<HTMLDivElement>(null);
 
@@ -367,7 +405,7 @@ function SubPanel({
         >
             {/* Panel header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-sidebar-border/50">
-                <span className="text-sm font-semibold text-sidebar-foreground">HR</span>
+                <span className="text-sm font-semibold text-sidebar-foreground">{title || 'Menu'}</span>
                 <button
                     onClick={onClose}
                     className="flex items-center justify-center w-6 h-6 rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
@@ -425,22 +463,30 @@ export function AppSidebar() {
     const displayName: string = (branding as any)?.name ?? appName ?? 'Oblivion Findings';
     const logoUrl: string | null = (branding as any)?.logoUrl ?? null;
 
-    const [subPanelOpen, setSubPanelOpen] = useState(false);
+    const [openPanelId, setOpenPanelId] = useState<string | null>(null);
 
     const iconNavItems = useMemo(() => buildIconNavItems({ role, can }), [role, can]);
-    const hrSubPanelGroups = useMemo(() => buildHrSubPanelGroups({ can }), [can]);
 
-    const toggleSubPanel = useCallback(() => {
-        setSubPanelOpen((prev) => !prev);
+    const subPanelMap = useMemo(() => ({
+        sites: buildSitesSubPanelGroups({ can }),
+        operations: buildOperationsSubPanelGroups({ can, role }),
+        safety: buildSafetySubPanelGroups({ can }),
+        hr: buildHrSubPanelGroups({ can }),
+        governance: buildGovernanceSubPanelGroups({ can }),
+        system: buildSystemSubPanelGroups({ can }),
+    }), [can, role]);
+
+    const toggleSubPanel = useCallback((id: string) => {
+        setOpenPanelId((prev) => (prev === id ? null : id));
     }, []);
 
     const closeSubPanel = useCallback(() => {
-        setSubPanelOpen(false);
+        setOpenPanelId(null);
     }, []);
 
     // Close sub-panel on navigation
     useEffect(() => {
-        setSubPanelOpen(false);
+        setOpenPanelId(null);
     }, [currentUrl]);
 
     return (
@@ -469,24 +515,26 @@ export function AppSidebar() {
                     {/* Middle: Nav icons */}
                     <div className="flex flex-1 flex-col items-center gap-1 overflow-y-auto scrollbar-none w-full px-2">
                         {iconNavItems.map((item) => {
-                            const active = isIconActive(currentUrl, item, hrSubPanelGroups);
+                            const panelGroups = item.subPanel ? (subPanelMap as any)[item.id] as SubPanelGroup[] | undefined : undefined;
+                            const active = isIconActive(currentUrl, item, panelGroups);
 
                             if (item.subPanel) {
+                                const isPanelOpen = openPanelId === item.id;
                                 return (
                                     <div key={item.id} className={cn(item.dividerAfter && 'mb-1 pb-1 border-b border-sidebar-border/30 w-full flex justify-center')}>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <button
                                                     data-sub-panel-trigger
-                                                    onClick={toggleSubPanel}
+                                                    onClick={() => toggleSubPanel(item.id)}
                                                     className={cn(
                                                         'flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
-                                                        active || subPanelOpen
+                                                        active || isPanelOpen
                                                             ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                                                             : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent',
                                                     )}
                                                 >
-                                                    <item.icon className="h-5 w-5" />
+                                                    <item.icon className="h-6 w-6" />
                                                 </button>
                                             </TooltipTrigger>
                                             <TooltipContent side="right">{item.label}</TooltipContent>
@@ -509,7 +557,7 @@ export function AppSidebar() {
                                                         : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent',
                                                 )}
                                             >
-                                                <item.icon className="h-5 w-5" />
+                                                <item.icon className="h-6 w-6" />
                                             </Link>
                                         </TooltipTrigger>
                                         <TooltipContent side="right">{item.label}</TooltipContent>
@@ -570,12 +618,13 @@ export function AppSidebar() {
                     </div>
                 </nav>
 
-                {/* Sub-panel (slides out) */}
-                {subPanelOpen && (
+                {/* Sub-panel (slides out for any section) */}
+                {openPanelId && (subPanelMap as any)[openPanelId] && (
                     <SubPanel
-                        groups={hrSubPanelGroups}
+                        groups={(subPanelMap as any)[openPanelId]}
                         currentUrl={currentUrl}
                         onClose={closeSubPanel}
+                        title={iconNavItems.find(i => i.id === openPanelId)?.label ?? ''}
                     />
                 )}
             </div>
