@@ -45,11 +45,15 @@ use App\Http\Controllers\Hr\JobPostingController;
 use App\Http\Controllers\Hr\WellbeingController;
 use App\Http\Controllers\Hr\FeedController;
 use App\Http\Controllers\Hr\FeedbackController;
+use App\Http\Controllers\Hr\ICalController;
 use Illuminate\Support\Facades\Route;
 
 /**
  * HR Module Routes
  */
+
+// Public iCal feed (no auth — uses token)
+Route::get('/hr/ical/{token}.ics', [ICalController::class, 'feed'])->name('hr.ical.feed');
 
 Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
@@ -76,6 +80,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/expenses', [MyHrController::class, 'storeExpense'])->name('expenses.store');
         Route::get('/payslips', [PayslipController::class, 'myPayslips'])->name('payslips');
         Route::post('/check-in', [MyHrController::class, 'checkIn'])->name('checkin');
+        Route::post('/ical-token', [ICalController::class, 'generateToken'])->name('ical.generate');
     });
 
     /*
@@ -425,6 +430,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/payroll/runs', [PayrollExportController::class, 'createRun'])->name('payroll.runs.store');
             Route::post('/payroll/runs/{run}/lock', [PayrollExportController::class, 'lockRun'])->name('payroll.runs.lock');
             Route::post('/payroll/runs/{run}/export', [PayrollExportController::class, 'export'])->name('payroll.runs.export');
+            Route::post('/payroll/runs/{run}/export-formatted', [PayrollExportController::class, 'exportFormatted'])->name('payroll.runs.export-formatted');
             Route::post('/payroll/payslips/generate', [PayslipController::class, 'generate'])->name('payroll.payslips.generate');
         });
     });

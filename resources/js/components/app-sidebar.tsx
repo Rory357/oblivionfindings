@@ -355,8 +355,9 @@ function buildNavigationGroups({
         || can?.hr?.policies?.view || can?.hr?.positions?.view || can?.hr?.time?.view
         || can?.hr?.compensation?.view;
 
-    // Directory is visible to all authenticated users
+    // Always-visible items
     hrGroup.items.push({ title: 'Directory', href: '/hr/directory', icon: Users });
+    hrGroup.items.push({ title: 'My Payslips', href: '/hr/my/payslips', icon: FileText });
 
     if (hasAnyHr) {
         if (can?.hr?.recruitment?.view) {
@@ -429,6 +430,7 @@ function buildNavigationGroups({
         if (can?.hr?.reports?.view) {
             hrGroup.items.push({ title: 'Reports', href: '/hr/reports', icon: FileText });
         }
+        hrGroup.items.push({ title: 'HR Settings', href: '/hr/settings/webhooks', icon: Settings });
     }
 
     // Governance

@@ -108,4 +108,31 @@ class PayrollExportController extends Controller
             'Content-Type' => 'text/csv',
         ]);
     }
+
+    /**
+     * Export payroll run in a specific format (Xero, MYOB, iPayroll, Bank).
+     */
+    public function exportFormatted(Request $request, HrPayrollRun $run)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+
+        $format = $request->input('format', 'xero');
+        $service = app(\App\Domain\Hr\Services\PayrollExportFormatService::class);
+
+        $content = match ($format) {
+            'xero' => $service->exportToXero($run),
+            'myob' => $service->exportToMyob($run),
+            'ipayroll' => $service->exportToIPayroll($run),
+            'bank' => $service->exportToBankFile($run),
+            default => $service->exportToXero($run),
+        };
+
+        $filename = "payroll-run-{$run->id}-{$format}.csv";
+
+        return response($content, 200, [
+            'Content-Type' => 'text/csv',
+            'Content-Disposition' => "attachment; filename=\"{$filename}\"",
+        ]);
+    }
 }
