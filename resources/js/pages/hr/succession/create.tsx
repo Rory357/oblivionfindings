@@ -1,0 +1,90 @@
+import AppLayout from '@/layouts/app-layout';
+import PageShell from '@/components/page-shell';
+import PageHeader from '@/components/page-header';
+import { Head, useForm } from '@inertiajs/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+
+type Props = {
+    positions: Array<{ id: number; title: string }>;
+    employees: Array<{ id: number; name: string }>;
+};
+
+const breadcrumbs = [
+    { title: 'HR', href: '/hr' },
+    { title: 'Succession', href: '/hr/succession' },
+    { title: 'Create', href: '/hr/succession/create' },
+];
+
+export default function SuccessionCreate({ positions, employees }: Props) {
+    const { data, setData, post, processing, errors } = useForm({
+        role_title: '',
+        department: '',
+        risk_level: 'medium',
+        position_id: '',
+        current_holder_user_id: '',
+        notes: '',
+    });
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        post('/hr/succession');
+    }
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Create Succession Plan" />
+            <PageShell>
+                <PageHeader title="Create Succession Plan" description="Define a key role and identify potential successors." />
+                <form onSubmit={handleSubmit}>
+                    <Card>
+                        <CardHeader><CardTitle>Plan Details</CardTitle></CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-sm font-medium">Role Title *</label>
+                                    <Input value={data.role_title} onChange={e => setData('role_title', e.target.value)} placeholder="e.g. Head of Operations" />
+                                    {errors.role_title && <p className="text-sm text-red-500 mt-1">{errors.role_title}</p>}
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">Department</label>
+                                    <Input value={data.department} onChange={e => setData('department', e.target.value)} />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-sm font-medium">Risk Level *</label>
+                                    <Select value={data.risk_level} onValueChange={v => setData('risk_level', v)}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="low">Low</SelectItem>
+                                            <SelectItem value="medium">Medium</SelectItem>
+                                            <SelectItem value="high">High</SelectItem>
+                                            <SelectItem value="critical">Critical</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <label className="text-sm font-medium">Current Holder</label>
+                                    <Select value={data.current_holder_user_id} onValueChange={v => setData('current_holder_user_id', v)}>
+                                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                        <SelectContent>
+                                            {employees.map(e => <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-sm font-medium">Notes</label>
+                                <textarea className="w-full rounded-md border bg-transparent px-3 py-2 text-sm" rows={3} value={data.notes} onChange={e => setData('notes', e.target.value)} />
+                            </div>
+                            <Button type="submit" disabled={processing}>Create Plan</Button>
+                        </CardContent>
+                    </Card>
+                </form>
+            </PageShell>
+        </AppLayout>
+    );
+}

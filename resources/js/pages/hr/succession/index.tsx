@@ -1,0 +1,100 @@
+import AppLayout from '@/layouts/app-layout';
+import PageShell from '@/components/page-shell';
+import PageHeader from '@/components/page-header';
+import { Head, Link, router } from '@inertiajs/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Users, Plus, Shield } from 'lucide-react';
+
+type SuccessionPlan = {
+    id: number;
+    role_title: string;
+    department: string | null;
+    risk_level: string;
+    current_holder_name: string | null;
+    candidates_count: number;
+    is_active: boolean;
+};
+
+type Props = {
+    plans: { data: SuccessionPlan[]; current_page: number; last_page: number; total: number; links: any[] };
+    can: { manage?: boolean };
+};
+
+const breadcrumbs = [
+    { title: 'HR', href: '/hr' },
+    { title: 'Succession Planning', href: '/hr/succession' },
+];
+
+const riskConfig: Record<string, { className: string; label: string }> = {
+    critical: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Critical' },
+    high: { className: 'border-orange-500/30 text-orange-400 bg-orange-500/10', label: 'High' },
+    medium: { className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10', label: 'Medium' },
+    low: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Low' },
+};
+
+export default function SuccessionIndex({ plans, can }: Props) {
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Succession Planning" />
+            <PageShell>
+                <PageHeader
+                    title="Succession Planning"
+                    description="Identify and develop talent for key roles."
+                    actions={
+                        can.manage ? (
+                            <Button asChild>
+                                <Link href="/hr/succession/create">
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    New Plan
+                                </Link>
+                            </Button>
+                        ) : undefined
+                    }
+                />
+
+                {plans.data.length === 0 ? (
+                    <Card>
+                        <CardContent className="py-12 text-center text-muted-foreground">
+                            <Shield className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                            <p>No succession plans created yet.</p>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                        {plans.data.map((plan) => {
+                            const risk = riskConfig[plan.risk_level] || riskConfig.low;
+                            return (
+                                <Card key={plan.id} className="hover:border-primary/30 transition-colors cursor-pointer" onClick={() => router.get(`/hr/succession/${plan.id}`)}>
+                                    <CardHeader className="pb-2">
+                                        <div className="flex items-center justify-between">
+                                            <CardTitle className="text-base">{plan.role_title}</CardTitle>
+                                            <Badge variant="outline" className={risk.className}>{risk.label}</Badge>
+                                        </div>
+                                        {plan.department && <p className="text-sm text-muted-foreground">{plan.department}</p>}
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Current Holder</span>
+                                                <span>{plan.current_holder_name || 'Vacant'}</span>
+                                            </div>
+                                            <div className="flex justify-between">
+                                                <span className="text-muted-foreground">Candidates</span>
+                                                <span className="flex items-center gap-1">
+                                                    <Users className="h-3 w-3" />
+                                                    {plan.candidates_count}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
+                )}
+            </PageShell>
+        </AppLayout>
+    );
+}
