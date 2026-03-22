@@ -37,6 +37,7 @@ use App\Http\Controllers\Hr\SkillsController;
 use App\Http\Controllers\Hr\CalendarController;
 use App\Http\Controllers\Hr\AnnouncementController;
 use App\Http\Controllers\Hr\ExitInterviewController;
+use App\Http\Controllers\Hr\PayslipController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -63,6 +64,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/time/clock-in', [MyHrController::class, 'clockIn'])->name('time.clockin');
         Route::post('/time/clock-out', [MyHrController::class, 'clockOut'])->name('time.clockout');
         Route::put('/profile', [MyHrController::class, 'updateProfile'])->name('profile.update');
+        Route::get('/payslips', [PayslipController::class, 'myPayslips'])->name('payslips');
     });
 
     /*
@@ -401,11 +403,15 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.payroll.view')->group(function () {
         Route::get('/payroll', [PayrollExportController::class, 'index'])->name('payroll.index');
+        Route::get('/payroll/payslips', [PayslipController::class, 'index'])->name('payroll.payslips');
+        Route::get('/payroll/payslips/{payslip}', [PayslipController::class, 'show'])->name('payroll.payslips.show');
+        Route::get('/payroll/payslips/{payslip}/download', [PayslipController::class, 'download'])->name('payroll.payslips.download');
 
         Route::middleware('permission:hr.payroll.export')->group(function () {
             Route::post('/payroll/runs', [PayrollExportController::class, 'createRun'])->name('payroll.runs.store');
             Route::post('/payroll/runs/{run}/lock', [PayrollExportController::class, 'lockRun'])->name('payroll.runs.lock');
             Route::post('/payroll/runs/{run}/export', [PayrollExportController::class, 'export'])->name('payroll.runs.export');
+            Route::post('/payroll/payslips/generate', [PayslipController::class, 'generate'])->name('payroll.payslips.generate');
         });
     });
 
