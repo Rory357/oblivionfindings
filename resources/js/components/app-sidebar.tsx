@@ -365,6 +365,7 @@ function buildNavigationGroups({
         }
         if (can?.hr?.employees?.viewAny) {
             hrGroup.items.push({ title: 'People', href: '/hr/people', icon: Users });
+            hrGroup.items.push({ title: 'Import/Export', href: '/hr/import-export', icon: FileText });
         }
         if (can?.hr?.positions?.view) {
             hrGroup.items.push({ title: 'Positions', href: '/hr/positions', icon: Briefcase });
@@ -375,6 +376,7 @@ function buildNavigationGroups({
         }
         if (can?.hr?.leave?.viewAny) {
             hrGroup.items.push({ title: 'Leave & Rosters', href: '/hr/leave', icon: CalendarDays });
+            hrGroup.items.push({ title: 'Leave Reports', href: '/hr/leave/reports', icon: FileText });
         }
         if (can?.hr?.time?.view) {
             hrGroup.items.push({ title: 'Time Tracking', href: '/hr/time', icon: Clock });
@@ -382,6 +384,8 @@ function buildNavigationGroups({
         if (can?.hr?.performance?.view) {
             hrGroup.items.push({ title: 'Performance', href: '/hr/performance', icon: ClipboardCheck });
             hrGroup.items.push({ title: '360 Feedback', href: '/hr/feedback', icon: Users });
+            hrGroup.items.push({ title: 'PIPs', href: '/hr/performance/pips', icon: ClipboardList });
+            hrGroup.items.push({ title: 'Competencies', href: '/hr/performance/competencies', icon: Target });
         }
         if (can?.hr?.compensation?.view) {
             hrGroup.items.push({ title: 'Compensation', href: '/hr/compensation/bands', icon: DollarSign });
