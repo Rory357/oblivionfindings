@@ -542,7 +542,7 @@ export function AppSidebar() {
         <TooltipProvider delayDuration={0}>
             <div className="relative hidden md:flex">
                 {/* Icon sidebar - 56px (w-14), fixed position */}
-                <nav className="fixed top-0 left-0 z-40 flex h-svh w-14 flex-col items-center bg-sidebar border-r border-sidebar-border py-3 overflow-hidden">
+                <nav className="fixed top-0 left-0 z-40 flex h-svh w-14 flex-col items-center bg-sidebar border-r border-sidebar-border py-3 overflow-x-hidden overflow-y-hidden">
                     {/* Top: Logo */}
                     <Tooltip>
                         <TooltipTrigger asChild>
