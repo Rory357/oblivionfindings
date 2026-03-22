@@ -77,7 +77,7 @@ function NavItemComponent({ item, isActive }: { item: NavItem; isActive: boolean
                 isActive={isActive}
                 tooltip={{ children: item.title }}
             >
-                <Link href={item.href} prefetch>
+                <Link href={item.href} prefetch preserveScroll>
                     {item.icon && <item.icon />}
                     <span>{item.title}</span>
                 </Link>
