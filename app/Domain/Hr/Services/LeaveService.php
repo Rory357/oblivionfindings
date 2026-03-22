@@ -65,6 +65,7 @@ class LeaveService
                 'tenant_id' => $user->tenant_id,
                 'user_id' => $user->id,
                 'leave_type' => $leaveType,
+                'period' => $data['period'] ?? 'full_day',
                 'starts_at' => $data['starts_at'],
                 'ends_at' => $data['ends_at'],
                 'hours_requested' => $hoursRequested,

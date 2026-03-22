@@ -148,6 +148,11 @@ class HrEmployeeProfile extends Model
         return $this->hasMany(self::class, 'manager_user_id', 'user_id');
     }
 
+    public function statusChanges(): HasMany
+    {
+        return $this->hasMany(HrEmployeeStatusChange::class, 'employee_profile_id');
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */

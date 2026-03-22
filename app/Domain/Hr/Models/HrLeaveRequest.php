@@ -16,6 +16,7 @@ class HrLeaveRequest extends Model
         'tenant_id',
         'user_id',
         'leave_type',
+        'period',
         'starts_at',
         'ends_at',
         'hours_requested',

@@ -1,0 +1,130 @@
+<?php
+
+namespace App\Domain\Hr\Services;
+
+use App\Domain\Hr\Models\HrApplication;
+use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrOffer;
+use Illuminate\Support\Facades\DB;
+
+class RecruitmentAnalyticsService
+{
+    /**
+     * Average days from application to offer per month.
+     */
+    public function getTimeToHire(?int $tenantId, int $months = 12): array
+    {
+        $since = now()->subMonths($months)->startOfMonth();
+
+        $results = DB::table('hr_offers')
+            ->join('hr_applications', 'hr_offers.application_id', '=', 'hr_applications.id')
+            ->where('hr_applications.tenant_id', $tenantId)
+            ->where('hr_offers.created_at', '>=', $since)
+            ->whereNotNull('hr_offers.created_at')
+            ->selectRaw("
+                DATE_FORMAT(hr_offers.created_at, '%Y-%m') as month,
+                AVG(DATEDIFF(hr_offers.created_at, hr_applications.created_at)) as avg_days,
+                COUNT(*) as count
+            ")
+            ->groupByRaw("DATE_FORMAT(hr_offers.created_at, '%Y-%m')")
+            ->orderBy('month')
+            ->get();
+
+        return $results->map(fn ($r) => [
+            'month' => $r->month,
+            'avg_days' => round((float) $r->avg_days, 1),
+            'count' => (int) $r->count,
+        ])->toArray();
+    }
+
+    /**
+     * Candidates by source with conversion rates.
+     */
+    public function getSourceEffectiveness(?int $tenantId): array
+    {
+        $results = DB::table('hr_candidates')
+            ->where('tenant_id', $tenantId)
+            ->selectRaw("
+                source,
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'hired' THEN 1 ELSE 0 END) as hired,
+                SUM(CASE WHEN status NOT IN ('withdrawn', 'rejected') THEN 1 ELSE 0 END) as active
+            ")
+            ->groupBy('source')
+            ->orderByDesc('total')
+            ->get();
+
+        return $results->map(fn ($r) => [
+            'source' => $r->source,
+            'total' => (int) $r->total,
+            'hired' => (int) $r->hired,
+            'active' => (int) $r->active,
+            'conversion_rate' => $r->total > 0 ? round(($r->hired / $r->total) * 100, 1) : 0,
+        ])->toArray();
+    }
+
+    /**
+     * Conversion rate at each pipeline stage.
+     */
+    public function getPipelineConversion(?int $tenantId): array
+    {
+        $stages = RecruitmentService::STAGES;
+
+        $counts = DB::table('hr_candidates')
+            ->where('tenant_id', $tenantId)
+            ->selectRaw('status, COUNT(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
+
+        $total = array_sum($counts);
+        $result = [];
+
+        foreach ($stages as $stage) {
+            $count = $counts[$stage] ?? 0;
+            $result[] = [
+                'stage' => $stage,
+                'count' => $count,
+                'percentage' => $total > 0 ? round(($count / $total) * 100, 1) : 0,
+            ];
+        }
+
+        // Add terminal statuses
+        foreach (['withdrawn', 'rejected'] as $terminal) {
+            $count = $counts[$terminal] ?? 0;
+            $result[] = [
+                'stage' => $terminal,
+                'count' => $count,
+                'percentage' => $total > 0 ? round(($count / $total) * 100, 1) : 0,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Open positions, applications per position, avg time open.
+     */
+    public function getOpenPositionsSummary(?int $tenantId): array
+    {
+        $results = DB::table('hr_applications')
+            ->where('tenant_id', $tenantId)
+            ->whereNotIn('status', ['rejected', 'withdrawn'])
+            ->selectRaw("
+                position_title,
+                COUNT(*) as applications,
+                MIN(created_at) as first_application,
+                DATEDIFF(NOW(), MIN(created_at)) as days_open
+            ")
+            ->groupBy('position_title')
+            ->orderByDesc('applications')
+            ->get();
+
+        return $results->map(fn ($r) => [
+            'position_title' => $r->position_title,
+            'applications' => (int) $r->applications,
+            'days_open' => (int) $r->days_open,
+            'first_application' => $r->first_application,
+        ])->toArray();
+    }
+}
