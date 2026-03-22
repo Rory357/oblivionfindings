@@ -56,6 +56,9 @@ use App\Http\Controllers\Hr\ImportExportController;
 use App\Http\Controllers\Hr\ScorecardController;
 use App\Http\Controllers\Hr\ComplianceCalendarController;
 use App\Http\Controllers\Hr\OnboardingEmailController;
+use App\Http\Controllers\Hr\SuccessionController;
+use App\Http\Controllers\Hr\HeadcountController;
+use App\Http\Controllers\Hr\BonusController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -313,6 +316,14 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/onboarding', [OnboardingController::class, 'store'])->name('onboarding.store');
             Route::post('/onboarding/tasks/{task}/complete', [OnboardingController::class, 'completeTask'])->name('onboarding.tasks.complete');
             Route::put('/onboarding/templates', [OnboardingController::class, 'updateTemplates'])->name('onboarding.templates.update');
+
+            // Onboarding Email Sequences
+            Route::get('/onboarding/emails', [OnboardingEmailController::class, 'index'])->name('onboarding.emails');
+            Route::post('/onboarding/emails', [OnboardingEmailController::class, 'store'])->name('onboarding.emails.store');
+            Route::put('/onboarding/emails/{email}', [OnboardingEmailController::class, 'update'])->name('onboarding.emails.update');
+            Route::delete('/onboarding/emails/{email}', [OnboardingEmailController::class, 'destroy'])->name('onboarding.emails.destroy');
+            Route::get('/onboarding/emails/{email}/preview', [OnboardingEmailController::class, 'preview'])->name('onboarding.emails.preview');
+            Route::get('/onboarding/emails/log', [OnboardingEmailController::class, 'log'])->name('onboarding.emails.log');
         });
     });
 
@@ -674,6 +685,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/reports/saved', [ReportBuilderController::class, 'index'])->name('reports.saved');
         Route::post('/reports/{report}/run', [ReportBuilderController::class, 'run'])->name('reports.run');
         Route::delete('/reports/{report}', [ReportBuilderController::class, 'destroy'])->name('reports.destroy');
+        Route::post('/reports/{report}/schedule', [ReportBuilderController::class, 'schedule'])->name('reports.schedule');
 
         Route::middleware('permission:hr.reports.export')->group(function () {
             Route::post('/reports/export', [HrReportController::class, 'export'])->name('reports.export');
@@ -845,5 +857,43 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     });
     Route::middleware('permission:hr.employees.manage')->group(function () {
         Route::put('/employees/{profile}/custom-fields', [CustomFieldController::class, 'updateEmployeeFields'])->name('employees.custom-fields.update');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Succession Planning
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.performance.manage')->prefix('succession')->name('succession.')->group(function () {
+        Route::get('/', [SuccessionController::class, 'index'])->name('index');
+        Route::get('/create', [SuccessionController::class, 'create'])->name('create');
+        Route::post('/', [SuccessionController::class, 'store'])->name('store');
+        Route::get('/{plan}', [SuccessionController::class, 'show'])->name('show');
+        Route::put('/{plan}', [SuccessionController::class, 'update'])->name('update');
+        Route::post('/{plan}/candidates', [SuccessionController::class, 'addCandidate'])->name('candidates.store');
+        Route::put('/candidates/{candidate}', [SuccessionController::class, 'updateCandidate'])->name('candidates.update');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Headcount Forecasting
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.analytics.view')->group(function () {
+        Route::get('/headcount', [HeadcountController::class, 'index'])->name('headcount.index');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Bonus / Incentive Tracking
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.compensation.view')->group(function () {
+        Route::get('/compensation/bonuses', [BonusController::class, 'index'])->name('compensation.bonuses');
+        Route::middleware('permission:hr.compensation.manage')->group(function () {
+            Route::post('/compensation/bonuses', [BonusController::class, 'store'])->name('compensation.bonuses.store');
+            Route::post('/compensation/bonuses/{bonus}/approve', [BonusController::class, 'approve'])->name('compensation.bonuses.approve');
+        });
+        Route::get('/compensation/bonuses/{bonus}', [BonusController::class, 'show'])->name('compensation.bonuses.show');
     });
 });

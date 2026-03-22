@@ -206,4 +206,31 @@ class ReportBuilderController extends Controller
 
         return redirect()->route('hr.reports.saved')->with('success', 'Report deleted.');
     }
+
+    /* ------------------------------------------------------------------ */
+    /*  Schedule — toggle scheduling on a saved report                     */
+    /* ------------------------------------------------------------------ */
+
+    public function schedule(Request $request, HrSavedReport $report)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.reports.view'), 403);
+
+        $data = $request->validate([
+            'is_scheduled' => ['required', 'boolean'],
+            'schedule_frequency' => ['nullable', 'string', Rule::in(['daily', 'weekly', 'monthly'])],
+            'schedule_recipients' => ['nullable', 'array'],
+            'schedule_recipients.*' => ['integer', 'exists:users,id'],
+        ]);
+
+        $report->update([
+            'is_scheduled' => $data['is_scheduled'],
+            'schedule_frequency' => $data['is_scheduled'] ? ($data['schedule_frequency'] ?? 'weekly') : null,
+            'schedule_recipients' => $data['is_scheduled'] ? ($data['schedule_recipients'] ?? [$user->id]) : null,
+        ]);
+
+        $message = $data['is_scheduled'] ? 'Report scheduling enabled.' : 'Report scheduling disabled.';
+
+        return redirect()->back()->with('success', $message);
+    }
 }

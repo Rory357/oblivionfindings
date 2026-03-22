@@ -373,6 +373,7 @@ function buildNavigationGroups({
         hrGroup.items.push({ title: 'Org Chart', href: '/hr/orgchart', icon: GitBranch });
         if (can?.hr?.compliance?.view) {
             hrGroup.items.push({ title: 'Compliance', href: '/hr/compliance', icon: Shield });
+            hrGroup.items.push({ title: 'Compliance Calendar', href: '/hr/compliance/calendar', icon: CalendarDays });
         }
         if (can?.hr?.leave?.viewAny) {
             hrGroup.items.push({ title: 'Leave & Rosters', href: '/hr/leave', icon: CalendarDays });
@@ -386,6 +387,7 @@ function buildNavigationGroups({
             hrGroup.items.push({ title: '360 Feedback', href: '/hr/feedback', icon: Users });
             hrGroup.items.push({ title: 'PIPs', href: '/hr/performance/pips', icon: ClipboardList });
             hrGroup.items.push({ title: 'Competencies', href: '/hr/performance/competencies', icon: Target });
+            hrGroup.items.push({ title: 'Succession', href: '/hr/succession', icon: Users });
         }
         if (can?.hr?.compensation?.view) {
             hrGroup.items.push({ title: 'Compensation', href: '/hr/compensation/bands', icon: DollarSign });
@@ -406,6 +408,7 @@ function buildNavigationGroups({
         hrGroup.items.push({ title: 'Time Off Calendar', href: '/hr/calendar/time-off', icon: CalendarDays });
         if (can?.hr?.analytics?.view) {
             hrGroup.items.push({ title: 'Analytics', href: '/hr/analytics', icon: LayoutGrid });
+            hrGroup.items.push({ title: 'Headcount', href: '/hr/headcount', icon: Users });
             hrGroup.items.push({ title: 'Wellbeing', href: '/hr/wellbeing', icon: Target });
         }
         if (can?.hr?.surveys?.view) {
