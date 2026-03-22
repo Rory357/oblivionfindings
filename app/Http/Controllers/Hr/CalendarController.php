@@ -31,15 +31,15 @@ class CalendarController extends Controller
         // Merge approved leave as calendar events
         $leaveEvents = HrLeaveRequest::where('tenant_id', $user->tenant_id)
             ->where('status', 'approved')
-            ->where('start_date', '<=', $end)
-            ->where('end_date', '>=', $start)
+            ->where('starts_at', '<=', $end)
+            ->where('ends_at', '>=', $start)
             ->with('user:id,name')
             ->get()
             ->map(fn ($leave) => [
                 'id' => 'leave-' . $leave->id,
                 'title' => ($leave->user->name ?? 'Staff') . ' - ' . ucfirst($leave->leave_type ?? 'Leave'),
-                'start' => $leave->start_date,
-                'end' => $leave->end_date,
+                'start' => $leave->starts_at,
+                'end' => $leave->ends_at,
                 'allDay' => true,
                 'event_type' => 'leave',
                 'color' => '#94a3b8',

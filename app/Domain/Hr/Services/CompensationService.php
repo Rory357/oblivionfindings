@@ -43,7 +43,7 @@ class CompensationService
     /**
      * Get the active salary band for a given role within a tenant.
      */
-    public function getSalaryBandForRole(int $tenantId, string $role): ?HrSalaryBand
+    public function getSalaryBandForRole(?int $tenantId, string $role): ?HrSalaryBand
     {
         return HrSalaryBand::forTenant($tenantId)
             ->where('position_role', $role)

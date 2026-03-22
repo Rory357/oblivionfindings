@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hr;
 use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrPublicHoliday;
 use App\Domain\Hr\Services\LeaveService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -261,5 +262,79 @@ class LeaveController extends Controller
         }
 
         return redirect()->back()->with('success', 'Leave request declined.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Holidays — list public holidays                                    */
+    /* ------------------------------------------------------------------ */
+
+    public function holidays(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.leave.viewAny'), 403);
+
+        $year = (int) $request->query('year', now()->year);
+
+        $holidays = HrPublicHoliday::forYear($year)
+            ->orderBy('date')
+            ->get()
+            ->map(fn ($h) => [
+                'id' => $h->id,
+                'name' => $h->name,
+                'date' => $h->date->toDateString(),
+                'region' => $h->region,
+                'is_national' => $h->is_national,
+                'year' => $h->year,
+            ]);
+
+        return Inertia::render('hr/leave/holidays', [
+            'holidays' => $holidays,
+            'year' => $year,
+            'can' => [
+                'manage' => $user->canDo('hr.leave.manage'),
+            ],
+        ]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Store Holiday — add a custom public holiday                        */
+    /* ------------------------------------------------------------------ */
+
+    public function storeHoliday(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.leave.manage'), 403);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'date' => ['required', 'date'],
+            'region' => ['nullable', 'string', 'max:100'],
+            'is_national' => ['boolean'],
+        ]);
+
+        HrPublicHoliday::create([
+            'tenant_id' => null,
+            'name' => $validated['name'],
+            'date' => $validated['date'],
+            'region' => $validated['region'] ?? null,
+            'is_national' => $validated['is_national'] ?? false,
+            'year' => (int) date('Y', strtotime($validated['date'])),
+        ]);
+
+        return redirect()->back()->with('success', 'Public holiday added.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Destroy Holiday — remove a public holiday                          */
+    /* ------------------------------------------------------------------ */
+
+    public function destroyHoliday(Request $request, HrPublicHoliday $holiday)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.leave.manage'), 403);
+
+        $holiday->delete();
+
+        return redirect()->back()->with('success', 'Public holiday removed.');
     }
 }

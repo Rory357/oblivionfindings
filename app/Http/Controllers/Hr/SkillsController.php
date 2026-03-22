@@ -22,7 +22,7 @@ class SkillsController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.skills.viewAny'), 403);
+        abort_unless($user && $user->canDo('hr.skills.view'), 403);
 
         $tenantId = null;
         $category = $request->query('category');
@@ -54,7 +54,7 @@ class SkillsController extends Controller
                 'q' => $search,
             ],
             'can' => [
-                'create' => $user->canDo('hr.skills.create'),
+                'create' => $user->canDo('hr.skills.manage'),
                 'manage' => $user->canDo('hr.skills.manage'),
             ],
         ]);
@@ -67,7 +67,7 @@ class SkillsController extends Controller
     public function matrix(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.skills.viewAny'), 403);
+        abort_unless($user && $user->canDo('hr.skills.view'), 403);
 
         $tenantId = null;
 
@@ -90,7 +90,7 @@ class SkillsController extends Controller
     public function storeSkill(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.skills.create'), 403);
+        abort_unless($user && $user->canDo('hr.skills.manage'), 403);
 
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],

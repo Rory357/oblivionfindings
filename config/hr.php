@@ -30,6 +30,28 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Leave Policies (NZ Holidays Act 2003)
+    |--------------------------------------------------------------------------
+    */
+    'leave_policies' => [
+        'annual' => [
+            'entitlement_weeks' => 4,
+            'min_months_for_entitlement' => 12,
+            'casual_rate' => 0.08, // 8% holiday pay for casuals
+        ],
+        'sick' => [
+            'days_per_year' => 10,
+            'min_months_for_entitlement' => 6,
+            'max_carry_over_days' => 20,
+        ],
+        'bereavement' => [
+            'close_relative_days' => 3,
+            'other_days' => 1,
+        ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Retention Periods (months)
     |--------------------------------------------------------------------------
     */

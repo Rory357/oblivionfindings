@@ -24,7 +24,7 @@ class SkillsMatrixService
      * @param  array   $data
      * @return HrEmployeeSkill
      */
-    public function assessSkill(int $tenantId, int $employeeProfileId, int $skillId, array $data): HrEmployeeSkill
+    public function assessSkill(?int $tenantId, int $employeeProfileId, int $skillId, array $data): HrEmployeeSkill
     {
         return DB::transaction(function () use ($tenantId, $employeeProfileId, $skillId, $data) {
             return HrEmployeeSkill::updateOrCreate(

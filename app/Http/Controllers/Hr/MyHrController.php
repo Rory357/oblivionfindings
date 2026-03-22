@@ -10,6 +10,7 @@ use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\LeaveService;
@@ -319,6 +320,40 @@ class MyHrController extends Controller
         }
 
         return redirect()->back()->with('success', 'Clocked out successfully.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Goals (Self-Service)                                               */
+    /* ------------------------------------------------------------------ */
+
+    public function goals(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $goals = HrGoal::where('user_id', $user->id)
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $goals->getCollection()->transform(fn ($g) => [
+            'id' => $g->id,
+            'title' => $g->title,
+            'description' => $g->description,
+            'goal_type' => $g->goal_type,
+            'status' => $g->status,
+            'priority' => $g->priority,
+            'progress_percentage' => $g->progress_percentage,
+            'target_value' => $g->target_value,
+            'current_value' => $g->current_value,
+            'unit' => $g->unit,
+            'start_date' => $g->start_date?->toDateString(),
+            'due_date' => $g->due_date?->toDateString(),
+        ]);
+
+        return Inertia::render('hr/my/goals', [
+            'goals' => $goals,
+        ]);
     }
 
     /* ------------------------------------------------------------------ */

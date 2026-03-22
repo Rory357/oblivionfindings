@@ -38,7 +38,7 @@ class ExitInterviewService
      * Returns departure reason counts and average satisfaction scores
      * over a configurable period.
      */
-    public function getExitTrends(int $tenantId, ?string $fromDate = null, ?string $toDate = null): array
+    public function getExitTrends(?int $tenantId, ?string $fromDate = null, ?string $toDate = null): array
     {
         $query = HrExitInterview::forTenant($tenantId);
 

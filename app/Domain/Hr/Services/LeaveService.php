@@ -2,8 +2,10 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrPublicHoliday;
 use App\Models\StaffTimeOff;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -51,7 +53,7 @@ class LeaveService
         // TODO: Fire LeaveRequestSubmitted event (notifies manager)
         // TODO: Log audit trail entry
 
-        return DB::transaction(function () use ($user, $data) {
+        $request = DB::transaction(function () use ($user, $data) {
             $leaveType = $data['leave_type'];
             $hoursRequested = (float) $data['hours_requested'];
             $year = now()->year;
@@ -81,6 +83,10 @@ class LeaveService
 
             return $request;
         });
+
+        app(HrNotificationService::class)->notifyLeaveRequest($request);
+
+        return $request;
     }
 
     /**
@@ -109,7 +115,7 @@ class LeaveService
             throw new \LogicException("Cannot approve a '{$request->status}' leave request.");
         }
 
-        return DB::transaction(function () use ($request, $reviewer, $reviewNotes) {
+        $result = DB::transaction(function () use ($request, $reviewer, $reviewNotes) {
             $timeOff = StaffTimeOff::create([
                 'tenant_id' => $request->tenant_id,
                 'user_id' => $request->user_id,
@@ -140,6 +146,10 @@ class LeaveService
 
             return $request->fresh();
         });
+
+        app(HrNotificationService::class)->notifyLeaveApproved($result);
+
+        return $result;
     }
 
     /**
@@ -167,7 +177,7 @@ class LeaveService
             throw new \LogicException("Cannot decline a '{$request->status}' leave request.");
         }
 
-        return DB::transaction(function () use ($request, $reviewer, $reason) {
+        $result = DB::transaction(function () use ($request, $reviewer, $reason) {
             $request->update([
                 'status' => 'declined',
                 'reviewed_by' => $reviewer->id,
@@ -185,6 +195,10 @@ class LeaveService
 
             return $request->fresh();
         });
+
+        app(HrNotificationService::class)->notifyLeaveDeclined($result);
+
+        return $result;
     }
 
     /**
@@ -301,5 +315,108 @@ class LeaveService
         // TODO: Return null if no escalation target can be determined
 
         return null;
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Leave Auto-Accrual (NZ Holidays Act 2003)                          */
+    /* ------------------------------------------------------------------ */
+
+    /**
+     * Calculate annual leave accrual for an employee based on NZ Holidays Act 2003.
+     * Minimum entitlement: 4 weeks (160 hours for full-time) after 12 months continuous employment.
+     * Accrual is proportional for part-time based on hours_per_week.
+     */
+    public function calculateAnnualAccrual(HrEmployeeProfile $profile): float
+    {
+        $startDate = $profile->start_date;
+
+        if (! $startDate) {
+            return 0;
+        }
+
+        $monthsEmployed = $startDate->diffInMonths(now());
+        $minMonths = config('hr.leave_policies.annual.min_months_for_entitlement', 12);
+
+        if ($monthsEmployed < $minMonths) {
+            // Not yet entitled — calculate 8% accrual for pay-as-you-go (casuals)
+            return 0;
+        }
+
+        $weeklyHours = $profile->hours_per_week ?? 40;
+        $entitlementWeeks = config('hr.leave_policies.annual.entitlement_weeks', 4);
+        $annualEntitlementHours = $weeklyHours * $entitlementWeeks;
+
+        return (float) $annualEntitlementHours;
+    }
+
+    /**
+     * Calculate sick leave entitlement based on NZ Holidays Act.
+     * After 6 months: 10 days per year. Max carry-over: 20 days unused.
+     */
+    public function calculateSickLeaveEntitlement(HrEmployeeProfile $profile): float
+    {
+        $startDate = $profile->start_date;
+
+        if (! $startDate) {
+            return 0;
+        }
+
+        $monthsEmployed = $startDate->diffInMonths(now());
+        $minMonths = config('hr.leave_policies.sick.min_months_for_entitlement', 6);
+
+        if ($monthsEmployed < $minMonths) {
+            return 0;
+        }
+
+        $daysPerYear = config('hr.leave_policies.sick.days_per_year', 10);
+        $dailyHours = ($profile->hours_per_week ?? 40) / 5;
+
+        return (float) ($daysPerYear * $dailyHours);
+    }
+
+    /**
+     * Run accrual for all employees — called by ProcessLeaveBalanceAccrualJob.
+     */
+    public function processAccruals(?int $tenantId): int
+    {
+        $processed = 0;
+        $year = now()->year;
+
+        HrEmployeeProfile::forTenant($tenantId)->active()->chunk(100, function ($profiles) use ($year, &$processed) {
+            foreach ($profiles as $profile) {
+                $annualHours = $this->calculateAnnualAccrual($profile);
+                $sickHours = $this->calculateSickLeaveEntitlement($profile);
+
+                // Upsert annual leave balance
+                if ($annualHours > 0) {
+                    HrLeaveBalance::updateOrCreate(
+                        ['user_id' => $profile->user_id, 'leave_type' => 'annual', 'year' => $year],
+                        ['tenant_id' => $profile->tenant_id, 'accrued_hours' => $annualHours, 'balance_hours' => $annualHours]
+                    );
+                }
+
+                // Upsert sick leave balance
+                if ($sickHours > 0) {
+                    HrLeaveBalance::updateOrCreate(
+                        ['user_id' => $profile->user_id, 'leave_type' => 'sick', 'year' => $year],
+                        ['tenant_id' => $profile->tenant_id, 'accrued_hours' => $sickHours, 'balance_hours' => $sickHours]
+                    );
+                }
+
+                $processed++;
+            }
+        });
+
+        return $processed;
+    }
+
+    /**
+     * Check if a date is a public holiday.
+     */
+    public function isPublicHoliday(string $date, ?string $region = null): bool
+    {
+        return HrPublicHoliday::where('date', $date)
+            ->where(fn ($q) => $q->where('is_national', true)->when($region, fn ($q2) => $q2->orWhere('region', $region)))
+            ->exists();
     }
 }

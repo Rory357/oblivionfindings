@@ -72,7 +72,7 @@ class AssetService
     /**
      * Get all available assets for a tenant.
      */
-    public function getAvailableAssets(int $tenantId): Collection
+    public function getAvailableAssets(?int $tenantId): Collection
     {
         return HrAsset::forTenant($tenantId)
             ->available()

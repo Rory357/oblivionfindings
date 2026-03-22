@@ -102,7 +102,11 @@ class ExpenseService
             'submitted_at' => now(),
         ]);
 
-        return $claim->fresh();
+        $claim = $claim->fresh();
+
+        app(HrNotificationService::class)->notifyExpenseSubmitted($claim);
+
+        return $claim;
     }
 
     /**
@@ -120,7 +124,7 @@ class ExpenseService
             throw new \LogicException("Cannot approve a '{$claim->status}' claim.");
         }
 
-        return DB::transaction(function () use ($claim, $approver) {
+        $result = DB::transaction(function () use ($claim, $approver) {
             $claim->update([
                 'status' => 'approved',
                 'approved_by' => $approver->id,
@@ -129,6 +133,10 @@ class ExpenseService
 
             return $claim->fresh();
         });
+
+        app(HrNotificationService::class)->notifyExpenseApproved($result);
+
+        return $result;
     }
 
     /**

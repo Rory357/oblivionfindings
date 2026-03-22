@@ -22,7 +22,7 @@ class SurveyController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.surveys.viewAny'), 403);
+        abort_unless($user && $user->canDo('hr.surveys.view'), 403);
 
         $tenantId = null;
         $status = $request->query('status');
@@ -54,7 +54,7 @@ class SurveyController extends Controller
                 'status' => $status,
             ],
             'can' => [
-                'create' => $user->canDo('hr.surveys.create'),
+                'create' => $user->canDo('hr.surveys.manage'),
                 'manage' => $user->canDo('hr.surveys.manage'),
             ],
         ]);
@@ -67,7 +67,7 @@ class SurveyController extends Controller
     public function create(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.surveys.create'), 403);
+        abort_unless($user && $user->canDo('hr.surveys.manage'), 403);
 
         return Inertia::render('hr/surveys/create', [
             'surveyTypes' => SurveyService::SURVEY_TYPES,
@@ -82,7 +82,7 @@ class SurveyController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.surveys.create'), 403);
+        abort_unless($user && $user->canDo('hr.surveys.manage'), 403);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -117,7 +117,7 @@ class SurveyController extends Controller
     public function show(Request $request, HrSurvey $survey)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.surveys.viewAny'), 403);
+        abort_unless($user && $user->canDo('hr.surveys.view'), 403);
 
         $results = $this->surveyService->calculateResults($survey);
         $enps = $survey->survey_type === 'enps'

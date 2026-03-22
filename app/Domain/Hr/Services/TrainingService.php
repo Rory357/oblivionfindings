@@ -36,7 +36,7 @@ class TrainingService
     /**
      * Enroll a user in a course (optionally in a specific session).
      */
-    public function enroll(int $tenantId, int $userId, int $courseId, ?int $sessionId = null, ?string $notes = null): HrCourseEnrollment
+    public function enroll(?int $tenantId, int $userId, int $courseId, ?int $sessionId = null, ?string $notes = null): HrCourseEnrollment
     {
         return DB::transaction(function () use ($tenantId, $userId, $courseId, $sessionId, $notes) {
             return HrCourseEnrollment::create([
@@ -72,7 +72,7 @@ class TrainingService
     /**
      * Get training summary statistics for a tenant.
      */
-    public function getTrainingSummary(int $tenantId): array
+    public function getTrainingSummary(?int $tenantId): array
     {
         $totalCourses = HrCourse::forTenant($tenantId)->active()->count();
         $mandatoryCourses = HrCourse::forTenant($tenantId)->active()->mandatory()->count();

@@ -49,7 +49,7 @@ class BenefitsService
     /**
      * Get enrollment summary for a tenant, grouped by plan type.
      */
-    public function getEnrollmentSummary(int $tenantId): array
+    public function getEnrollmentSummary(?int $tenantId): array
     {
         $enrollments = HrBenefitEnrollment::forTenant($tenantId)
             ->active()

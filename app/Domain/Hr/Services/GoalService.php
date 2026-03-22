@@ -86,7 +86,7 @@ class GoalService
     /**
      * Get goal tree (hierarchical) for a tenant.
      */
-    public function getGoalTree(int $tenantId, ?int $userId = null): \Illuminate\Database\Eloquent\Collection
+    public function getGoalTree(?int $tenantId, ?int $userId = null): \Illuminate\Database\Eloquent\Collection
     {
         $query = HrGoal::forTenant($tenantId)
             ->whereNull('parent_goal_id')

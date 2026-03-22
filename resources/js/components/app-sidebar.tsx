@@ -415,6 +415,8 @@ function buildNavigationGroups({
         if (can?.hr?.announcements?.view) {
             hrGroup.items.push({ title: 'Announcements', href: '/hr/announcements', icon: MessageSquareText });
         }
+        hrGroup.items.push({ title: 'Approvals', href: '/hr/approvals/pending', icon: ClipboardCheck });
+        hrGroup.items.push({ title: 'Signatures', href: '/hr/signatures/pending', icon: FileText });
         if (can?.hr?.policies?.view) {
             hrGroup.items.push({ title: 'Policies', href: '/hr/policies', icon: FileText });
         }

@@ -20,7 +20,7 @@ class PositionService
         return $position->fresh();
     }
 
-    public function getVacancies(int $tenantId): Collection
+    public function getVacancies(?int $tenantId): Collection
     {
         return HrPosition::forTenant($tenantId)
             ->active()
@@ -37,7 +37,7 @@ class PositionService
         $position->update(['current_headcount' => $count]);
     }
 
-    public function syncAllHeadcounts(int $tenantId): void
+    public function syncAllHeadcounts(?int $tenantId): void
     {
         $counts = HrEmployeeProfile::where('is_active', true)
             ->whereNotNull('position_id')
@@ -52,7 +52,7 @@ class PositionService
         });
     }
 
-    public function getDepartments(int $tenantId): array
+    public function getDepartments(?int $tenantId): array
     {
         return HrPosition::forTenant($tenantId)
             ->active()
@@ -64,7 +64,7 @@ class PositionService
             ->all();
     }
 
-    public function getPositionHierarchy(int $tenantId): array
+    public function getPositionHierarchy(?int $tenantId): array
     {
         $positions = HrPosition::forTenant($tenantId)
             ->active()

@@ -37,6 +37,9 @@ use App\Http\Controllers\Hr\SkillsController;
 use App\Http\Controllers\Hr\CalendarController;
 use App\Http\Controllers\Hr\AnnouncementController;
 use App\Http\Controllers\Hr\ExitInterviewController;
+use App\Http\Controllers\Hr\ReportBuilderController;
+use App\Http\Controllers\Hr\ApprovalController;
+use App\Http\Controllers\Hr\ESignatureController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -63,6 +66,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/time/clock-in', [MyHrController::class, 'clockIn'])->name('time.clockin');
         Route::post('/time/clock-out', [MyHrController::class, 'clockOut'])->name('time.clockout');
         Route::put('/profile', [MyHrController::class, 'updateProfile'])->name('profile.update');
+        Route::get('/goals', [MyHrController::class, 'goals'])->name('goals');
+        Route::get('/expenses', [MyHrController::class, 'expenses'])->name('expenses');
+        Route::post('/expenses', [MyHrController::class, 'storeExpense'])->name('expenses.store');
     });
 
     /*
@@ -233,10 +239,13 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.leave.viewAny')->group(function () {
         Route::get('/leave', [LeaveController::class, 'index'])->name('leave.index');
         Route::get('/leave/balances', [LeaveController::class, 'balances'])->name('leave.balances');
+        Route::get('/leave/holidays', [LeaveController::class, 'holidays'])->name('leave.holidays');
 
         Route::middleware('permission:hr.leave.manage')->group(function () {
             Route::get('/leave/create', [LeaveController::class, 'create'])->name('leave.create');
             Route::post('/leave', [LeaveController::class, 'store'])->name('leave.store');
+            Route::post('/leave/holidays', [LeaveController::class, 'storeHoliday'])->name('leave.holidays.store');
+            Route::delete('/leave/holidays/{holiday}', [LeaveController::class, 'destroyHoliday'])->name('leave.holidays.destroy');
         });
 
         Route::middleware('permission:hr.leave.approve')->group(function () {
@@ -579,8 +588,17 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/reports', [HrReportController::class, 'index'])->name('reports.index');
         Route::post('/reports/generate', [HrReportController::class, 'generate'])->name('reports.generate');
 
+        // Report Builder
+        Route::get('/reports/builder', [ReportBuilderController::class, 'create'])->name('reports.builder');
+        Route::post('/reports/preview', [ReportBuilderController::class, 'preview'])->name('reports.preview');
+        Route::post('/reports/save', [ReportBuilderController::class, 'store'])->name('reports.save');
+        Route::get('/reports/saved', [ReportBuilderController::class, 'index'])->name('reports.saved');
+        Route::post('/reports/{report}/run', [ReportBuilderController::class, 'run'])->name('reports.run');
+        Route::delete('/reports/{report}', [ReportBuilderController::class, 'destroy'])->name('reports.destroy');
+
         Route::middleware('permission:hr.reports.export')->group(function () {
             Route::post('/reports/export', [HrReportController::class, 'export'])->name('reports.export');
+            Route::post('/reports/{report}/export', [ReportBuilderController::class, 'export'])->name('reports.builder.export');
         });
     });
 
@@ -631,5 +649,34 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         });
 
         Route::get('/{exitInterview}', [ExitInterviewController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Approval Workflows
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.approvals.view')->prefix('approvals')->name('approvals.')->group(function () {
+        Route::get('/pending', [ApprovalController::class, 'pending'])->name('pending');
+        Route::post('/{instance}/action', [ApprovalController::class, 'action'])->name('action');
+        Route::middleware('permission:hr.approvals.manage')->group(function () {
+            Route::get('/chains', [ApprovalController::class, 'chains'])->name('chains');
+            Route::post('/chains', [ApprovalController::class, 'storeChain'])->name('chains.store');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | E-Signatures
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('signatures')->name('signatures.')->group(function () {
+        Route::get('/pending', [ESignatureController::class, 'pending'])->name('pending');
+        Route::get('/{signature}', [ESignatureController::class, 'show'])->name('show');
+        Route::post('/{signature}/sign', [ESignatureController::class, 'sign'])->name('sign');
+        Route::post('/{signature}/decline', [ESignatureController::class, 'decline'])->name('decline');
+        Route::middleware('permission:hr.documents.manage')->group(function () {
+            Route::post('/request', [ESignatureController::class, 'request'])->name('request');
+        });
     });
 });

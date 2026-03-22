@@ -2,47 +2,41 @@
 
 namespace App\Domain\Hr\Models;
 
-use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class HrSurvey extends Model
+class HrApprovalChain extends Model
 {
-    use HasFactory, AuditableChanges;
+    use HasFactory;
 
     protected $fillable = [
         'tenant_id',
-        'title',
-        'description',
-        'survey_type',
-        'status',
-        'is_anonymous',
-        'starts_at',
-        'ends_at',
+        'name',
+        'process_type',
+        'is_active',
         'created_by',
     ];
 
     protected $casts = [
-        'is_anonymous' => 'boolean',
-        'starts_at' => 'datetime',
-        'ends_at' => 'datetime',
+        'is_active' => 'boolean',
     ];
 
     /* ------------------------------------------------------------------ */
     /*  Relationships                                                      */
     /* ------------------------------------------------------------------ */
 
-    public function questions(): HasMany
+    public function steps(): HasMany
     {
-        return $this->hasMany(HrSurveyQuestion::class, 'survey_id')->orderBy('sort_order');
+        return $this->hasMany(HrApprovalChainStep::class, 'approval_chain_id')->orderBy('step_order');
     }
 
-    public function responses(): HasMany
+    public function instances(): HasMany
     {
-        return $this->hasMany(HrSurveyResponse::class, 'survey_id');
+        return $this->hasMany(HrApprovalInstance::class, 'approval_chain_id');
     }
 
     public function creator(): BelongsTo
@@ -54,13 +48,18 @@ class HrSurvey extends Model
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */
 
-    public function scopeForTenant($query, ?int $tenantId)
+    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
     {
         return $query->where('tenant_id', $tenantId);
     }
 
-    public function scopeActive($query)
+    public function scopeActive(Builder $query): Builder
     {
-        return $query->where('status', 'active');
+        return $query->where('is_active', true);
+    }
+
+    public function scopeForProcess(Builder $query, string $processType): Builder
+    {
+        return $query->where('process_type', $processType);
     }
 }

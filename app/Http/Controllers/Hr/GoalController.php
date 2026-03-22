@@ -35,7 +35,7 @@ class GoalController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $users = User::where('tenant_id', $user->tenant_id)->get(['id', 'name']);
+        $users = User::orderBy('name')->get(['id', 'name']);
 
         return Inertia::render('hr/goals/index', [
             'goals' => $goals,
@@ -60,7 +60,7 @@ class GoalController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.goals.manage'), 403);
 
-        $users = User::where('tenant_id', $user->tenant_id)->get(['id', 'name']);
+        $users = User::orderBy('name')->get(['id', 'name']);
         $parentGoals = HrGoal::forTenant($user->tenant_id)
             ->whereNull('parent_goal_id')
             ->active()

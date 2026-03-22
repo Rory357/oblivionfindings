@@ -16,7 +16,7 @@ class TimeOffCalendarController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.leave.view'), 403);
+        abort_unless($user, 403);
 
         $month = $request->query('month', now()->format('Y-m'));
         $startOfMonth = \Carbon\Carbon::parse($month . '-01')->startOfMonth();

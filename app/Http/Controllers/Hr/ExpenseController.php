@@ -22,7 +22,7 @@ class ExpenseController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.viewAny'), 403);
+        abort_unless($user && $user->canDo('hr.expenses.view'), 403);
 
         $tenantId = null;
         $status = $request->query('status');
@@ -61,7 +61,7 @@ class ExpenseController extends Controller
                 'q' => $search,
             ],
             'can' => [
-                'create' => $user->canDo('hr.expenses.create'),
+                'create' => $user->canDo('hr.expenses.manage'),
                 'manage' => $canManage,
             ],
         ]);
@@ -74,7 +74,7 @@ class ExpenseController extends Controller
     public function create(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.create'), 403);
+        abort_unless($user && $user->canDo('hr.expenses.manage'), 403);
 
         return Inertia::render('hr/expenses/create', [
             'categories' => ExpenseService::CATEGORIES,
@@ -88,7 +88,7 @@ class ExpenseController extends Controller
     public function store(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.create'), 403);
+        abort_unless($user && $user->canDo('hr.expenses.manage'), 403);
 
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -119,7 +119,7 @@ class ExpenseController extends Controller
     public function show(Request $request, HrExpenseClaim $expenseClaim)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.viewAny'), 403);
+        abort_unless($user && $user->canDo('hr.expenses.view'), 403);
 
         $expenseClaim->load(['user:id,name,email', 'items', 'approver:id,name']);
 
@@ -163,7 +163,7 @@ class ExpenseController extends Controller
     public function submit(Request $request, HrExpenseClaim $expenseClaim)
     {
         $user = $request->user();
-        abort_unless($user && ($user->canDo('hr.expenses.create') || $expenseClaim->user_id === $user->id), 403);
+        abort_unless($user && ($user->canDo('hr.expenses.manage') || $expenseClaim->user_id === $user->id), 403);
 
         try {
             $this->expenseService->submitClaim($expenseClaim);

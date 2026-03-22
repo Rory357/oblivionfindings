@@ -7,7 +7,7 @@ use Illuminate\Support\Collection;
 
 class OrgChartService
 {
-    public function getHierarchy(int $tenantId): array
+    public function getHierarchy(?int $tenantId): array
     {
         $employees = HrEmployeeProfile::forTenant($tenantId)
             ->active()

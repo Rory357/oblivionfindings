@@ -104,7 +104,7 @@ class TimeTrackingService
             throw new \LogicException("Cannot submit a '{$timesheet->status}' timesheet.");
         }
 
-        return DB::transaction(function () use ($timesheet, $user) {
+        $timesheet = DB::transaction(function () use ($timesheet, $user) {
             // Calculate total hours from entries in the period
             $totalHours = HrTimeEntry::forTenant($timesheet->tenant_id)
                 ->forUser($timesheet->user_id)
@@ -134,6 +134,10 @@ class TimeTrackingService
 
             return $timesheet->fresh();
         });
+
+        app(HrNotificationService::class)->notifyTimesheetSubmitted($timesheet);
+
+        return $timesheet;
     }
 
     /**
@@ -204,7 +208,7 @@ class TimeTrackingService
     /**
      * Get a weekly summary of hours for a user.
      */
-    public function getWeeklySummary(int $tenantId, int $userId, ?string $weekStart = null): array
+    public function getWeeklySummary(?int $tenantId, int $userId, ?string $weekStart = null): array
     {
         $start = $weekStart ? Carbon::parse($weekStart)->startOfWeek() : now()->startOfWeek();
         $end = $start->copy()->endOfWeek();

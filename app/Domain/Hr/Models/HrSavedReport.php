@@ -4,46 +4,43 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
-class HrSurvey extends Model
+class HrSavedReport extends Model
 {
     use HasFactory, AuditableChanges;
 
     protected $fillable = [
         'tenant_id',
-        'title',
+        'name',
         'description',
-        'survey_type',
-        'status',
-        'is_anonymous',
-        'starts_at',
-        'ends_at',
+        'report_type',
+        'fields',
+        'filters',
+        'group_by',
+        'sort_by',
+        'sort_direction',
+        'is_scheduled',
+        'schedule_frequency',
+        'schedule_recipients',
+        'last_run_at',
         'created_by',
     ];
 
     protected $casts = [
-        'is_anonymous' => 'boolean',
-        'starts_at' => 'datetime',
-        'ends_at' => 'datetime',
+        'fields' => 'array',
+        'filters' => 'array',
+        'schedule_recipients' => 'array',
+        'is_scheduled' => 'boolean',
+        'last_run_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
     /*  Relationships                                                      */
     /* ------------------------------------------------------------------ */
-
-    public function questions(): HasMany
-    {
-        return $this->hasMany(HrSurveyQuestion::class, 'survey_id')->orderBy('sort_order');
-    }
-
-    public function responses(): HasMany
-    {
-        return $this->hasMany(HrSurveyResponse::class, 'survey_id');
-    }
 
     public function creator(): BelongsTo
     {
@@ -54,13 +51,13 @@ class HrSurvey extends Model
     /*  Scopes                                                             */
     /* ------------------------------------------------------------------ */
 
-    public function scopeForTenant($query, ?int $tenantId)
+    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
     {
         return $query->where('tenant_id', $tenantId);
     }
 
-    public function scopeActive($query)
+    public function scopeOfType(Builder $query, string $reportType): Builder
     {
-        return $query->where('status', 'active');
+        return $query->where('report_type', $reportType);
     }
 }
