@@ -309,7 +309,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.onboarding.view')->group(function () {
         Route::get('/onboarding', [OnboardingController::class, 'index'])->name('onboarding.index');
-        Route::get('/onboarding/{checklist}', [OnboardingController::class, 'show'])->name('onboarding.show');
 
         Route::middleware('permission:hr.onboarding.manage')->group(function () {
             Route::get('/onboarding/create', [OnboardingController::class, 'create'])->name('onboarding.create');
@@ -325,6 +324,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/onboarding/emails/{email}/preview', [OnboardingEmailController::class, 'preview'])->name('onboarding.emails.preview');
             Route::get('/onboarding/emails/log', [OnboardingEmailController::class, 'log'])->name('onboarding.emails.log');
         });
+
+        Route::get('/onboarding/{checklist}', [OnboardingController::class, 'show'])->name('onboarding.show');
     });
 
     /*
