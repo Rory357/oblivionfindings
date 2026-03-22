@@ -42,6 +42,9 @@ use App\Http\Controllers\Hr\JobPostingController;
 use App\Http\Controllers\Hr\WellbeingController;
 use App\Http\Controllers\Hr\FeedController;
 use App\Http\Controllers\Hr\FeedbackController;
+use App\Http\Controllers\Hr\WebhookController;
+use App\Http\Controllers\Hr\CustomFieldController;
+use App\Http\Controllers\Hr\AuditController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -696,5 +699,37 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.analytics.view')->group(function () {
         Route::get('/wellbeing', [WellbeingController::class, 'index'])->name('wellbeing.index');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Settings — Webhooks, Custom Fields, Audit Log
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.settings.manage')->prefix('settings')->name('settings.')->group(function () {
+        // Webhooks
+        Route::get('/webhooks', [WebhookController::class, 'index'])->name('webhooks');
+        Route::post('/webhooks', [WebhookController::class, 'store'])->name('webhooks.store');
+        Route::put('/webhooks/{webhook}', [WebhookController::class, 'update'])->name('webhooks.update');
+        Route::delete('/webhooks/{webhook}', [WebhookController::class, 'destroy'])->name('webhooks.destroy');
+        Route::post('/webhooks/{webhook}/test', [WebhookController::class, 'test'])->name('webhooks.test');
+
+        // Custom Fields
+        Route::get('/custom-fields', [CustomFieldController::class, 'definitions'])->name('custom-fields');
+        Route::post('/custom-fields', [CustomFieldController::class, 'storeDefinition'])->name('custom-fields.store');
+        Route::put('/custom-fields/{definition}', [CustomFieldController::class, 'updateDefinition'])->name('custom-fields.update');
+        Route::delete('/custom-fields/{definition}', [CustomFieldController::class, 'destroyDefinition'])->name('custom-fields.destroy');
+
+        // Audit Log
+        Route::get('/audit-log', [AuditController::class, 'index'])->name('audit-log');
+        Route::get('/audit-log/{type}/{id}', [AuditController::class, 'show'])->name('audit-trail');
+    });
+
+    // Custom fields for employee profiles (accessible to employees managers)
+    Route::middleware('permission:hr.employees.viewAny')->group(function () {
+        Route::get('/employees/{profile}/custom-fields', [CustomFieldController::class, 'employeeFields'])->name('employees.custom-fields');
+    });
+    Route::middleware('permission:hr.employees.manage')->group(function () {
+        Route::put('/employees/{profile}/custom-fields', [CustomFieldController::class, 'updateEmployeeFields'])->name('employees.custom-fields.update');
     });
 });

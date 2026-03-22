@@ -418,6 +418,9 @@ function buildNavigationGroups({
         if (can?.hr?.policies?.view) {
             hrGroup.items.push({ title: 'Policies', href: '/hr/policies', icon: FileText });
         }
+        if (can?.hr?.settings?.manage) {
+            hrGroup.items.push({ title: 'Settings', href: '/hr/settings/webhooks', icon: Settings });
+        }
         if (can?.hr?.reports?.view) {
             hrGroup.items.push({ title: 'Reports', href: '/hr/reports', icon: FileText });
         }
