@@ -54,6 +54,8 @@ use App\Http\Controllers\Hr\PipController;
 use App\Http\Controllers\Hr\CompetencyController;
 use App\Http\Controllers\Hr\ImportExportController;
 use App\Http\Controllers\Hr\ScorecardController;
+use App\Http\Controllers\Hr\ComplianceCalendarController;
+use App\Http\Controllers\Hr\OnboardingEmailController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -214,6 +216,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.compliance.view')->group(function () {
         Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance.index');
+        Route::get('/compliance/calendar', [ComplianceCalendarController::class, 'index'])->name('compliance.calendar');
         Route::get('/compliance/staff/{user}', [ComplianceController::class, 'staffDetail'])->name('compliance.staff');
 
         Route::middleware('permission:hr.compliance.manage')->group(function () {
@@ -411,6 +414,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.documents.view')->group(function () {
         Route::get('/documents', [HrDocumentController::class, 'index'])->name('documents.index');
+        Route::get('/documents/expiring', [HrDocumentController::class, 'expiring'])->name('documents.expiring');
 
         Route::middleware('permission:hr.documents.manage')->group(function () {
             Route::post('/documents', [HrDocumentController::class, 'store'])->name('documents.store');
@@ -534,6 +538,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/training/enroll/{course}', [TrainingController::class, 'enroll'])->name('training.enroll');
             Route::post('/training/enrollments/{enrollment}/complete', [TrainingController::class, 'completeEnrollment'])->name('training.enrollments.complete');
         });
+
+        Route::get('/training/enrollments/{enrollment}/certificate', [TrainingController::class, 'downloadCertificate'])->name('training.certificate');
     });
 
     /*

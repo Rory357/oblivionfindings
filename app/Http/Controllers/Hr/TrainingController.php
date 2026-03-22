@@ -6,15 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrCourseSession;
+use App\Domain\Hr\Services\CertificateService;
 use App\Domain\Hr\Services\TrainingService;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 
 class TrainingController extends Controller
 {
     public function __construct(
         protected TrainingService $trainingService,
+        protected CertificateService $certificateService,
     ) {}
 
     /**
@@ -164,5 +167,28 @@ class TrainingController extends Controller
         $this->trainingService->completeEnrollment($enrollment, $data);
 
         return redirect()->back()->with('success', 'Enrollment marked as completed.');
+    }
+
+    /**
+     * Generate and download a training certificate for a completed enrollment.
+     */
+    public function downloadCertificate(Request $request, HrCourseEnrollment $enrollment)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.training.view'), 403);
+        abort_unless($enrollment->status === 'completed', 404, 'Certificate is only available for completed enrollments.');
+
+        // Generate if not already generated
+        $path = $enrollment->certificate_path;
+        if (! $path || ! Storage::disk('private')->exists($path)) {
+            $path = $this->certificateService->generateCertificate($enrollment);
+        }
+
+        $enrollment->loadMissing('course');
+        $filename = 'certificate_' . \Illuminate\Support\Str::slug($enrollment->course?->title ?? 'course') . '.html';
+
+        return Storage::disk('private')->download($path, $filename, [
+            'Content-Type' => 'text/html',
+        ]);
     }
 }

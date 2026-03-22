@@ -47,6 +47,37 @@ class HrDocumentController extends Controller
     }
 
     /**
+     * List documents expiring within 30/60/90 days.
+     */
+    public function expiring(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.documents.view'), 403);
+
+        $days = (int) ($request->query('days', 30));
+        $days = in_array($days, [7, 30, 60, 90]) ? $days : 30;
+
+        $documents = HrDocument::query()
+            ->whereNotNull('expires_at')
+            ->where('expires_at', '<=', now()->addDays($days))
+            ->where('expires_at', '>=', now()->subDays(30)) // Include recently expired too
+            ->with([
+                'employeeProfile:id,user_id,employee_number',
+                'employeeProfile.user:id,name',
+            ])
+            ->orderBy('expires_at')
+            ->paginate(30)
+            ->withQueryString();
+
+        return Inertia::render('hr/documents/expiring', [
+            'documents' => $documents,
+            'filters' => [
+                'days' => $days,
+            ],
+        ]);
+    }
+
+    /**
      * Upload a new HR document.
      */
     public function store(Request $request)

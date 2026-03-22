@@ -29,6 +29,8 @@ class HrDocument extends Model
         'signed_by_employee',
         'signed_at',
         'signed_document_path',
+        'expires_at',
+        'expiry_reminder_sent',
         'created_by',
         'uploaded_by',
     ];
@@ -41,6 +43,8 @@ class HrDocument extends Model
         'sent_at' => 'datetime',
         'signed_by_employee' => 'boolean',
         'signed_at' => 'datetime',
+        'expires_at' => 'date',
+        'expiry_reminder_sent' => 'boolean',
     ];
 
     /* ------------------------------------------------------------------ */
