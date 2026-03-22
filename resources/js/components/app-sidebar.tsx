@@ -374,12 +374,15 @@ function buildNavigationGroups({
         }
         if (can?.hr?.leave?.viewAny) {
             hrGroup.items.push({ title: 'Leave & Rosters', href: '/hr/leave', icon: CalendarDays });
+            hrGroup.items.push({ title: 'Leave Reports', href: '/hr/leave/reports', icon: FileText });
         }
         if (can?.hr?.time?.view) {
             hrGroup.items.push({ title: 'Time Tracking', href: '/hr/time', icon: Clock });
         }
         if (can?.hr?.performance?.view) {
             hrGroup.items.push({ title: 'Performance', href: '/hr/performance', icon: ClipboardCheck });
+            hrGroup.items.push({ title: 'PIPs', href: '/hr/performance/pips', icon: ClipboardList });
+            hrGroup.items.push({ title: 'Competencies', href: '/hr/performance/competencies', icon: Target });
         }
         if (can?.hr?.compensation?.view) {
             hrGroup.items.push({ title: 'Compensation', href: '/hr/compensation/bands', icon: DollarSign });

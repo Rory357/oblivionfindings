@@ -45,6 +45,9 @@ use App\Http\Controllers\Hr\FeedbackController;
 use App\Http\Controllers\Hr\WebhookController;
 use App\Http\Controllers\Hr\CustomFieldController;
 use App\Http\Controllers\Hr\AuditController;
+use App\Http\Controllers\Hr\LeaveReportController;
+use App\Http\Controllers\Hr\PipController;
+use App\Http\Controllers\Hr\CompetencyController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -699,6 +702,42 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.analytics.view')->group(function () {
         Route::get('/wellbeing', [WellbeingController::class, 'index'])->name('wellbeing.index');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Leave Reports
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/leave/reports', [LeaveReportController::class, 'index'])->name('leave.reports');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Performance Improvement Plans (PIPs)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.performance.manage')->prefix('performance/pips')->name('performance.pips.')->group(function () {
+        Route::get('/', [PipController::class, 'index'])->name('index');
+        Route::get('/create', [PipController::class, 'create'])->name('create');
+        Route::post('/', [PipController::class, 'store'])->name('store');
+        Route::get('/{pip}', [PipController::class, 'show'])->name('show');
+        Route::post('/{pip}/complete', [PipController::class, 'complete'])->name('complete');
+        Route::put('/milestones/{milestone}', [PipController::class, 'updateMilestone'])->name('milestones.update');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Competencies
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.performance.view')->prefix('performance/competencies')->name('performance.competencies.')->group(function () {
+        Route::get('/', [CompetencyController::class, 'index'])->name('index');
+        Route::get('/profile/{profile}', [CompetencyController::class, 'employeeProfile'])->name('profile');
+        Route::middleware('permission:hr.performance.manage')->group(function () {
+            Route::post('/', [CompetencyController::class, 'store'])->name('store');
+            Route::put('/{competency}', [CompetencyController::class, 'update'])->name('update');
+            Route::post('/assess', [CompetencyController::class, 'assess'])->name('assess');
+        });
     });
 
     /*
