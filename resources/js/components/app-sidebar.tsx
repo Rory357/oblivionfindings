@@ -549,7 +549,7 @@ export function AppSidebar() {
                             <Link
                                 href={dashboard()}
                                 prefetch
-                                className="flex items-center justify-center w-10 h-10 rounded-lg mb-4 bg-sidebar-primary text-sidebar-primary-foreground overflow-hidden"
+                                className="flex items-center justify-center w-10 h-10 rounded-xl mb-4 bg-sidebar-primary text-sidebar-primary-foreground overflow-hidden"
                             >
                                 {logoUrl ? (
                                     <img src={logoUrl} alt={displayName} className="h-full w-full object-cover" />
@@ -577,7 +577,7 @@ export function AppSidebar() {
                                                     data-sub-panel-trigger
                                                     onClick={() => toggleSubPanel(item.id)}
                                                     className={cn(
-                                                        'flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
+                                                        'flex items-center justify-center w-10 h-10 rounded-xl transition-colors',
                                                         active || isPanelOpen
                                                             ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                                                             : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent',
@@ -600,7 +600,7 @@ export function AppSidebar() {
                                                 href={item.href!}
                                                 prefetch
                                                 className={cn(
-                                                    'flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
+                                                    'flex items-center justify-center w-10 h-10 rounded-xl transition-colors',
                                                     active
                                                         ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                                                         : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent',
@@ -625,7 +625,7 @@ export function AppSidebar() {
                                     href="/settings"
                                     prefetch
                                     className={cn(
-                                        'flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
+                                        'flex items-center justify-center w-10 h-10 rounded-xl transition-colors',
                                         currentUrl.startsWith('/settings')
                                             ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                                             : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent',
