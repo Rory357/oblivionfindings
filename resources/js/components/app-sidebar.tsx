@@ -1,537 +1,699 @@
-﻿import { NavFooter } from '@/components/nav-footer';
-import { NavMain } from '@/components/nav-main';
-import { NavUser } from '@/components/nav-user';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
-    Sidebar,
-    SidebarContent,
-    SidebarFooter,
-    SidebarHeader,
-    SidebarMenu,
-    SidebarMenuButton,
-    SidebarMenuItem,
-} from '@/components/ui/sidebar';
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { UserMenuContent } from '@/components/user-menu-content';
+import { useInitials } from '@/hooks/use-initials';
+import { cn } from '@/lib/utils';
+import { resolveUrl } from '@/lib/utils';
+import { type NavItem } from '@/types';
 import { dashboard } from '@/routes';
-import { type NavItem, type NavGroup } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
     Briefcase,
     Building2,
     CalendarDays,
+    ChevronRight,
     ClipboardCheck,
     ClipboardList,
     Clock,
     DollarSign,
-    FileQuestion,
     FileText,
-    Folder,
-    Gavel,
     GitBranch,
     Home,
     Landmark,
     LayoutGrid,
-    Lock,
-    MapPin,
     MessageSquareText,
     Package,
-    Scale,
     Settings,
     Shield,
     ShieldAlert,
     Target,
-    Truck,
     Users,
-    Vote,
-    Warehouse,
-    Wrench,
+    X,
+    type LucideIcon,
 } from 'lucide-react';
-import AppLogo from './app-logo';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AppLogoIcon from './app-logo-icon';
+
+// ── Types ──────────────────────────────────────────────────────────────────
 
 type PageProps = {
     auth: {
         user: null | {
+            id: number;
             name: string;
             email: string;
+            avatar?: string;
             role?: string | null;
             organization_id?: number | null;
         };
         can?: any;
     };
     labels?: Record<string, string>;
+    branding?: { name?: string; logoUrl?: string | null };
+    name?: string;
 };
 
-const footerNavItems: NavItem[] = [
-    {
-        title: 'Documentation',
-        href: '/docs',
-        icon: BookOpen,
-    },
-];
+interface IconNavItem {
+    id: string;
+    icon: LucideIcon;
+    label: string;
+    href?: string;
+    subPanel?: boolean;
+    dividerAfter?: boolean;
+}
 
-function buildNavigationGroups({
+interface SubPanelGroup {
+    label: string;
+    items: NavItem[];
+}
+
+// ── URL matching (reused from nav-main) ────────────────────────────────────
+
+function normalizePath(url: string): string {
+    const path = url.split('?')[0] ?? '/';
+    const trimmed = path.replace(/\/+$/, '');
+    return trimmed.length > 0 ? trimmed : '/';
+}
+
+function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
+    const current = resolveUrl(currentUrl);
+    const item = resolveUrl(itemHref);
+
+    const [currentPath, currentQuery = ''] = current.split('?');
+    const [itemPath, itemQuery = ''] = item.split('?');
+
+    const normalizedCurrentPath = normalizePath(currentPath);
+    const normalizedItemPath = normalizePath(itemPath);
+
+    if (itemQuery.length > 0) {
+        return normalizedCurrentPath === normalizedItemPath && currentQuery === itemQuery
+            ? 3000 + item.length
+            : -1;
+    }
+
+    if (normalizedCurrentPath === normalizedItemPath) {
+        return 2000 + item.length;
+    }
+
+    if (normalizedCurrentPath.startsWith(`${normalizedItemPath}/`)) {
+        return 1000 + item.length;
+    }
+
+    return -1;
+}
+
+function isIconActive(currentUrl: string, item: IconNavItem, hrSubPanelGroups?: SubPanelGroup[]): boolean {
+    if (item.href) {
+        return matchScore(currentUrl, item.href) > 0;
+    }
+    // For sub-panel items (HR, governance, etc.), check if any child is active
+    if (item.subPanel && item.id === 'hr' && hrSubPanelGroups) {
+        return hrSubPanelGroups.some(group =>
+            group.items.some(sub => matchScore(currentUrl, sub.href) > 0)
+        );
+    }
+    return false;
+}
+
+function isSubItemActive(currentUrl: string, href: NavItem['href']): boolean {
+    return matchScore(currentUrl, href) > 0;
+}
+
+// ── Build icon nav items ───────────────────────────────────────────────────
+
+function buildIconNavItems({
     role,
     can,
-    labels,
-    activeSiteId,
 }: {
     role?: string | null;
     can?: any;
-    labels: Record<string, string>;
-    activeSiteId?: number | null;
-}): NavGroup[] {
-    const clientPlural = labels['client.plural'] ?? 'Clients';
-    const sitePlural = labels['site.plural'] ?? 'Sites';
-    const staffPlural = labels['staff.plural'] ?? 'Staff';
-    const shiftPlural = labels['shift.plural'] ?? 'Shifts';
-    const timesheetPlural = labels['timesheet.plural'] ?? 'Timesheets';
-    const assetPlural = labels['asset.plural'] ?? 'Assets';
-    const medicationPlural = labels['medication.plural'] ?? 'Medications';
-    const incidentPlural = labels['incident.plural'] ?? 'Incidents';
-    const notePlural = labels['note.plural'] ?? 'Notes';
-    const timelineLabel = labels['timeline.singular'] ?? 'Timeline';
-    const emergencyLabel = labels['emergency_access.singular'] ?? 'Emergency Access';
-    const respitePlural = labels['respite.plural'] ?? 'Respite';
+}): IconNavItem[] {
+    const items: IconNavItem[] = [
+        { id: 'dashboard', icon: LayoutGrid, label: 'Dashboard', href: '/dashboard' },
+        { id: 'today', icon: ClipboardList, label: 'Today', href: '/today', dividerAfter: true },
+    ];
 
-    // Main navigation group (always visible)
-    const mainGroup: NavGroup = {
-        id: 'main',
-        label: 'Main',
+    // Sites
+    if (can?.sites?.viewAny) {
+        items.push({ id: 'sites', icon: Building2, label: 'Sites', href: '/sites' });
+    }
+
+    // Clients
+    if (can?.clients?.viewAny || role === 'support_worker') {
+        items.push({ id: 'clients', icon: Users, label: 'Clients', href: '/clients' });
+    }
+
+    // Shifts
+    if (can?.shifts?.viewAny || role === 'support_worker') {
+        items.push({ id: 'shifts', icon: CalendarDays, label: 'Shifts', href: '/shifts' });
+    }
+
+    // Timesheets
+    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned || role === 'support_worker') {
+        items.push({ id: 'timesheets', icon: Clock, label: 'Timesheets', href: '/timesheets' });
+    }
+
+    // Rostering
+    if (can?.rostering?.viewAny) {
+        items.push({ id: 'rostering', icon: CalendarDays, label: 'Rostering', href: '/rostering', dividerAfter: true });
+    } else {
+        // add divider to last item
+        if (items.length > 0) {
+            items[items.length - 1].dividerAfter = true;
+        }
+    }
+
+    // Incidents
+    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned) {
+        items.push({ id: 'incidents', icon: ShieldAlert, label: 'Incidents', href: '/incidents' });
+    }
+
+    // Compliance
+    if (can?.compliance?.view) {
+        items.push({ id: 'compliance', icon: Shield, label: 'Compliance', href: '/compliance', dividerAfter: true });
+    } else if (items.length > 0 && (can?.incidents?.viewAny || can?.incidents?.viewAssigned)) {
+        items[items.length - 1].dividerAfter = true;
+    }
+
+    // HR - always visible (at minimum My HR)
+    items.push({ id: 'hr', icon: Briefcase, label: 'HR', subPanel: true, dividerAfter: true });
+
+    // Governance
+    if (can?.governance?.view) {
+        items.push({ id: 'governance', icon: Landmark, label: 'Governance', href: '/governance/dashboard', dividerAfter: true });
+    }
+
+    // Reports
+    if (can?.reports?.viewAny) {
+        items.push({ id: 'reports', icon: FileText, label: 'Reports', href: '/reports' });
+    }
+
+    return items;
+}
+
+// ── Build HR sub-panel groups ──────────────────────────────────────────────
+
+function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    const groups: SubPanelGroup[] = [];
+
+    // My HR - always visible
+    const myHr: SubPanelGroup = {
+        label: 'My HR',
         items: [
-            { title: 'Dashboard', href: dashboard(), icon: LayoutGrid },
-            { title: 'Today', href: '/today', icon: ClipboardList },
+            { title: 'My HR', href: '/hr/my', icon: Home },
+            { title: 'My Training', href: '/hr/my/training', icon: Target },
+            { title: 'My Payslips', href: '/hr/my/payslips', icon: FileText },
         ],
     };
+    groups.push(myHr);
 
-    // Operations group
-    const operationsGroup: NavGroup = {
-        id: 'operations',
-        label: 'Operations',
-        items: [],
+    // People
+    const people: SubPanelGroup = {
+        label: 'People',
+        items: [
+            { title: 'Directory', href: '/hr/directory', icon: Users },
+        ],
     };
-
-    // Resources group
-    const resourcesGroup: NavGroup = {
-        id: 'resources',
-        label: 'Resources',
-        items: [],
-    };
-
-    // Compliance group
-    const complianceGroup: NavGroup = {
-        id: 'compliance',
-        label: 'Compliance & Safety',
-        items: [],
-    };
-
-    // Governance group
-    const governanceGroup: NavGroup = {
-        id: 'governance',
-        label: 'Governance',
-        items: [],
-    };
-
-    // System group
-    const systemGroup: NavGroup = {
-        id: 'system',
-        label: 'System',
-        items: [],
-    };
-
-    // Sites/Locations group (for all authenticated users with access)
-    const sitesGroup: NavGroup = {
-        id: 'sites',
-        label: 'Sites / Locations',
-        items: [],
-    };
-
-    if (can?.sites?.viewAny) {
-        sitesGroup.items.push({ title: 'All Sites', href: '/sites', icon: MapPin });
-        sitesGroup.items.push({ title: 'Head Office', href: '/sites?type=head_office', icon: Building2 });
-        sitesGroup.items.push({ title: 'Houses', href: '/sites?type=house', icon: Home });
-        sitesGroup.items.push({ title: 'Facilities', href: '/sites?type=facility', icon: Warehouse });
+    if (can?.hr?.employees?.viewAny) {
+        people.items.push({ title: 'People', href: '/hr/people', icon: Users });
+        people.items.push({ title: 'Import/Export', href: '/hr/import-export', icon: FileText });
     }
-
-    if (can?.calendar?.view) {
-        sitesGroup.items.push({ title: 'Calendars', href: '/sites/calendar', icon: CalendarDays });
+    if (can?.hr?.positions?.view) {
+        people.items.push({ title: 'Positions', href: '/hr/positions', icon: Briefcase });
     }
-
-    if (can?.checklists?.manageTemplates) {
-        sitesGroup.items.push({ title: 'Checklist Templates', href: '/sites/checklists/templates', icon: FileQuestion });
-    } else if (can?.checklists?.view) {
-        sitesGroup.items.push({ title: 'Checklists & Walkthroughs', href: '/sites/checklists/templates', icon: ClipboardCheck });
-    }
-
-    if (can?.hazards?.view) {
-        sitesGroup.items.push({ title: 'Hazards', href: '/compliance/hazards', icon: ShieldAlert });
-    }
-
-    sitesGroup.items.push({ title: 'Documents & Notes', href: '/sites?tab=documents', icon: FileText });
-
-    if (can?.checklists?.view) {
-        sitesGroup.items.push({ title: 'Inspections & Maintenance', href: '/sites?tab=inspections', icon: Wrench });
-    }
-
-    if (can?.vendors?.view || can?.credentials?.view) {
-        const href = activeSiteId
-            ? can?.vendors?.view
-                ? `/sites/${activeSiteId}/vendors`
-                : `/sites/${activeSiteId}/credentials`
-            : '/sites';
-
-        sitesGroup.items.push({ title: 'Vendors & Credentials', href, icon: Truck });
-    }
-
-    if (can?.assets?.viewAny) {
-        sitesGroup.items.push({ title: 'Assets', href: '/assets', icon: Package });
-    }
-
-    // Support Worker specific nav
-    if (role === 'support_worker') {
-        operationsGroup.items.push(
-            { title: 'My Shifts', href: '/shifts', icon: CalendarDays },
-            { title: timesheetPlural, href: '/timesheets', icon: ClipboardList },
-            { title: clientPlural, href: '/clients', icon: Users },
-            { title: notePlural, href: '/notes', icon: FileText },
-            { title: timelineLabel, href: '/timeline', icon: MessageSquareText }
-        );
-
-        if (can?.medications?.view) {
-            operationsGroup.items.push({
-                title: medicationPlural,
-                href: '/medications',
-                icon: ClipboardList,
-            });
-        }
-
-        if (can?.medications?.breakGlass) {
-            operationsGroup.items.push({
-                title: emergencyLabel,
-                href: '/emergency-access',
-                icon: Shield,
-            });
-        }
-
-        if (can?.assets?.viewAssigned || can?.assets?.viewAny) {
-            resourcesGroup.items.push({
-                title: assetPlural,
-                href: '/assets',
-                icon: Package,
-            });
-        }
-
-        if (can?.assets?.alertsView) {
-            resourcesGroup.items.push({
-                title: 'Asset Alerts',
-                href: '/assets/alerts',
-                icon: ShieldAlert,
-            });
-        }
-
-        if (can?.incidents?.viewAssigned) {
-            complianceGroup.items.push({
-                title: incidentPlural,
-                href: '/incidents',
-                icon: FileText,
-            });
-        }
-
-        return [
-            mainGroup,
-            ...(sitesGroup.items.length > 0 ? [sitesGroup] : []),
-            ...(operationsGroup.items.length > 0 ? [operationsGroup] : []),
-            ...(resourcesGroup.items.length > 0 ? [resourcesGroup] : []),
-            ...(complianceGroup.items.length > 0 ? [complianceGroup] : []),
-        ];
-    }
-
-    // Provider/Manager/Admin nav - Operations
-    if (can?.clients?.viewAny) {
-        operationsGroup.items.push({ title: clientPlural, href: '/clients', icon: Users });
-    }
-    if (can?.shifts?.viewAny) {
-        operationsGroup.items.push({ title: shiftPlural, href: '/shifts', icon: CalendarDays });
-    }
-    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned) {
-        operationsGroup.items.push({
-            title: timesheetPlural,
-            href: '/timesheets',
-            icon: ClipboardList,
-        });
-    }
-    if (can?.respite?.viewAny) {
-        operationsGroup.items.push({
-            title: respitePlural,
-            href: '/respite',
-            icon: CalendarDays,
-        });
-    }
-    if (can?.medications?.view) {
-        operationsGroup.items.push({
-            title: medicationPlural,
-            href: '/medications',
-            icon: ClipboardList,
-        });
-    }
-    if (can?.medications?.breakGlass) {
-        operationsGroup.items.push({
-            title: emergencyLabel,
-            href: '/emergency-access',
-            icon: Shield,
-        });
-    }
-
-    // Resources
-    if (can?.assets?.viewAny || can?.assets?.viewAssigned) {
-        resourcesGroup.items.push({ title: assetPlural, href: '/assets', icon: Package });
-    }
-    if (can?.assets?.alertsView) {
-        resourcesGroup.items.push({
-            title: 'Asset Alerts',
-            href: '/assets/alerts',
-            icon: ShieldAlert,
-        });
-    }
-    if (can?.staff?.viewAny) {
-        resourcesGroup.items.push({ title: staffPlural, href: '/staff', icon: Users });
-    }
-    if (can?.fleet?.viewAny) {
-        resourcesGroup.items.push({
-            title: 'Fleet Management',
-            href: '/fleet-management',
-            icon: MapPin,
-        });
-    }
-    if (can?.rostering?.viewAny) {
-        resourcesGroup.items.push({
-            title: 'Rostering',
-            href: '/rostering',
-            icon: Settings,
-        });
-    }
-
-    // Compliance & Safety
-    if (can?.incidents?.viewAny) {
-        complianceGroup.items.push({
-            title: incidentPlural,
-            href: '/incidents',
-            icon: FileText,
-        });
-    }
-    if (can?.safeguarding?.viewAny || can?.safeguarding?.create) {
-        complianceGroup.items.push({
-            title: 'Safeguarding',
-            href: '/safeguarding',
-            icon: ShieldAlert,
-        });
-    }
-    if (can?.privacy?.viewRequests) {
-        complianceGroup.items.push({
-            title: 'Privacy & GDPR',
-            href: '/privacy/dashboard',
-            icon: Lock,
-        });
-    }
-    if (can?.compliance?.view) {
-        complianceGroup.items.push({
-            title: 'Compliance',
-            href: '/compliance',
-            icon: Shield,
-        });
-    }
-
-    // HR
-    const hrGroup: NavGroup = {
-        id: 'hr',
-        label: 'HR',
-        items: [],
-    };
-
-    // My HR is always visible to any authenticated user
-    hrGroup.items.push({ title: 'My HR', href: '/hr/my', icon: Home });
-    hrGroup.items.push({ title: 'My Training', href: '/hr/my/training', icon: Target });
-
     const hasAnyHr = can?.hr?.recruitment?.view || can?.hr?.employees?.viewAny || can?.hr?.compliance?.view
         || can?.hr?.leave?.viewAny || can?.hr?.performance?.view || can?.hr?.reports?.view
         || can?.hr?.policies?.view || can?.hr?.positions?.view || can?.hr?.time?.view
         || can?.hr?.compensation?.view;
-
-    // Always-visible items
-    hrGroup.items.push({ title: 'Directory', href: '/hr/directory', icon: Users });
-    hrGroup.items.push({ title: 'My Payslips', href: '/hr/my/payslips', icon: FileText });
-
     if (hasAnyHr) {
-        if (can?.hr?.recruitment?.view) {
-            hrGroup.items.push({ title: 'Recruitment', href: '/hr/recruitment', icon: Users });
-        }
-        if (can?.hr?.employees?.viewAny) {
-            hrGroup.items.push({ title: 'People', href: '/hr/people', icon: Users });
-            hrGroup.items.push({ title: 'Import/Export', href: '/hr/import-export', icon: FileText });
-        }
-        if (can?.hr?.positions?.view) {
-            hrGroup.items.push({ title: 'Positions', href: '/hr/positions', icon: Briefcase });
-        }
-        hrGroup.items.push({ title: 'Org Chart', href: '/hr/orgchart', icon: GitBranch });
-        if (can?.hr?.compliance?.view) {
-            hrGroup.items.push({ title: 'Compliance', href: '/hr/compliance', icon: Shield });
-            hrGroup.items.push({ title: 'Compliance Calendar', href: '/hr/compliance/calendar', icon: CalendarDays });
-        }
-        if (can?.hr?.leave?.viewAny) {
-            hrGroup.items.push({ title: 'Leave & Rosters', href: '/hr/leave', icon: CalendarDays });
-            hrGroup.items.push({ title: 'Leave Reports', href: '/hr/leave/reports', icon: FileText });
-        }
-        if (can?.hr?.time?.view) {
-            hrGroup.items.push({ title: 'Time Tracking', href: '/hr/time', icon: Clock });
-        }
-        if (can?.hr?.performance?.view) {
-            hrGroup.items.push({ title: 'Performance', href: '/hr/performance', icon: ClipboardCheck });
-            hrGroup.items.push({ title: '360 Feedback', href: '/hr/feedback', icon: Users });
-            hrGroup.items.push({ title: 'PIPs', href: '/hr/performance/pips', icon: ClipboardList });
-            hrGroup.items.push({ title: 'Competencies', href: '/hr/performance/competencies', icon: Target });
-            hrGroup.items.push({ title: 'Succession', href: '/hr/succession', icon: Users });
-        }
-        if (can?.hr?.compensation?.view) {
-            hrGroup.items.push({ title: 'Compensation', href: '/hr/compensation/bands', icon: DollarSign });
-        }
-        if (can?.hr?.benefits?.view) {
-            hrGroup.items.push({ title: 'Benefits', href: '/hr/benefits', icon: Shield });
-        }
-        if (can?.hr?.goals?.view) {
-            hrGroup.items.push({ title: 'Goals', href: '/hr/goals', icon: Target });
-        }
-        if (can?.hr?.training?.view) {
-            hrGroup.items.push({ title: 'Training', href: '/hr/training/catalog', icon: BookOpen });
-        }
-        if (can?.hr?.assets?.view) {
-            hrGroup.items.push({ title: 'Assets', href: '/hr/assets', icon: Package });
-        }
-        hrGroup.items.push({ title: 'Community Feed', href: '/hr/feed', icon: MessageSquareText });
-        hrGroup.items.push({ title: 'Time Off Calendar', href: '/hr/calendar/time-off', icon: CalendarDays });
-        if (can?.hr?.analytics?.view) {
-            hrGroup.items.push({ title: 'Analytics', href: '/hr/analytics', icon: LayoutGrid });
-            hrGroup.items.push({ title: 'Headcount', href: '/hr/headcount', icon: Users });
-            hrGroup.items.push({ title: 'Wellbeing', href: '/hr/wellbeing', icon: Target });
-        }
-        if (can?.hr?.surveys?.view) {
-            hrGroup.items.push({ title: 'Surveys', href: '/hr/surveys', icon: ClipboardList });
-        }
-        if (can?.hr?.expenses?.view) {
-            hrGroup.items.push({ title: 'Expenses', href: '/hr/expenses', icon: DollarSign });
-        }
-        if (can?.hr?.skills?.view) {
-            hrGroup.items.push({ title: 'Skills', href: '/hr/skills', icon: Target });
-        }
-        if (can?.hr?.calendar?.view) {
-            hrGroup.items.push({ title: 'Calendar', href: '/hr/calendar', icon: CalendarDays });
-        }
-        if (can?.hr?.recruitment?.view) {
-            hrGroup.items.push({ title: 'Job Postings', href: '/hr/job-postings', icon: Briefcase });
-        }
-        if (can?.hr?.announcements?.view) {
-            hrGroup.items.push({ title: 'Announcements', href: '/hr/announcements', icon: MessageSquareText });
-        }
-        hrGroup.items.push({ title: 'Approvals', href: '/hr/approvals/pending', icon: ClipboardCheck });
-        hrGroup.items.push({ title: 'Signatures', href: '/hr/signatures/pending', icon: FileText });
-        if (can?.hr?.policies?.view) {
-            hrGroup.items.push({ title: 'Policies', href: '/hr/policies', icon: FileText });
-        }
-        if (can?.hr?.settings?.manage) {
-            hrGroup.items.push({ title: 'Settings', href: '/hr/settings/webhooks', icon: Settings });
-        }
-        if (can?.hr?.reports?.view) {
-            hrGroup.items.push({ title: 'Reports', href: '/hr/reports', icon: FileText });
-        }
+        people.items.push({ title: 'Org Chart', href: '/hr/orgchart', icon: GitBranch });
     }
+    if (can?.hr?.recruitment?.view) {
+        people.items.push({ title: 'Recruitment', href: '/hr/recruitment', icon: Users });
+        people.items.push({ title: 'Job Postings', href: '/hr/job-postings', icon: Briefcase });
+    }
+    groups.push(people);
 
-    // Governance
-    if (can?.governance?.view) {
-        governanceGroup.items.push(
-            { title: 'Dashboard', href: '/governance/dashboard', icon: Landmark },
-            { title: 'Meetings', href: '/governance/meetings', icon: CalendarDays },
-            ...(can?.governance?.meetings?.manage
-                ? [{ title: 'Admin', href: '/governance/admin/board-members', icon: Users }]
-                : []),
-            { title: 'Risks', href: '/governance/risks', icon: Scale },
-            { title: 'Resolutions', href: '/governance/resolutions', icon: Vote },
-            { title: 'Compliance', href: '/governance/compliance', icon: Shield },
-            { title: 'Strategy', href: '/governance/strategy', icon: Target },
-            { title: 'Performance', href: '/governance/performance', icon: Gavel },
-            { title: 'Budgets', href: '/governance/budgets', icon: Folder },
-            { title: 'Action Items', href: '/governance/actions', icon: ClipboardList },
-        );
+    // Workforce
+    const workforce: SubPanelGroup = { label: 'Workforce', items: [] };
+    if (can?.hr?.leave?.viewAny) {
+        workforce.items.push({ title: 'Leave & Rosters', href: '/hr/leave', icon: CalendarDays });
+        workforce.items.push({ title: 'Leave Reports', href: '/hr/leave/reports', icon: FileText });
     }
+    if (can?.hr?.time?.view) {
+        workforce.items.push({ title: 'Time Tracking', href: '/hr/time', icon: Clock });
+    }
+    if (can?.hr?.compensation?.view) {
+        workforce.items.push({ title: 'Compensation', href: '/hr/compensation/bands', icon: DollarSign });
+    }
+    if (can?.hr?.benefits?.view) {
+        workforce.items.push({ title: 'Benefits', href: '/hr/benefits', icon: Shield });
+    }
+    if (can?.hr?.expenses?.view) {
+        workforce.items.push({ title: 'Expenses', href: '/hr/expenses', icon: DollarSign });
+    }
+    workforce.items.push({ title: 'Time Off Calendar', href: '/hr/calendar/time-off', icon: CalendarDays });
+    if (workforce.items.length > 0) groups.push(workforce);
 
-    // System
-    if (can?.reports?.viewAny) {
-        systemGroup.items.push({ title: 'Reports', href: '/reports', icon: FileText });
+    // Performance
+    const performance: SubPanelGroup = { label: 'Performance', items: [] };
+    if (can?.hr?.performance?.view) {
+        performance.items.push({ title: 'Performance', href: '/hr/performance', icon: ClipboardCheck });
+        performance.items.push({ title: '360 Feedback', href: '/hr/feedback', icon: Users });
+        performance.items.push({ title: 'PIPs', href: '/hr/performance/pips', icon: ClipboardList });
+        performance.items.push({ title: 'Competencies', href: '/hr/performance/competencies', icon: Target });
+        performance.items.push({ title: 'Succession', href: '/hr/succession', icon: Users });
     }
-    if (can?.calendar?.viewAny) {
-        systemGroup.items.push({ title: 'Calendar', href: '/calendar', icon: CalendarDays });
+    if (can?.hr?.goals?.view) {
+        performance.items.push({ title: 'Goals', href: '/hr/goals', icon: Target });
     }
-    if (can?.timeline?.viewAny) {
-        systemGroup.items.push({ title: 'Timeline', href: '/timeline', icon: MessageSquareText });
-    }
-    if (can?.summaries?.viewAny) {
-        systemGroup.items.push({ title: 'Summaries', href: '/summaries', icon: FileText });
-    }
-    if (can?.audit?.viewAny) {
-        systemGroup.items.push(
-            { title: 'Audit Logs', href: '/audit-logs', icon: Shield },
-            { title: 'QA Checklist', href: '/quality/checklist', icon: ClipboardList }
-        );
-    }
-    if (can?.controlRoom?.viewAny) {
-        systemGroup.items.push({
-            title: 'Control Room',
-            href: '/control-room',
-            icon: ShieldAlert,
-        });
-    }
-    systemGroup.items.push({ title: 'Settings', href: '/settings', icon: Settings });
+    if (performance.items.length > 0) groups.push(performance);
 
-    return [
-        mainGroup,
-        ...(sitesGroup.items.length > 0 ? [sitesGroup] : []),
-        ...(operationsGroup.items.length > 0 ? [operationsGroup] : []),
-        ...(resourcesGroup.items.length > 0 ? [resourcesGroup] : []),
-        ...(complianceGroup.items.length > 0 ? [complianceGroup] : []),
-        ...(hrGroup.items.length > 0 ? [hrGroup] : []),
-        ...(governanceGroup.items.length > 0 ? [governanceGroup] : []),
-        ...(systemGroup.items.length > 0 ? [systemGroup] : []),
-    ];
+    // Engagement
+    const engagement: SubPanelGroup = { label: 'Engagement', items: [] };
+    engagement.items.push({ title: 'Community Feed', href: '/hr/feed', icon: MessageSquareText });
+    if (can?.hr?.surveys?.view) {
+        engagement.items.push({ title: 'Surveys', href: '/hr/surveys', icon: ClipboardList });
+    }
+    if (can?.hr?.announcements?.view) {
+        engagement.items.push({ title: 'Announcements', href: '/hr/announcements', icon: MessageSquareText });
+    }
+    if (can?.hr?.analytics?.view) {
+        engagement.items.push({ title: 'Wellbeing', href: '/hr/wellbeing', icon: Target });
+    }
+    if (engagement.items.length > 0) groups.push(engagement);
+
+    // Admin
+    const admin: SubPanelGroup = { label: 'Admin', items: [] };
+    if (can?.hr?.compliance?.view) {
+        admin.items.push({ title: 'Compliance', href: '/hr/compliance', icon: Shield });
+        admin.items.push({ title: 'Compliance Calendar', href: '/hr/compliance/calendar', icon: CalendarDays });
+    }
+    if (can?.hr?.training?.view) {
+        admin.items.push({ title: 'Training', href: '/hr/training/catalog', icon: BookOpen });
+    }
+    if (can?.hr?.assets?.view) {
+        admin.items.push({ title: 'Assets', href: '/hr/assets', icon: Package });
+    }
+    if (can?.hr?.skills?.view) {
+        admin.items.push({ title: 'Skills', href: '/hr/skills', icon: Target });
+    }
+    if (can?.hr?.analytics?.view) {
+        admin.items.push({ title: 'Analytics', href: '/hr/analytics', icon: LayoutGrid });
+        admin.items.push({ title: 'Headcount', href: '/hr/headcount', icon: Users });
+    }
+    if (can?.hr?.calendar?.view) {
+        admin.items.push({ title: 'Calendar', href: '/hr/calendar', icon: CalendarDays });
+    }
+    admin.items.push({ title: 'Approvals', href: '/hr/approvals/pending', icon: ClipboardCheck });
+    admin.items.push({ title: 'Signatures', href: '/hr/signatures/pending', icon: FileText });
+    if (can?.hr?.policies?.view) {
+        admin.items.push({ title: 'Policies', href: '/hr/policies', icon: FileText });
+    }
+    if (can?.hr?.reports?.view) {
+        admin.items.push({ title: 'Reports', href: '/hr/reports', icon: FileText });
+    }
+    if (can?.hr?.settings?.manage) {
+        admin.items.push({ title: 'Settings', href: '/hr/settings/webhooks', icon: Settings });
+    }
+    if (admin.items.length > 0) groups.push(admin);
+
+    return groups;
 }
+
+// ── Sub-panel component ────────────────────────────────────────────────────
+
+function SubPanel({
+    groups,
+    currentUrl,
+    onClose,
+}: {
+    groups: SubPanelGroup[];
+    currentUrl: string;
+    onClose: () => void;
+}) {
+    const panelRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleClickOutside(e: MouseEvent) {
+            if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+                // Check if the click is on the sidebar icon that triggered the panel
+                const target = e.target as HTMLElement;
+                if (target.closest('[data-sub-panel-trigger]')) return;
+                onClose();
+            }
+        }
+        function handleEsc(e: KeyboardEvent) {
+            if (e.key === 'Escape') onClose();
+        }
+        document.addEventListener('mousedown', handleClickOutside);
+        document.addEventListener('keydown', handleEsc);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEsc);
+        };
+    }, [onClose]);
+
+    return (
+        <div
+            ref={panelRef}
+            className="absolute left-14 top-0 bottom-0 z-50 w-60 border-r border-sidebar-border bg-sidebar text-sidebar-foreground overflow-y-auto shadow-lg"
+        >
+            {/* Panel header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-sidebar-border/50">
+                <span className="text-sm font-semibold text-sidebar-foreground">HR</span>
+                <button
+                    onClick={onClose}
+                    className="flex items-center justify-center w-6 h-6 rounded-md text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent transition-colors"
+                >
+                    <X className="h-4 w-4" />
+                </button>
+            </div>
+
+            {/* Panel groups */}
+            <div className="py-2">
+                {groups.map((group) => (
+                    <div key={group.label} className="mb-1">
+                        <div className="px-4 py-1.5 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/40">
+                            {group.label}
+                        </div>
+                        {group.items.map((item) => {
+                            const active = isSubItemActive(currentUrl, item.href);
+                            return (
+                                <Link
+                                    key={resolveUrl(item.href)}
+                                    href={item.href}
+                                    prefetch
+                                    preserveScroll
+                                    className={cn(
+                                        'flex items-center gap-2.5 px-4 py-1.5 text-sm transition-colors',
+                                        active
+                                            ? 'bg-sidebar-primary/10 text-sidebar-primary-foreground font-medium'
+                                            : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent',
+                                    )}
+                                >
+                                    {item.icon && <item.icon className="h-4 w-4 shrink-0" />}
+                                    <span className="truncate">{item.title}</span>
+                                    {active && (
+                                        <ChevronRight className="ml-auto h-3 w-3 text-sidebar-foreground/40" />
+                                    )}
+                                </Link>
+                            );
+                        })}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+// ── Main AppSidebar component ──────────────────────────────────────────────
 
 export function AppSidebar() {
     const page = usePage<PageProps & Record<string, any>>();
-    const { auth } = page.props;
-    const { labels } = page.props;
+    const { auth, branding, name: appName } = page.props;
     const role = auth.user?.role ?? null;
     const can = auth?.can;
+    const currentUrl = page.url;
+    const getInitials = useInitials();
+    const displayName: string = (branding as any)?.name ?? appName ?? 'Oblivion Findings';
+    const logoUrl: string | null = (branding as any)?.logoUrl ?? null;
 
-    const activeSiteId = page.props?.site?.id ?? null;
-    const navigationGroups = buildNavigationGroups({ role, can, labels: labels ?? {}, activeSiteId });
+    const [subPanelOpen, setSubPanelOpen] = useState(false);
+
+    const iconNavItems = useMemo(() => buildIconNavItems({ role, can }), [role, can]);
+    const hrSubPanelGroups = useMemo(() => buildHrSubPanelGroups({ can }), [can]);
+
+    const toggleSubPanel = useCallback(() => {
+        setSubPanelOpen((prev) => !prev);
+    }, []);
+
+    const closeSubPanel = useCallback(() => {
+        setSubPanelOpen(false);
+    }, []);
+
+    // Close sub-panel on navigation
+    useEffect(() => {
+        setSubPanelOpen(false);
+    }, [currentUrl]);
 
     return (
-        <Sidebar collapsible="icon" variant="inset">
-            <SidebarHeader>
-                <SidebarMenu>
-                    <SidebarMenuItem>
-                        <SidebarMenuButton size="lg" asChild>
-                            <Link href={dashboard()} prefetch>
-                                <AppLogo />
+        <TooltipProvider delayDuration={0}>
+            <div className="relative hidden md:flex h-svh">
+                {/* Icon sidebar - 56px (w-14) */}
+                <nav className="flex h-full w-14 flex-col items-center bg-sidebar border-r border-sidebar-border py-3 shrink-0">
+                    {/* Top: Logo */}
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Link
+                                href={dashboard()}
+                                prefetch
+                                className="flex items-center justify-center w-10 h-10 rounded-lg mb-4 bg-sidebar-primary text-sidebar-primary-foreground overflow-hidden"
+                            >
+                                {logoUrl ? (
+                                    <img src={logoUrl} alt={displayName} className="h-full w-full object-cover" />
+                                ) : (
+                                    <AppLogoIcon className="size-5 fill-current text-white dark:text-black" />
+                                )}
                             </Link>
-                        </SidebarMenuButton>
-                    </SidebarMenuItem>
-                </SidebarMenu>
-            </SidebarHeader>
+                        </TooltipTrigger>
+                        <TooltipContent side="right">{displayName}</TooltipContent>
+                    </Tooltip>
 
-            <SidebarContent>
-                <NavMain groups={navigationGroups} />
-            </SidebarContent>
+                    {/* Middle: Nav icons */}
+                    <div className="flex flex-1 flex-col items-center gap-1 overflow-y-auto scrollbar-none w-full px-2">
+                        {iconNavItems.map((item) => {
+                            const active = isIconActive(currentUrl, item, hrSubPanelGroups);
 
-            <SidebarFooter>
-                <NavFooter items={footerNavItems} className="mt-auto" />
-                <NavUser />
-            </SidebarFooter>
-        </Sidebar>
+                            if (item.subPanel) {
+                                return (
+                                    <div key={item.id} className={cn(item.dividerAfter && 'mb-1 pb-1 border-b border-sidebar-border/30 w-full flex justify-center')}>
+                                        <Tooltip>
+                                            <TooltipTrigger asChild>
+                                                <button
+                                                    data-sub-panel-trigger
+                                                    onClick={toggleSubPanel}
+                                                    className={cn(
+                                                        'flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
+                                                        active || subPanelOpen
+                                                            ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                                            : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent',
+                                                    )}
+                                                >
+                                                    <item.icon className="h-5 w-5" />
+                                                </button>
+                                            </TooltipTrigger>
+                                            <TooltipContent side="right">{item.label}</TooltipContent>
+                                        </Tooltip>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <div key={item.id} className={cn(item.dividerAfter && 'mb-1 pb-1 border-b border-sidebar-border/30 w-full flex justify-center')}>
+                                    <Tooltip>
+                                        <TooltipTrigger asChild>
+                                            <Link
+                                                href={item.href!}
+                                                prefetch
+                                                className={cn(
+                                                    'flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
+                                                    active
+                                                        ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                                        : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent',
+                                                )}
+                                            >
+                                                <item.icon className="h-5 w-5" />
+                                            </Link>
+                                        </TooltipTrigger>
+                                        <TooltipContent side="right">{item.label}</TooltipContent>
+                                    </Tooltip>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Bottom: Settings + User avatar */}
+                    <div className="mt-auto flex flex-col items-center gap-1 pt-2 border-t border-sidebar-border/30 w-full px-2">
+                        {/* Settings */}
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Link
+                                    href="/settings"
+                                    prefetch
+                                    className={cn(
+                                        'flex items-center justify-center w-10 h-10 rounded-lg transition-colors',
+                                        currentUrl.startsWith('/settings')
+                                            ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                                            : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent',
+                                    )}
+                                >
+                                    <Settings className="h-5 w-5" />
+                                </Link>
+                            </TooltipTrigger>
+                            <TooltipContent side="right">Settings</TooltipContent>
+                        </Tooltip>
+
+                        {/* User avatar with dropdown */}
+                        {auth.user && (
+                            <DropdownMenu>
+                                <Tooltip>
+                                    <TooltipTrigger asChild>
+                                        <DropdownMenuTrigger asChild>
+                                            <button className="flex items-center justify-center w-10 h-10 rounded-lg transition-colors text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent">
+                                                <Avatar className="h-8 w-8 overflow-hidden rounded-full">
+                                                    <AvatarImage src={auth.user.avatar} alt={auth.user.name} />
+                                                    <AvatarFallback className="rounded-full bg-neutral-200 text-black text-xs dark:bg-neutral-700 dark:text-white">
+                                                        {getInitials(auth.user.name)}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="right">{auth.user.name}</TooltipContent>
+                                </Tooltip>
+                                <DropdownMenuContent
+                                    className="min-w-56 rounded-lg"
+                                    align="end"
+                                    side="right"
+                                >
+                                    <UserMenuContent user={auth.user as any} />
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                    </div>
+                </nav>
+
+                {/* Sub-panel (slides out) */}
+                {subPanelOpen && (
+                    <SubPanel
+                        groups={hrSubPanelGroups}
+                        currentUrl={currentUrl}
+                        onClose={closeSubPanel}
+                    />
+                )}
+            </div>
+        </TooltipProvider>
+    );
+}
+
+// ── Mobile sidebar (full drawer with labels) ──────────────────────────────
+
+export function AppSidebarMobile({
+    open,
+    onClose,
+}: {
+    open: boolean;
+    onClose: () => void;
+}) {
+    const page = usePage<PageProps & Record<string, any>>();
+    const { auth } = page.props;
+    const role = auth.user?.role ?? null;
+    const can = auth?.can;
+    const currentUrl = page.url;
+
+    const iconNavItems = useMemo(() => buildIconNavItems({ role, can }), [role, can]);
+    const hrSubPanelGroups = useMemo(() => buildHrSubPanelGroups({ can }), [can]);
+
+    const [hrExpanded, setHrExpanded] = useState(false);
+
+    // Close on navigation
+    useEffect(() => {
+        onClose();
+    }, [currentUrl]);
+
+    if (!open) return null;
+
+    return (
+        <>
+            {/* Backdrop */}
+            <div className="fixed inset-0 z-40 bg-black/50 md:hidden" onClick={onClose} />
+
+            {/* Drawer */}
+            <div className="fixed inset-y-0 left-0 z-50 w-72 bg-sidebar text-sidebar-foreground overflow-y-auto md:hidden">
+                {/* Close button */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-sidebar-border/50">
+                    <span className="text-sm font-semibold">Menu</span>
+                    <button onClick={onClose} className="p-1 rounded-md hover:bg-sidebar-accent">
+                        <X className="h-5 w-5" />
+                    </button>
+                </div>
+
+                <div className="py-2">
+                    {iconNavItems.map((item) => {
+                        if (item.subPanel) {
+                            const active = isIconActive(currentUrl, item, hrSubPanelGroups);
+                            return (
+                                <div key={item.id}>
+                                    <button
+                                        onClick={() => setHrExpanded(!hrExpanded)}
+                                        className={cn(
+                                            'flex items-center gap-3 w-full px-4 py-2 text-sm transition-colors',
+                                            active
+                                                ? 'bg-sidebar-primary/10 text-sidebar-primary-foreground font-medium'
+                                                : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent',
+                                        )}
+                                    >
+                                        <item.icon className="h-5 w-5 shrink-0" />
+                                        <span>{item.label}</span>
+                                        <ChevronRight className={cn('ml-auto h-4 w-4 transition-transform', hrExpanded && 'rotate-90')} />
+                                    </button>
+                                    {hrExpanded && hrSubPanelGroups.map((group) => (
+                                        <div key={group.label} className="ml-4">
+                                            <div className="px-4 py-1 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/40">
+                                                {group.label}
+                                            </div>
+                                            {group.items.map((sub) => (
+                                                <Link
+                                                    key={resolveUrl(sub.href)}
+                                                    href={sub.href}
+                                                    prefetch
+                                                    className={cn(
+                                                        'flex items-center gap-2.5 px-4 py-1.5 text-sm transition-colors',
+                                                        isSubItemActive(currentUrl, sub.href)
+                                                            ? 'bg-sidebar-primary/10 text-sidebar-primary-foreground font-medium'
+                                                            : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent',
+                                                    )}
+                                                >
+                                                    {sub.icon && <sub.icon className="h-4 w-4 shrink-0" />}
+                                                    <span>{sub.title}</span>
+                                                </Link>
+                                            ))}
+                                        </div>
+                                    ))}
+                                    {item.dividerAfter && <div className="my-1 mx-4 border-b border-sidebar-border/30" />}
+                                </div>
+                            );
+                        }
+
+                        const active = item.href ? matchScore(currentUrl, item.href) > 0 : false;
+                        return (
+                            <div key={item.id}>
+                                <Link
+                                    href={item.href!}
+                                    prefetch
+                                    className={cn(
+                                        'flex items-center gap-3 px-4 py-2 text-sm transition-colors',
+                                        active
+                                            ? 'bg-sidebar-primary/10 text-sidebar-primary-foreground font-medium'
+                                            : 'text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent',
+                                    )}
+                                >
+                                    <item.icon className="h-5 w-5 shrink-0" />
+                                    <span>{item.label}</span>
+                                </Link>
+                                {item.dividerAfter && <div className="my-1 mx-4 border-b border-sidebar-border/30" />}
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        </>
     );
 }

@@ -2,6 +2,11 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrFeedPost;
+use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrPosition;
+use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\IncidentFollowup;

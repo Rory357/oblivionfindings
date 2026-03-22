@@ -1,6 +1,9 @@
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs } from '@/components/ui/tabs';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs } from '@/components/ui/tabs';
+
 import AppLayout from '@/layouts/app-layout';
 import { dashboard } from '@/routes';
 import { type BreadcrumbItem } from '@/types';
@@ -11,32 +14,49 @@ import {
     type ActivityEventLite,
 } from '@/components/dashboard/activity-timeline';
 import { DashboardAnalytics } from '@/components/dashboard/analytics';
+import { DonutChart } from '@/components/dashboard/donut-chart';
+import { KpiCard } from '@/components/dashboard/kpi-card';
 import { ShiftTimeline, type ShiftLite } from '@/components/dashboard/timeline';
 import { MyDayList, type MyDayItem } from '@/components/workstream/my-day-list';
 
-function SmallKpi({
-    label,
-    value,
-    hint,
-}: {
-    label: string;
-    value: string | number;
-    hint?: string;
-}) {
-    return (
-        <div className="rounded-xl border p-4">
-            <div className="text-xs text-muted-foreground">{label}</div>
-            <div className="mt-2 text-2xl font-semibold">{value}</div>
-            {hint ? (
-                <div className="mt-1 text-xs text-muted-foreground">{hint}</div>
-            ) : null}
-        </div>
-    );
-}
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip as RechartsTooltip,
+    ResponsiveContainer,
+    LineChart,
+    Line,
+} from 'recharts';
+
+import {
+    Users,
+    ClipboardList,
+    Clock,
+    ShieldAlert,
+    CalendarDays,
+    Timer,
+    CheckCircle2,
+    ListTodo,
+    Building2,
+    Briefcase,
+    FileWarning,
+    Activity,
+} from 'lucide-react';
+
+/* -------------------------------------------------------------------------- */
+/*  Breadcrumbs                                                                */
+/* -------------------------------------------------------------------------- */
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Dashboard', href: dashboard().url },
 ];
+
+/* -------------------------------------------------------------------------- */
+/*  Types                                                                      */
+/* -------------------------------------------------------------------------- */
 
 type ClientLite = {
     id: number;
@@ -53,8 +73,28 @@ type TimesheetLite = {
     created_at?: string;
 };
 
+type HrFeedPostLite = {
+    id: number;
+    post_type: string;
+    content: string;
+    created_at: string;
+    user?: { id: number; name: string } | null;
+};
+
+type ExpiringComplianceItem = {
+    user_id: number;
+    user_name: string;
+    requirement_name: string;
+    expires_at: string;
+};
+
+type DepartmentBreakdown = {
+    department: string;
+    count: number;
+};
+
 type Props = {
-    mode: 'staff' | 'manager' | 'client';
+    mode: 'staff' | 'manager' | 'client' | 'hr_admin';
     filters?: {
         range?: 'today' | 'week';
         status?: string;
@@ -74,8 +114,10 @@ type Props = {
     upcomingEvents?: ActivityEventLite[];
     todayTimesheets?: TimesheetLite[];
     managerSummary?: {
+        shiftsTodayCount: number;
         staffWorkingTodayCount: number;
         timesheetsPendingCount: number;
+        staffSparkline?: number[];
     } | null;
     incidentKpis?: {
         incidentsLast30: number;
@@ -114,14 +156,60 @@ type Props = {
         pending_signatures: number;
         due_attestations: number;
     } | null;
+    /* HR Admin mode props */
+    hrAdmin?: {
+        headcount: number;
+        headcountTrend?: number[];
+        vacancies: number;
+        pendingLeave: number;
+        complianceScore: number;
+        headcountSeries?: Array<{ month: string; count: number }>;
+        departmentBreakdown?: DepartmentBreakdown[];
+        recentFeedPosts?: HrFeedPostLite[];
+        expiringCompliance?: ExpiringComplianceItem[];
+    } | null;
+    /* Staff-specific */
+    staffKpis?: {
+        myShiftsToday: number;
+        leaveBalance: number;
+        compliancePercent: number;
+        pendingTasks: number;
+    } | null;
 };
 
 function fullName(c: ClientLite) {
     return `${c.first_name} ${c.last_name}`;
 }
 
-export default function Dashboard(props: Props) {
+function formatShortDate(iso: string) {
+    const d = new Date(iso);
+    return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Severity color map for donut                                               */
+/* -------------------------------------------------------------------------- */
+
+const SEVERITY_COLORS: Record<string, string> = {
+    low: '#a78bfa',
+    medium: '#8b5cf6',
+    high: '#7c3aed',
+    critical: '#5b21b6',
+    unspecified: '#c4b5fd',
+};
+
+const DEPT_COLORS = [
+    '#8b5cf6', '#a78bfa', '#7c3aed', '#c084fc',
+    '#6d28d9', '#ddd6fe', '#5b21b6', '#ede9fe',
+];
+
+/* -------------------------------------------------------------------------- */
+/*  Manager Dashboard                                                          */
+/* -------------------------------------------------------------------------- */
+
+function ManagerDashboard({ props }: { props: Props }) {
     const { labels } = usePage().props as any;
+    const clientLabelPlural = labels?.['client.plural'] ?? 'Clients';
 
     const shiftSeries = props.analytics?.shiftSeries ?? [];
     const shiftSeries30 = props.analytics?.shiftSeries30 ?? [];
@@ -130,16 +218,24 @@ export default function Dashboard(props: Props) {
     const timesheetByStatus = props.analytics?.timesheetByStatus ?? [];
     const timesheetSeries30 = props.analytics?.timesheetSeries30 ?? [];
 
-    const clientLabelPlural = labels?.['client.plural'] ?? 'Clients';
-    const clientLabelSingular = labels?.['client.singular'] ?? 'Client';
-    const staffLabelPlural = labels?.['staff.plural'] ?? 'Staff';
+    const summary = props.managerSummary;
+    const incidents = props.incidentKpis;
 
-    const myDayItems = props.myDayItems ?? [];
+    // Build bar chart data from shift series (use 7-day by default)
+    const barData = (shiftSeries.length ? shiftSeries : shiftSeries30).map((d) => ({
+        name: formatShortDate(d.date),
+        shifts: d.count,
+        hours: Math.round((d.hours ?? 0) * 10) / 10,
+    }));
 
-    const shiftsForWorkTab = [
-        ...(props.todayShifts ?? []),
-        ...(props.upcomingShifts ?? []),
-    ];
+    // Build severity donut data
+    const severityDonut = incidentBySeverity30.map((d) => ({
+        label: d.severity || 'unspecified',
+        value: d.count,
+        color: SEVERITY_COLORS[d.severity] ?? '#c4b5fd',
+    }));
+
+    const severityTotal = severityDonut.reduce((s, d) => s + d.value, 0);
 
     const filters = props.filters ?? { range: 'week', status: 'all', client_id: null };
 
@@ -157,92 +253,207 @@ export default function Dashboard(props: Props) {
         );
     }
 
-    const workTab = (
-        <div className="space-y-4">
-            {props.mode !== 'client' ? (
-                <div className="flex flex-wrap items-end gap-3 rounded-xl border p-4">
-                    <div>
-                        <div className="text-xs text-muted-foreground">Range</div>
-                        <Select
-                            value={filters.range ?? 'week'}
-                            onValueChange={(v) => updateFilters({ range: v as any })}
-                        >
-                            <SelectTrigger className="mt-1 w-[160px]">
-                                <SelectValue placeholder="Range" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="today">Today</SelectItem>
-                                <SelectItem value="week">Next 7 days</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+    const shiftsForWorkTab = [
+        ...(props.todayShifts ?? []),
+        ...(props.upcomingShifts ?? []),
+    ];
 
-                    <div>
-                        <div className="text-xs text-muted-foreground">Status</div>
-                        <Select
-                            value={filters.status ?? 'all'}
-                            onValueChange={(v) => updateFilters({ status: v })}
-                        >
-                            <SelectTrigger className="mt-1 w-[180px]">
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All</SelectItem>
-                                <SelectItem value="scheduled">Scheduled</SelectItem>
-                                <SelectItem value="in_progress">In progress</SelectItem>
-                                <SelectItem value="completed">Completed</SelectItem>
-                                <SelectItem value="cancelled">Cancelled</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+    return (
+        <div className="space-y-6">
+            {/* Row 1: KPI cards */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <KpiCard
+                    label="Staff Active Today"
+                    value={summary?.staffWorkingTodayCount ?? 0}
+                    icon={Users}
+                    sparklineData={summary?.staffSparkline}
+                    href="/shifts"
+                />
+                <KpiCard
+                    label="Pending Timesheets"
+                    value={summary?.timesheetsPendingCount ?? 0}
+                    icon={ClipboardList}
+                    href="/timesheets"
+                />
+                <KpiCard
+                    label="Shifts Today"
+                    value={summary?.shiftsTodayCount ?? 0}
+                    icon={Clock}
+                    href="/shifts"
+                />
+                <KpiCard
+                    label="Incidents (30d)"
+                    value={incidents?.incidentsLast30 ?? 0}
+                    icon={ShieldAlert}
+                    href="/incidents"
+                    trend={
+                        incidents && incidents.incidentsHighLast30 > 0
+                            ? {
+                                  value: incidents.incidentsHighLast30,
+                                  label: 'high severity',
+                                  direction: 'up',
+                              }
+                            : undefined
+                    }
+                />
+            </div>
 
-                    <div>
-                        <div className="text-xs text-muted-foreground">Client</div>
-                        <Select
-                            value={filters.client_id ? String(filters.client_id) : 'all'}
-                            onValueChange={(v) =>
-                                updateFilters({ client_id: v === 'all' ? null : Number(v) })
-                            }
-                        >
-                            <SelectTrigger className="mt-1 w-[260px]">
-                                <SelectValue placeholder="Client" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="all">All clients</SelectItem>
-                                {(props.assignedClients ?? []).map((c) => (
-                                    <SelectItem key={c.id} value={String(c.id)}>
-                                        {fullName(c)}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="ml-auto text-xs text-muted-foreground">
-                        Showing {shiftsForWorkTab.length} shift
-                        {shiftsForWorkTab.length === 1 ? '' : 's'}
-                    </div>
+            {/* HR widgets if available */}
+            {props.hrWidgets && (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <KpiCard
+                        label="Pending Leave"
+                        value={props.hrWidgets.pending_leave}
+                        icon={CalendarDays}
+                        href="/hr/leave"
+                    />
+                    <KpiCard
+                        label="Expiring Compliance"
+                        value={props.hrWidgets.expiring_compliance}
+                        icon={FileWarning}
+                        href="/hr/compliance"
+                    />
+                    <KpiCard
+                        label="Pending Signatures"
+                        value={props.hrWidgets.pending_signatures}
+                        icon={ClipboardList}
+                        href="/hr/signatures/pending"
+                    />
+                    <KpiCard
+                        label="Due Attestations"
+                        value={props.hrWidgets.due_attestations}
+                        icon={CheckCircle2}
+                        href="/hr/my/policies"
+                    />
                 </div>
-            ) : null}
+            )}
 
+            {/* Row 2: Charts */}
+            <div className="grid gap-4 lg:grid-cols-5">
+                {/* Weekly shifts bar chart */}
+                <Card className="lg:col-span-3">
+                    <CardHeader>
+                        <CardTitle className="text-sm">Weekly Shifts</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {barData.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={260}>
+                                <BarChart data={barData}>
+                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                    <XAxis
+                                        dataKey="name"
+                                        tick={{ fontSize: 11 }}
+                                        className="fill-muted-foreground"
+                                    />
+                                    <YAxis
+                                        tick={{ fontSize: 11 }}
+                                        className="fill-muted-foreground"
+                                    />
+                                    <RechartsTooltip
+                                        contentStyle={{
+                                            backgroundColor: 'hsl(var(--card))',
+                                            border: '1px solid hsl(var(--border))',
+                                            borderRadius: '0.75rem',
+                                            fontSize: 12,
+                                        }}
+                                    />
+                                    <Bar
+                                        dataKey="shifts"
+                                        fill="var(--primary)"
+                                        radius={[4, 4, 0, 0]}
+                                    />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
+                                No shift data available.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Incident severity donut */}
+                <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="text-sm">Incident Severity (30d)</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-center">
+                        {severityTotal > 0 ? (
+                            <DonutChart
+                                data={severityDonut}
+                                size={160}
+                                thickness={24}
+                                centerValue={severityTotal}
+                                centerLabel="incidents"
+                            />
+                        ) : (
+                            <div className="text-sm text-muted-foreground">
+                                No incidents in the last 30 days.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Row 3: Upcoming shifts + My Day */}
             <div className="grid gap-4 lg:grid-cols-3">
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-2 space-y-4">
+                    {/* Filters */}
+                    <div className="flex flex-wrap items-end gap-3 rounded-xl border p-4">
+                        <div>
+                            <div className="text-xs text-muted-foreground">Range</div>
+                            <Select
+                                value={filters.range ?? 'week'}
+                                onValueChange={(v) => updateFilters({ range: v as any })}
+                            >
+                                <SelectTrigger className="mt-1 w-[160px]">
+                                    <SelectValue placeholder="Range" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="today">Today</SelectItem>
+                                    <SelectItem value="week">Next 7 days</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <div className="text-xs text-muted-foreground">Status</div>
+                            <Select
+                                value={filters.status ?? 'all'}
+                                onValueChange={(v) => updateFilters({ status: v })}
+                            >
+                                <SelectTrigger className="mt-1 w-[180px]">
+                                    <SelectValue placeholder="Status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All</SelectItem>
+                                    <SelectItem value="scheduled">Scheduled</SelectItem>
+                                    <SelectItem value="in_progress">In progress</SelectItem>
+                                    <SelectItem value="completed">Completed</SelectItem>
+                                    <SelectItem value="cancelled">Cancelled</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="ml-auto text-xs text-muted-foreground">
+                            Showing {shiftsForWorkTab.length} shift
+                            {shiftsForWorkTab.length === 1 ? '' : 's'}
+                        </div>
+                    </div>
+
+                    {/* Upcoming shifts */}
                     <ShiftTimeline
-                        title="To do timeline"
+                        title="Upcoming Shifts"
                         shifts={shiftsForWorkTab}
-                        mode={props.mode}
+                        mode="manager"
                         emptyText="No shifts scheduled."
                     />
                 </div>
 
                 <div className="lg:col-span-1 space-y-4">
-                    {props.mode !== 'client' ? (
-                        <MyDayList
-                            title="My day"
-                            items={props.myDayItems ?? []}
-                            emptyLabel="No tasks or follow-ups due."
-                        />
-                    ) : null}
+                    <MyDayList
+                        title="My Day"
+                        items={props.myDayItems ?? []}
+                        emptyLabel="No tasks or follow-ups due."
+                    />
 
                     <ActivityTimeline
                         title="Activity"
@@ -252,289 +463,512 @@ export default function Dashboard(props: Props) {
                 </div>
             </div>
 
-            <div className="grid gap-4 lg:grid-cols-3">
-                <div className="rounded-xl border p-4 lg:col-span-2">
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <div className="text-sm font-semibold">
-                                Assigned {clientLabelPlural}
-                            </div>
-                            <div className="text-xs text-muted-foreground">
-                                Quick access to your{' '}
-                                {clientLabelPlural.toLowerCase()}.
-                            </div>
-                        </div>
-                        <Button asChild size="sm" variant="outline">
-                            <Link href="/clients">View all</Link>
-                        </Button>
-                    </div>
+            {/* Analytics tab */}
+            <Tabs
+                tabs={[
+                    {
+                        key: 'analytics',
+                        label: 'Analytics',
+                        content: (
+                            <DashboardAnalytics
+                                shiftSeries7={shiftSeries as any}
+                                shiftSeries30={shiftSeries30 as any}
+                                timesheetByStatus={timesheetByStatus}
+                                timesheetSeries30={timesheetSeries30 as any}
+                                incidentSeries30={incidentSeries30 as any}
+                                incidentBySeverity30={incidentBySeverity30 as any}
+                            />
+                        ),
+                    },
+                ]}
+            />
+        </div>
+    );
+}
 
-                    <div className="mt-4 grid gap-2 md:grid-cols-2">
-                        {props.assignedClients?.length ? (
-                            props.assignedClients.map((c) => (
-                                <Link
-                                    key={c.id}
-                                    href={`/clients/${c.id}`}
-                                    className="rounded-lg border p-3 transition hover:bg-muted/30"
-                                >
-                                    <div className="text-sm font-medium">
-                                        {fullName(c)}
-                                    </div>
-                                    <div className="mt-1 text-xs text-muted-foreground">
-                                        Status: {c.status ?? '—'}
-                                    </div>
-                                </Link>
-                            ))
-                        ) : (
-                            <div className="text-sm text-muted-foreground">
-                                No assigned {clientLabelPlural.toLowerCase()}.
-                            </div>
-                        )}
-                    </div>
+/* -------------------------------------------------------------------------- */
+/*  Staff Dashboard                                                            */
+/* -------------------------------------------------------------------------- */
+
+function StaffDashboard({ props }: { props: Props }) {
+    const kpis = props.staffKpis;
+    const shiftsForWorkTab = [
+        ...(props.todayShifts ?? []),
+        ...(props.upcomingShifts ?? []),
+    ];
+
+    return (
+        <div className="space-y-6">
+            {/* Row 1: KPI cards */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <KpiCard
+                    label="My Shifts Today"
+                    value={kpis?.myShiftsToday ?? props.todayShifts?.length ?? 0}
+                    icon={Clock}
+                    href="/shifts"
+                />
+                <KpiCard
+                    label="Leave Balance"
+                    value={kpis?.leaveBalance != null ? `${kpis.leaveBalance}h` : '--'}
+                    icon={CalendarDays}
+                    href="/hr/leave"
+                />
+                <KpiCard
+                    label="Compliance"
+                    value={kpis?.compliancePercent != null ? `${kpis.compliancePercent}%` : '--'}
+                    icon={CheckCircle2}
+                    trend={
+                        kpis?.compliancePercent != null
+                            ? {
+                                  value: kpis.compliancePercent,
+                                  label: 'complete',
+                                  direction:
+                                      kpis.compliancePercent >= 90
+                                          ? 'up'
+                                          : kpis.compliancePercent >= 70
+                                            ? 'neutral'
+                                            : 'down',
+                              }
+                            : undefined
+                    }
+                />
+                <KpiCard
+                    label="Pending Tasks"
+                    value={kpis?.pendingTasks ?? props.myDayItems?.length ?? 0}
+                    icon={ListTodo}
+                />
+            </div>
+
+            {/* HR widgets if available */}
+            {props.hrWidgets && (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <KpiCard
+                        label="Pending Leave"
+                        value={props.hrWidgets.pending_leave}
+                        icon={CalendarDays}
+                        href="/hr/leave"
+                    />
+                    <KpiCard
+                        label="Expiring Compliance"
+                        value={props.hrWidgets.expiring_compliance}
+                        icon={FileWarning}
+                        href="/hr/compliance"
+                    />
+                    <KpiCard
+                        label="Pending Signatures"
+                        value={props.hrWidgets.pending_signatures}
+                        icon={ClipboardList}
+                        href="/hr/signatures/pending"
+                    />
+                    <KpiCard
+                        label="Due Attestations"
+                        value={props.hrWidgets.due_attestations}
+                        icon={CheckCircle2}
+                        href="/hr/my/policies"
+                    />
+                </div>
+            )}
+
+            {/* Row 2: Schedule + Check-in */}
+            <div className="grid gap-4 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                    <ShiftTimeline
+                        title="Today's Schedule"
+                        shifts={shiftsForWorkTab}
+                        mode="staff"
+                        emptyText="No shifts scheduled for today."
+                    />
                 </div>
 
-                <div className="rounded-xl border p-4 lg:col-span-1">
-                    <div className="text-sm font-semibold">Quick actions</div>
-                    <div className="mt-1 text-xs text-muted-foreground">
-                        Common actions for today.
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                        <Button asChild size="sm" variant="outline">
-                            <Link href="/shifts">Shifts</Link>
-                        </Button>
-                        <Button asChild size="sm" variant="outline">
-                            <Link href="/timesheets">Timesheets</Link>
-                        </Button>
-                        <Button asChild size="sm">
-                            <Link href="/shifts/create">Create shift</Link>
-                        </Button>
-                    </div>
-
-                    {props.todayTimesheets?.length ? (
-                        <div className="mt-6">
-                            <div className="text-xs font-medium text-muted-foreground">
-                                Today’s timesheets
+                <div className="lg:col-span-1">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-sm">Daily Check-in</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            <div className="text-sm text-muted-foreground">
+                                How are you feeling today?
                             </div>
-                            <div className="mt-2 space-y-2">
-                                {props.todayTimesheets.slice(0, 5).map((t) => (
-                                    <Link
-                                        key={t.id}
-                                        href={`/timesheets/${t.id}/edit`}
-                                        className="block rounded-lg border p-3 transition hover:bg-muted/30"
+                            <div className="flex gap-2">
+                                {['Great', 'Good', 'Okay', 'Tired'].map((mood) => (
+                                    <Button
+                                        key={mood}
+                                        size="sm"
+                                        variant="outline"
+                                        className="flex-1"
                                     >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <div className="truncate text-sm font-medium">
-                                                {t.client
-                                                    ? fullName(t.client)
-                                                    : clientLabelSingular}
-                                            </div>
-                                            <span className="shrink-0 rounded-md border px-2 py-0.5 text-xs">
-                                                {t.status}
-                                            </span>
-                                        </div>
-                                        <div className="mt-1 text-xs text-muted-foreground">
-                                            {t.work_date}
-                                        </div>
-                                    </Link>
+                                        {mood}
+                                    </Button>
                                 ))}
                             </div>
-                        </div>
-                    ) : null}
+
+                            <div className="border-t pt-4">
+                                <div className="text-xs font-medium text-muted-foreground">
+                                    Quick Actions
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                    <Button asChild size="sm" variant="outline">
+                                        <Link href="/hr/leave/create">Submit Leave</Link>
+                                    </Button>
+                                    <Button asChild size="sm" variant="outline">
+                                        <Link href="/timesheets">View Timesheets</Link>
+                                    </Button>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
+
+            {/* Row 3: Tasks + Quick Actions */}
+            <div className="grid gap-4 lg:grid-cols-3">
+                <div className="lg:col-span-2">
+                    <MyDayList
+                        title="My Tasks / Follow-ups"
+                        items={props.myDayItems ?? []}
+                        emptyLabel="No tasks or follow-ups due."
+                    />
+                </div>
+
+                <div className="lg:col-span-1">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-sm">Quick Actions</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-2 gap-2">
+                                <Button asChild size="sm" variant="outline" className="justify-start">
+                                    <Link href="/hr/leave/create">
+                                        <CalendarDays className="mr-2 h-4 w-4" />
+                                        Submit Leave
+                                    </Link>
+                                </Button>
+                                <Button asChild size="sm" variant="outline" className="justify-start">
+                                    <Link href="/timesheets">
+                                        <Timer className="mr-2 h-4 w-4" />
+                                        View Timesheets
+                                    </Link>
+                                </Button>
+                                <Button asChild size="sm" variant="outline" className="justify-start">
+                                    <Link href="/hr/my/training">
+                                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                                        My Training
+                                    </Link>
+                                </Button>
+                                <Button asChild size="sm" variant="outline" className="justify-start">
+                                    <Link href="/hr/my/policies">
+                                        <ClipboardList className="mr-2 h-4 w-4" />
+                                        My Policies
+                                    </Link>
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <div className="mt-4">
+                        <ActivityTimeline
+                            title="Activity"
+                            events={props.upcomingEvents ?? []}
+                            emptyText="No upcoming activity."
+                        />
+                    </div>
                 </div>
             </div>
         </div>
     );
+}
 
-    const analyticsTab = (
-        <DashboardAnalytics
-            shiftSeries7={shiftSeries as any}
-            shiftSeries30={shiftSeries30 as any}
-            timesheetByStatus={timesheetByStatus}
-            timesheetSeries30={timesheetSeries30 as any}
-            incidentSeries30={incidentSeries30 as any}
-            incidentBySeverity30={incidentBySeverity30 as any}
-        />
+/* -------------------------------------------------------------------------- */
+/*  HR Admin Dashboard                                                         */
+/* -------------------------------------------------------------------------- */
+
+function HrAdminDashboard({ props }: { props: Props }) {
+    const hr = props.hrAdmin;
+
+    const headcountSeries = (hr?.headcountSeries ?? []).map((d) => ({
+        name: d.month,
+        headcount: d.count,
+    }));
+
+    const deptDonut = (hr?.departmentBreakdown ?? []).map((d, i) => ({
+        label: d.department || 'Unassigned',
+        value: d.count,
+        color: DEPT_COLORS[i % DEPT_COLORS.length],
+    }));
+
+    const deptTotal = deptDonut.reduce((s, d) => s + d.value, 0);
+
+    return (
+        <div className="space-y-6">
+            {/* Row 1: KPI cards */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <KpiCard
+                    label="Total Headcount"
+                    value={hr?.headcount ?? 0}
+                    icon={Users}
+                    sparklineData={hr?.headcountTrend}
+                    href="/hr/employees"
+                />
+                <KpiCard
+                    label="Open Vacancies"
+                    value={hr?.vacancies ?? 0}
+                    icon={Briefcase}
+                    href="/hr/positions"
+                />
+                <KpiCard
+                    label="Pending Leave"
+                    value={hr?.pendingLeave ?? 0}
+                    icon={CalendarDays}
+                    href="/hr/leave"
+                />
+                <KpiCard
+                    label="Compliance Score"
+                    value={hr?.complianceScore != null ? `${hr.complianceScore}%` : '--'}
+                    icon={CheckCircle2}
+                    trend={
+                        hr?.complianceScore != null
+                            ? {
+                                  value: hr.complianceScore,
+                                  label: 'compliant',
+                                  direction:
+                                      hr.complianceScore >= 90
+                                          ? 'up'
+                                          : hr.complianceScore >= 70
+                                            ? 'neutral'
+                                            : 'down',
+                              }
+                            : undefined
+                    }
+                    href="/hr/compliance"
+                />
+            </div>
+
+            {/* Row 2: Charts */}
+            <div className="grid gap-4 lg:grid-cols-5">
+                {/* Headcount trend line chart */}
+                <Card className="lg:col-span-3">
+                    <CardHeader>
+                        <CardTitle className="text-sm">Headcount Trend (12 months)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {headcountSeries.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={260}>
+                                <LineChart data={headcountSeries}>
+                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                    <XAxis
+                                        dataKey="name"
+                                        tick={{ fontSize: 11 }}
+                                        className="fill-muted-foreground"
+                                    />
+                                    <YAxis
+                                        tick={{ fontSize: 11 }}
+                                        className="fill-muted-foreground"
+                                    />
+                                    <RechartsTooltip
+                                        contentStyle={{
+                                            backgroundColor: 'hsl(var(--card))',
+                                            border: '1px solid hsl(var(--border))',
+                                            borderRadius: '0.75rem',
+                                            fontSize: 12,
+                                        }}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="headcount"
+                                        stroke="var(--primary)"
+                                        strokeWidth={2}
+                                        dot={{ r: 3, fill: 'var(--primary)' }}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
+                                No headcount data available.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Department breakdown donut */}
+                <Card className="lg:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="text-sm">Department Breakdown</CardTitle>
+                    </CardHeader>
+                    <CardContent className="flex items-center justify-center">
+                        {deptTotal > 0 ? (
+                            <DonutChart
+                                data={deptDonut}
+                                size={160}
+                                thickness={24}
+                                centerValue={deptTotal}
+                                centerLabel="employees"
+                            />
+                        ) : (
+                            <div className="text-sm text-muted-foreground">
+                                No department data available.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Row 3: Recent activity + Expiring compliance */}
+            <div className="grid gap-4 lg:grid-cols-2">
+                {/* Recent activity feed */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-sm">Recent Activity</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        {hr?.recentFeedPosts?.length ? (
+                            <div className="space-y-3">
+                                {hr.recentFeedPosts.map((post) => (
+                                    <div
+                                        key={post.id}
+                                        className="flex items-start gap-3 rounded-lg border p-3"
+                                    >
+                                        <Activity className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">
+                                                    {post.user?.name ?? 'System'}
+                                                </span>
+                                                <Badge variant="secondary" className="text-[10px]">
+                                                    {post.post_type}
+                                                </Badge>
+                                            </div>
+                                            <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                                {post.content}
+                                            </div>
+                                            <div className="mt-1 text-xs text-muted-foreground">
+                                                {formatShortDate(post.created_at)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-muted-foreground">
+                                No recent activity.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Expiring compliance */}
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                        <CardTitle className="text-sm">Expiring Compliance</CardTitle>
+                        <Button asChild size="sm" variant="outline">
+                            <Link href="/hr/compliance">View all</Link>
+                        </Button>
+                    </CardHeader>
+                    <CardContent>
+                        {hr?.expiringCompliance?.length ? (
+                            <div className="space-y-2">
+                                {hr.expiringCompliance.map((item, i) => (
+                                    <div
+                                        key={`${item.user_id}-${i}`}
+                                        className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                                    >
+                                        <div className="min-w-0">
+                                            <div className="text-sm font-medium">
+                                                {item.user_name}
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {item.requirement_name}
+                                            </div>
+                                        </div>
+                                        <Badge variant="destructive" className="shrink-0 text-[10px]">
+                                            Expires {formatShortDate(item.expires_at)}
+                                        </Badge>
+                                    </div>
+                                ))}
+                            </div>
+                        ) : (
+                            <div className="text-sm text-muted-foreground">
+                                No items expiring soon.
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </div>
     );
+}
 
+/* -------------------------------------------------------------------------- */
+/*  Client Dashboard (preserved from original)                                 */
+/* -------------------------------------------------------------------------- */
+
+function ClientDashboard({ props }: { props: Props }) {
+    const { labels } = usePage().props as any;
+    const clientLabelSingular = labels?.['client.singular'] ?? 'Client';
+    const staffLabelPlural = labels?.['staff.plural'] ?? 'Staff';
+
+    const shiftsForWorkTab = [
+        ...(props.todayShifts ?? []),
+        ...(props.upcomingShifts ?? []),
+    ];
+
+    return (
+        <div className="grid gap-4 lg:grid-cols-3">
+            <div className="rounded-xl border p-4 lg:col-span-1">
+                <div className="text-sm font-semibold">
+                    {clientLabelSingular}: {props.client?.first_name} {props.client?.last_name}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                    Status: {props.client?.status ?? '--'}
+                </div>
+
+                <div className="mt-4">
+                    <div className="text-xs font-medium text-muted-foreground">
+                        Assigned {staffLabelPlural}
+                    </div>
+                    <div className="mt-2 space-y-2">
+                        {props.assignedStaff?.length ? (
+                            props.assignedStaff.map((s) => (
+                                <div key={s.id} className="rounded-md border p-2 text-sm">
+                                    <div className="font-medium">{s.name}</div>
+                                    {s.email && (
+                                        <div className="text-xs text-muted-foreground">{s.email}</div>
+                                    )}
+                                </div>
+                            ))
+                        ) : (
+                            <div className="text-sm text-muted-foreground">
+                                No assigned {staffLabelPlural.toLowerCase()}.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+
+            <div className="lg:col-span-2">
+                <ShiftTimeline
+                    title="Upcoming shifts"
+                    shifts={shiftsForWorkTab}
+                    mode="client"
+                    emptyText="No shifts scheduled."
+                />
+            </div>
+        </div>
+    );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Main Dashboard                                                             */
+/* -------------------------------------------------------------------------- */
+
+export default function Dashboard(props: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Dashboard" />
 
-            <div className="space-y-6">
-                {props.mode === 'manager' && props.managerSummary ? (
-                    <div className="grid gap-4 md:grid-cols-3">
-                        <SmallKpi
-                            label="Staff working today"
-                            value={props.managerSummary.staffWorkingTodayCount}
-                            hint={`${props.managerSummary.staffWorkingTodayCount} scheduled`}
-                        />
-                        <SmallKpi
-                            label="Timesheets pending approval"
-                            value={props.managerSummary.timesheetsPendingCount}
-                            hint="Awaiting review"
-                        />
-                        <div className="rounded-xl border p-4">
-                            <div className="text-xs text-muted-foreground">
-                                Quick actions
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                <Button asChild size="sm" variant="outline">
-                                    <Link href="/shifts">View shifts</Link>
-                                </Button>
-                                <Button asChild size="sm" variant="outline">
-                                    <Link href="/timesheets">
-                                        View timesheets
-                                    </Link>
-                                </Button>
-                                <Button asChild size="sm">
-                                    <Link href="/shifts/create">
-                                        Create shift
-                                    </Link>
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                ) : null}
-
-                {props.hrWidgets ? (
-                    <div className="grid gap-4 md:grid-cols-4">
-                        <Link href="/hr/leave" className="rounded-xl border p-4 hover:border-primary/50 transition-colors">
-                            <div className="text-xs text-muted-foreground">Pending Leave</div>
-                            <div className="mt-2 text-2xl font-semibold">{props.hrWidgets.pending_leave}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">Awaiting approval</div>
-                        </Link>
-                        <Link href="/hr/compliance" className="rounded-xl border p-4 hover:border-primary/50 transition-colors">
-                            <div className="text-xs text-muted-foreground">Expiring Compliance</div>
-                            <div className="mt-2 text-2xl font-semibold">{props.hrWidgets.expiring_compliance}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">Items expiring soon</div>
-                        </Link>
-                        <Link href="/hr/signatures/pending" className="rounded-xl border p-4 hover:border-primary/50 transition-colors">
-                            <div className="text-xs text-muted-foreground">Pending Signatures</div>
-                            <div className="mt-2 text-2xl font-semibold">{props.hrWidgets.pending_signatures}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">Documents to sign</div>
-                        </Link>
-                        <Link href="/hr/my/policies" className="rounded-xl border p-4 hover:border-primary/50 transition-colors">
-                            <div className="text-xs text-muted-foreground">Due Attestations</div>
-                            <div className="mt-2 text-2xl font-semibold">{props.hrWidgets.due_attestations}</div>
-                            <div className="mt-1 text-xs text-muted-foreground">Policies to acknowledge</div>
-                        </Link>
-                    </div>
-                ) : null}
-
-                {props.mode === 'manager' && props.incidentKpis ? (
-                    <div className="grid gap-4 md:grid-cols-5">
-                        <SmallKpi
-                            label="Incidents (last 30 days)"
-                            value={props.incidentKpis.incidentsLast30}
-                            hint="All severities"
-                        />
-                        <SmallKpi
-                            label="High severity (last 30 days)"
-                            value={props.incidentKpis.incidentsHighLast30}
-                            hint="Requires attention"
-                        />
-                        <SmallKpi
-                            label="Open follow-ups"
-                            value={props.incidentKpis.followupsOpen}
-                            hint="Not completed"
-                        />
-                        <SmallKpi
-                            label="Overdue follow-ups"
-                            value={props.incidentKpis.followupsOverdue}
-                            hint="Past due"
-                        />
-                        <div className="rounded-xl border p-4">
-                            <div className="text-xs text-muted-foreground">
-                                Incident review
-                            </div>
-                            <div className="mt-2 text-2xl font-semibold">
-                                {props.incidentKpis.reviewedLast30}/
-                                {props.incidentKpis.reviewedLast30 +
-                                    props.incidentKpis.unreviewedLast30}
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                                Reviewed vs unreviewed (30 days)
-                            </div>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                <Button asChild size="sm" variant="outline">
-                                    <Link href="/incidents">View incidents</Link>
-                                </Button>
-                                <Button asChild size="sm" variant="outline">
-                                    <Link href="/reports/incidents">Reports</Link>
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                ) : null}
-
-                {props.mode !== 'client' ? (
-                    <Tabs
-                        tabs={[
-                            { key: 'work', label: 'Work', content: workTab },
-                            {
-                                key: 'analytics',
-                                label: 'Analytics',
-                                content: analyticsTab,
-                            },
-                        ]}
-                    />
-                ) : null}
-
-                {props.mode === 'client' ? (
-                    <div className="grid gap-4 lg:grid-cols-3">
-                        <div className="rounded-xl border p-4 lg:col-span-1">
-                            <div className="text-sm font-semibold">
-                                {clientLabelSingular}:{' '}
-                                {props.client?.first_name}{' '}
-                                {props.client?.last_name}
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                                Status: {props.client?.status ?? '—'}
-                            </div>
-
-                            <div className="mt-4">
-                                <div className="text-xs font-medium text-muted-foreground">
-                                    Assigned {staffLabelPlural}
-                                </div>
-                                <div className="mt-2 space-y-2">
-                                    {props.assignedStaff?.length ? (
-                                        props.assignedStaff.map((s) => (
-                                            <div
-                                                key={s.id}
-                                                className="rounded-md border p-2 text-sm"
-                                            >
-                                                <div className="font-medium">
-                                                    {s.name}
-                                                </div>
-                                                {s.email ? (
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {s.email}
-                                                    </div>
-                                                ) : null}
-                                            </div>
-                                        ))
-                                    ) : (
-                                        <div className="text-sm text-muted-foreground">
-                                            No assigned{' '}
-                                            {staffLabelPlural.toLowerCase()}.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="lg:col-span-2">
-                            <ShiftTimeline
-                                title="Upcoming shifts"
-                                shifts={shiftsForWorkTab}
-                                mode="client"
-                                emptyText="No shifts scheduled."
-                            />
-                        </div>
-                    </div>
-                ) : null}
-            </div>
+            {props.mode === 'hr_admin' && <HrAdminDashboard props={props} />}
+            {props.mode === 'manager' && <ManagerDashboard props={props} />}
+            {props.mode === 'staff' && <StaffDashboard props={props} />}
+            {props.mode === 'client' && <ClientDashboard props={props} />}
         </AppLayout>
     );
 }
