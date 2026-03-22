@@ -8,6 +8,9 @@ return new class extends Migration
 {
     public function up(): void
     {
+        Schema::dropIfExists('hr_competency_assessments');
+        Schema::dropIfExists('hr_competencies');
+
         Schema::create('hr_competencies', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('tenant_id')->nullable()->index();
@@ -32,7 +35,7 @@ return new class extends Migration
             $table->foreignId('performance_review_id')->nullable()->constrained('hr_performance_reviews')->nullOnDelete();
             $table->timestamp('created_at')->nullable();
 
-            $table->index(['employee_profile_id', 'competency_id']);
+            $table->index(['employee_profile_id', 'competency_id'], 'hr_comp_assess_profile_comp_idx');
         });
     }
 
