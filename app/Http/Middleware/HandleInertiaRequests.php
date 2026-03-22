@@ -448,6 +448,66 @@ class HandleInertiaRequests extends Middleware
                         'view' => $user->canDo('hr.onboarding.view'),
                         'manage' => $user->canDo('hr.onboarding.manage'),
                     ],
+                    'positions' => [
+                        'view' => $user->canDo('hr.positions.view'),
+                        'manage' => $user->canDo('hr.positions.manage'),
+                    ],
+                    'orgchart' => [
+                        'view' => $user->canDo('hr.orgchart.view'),
+                        'manage' => $user->canDo('hr.orgchart.manage'),
+                    ],
+                    'time' => [
+                        'view' => $user->canDo('hr.time.view'),
+                        'manage' => $user->canDo('hr.time.manage'),
+                        'approve' => $user->canDo('hr.time.approve'),
+                    ],
+                    'compensation' => [
+                        'view' => $user->canDo('hr.compensation.view'),
+                        'manage' => $user->canDo('hr.compensation.manage'),
+                    ],
+                    'benefits' => [
+                        'view' => $user->canDo('hr.benefits.view'),
+                        'manage' => $user->canDo('hr.benefits.manage'),
+                    ],
+                    'goals' => [
+                        'view' => $user->canDo('hr.goals.view'),
+                        'manage' => $user->canDo('hr.goals.manage'),
+                    ],
+                    'assets' => [
+                        'view' => $user->canDo('hr.assets.view'),
+                        'manage' => $user->canDo('hr.assets.manage'),
+                    ],
+                    'calendar' => [
+                        'view' => $user->canDo('hr.calendar.view'),
+                        'manage' => $user->canDo('hr.calendar.manage'),
+                    ],
+                    'analytics' => [
+                        'view' => $user->canDo('hr.analytics.view'),
+                    ],
+                    'surveys' => [
+                        'view' => $user->canDo('hr.surveys.view'),
+                        'manage' => $user->canDo('hr.surveys.manage'),
+                    ],
+                    'expenses' => [
+                        'view' => $user->canDo('hr.expenses.view'),
+                        'manage' => $user->canDo('hr.expenses.manage'),
+                        'approve' => $user->canDo('hr.expenses.approve'),
+                    ],
+                    'skills' => [
+                        'view' => $user->canDo('hr.skills.view'),
+                        'manage' => $user->canDo('hr.skills.manage'),
+                    ],
+                    'announcements' => [
+                        'view' => $user->canDo('hr.announcements.view'),
+                        'manage' => $user->canDo('hr.announcements.manage'),
+                    ],
+                    'approvals' => [
+                        'view' => $user->canDo('hr.approvals.view'),
+                        'manage' => $user->canDo('hr.approvals.manage'),
+                    ],
+                    'settings' => [
+                        'manage' => $user->canDo('hr.settings.manage'),
+                    ],
                 ],
 
                 'governance' => [
