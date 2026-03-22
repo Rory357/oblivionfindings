@@ -86,6 +86,12 @@ class SeedHrPermissionsSeeder extends Seeder
 
             // Report Builder
             'hr.reports.builder' => 'Use custom report builder',
+
+            // Settings
+            'hr.settings.manage' => 'Manage HR settings (webhooks, custom fields, audit)',
+
+            // Wellbeing
+            'hr.wellbeing.view' => 'View wellbeing dashboard',
         ];
 
         $createdIds = [];
