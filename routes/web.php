@@ -80,6 +80,11 @@ Route::get('/smart-monitoring', function () {
 Route::get('/contact', [ContactController::class, 'index'])->name('contact');
 Route::post('/contact', [ContactController::class, 'store']);
 
+Route::get('/careers', [App\Http\Controllers\CareerPortalController::class, 'index'])->name('careers.index');
+Route::get('/careers/{posting}', [App\Http\Controllers\CareerPortalController::class, 'show'])->name('careers.show');
+Route::get('/careers/{posting}/apply', [App\Http\Controllers\CareerPortalController::class, 'apply'])->name('careers.apply');
+Route::post('/careers/{posting}/apply', [App\Http\Controllers\CareerPortalController::class, 'storeApplication'])->name('careers.apply.store');
+
 // Authenticated routes
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/dashboard', DashboardController::class)->name('dashboard');

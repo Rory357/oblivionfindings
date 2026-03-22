@@ -41,6 +41,10 @@ use App\Http\Controllers\Hr\ReportBuilderController;
 use App\Http\Controllers\Hr\ApprovalController;
 use App\Http\Controllers\Hr\ESignatureController;
 use App\Http\Controllers\Hr\PayslipController;
+use App\Http\Controllers\Hr\JobPostingController;
+use App\Http\Controllers\Hr\WellbeingController;
+use App\Http\Controllers\Hr\FeedController;
+use App\Http\Controllers\Hr\FeedbackController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -71,6 +75,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/expenses', [MyHrController::class, 'expenses'])->name('expenses');
         Route::post('/expenses', [MyHrController::class, 'storeExpense'])->name('expenses.store');
         Route::get('/payslips', [PayslipController::class, 'myPayslips'])->name('payslips');
+        Route::post('/check-in', [MyHrController::class, 'checkIn'])->name('checkin');
     });
 
     /*
@@ -587,6 +592,33 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
+    | Community Feed & Kudos
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('feed')->name('feed.')->group(function () {
+        Route::get('/', [FeedController::class, 'index'])->name('index');
+        Route::post('/', [FeedController::class, 'store'])->name('store');
+        Route::post('/kudos', [FeedController::class, 'sendKudos'])->name('kudos');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | 360-Degree Feedback
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.performance.view')->prefix('feedback')->name('feedback.')->group(function () {
+        Route::get('/', [FeedbackController::class, 'index'])->name('index');
+        Route::get('/summary/{user}', [FeedbackController::class, 'summary'])->name('summary');
+        Route::middleware('permission:hr.performance.manage')->group(function () {
+            Route::get('/request', [FeedbackController::class, 'request'])->name('request');
+            Route::post('/request', [FeedbackController::class, 'storeRequest'])->name('request.store');
+        });
+        Route::get('/{feedbackRequest}/respond', [FeedbackController::class, 'respond'])->name('respond');
+        Route::post('/{feedbackRequest}/respond', [FeedbackController::class, 'submitResponse'])->name('respond.store');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
     | HR Reports
     |--------------------------------------------------------------------------
     */
@@ -684,5 +716,32 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::middleware('permission:hr.documents.manage')->group(function () {
             Route::post('/request', [ESignatureController::class, 'request'])->name('request');
         });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Job Postings
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.recruitment.view')->prefix('job-postings')->name('job-postings.')->group(function () {
+        Route::get('/', [JobPostingController::class, 'index'])->name('index');
+        Route::middleware('permission:hr.recruitment.manage')->group(function () {
+            Route::get('/create', [JobPostingController::class, 'create'])->name('create');
+            Route::post('/', [JobPostingController::class, 'store'])->name('store');
+            Route::get('/{posting}/edit', [JobPostingController::class, 'edit'])->name('edit');
+            Route::put('/{posting}', [JobPostingController::class, 'update'])->name('update');
+            Route::post('/{posting}/publish', [JobPostingController::class, 'publish'])->name('publish');
+            Route::post('/{posting}/close', [JobPostingController::class, 'close'])->name('close');
+        });
+        Route::get('/{posting}', [JobPostingController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Wellbeing Dashboard
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.analytics.view')->group(function () {
+        Route::get('/wellbeing', [WellbeingController::class, 'index'])->name('wellbeing.index');
     });
 });

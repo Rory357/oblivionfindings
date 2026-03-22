@@ -9,6 +9,7 @@ use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
+use App\Domain\Hr\Models\HrCheckIn;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrGoal;
 use App\Domain\Hr\Models\HrTimeEntry;
@@ -59,6 +60,10 @@ class MyHrController extends Controller
             ->whereDoesntHave('attestations', fn ($q) => $q->where('user_id', $user->id))
             ->count();
 
+        $todayCheckIn = HrCheckIn::where('user_id', $user->id)
+            ->where('check_in_date', now()->toDateString())
+            ->first();
+
         return Inertia::render('hr/my/index', [
             'profile' => $profile,
             'pendingLeave' => $pendingLeave,
@@ -66,6 +71,12 @@ class MyHrController extends Controller
             'complianceSummary' => $complianceSummary,
             'complianceStatuses' => $complianceStatuses,
             'policiesDue' => $policiesDue,
+            'todayCheckIn' => $todayCheckIn ? [
+                'id' => $todayCheckIn->id,
+                'mood' => $todayCheckIn->mood,
+                'energy_level' => $todayCheckIn->energy_level,
+                'check_in_date' => $todayCheckIn->check_in_date->toDateString(),
+            ] : null,
         ]);
     }
 
@@ -410,5 +421,31 @@ class MyHrController extends Controller
         }
 
         return redirect()->back()->with('success', 'Expense claim created.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Wellbeing Check-in (Self-Service)                                  */
+    /* ------------------------------------------------------------------ */
+
+    public function checkIn(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $validated = $request->validate([
+            'mood' => ['required', Rule::in(['great', 'good', 'okay', 'struggling', 'bad'])],
+            'energy_level' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'workload_rating' => ['nullable', 'integer', 'min:1', 'max:5'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        HrCheckIn::create([
+            ...$validated,
+            'tenant_id' => $user->tenant_id,
+            'user_id' => $user->id,
+            'check_in_date' => now()->toDateString(),
+        ]);
+
+        return redirect()->back()->with('success', 'Check-in recorded. Thank you!');
     }
 }
