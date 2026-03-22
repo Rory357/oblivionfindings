@@ -1,0 +1,215 @@
+import AppLayout from '@/layouts/app-layout';
+import PageShell from '@/components/page-shell';
+import PageHeader from '@/components/page-header';
+import { Head, Link, router } from '@inertiajs/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Plus, BarChart3, Star } from 'lucide-react';
+
+type BreadcrumbItem = { title: string; href: string };
+
+interface ExitInterview {
+    id: number;
+    interview_date: string;
+    departure_reason: string;
+    would_recommend: boolean | null;
+    overall_satisfaction: number | null;
+    is_confidential: boolean;
+    employee_profile: {
+        id: number;
+        user: { id: number; name: string };
+    };
+    interviewer: { id: number; name: string };
+}
+
+interface Props {
+    interviews: { data: ExitInterview[]; links: any[] };
+    filters: { reason: string | null };
+    can: { manage: boolean };
+}
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'HR', href: '/hr' },
+    { title: 'Exit Interviews', href: '/hr/exit-interviews' },
+];
+
+const formatDate = (value?: string | null) => {
+    if (!value) return '-';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const reasonLabels: Record<string, string> = {
+    career_growth: 'Career Growth',
+    compensation: 'Compensation',
+    work_life_balance: 'Work-Life Balance',
+    management: 'Management Issues',
+    culture: 'Company Culture',
+    relocation: 'Relocation',
+    retirement: 'Retirement',
+    personal: 'Personal Reasons',
+    redundancy: 'Redundancy',
+    contract_end: 'Contract End',
+    other: 'Other',
+};
+
+function SatisfactionStars({ rating }: { rating: number | null }) {
+    if (rating === null) return <span className="text-sm text-slate-400">-</span>;
+    return (
+        <div className="flex items-center gap-0.5">
+            {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                    key={star}
+                    className={`h-4 w-4 ${star <= rating ? 'fill-yellow-400 text-yellow-400' : 'text-slate-300'}`}
+                />
+            ))}
+        </div>
+    );
+}
+
+export default function ExitInterviewsIndex({ interviews, filters, can }: Props) {
+    const NONE = '__none__';
+
+    const onFilter = (next: Partial<typeof filters>) => {
+        router.get('/hr/exit-interviews', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+    };
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Exit Interviews" />
+
+            <PageShell>
+                <PageHeader title="Exit Interviews" description="Track departure feedback and identify retention insights.">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Link href="/hr/exit-interviews/trends">
+                            <Button size="sm" variant="outline">
+                                <BarChart3 className="mr-1.5 h-4 w-4" />
+                                Trends
+                            </Button>
+                        </Link>
+                        {can.manage && (
+                            <Link href="/hr/exit-interviews/create">
+                                <Button size="sm">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Interview
+                                </Button>
+                            </Link>
+                        )}
+                    </div>
+                </PageHeader>
+
+                {/* Filters */}
+                <Card className="mb-4">
+                    <CardHeader>
+                        <CardTitle className="text-base">Filters</CardTitle>
+                    </CardHeader>
+                    <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div>
+                            <Label className="text-xs text-slate-500">Departure Reason</Label>
+                            <Select
+                                value={filters.reason ?? NONE}
+                                onValueChange={(v) => onFilter({ reason: v === NONE ? null : v })}
+                            >
+                                <SelectTrigger><SelectValue placeholder="All reasons" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value={NONE}>All Reasons</SelectItem>
+                                    {Object.entries(reasonLabels).map(([value, label]) => (
+                                        <SelectItem key={value} value={value}>{label}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Table */}
+                <Card>
+                    <CardContent className="p-0">
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Employee</TableHead>
+                                    <TableHead>Date</TableHead>
+                                    <TableHead>Departure Reason</TableHead>
+                                    <TableHead>Satisfaction</TableHead>
+                                    <TableHead>Recommend</TableHead>
+                                    <TableHead>Interviewer</TableHead>
+                                    <TableHead className="w-20"></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {interviews.data.map((interview) => (
+                                    <TableRow key={interview.id}>
+                                        <TableCell className="font-medium">
+                                            {interview.employee_profile?.user?.name ?? 'Unknown'}
+                                        </TableCell>
+                                        <TableCell>{formatDate(interview.interview_date)}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">
+                                                {reasonLabels[interview.departure_reason] ?? interview.departure_reason}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <SatisfactionStars rating={interview.overall_satisfaction} />
+                                        </TableCell>
+                                        <TableCell>
+                                            {interview.would_recommend === null
+                                                ? '-'
+                                                : interview.would_recommend
+                                                    ? <Badge className="border-emerald-500/30 bg-emerald-500/10 text-emerald-400">Yes</Badge>
+                                                    : <Badge className="border-red-500/30 bg-red-500/10 text-red-400">No</Badge>
+                                            }
+                                        </TableCell>
+                                        <TableCell className="text-sm text-slate-600">
+                                            {interview.interviewer?.name ?? '-'}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Link
+                                                href={`/hr/exit-interviews/${interview.id}`}
+                                                className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+                                            >
+                                                View
+                                            </Link>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                                {!interviews.data.length && (
+                                    <TableRow>
+                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">
+                                            No exit interviews found.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </CardContent>
+                </Card>
+
+                {/* Pagination */}
+                {interviews?.links?.length ? (
+                    <div className="mt-4 flex flex-wrap gap-2">
+                        {interviews.links.map((l: any) => (
+                            <button
+                                key={l.label}
+                                disabled={!l.url}
+                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
+                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                dangerouslySetInnerHTML={{ __html: l.label }}
+                            />
+                        ))}
+                    </div>
+                ) : null}
+            </PageShell>
+        </AppLayout>
+    );
+}

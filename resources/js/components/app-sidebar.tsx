@@ -15,14 +15,18 @@ import { type NavItem, type NavGroup } from '@/types';
 import { Link, usePage } from '@inertiajs/react';
 import {
     BookOpen,
+    Briefcase,
     Building2,
     CalendarDays,
     ClipboardCheck,
     ClipboardList,
+    Clock,
+    DollarSign,
     FileQuestion,
     FileText,
     Folder,
     Gavel,
+    GitBranch,
     Home,
     Landmark,
     LayoutGrid,
@@ -348,7 +352,11 @@ function buildNavigationGroups({
 
     const hasAnyHr = can?.hr?.recruitment?.view || can?.hr?.employees?.viewAny || can?.hr?.compliance?.view
         || can?.hr?.leave?.viewAny || can?.hr?.performance?.view || can?.hr?.reports?.view
-        || can?.hr?.policies?.view;
+        || can?.hr?.policies?.view || can?.hr?.positions?.view || can?.hr?.time?.view
+        || can?.hr?.compensation?.view;
+
+    // Directory is visible to all authenticated users
+    hrGroup.items.push({ title: 'Directory', href: '/hr/directory', icon: Users });
 
     if (hasAnyHr) {
         if (can?.hr?.recruitment?.view) {
@@ -357,14 +365,55 @@ function buildNavigationGroups({
         if (can?.hr?.employees?.viewAny) {
             hrGroup.items.push({ title: 'People', href: '/hr/people', icon: Users });
         }
+        if (can?.hr?.positions?.view) {
+            hrGroup.items.push({ title: 'Positions', href: '/hr/positions', icon: Briefcase });
+        }
+        hrGroup.items.push({ title: 'Org Chart', href: '/hr/orgchart', icon: GitBranch });
         if (can?.hr?.compliance?.view) {
             hrGroup.items.push({ title: 'Compliance', href: '/hr/compliance', icon: Shield });
         }
         if (can?.hr?.leave?.viewAny) {
             hrGroup.items.push({ title: 'Leave & Rosters', href: '/hr/leave', icon: CalendarDays });
         }
+        if (can?.hr?.time?.view) {
+            hrGroup.items.push({ title: 'Time Tracking', href: '/hr/time', icon: Clock });
+        }
         if (can?.hr?.performance?.view) {
             hrGroup.items.push({ title: 'Performance', href: '/hr/performance', icon: ClipboardCheck });
+        }
+        if (can?.hr?.compensation?.view) {
+            hrGroup.items.push({ title: 'Compensation', href: '/hr/compensation/bands', icon: DollarSign });
+        }
+        if (can?.hr?.benefits?.view) {
+            hrGroup.items.push({ title: 'Benefits', href: '/hr/benefits', icon: Shield });
+        }
+        if (can?.hr?.goals?.view) {
+            hrGroup.items.push({ title: 'Goals', href: '/hr/goals', icon: Target });
+        }
+        if (can?.hr?.training?.view) {
+            hrGroup.items.push({ title: 'Training', href: '/hr/training/catalog', icon: BookOpen });
+        }
+        if (can?.hr?.assets?.view) {
+            hrGroup.items.push({ title: 'Assets', href: '/hr/assets', icon: Package });
+        }
+        hrGroup.items.push({ title: 'Time Off Calendar', href: '/hr/calendar/time-off', icon: CalendarDays });
+        if (can?.hr?.analytics?.view) {
+            hrGroup.items.push({ title: 'Analytics', href: '/hr/analytics', icon: LayoutGrid });
+        }
+        if (can?.hr?.surveys?.view) {
+            hrGroup.items.push({ title: 'Surveys', href: '/hr/surveys', icon: ClipboardList });
+        }
+        if (can?.hr?.expenses?.view) {
+            hrGroup.items.push({ title: 'Expenses', href: '/hr/expenses', icon: DollarSign });
+        }
+        if (can?.hr?.skills?.view) {
+            hrGroup.items.push({ title: 'Skills', href: '/hr/skills', icon: Target });
+        }
+        if (can?.hr?.calendar?.view) {
+            hrGroup.items.push({ title: 'Calendar', href: '/hr/calendar', icon: CalendarDays });
+        }
+        if (can?.hr?.announcements?.view) {
+            hrGroup.items.push({ title: 'Announcements', href: '/hr/announcements', icon: MessageSquareText });
         }
         if (can?.hr?.policies?.view) {
             hrGroup.items.push({ title: 'Policies', href: '/hr/policies', icon: FileText });

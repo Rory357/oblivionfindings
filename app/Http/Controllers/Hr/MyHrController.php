@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\LeaveService;
+use App\Domain\Hr\Services\TimeTrackingService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -18,6 +22,8 @@ class MyHrController extends Controller
 {
     public function __construct(
         private readonly LeaveService $leaveService,
+        private readonly TimeTrackingService $timeTrackingService,
+        private readonly ExpenseService $expenseService,
     ) {}
 
     public function index(Request $request)
@@ -235,5 +241,139 @@ class MyHrController extends Controller
         $profile->update($validated);
 
         return redirect()->back()->with('success', 'Profile updated.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Time Tracking (Self-Service)                                       */
+    /* ------------------------------------------------------------------ */
+
+    public function timeTracking(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $tenantId = $user->tenant_id;
+
+        $activeClock = HrTimeEntry::forTenant($tenantId)
+            ->forUser($user->id)
+            ->active()
+            ->first();
+
+        $todayEntries = HrTimeEntry::forTenant($tenantId)
+            ->forUser($user->id)
+            ->where('entry_date', now()->toDateString())
+            ->orderByDesc('clock_in')
+            ->get()
+            ->map(fn ($entry) => [
+                'id' => $entry->id,
+                'entry_date' => $entry->entry_date->toDateString(),
+                'clock_in' => $entry->clock_in->format('H:i'),
+                'clock_out' => $entry->clock_out?->format('H:i'),
+                'break_minutes' => $entry->break_minutes,
+                'total_hours' => $entry->total_hours,
+                'entry_type' => $entry->entry_type,
+                'status' => $entry->status,
+                'notes' => $entry->notes,
+            ]);
+
+        $weeklySummary = $this->timeTrackingService->getWeeklySummary($tenantId, $user->id);
+
+        return Inertia::render('hr/my/time', [
+            'activeClock' => $activeClock ? [
+                'id' => $activeClock->id,
+                'clock_in' => $activeClock->clock_in->format('Y-m-d H:i'),
+                'notes' => $activeClock->notes,
+            ] : null,
+            'todayEntries' => $todayEntries,
+            'weeklySummary' => $weeklySummary,
+        ]);
+    }
+
+    public function clockIn(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        try {
+            $this->timeTrackingService->clockIn($user);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Clocked in successfully.');
+    }
+
+    public function clockOut(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $validated = $request->validate([
+            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
+        ]);
+
+        try {
+            $this->timeTrackingService->clockOut($user, (int) ($validated['break_minutes'] ?? 0));
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Clocked out successfully.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Expenses (Self-Service)                                            */
+    /* ------------------------------------------------------------------ */
+
+    public function expenses(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $claims = HrExpenseClaim::where('user_id', $user->id)
+            ->withCount('items')
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $claims->getCollection()->transform(fn ($c) => [
+            'id' => $c->id,
+            'claim_number' => $c->claim_number,
+            'title' => $c->title,
+            'status' => $c->status,
+            'total_amount' => (float) $c->total_amount,
+            'currency' => $c->currency,
+            'items_count' => $c->items_count,
+            'submitted_at' => $c->submitted_at?->toDateString(),
+            'created_at' => $c->created_at?->toDateString(),
+        ]);
+
+        return Inertia::render('hr/my/expenses', [
+            'claims' => $claims,
+            'categories' => ExpenseService::CATEGORIES,
+        ]);
+    }
+
+    public function storeExpense(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'items' => ['required', 'array', 'min:1'],
+            'items.*.description' => ['required', 'string', 'max:500'],
+            'items.*.category' => ['required', 'string', Rule::in(ExpenseService::CATEGORIES)],
+            'items.*.amount' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
+            'items.*.expense_date' => ['required', 'date'],
+        ]);
+
+        try {
+            $this->expenseService->createClaim($user, $validated);
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Expense claim created.');
     }
 }

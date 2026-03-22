@@ -51,10 +51,18 @@ class HrEmployeeProfile extends Model
         'driver_eligibility_reviewed_at',
         'is_first_aider',
         'is_fire_warden',
+        'position_id',
+        'manager_user_id',
+        'department',
+        'team',
+        'reporting_level',
         'offer_id',
         'candidate_id',
         'notes',
         'restricted_notes',
+        'profile_photo_path',
+        'bio',
+        'preferred_name',
         'created_by',
         'updated_by',
     ];
@@ -78,6 +86,7 @@ class HrEmployeeProfile extends Model
         'ird_number' => 'encrypted',
         'hourly_rate' => 'encrypted',
         'annual_salary' => 'encrypted',
+        'reporting_level' => 'integer',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -122,6 +131,21 @@ class HrEmployeeProfile extends Model
     public function candidate(): BelongsTo
     {
         return $this->belongsTo(HrCandidate::class, 'candidate_id');
+    }
+
+    public function position(): BelongsTo
+    {
+        return $this->belongsTo(HrPosition::class, 'position_id');
+    }
+
+    public function manager(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'manager_user_id');
+    }
+
+    public function directReports(): HasMany
+    {
+        return $this->hasMany(self::class, 'manager_user_id', 'user_id');
     }
 
     /* ------------------------------------------------------------------ */

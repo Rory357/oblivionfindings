@@ -1,0 +1,248 @@
+import { useState, FormEvent } from 'react';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router } from '@inertiajs/react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { type BreadcrumbItem } from '@/types';
+
+type SkillDef = {
+    id: number;
+    name: string;
+    category: string;
+};
+
+type EmployeeRow = {
+    employee_id: number;
+    name: string;
+    position: string | null;
+    department: string | null;
+    skills: Record<number, string | null>; // skill_id -> proficiency_level or null
+};
+
+type Props = {
+    employees: EmployeeRow[];
+    skills: SkillDef[];
+    proficiencyLevels: string[];
+    can: { assess: boolean };
+};
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'HR', href: '/hr' },
+    { title: 'Skills', href: '/hr/skills' },
+    { title: 'Matrix', href: '/hr/skills/matrix' },
+];
+
+const proficiencyColors: Record<string, string> = {
+    beginner: 'bg-red-500/20 text-red-400 border-red-500/30',
+    intermediate: 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30',
+    advanced: 'bg-blue-500/20 text-blue-400 border-blue-500/30',
+    expert: 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30',
+};
+
+const proficiencyShort: Record<string, string> = {
+    beginner: 'B',
+    intermediate: 'I',
+    advanced: 'A',
+    expert: 'E',
+};
+
+export default function SkillsMatrix({ employees, skills, proficiencyLevels, can }: Props) {
+    const [assessOpen, setAssessOpen] = useState(false);
+    const [assessData, setAssessData] = useState({
+        employee_profile_id: 0,
+        skill_id: 0,
+        proficiency_level: 'beginner',
+        notes: '',
+        employeeName: '',
+        skillName: '',
+    });
+    const [processing, setProcessing] = useState(false);
+
+    // Group skills by category
+    const skillsByCategory = skills.reduce<Record<string, SkillDef[]>>((acc, skill) => {
+        if (!acc[skill.category]) acc[skill.category] = [];
+        acc[skill.category].push(skill);
+        return acc;
+    }, {});
+
+    const openAssess = (emp: EmployeeRow, skill: SkillDef, currentLevel: string | null) => {
+        setAssessData({
+            employee_profile_id: emp.employee_id,
+            skill_id: skill.id,
+            proficiency_level: currentLevel || 'beginner',
+            notes: '',
+            employeeName: emp.name,
+            skillName: skill.name,
+        });
+        setAssessOpen(true);
+    };
+
+    const handleAssess = (e: FormEvent) => {
+        e.preventDefault();
+        setProcessing(true);
+        router.post(
+            '/hr/skills/assess',
+            {
+                employee_profile_id: assessData.employee_profile_id,
+                skill_id: assessData.skill_id,
+                proficiency_level: assessData.proficiency_level,
+                notes: assessData.notes || null,
+            },
+            {
+                onSuccess: () => setAssessOpen(false),
+                onFinish: () => setProcessing(false),
+            }
+        );
+    };
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Skills Matrix" />
+            <div className="flex flex-col gap-6 p-6">
+                <div>
+                    <h1 className="text-2xl font-bold">Skills Matrix</h1>
+                    <p className="text-sm text-muted-foreground">
+                        Employee skills overview. {can.assess ? 'Click a cell to assess.' : ''}
+                    </p>
+                </div>
+
+                {/* Legend */}
+                <div className="flex flex-wrap gap-3">
+                    {proficiencyLevels.map((level) => (
+                        <div key={level} className="flex items-center gap-1.5">
+                            <span className={`inline-flex h-6 w-6 items-center justify-center rounded text-xs font-bold ${proficiencyColors[level] || ''}`}>
+                                {proficiencyShort[level] || level[0]?.toUpperCase()}
+                            </span>
+                            <span className="text-xs capitalize text-muted-foreground">{level}</span>
+                        </div>
+                    ))}
+                    <div className="flex items-center gap-1.5">
+                        <span className="inline-flex h-6 w-6 items-center justify-center rounded border border-dashed text-xs text-muted-foreground">
+                            -
+                        </span>
+                        <span className="text-xs text-muted-foreground">Not assessed</span>
+                    </div>
+                </div>
+
+                {/* Matrix Grid */}
+                <Card>
+                    <CardContent className="overflow-x-auto p-0">
+                        <table className="w-full text-sm">
+                            <thead>
+                                <tr className="border-b bg-muted/50">
+                                    <th className="sticky left-0 z-10 bg-muted/50 px-4 py-3 text-left font-medium">Employee</th>
+                                    <th className="px-3 py-3 text-left font-medium">Department</th>
+                                    {Object.entries(skillsByCategory).map(([category, catSkills]) => (
+                                        catSkills.map((skill) => (
+                                            <th key={skill.id} className="px-2 py-3 text-center font-medium">
+                                                <div className="flex flex-col items-center">
+                                                    <span className="text-[10px] text-muted-foreground">{skill.category}</span>
+                                                    <span className="whitespace-nowrap text-xs">{skill.name}</span>
+                                                </div>
+                                            </th>
+                                        ))
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                                {employees.map((emp) => (
+                                    <tr key={emp.employee_id} className="hover:bg-muted/30">
+                                        <td className="sticky left-0 z-10 bg-background px-4 py-2 font-medium">
+                                            {emp.name}
+                                            {emp.position && (
+                                                <span className="block text-xs text-muted-foreground">{emp.position}</span>
+                                            )}
+                                        </td>
+                                        <td className="px-3 py-2 text-muted-foreground">{emp.department || '-'}</td>
+                                        {skills.map((skill) => {
+                                            const level = emp.skills[skill.id];
+                                            return (
+                                                <td key={skill.id} className="px-2 py-2 text-center">
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => can.assess && openAssess(emp, skill, level)}
+                                                        className={`inline-flex h-7 w-7 items-center justify-center rounded text-xs font-bold transition-colors ${
+                                                            level
+                                                                ? proficiencyColors[level] || ''
+                                                                : 'border border-dashed text-muted-foreground hover:bg-muted'
+                                                        } ${can.assess ? 'cursor-pointer' : 'cursor-default'}`}
+                                                        disabled={!can.assess}
+                                                    >
+                                                        {level ? proficiencyShort[level] || '-' : '-'}
+                                                    </button>
+                                                </td>
+                                            );
+                                        })}
+                                    </tr>
+                                ))}
+                                {employees.length === 0 && (
+                                    <tr>
+                                        <td colSpan={skills.length + 2} className="py-12 text-center text-muted-foreground">
+                                            No employees or skills found. Add skills and employees to populate the matrix.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Assess Dialog */}
+            <Dialog open={assessOpen} onOpenChange={setAssessOpen}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>Assess Skill</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={handleAssess} className="space-y-4">
+                        <div>
+                            <p className="text-sm">
+                                <span className="font-medium">{assessData.employeeName}</span>
+                                <span className="text-muted-foreground"> / </span>
+                                <span className="font-medium">{assessData.skillName}</span>
+                            </p>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Proficiency Level</Label>
+                            <Select
+                                value={assessData.proficiency_level}
+                                onValueChange={(v) => setAssessData((p) => ({ ...p, proficiency_level: v }))}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {proficiencyLevels.map((level) => (
+                                        <SelectItem key={level} value={level}>
+                                            <span className="capitalize">{level}</span>
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Notes</Label>
+                            <Textarea
+                                rows={2}
+                                value={assessData.notes}
+                                onChange={(e) => setAssessData((p) => ({ ...p, notes: e.target.value }))}
+                                placeholder="Optional assessment notes..."
+                            />
+                        </div>
+                        <div className="flex justify-end gap-2">
+                            <Button type="button" variant="outline" onClick={() => setAssessOpen(false)}>Cancel</Button>
+                            <Button type="submit" disabled={processing}>
+                                {processing ? 'Saving...' : 'Save Assessment'}
+                            </Button>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
+        </AppLayout>
+    );
+}
