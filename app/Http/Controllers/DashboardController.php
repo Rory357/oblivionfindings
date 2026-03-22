@@ -303,8 +303,23 @@ class DashboardController extends Controller
             ->take(200)
             ->values();
 
+        // HR quick stats for dashboard
+        $hrWidgets = null;
+        if ($user->canDo('hr.leave.viewAny') || $user->canDo('hr.performance.view') || $user->canDo('hr.compliance.view')) {
+            $hrWidgets = [
+                'pending_leave' => \App\Domain\Hr\Models\HrLeaveRequest::where('status', 'pending')->count(),
+                'expiring_compliance' => \App\Domain\Hr\Models\HrStaffComplianceStatus::where('status', 'expiring_soon')->count(),
+                'pending_signatures' => \App\Domain\Hr\Models\HrDocumentSignature::where('signer_user_id', $user->id)->where('status', 'pending')->count(),
+                'due_attestations' => \App\Domain\Hr\Models\HrPolicy::where('is_active', true)
+                    ->where('requires_attestation', true)
+                    ->whereDoesntHave('attestations', fn ($q) => $q->where('user_id', $user->id))
+                    ->count(),
+            ];
+        }
+
         return inertia('dashboard', [
             'mode' => $user->canDo('shifts.manageAny') || $user->canDo('timesheets.manageAny') ? 'manager' : 'staff',
+            'hrWidgets' => $hrWidgets,
             'filters' => [
                 'range' => $range,
                 'status' => $status ?? 'all',

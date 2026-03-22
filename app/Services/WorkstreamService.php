@@ -85,8 +85,54 @@ class WorkstreamService
                 ];
             });
 
+        // HR tasks
+        $hrTasks = collect();
+
+        // Pending signatures for this user
+        $hrTasks = $hrTasks->concat(
+            \App\Domain\Hr\Models\HrDocumentSignature::where('signer_user_id', $user->id)
+                ->where('status', 'pending')
+                ->with('document:id,title')
+                ->limit(5)
+                ->get()
+                ->map(fn ($sig) => [
+                    'kind' => 'hr_signature',
+                    'id' => $sig->id,
+                    'at' => optional($sig->requested_at)->toISOString(),
+                    'end_at' => null,
+                    'title' => 'Sign: ' . ($sig->document?->title ?? 'Document'),
+                    'subtitle' => 'E-Signature required',
+                    'status' => 'open',
+                    'url' => '/hr/signatures/' . $sig->id,
+                    'client' => null,
+                    'meta' => ['type' => 'hr'],
+                ])
+        );
+
+        // Due policy attestations
+        $hrTasks = $hrTasks->concat(
+            \App\Domain\Hr\Models\HrPolicy::where('is_active', true)
+                ->where('requires_attestation', true)
+                ->whereDoesntHave('attestations', fn ($q) => $q->where('user_id', $user->id))
+                ->limit(5)
+                ->get()
+                ->map(fn ($p) => [
+                    'kind' => 'hr_attestation',
+                    'id' => $p->id,
+                    'at' => now()->toISOString(),
+                    'end_at' => null,
+                    'title' => 'Attest: ' . $p->title,
+                    'subtitle' => 'Policy acknowledgement due',
+                    'status' => 'open',
+                    'url' => '/hr/my/policies',
+                    'client' => null,
+                    'meta' => ['type' => 'hr'],
+                ])
+        );
+
         return $shifts
             ->concat($followups)
+            ->concat($hrTasks)
             ->sortBy(fn ($i) => $i['at'] ?? '')
             ->values();
     }

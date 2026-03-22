@@ -108,6 +108,12 @@ type Props = {
             hours: number;
         }>;
     } | null;
+    hrWidgets?: {
+        pending_leave: number;
+        expiring_compliance: number;
+        pending_signatures: number;
+        due_attestations: number;
+    } | null;
 };
 
 function fullName(c: ClientLite) {
@@ -388,6 +394,31 @@ export default function Dashboard(props: Props) {
                                 </Button>
                             </div>
                         </div>
+                    </div>
+                ) : null}
+
+                {props.hrWidgets ? (
+                    <div className="grid gap-4 md:grid-cols-4">
+                        <Link href="/hr/leave" className="rounded-xl border p-4 hover:border-primary/50 transition-colors">
+                            <div className="text-xs text-muted-foreground">Pending Leave</div>
+                            <div className="mt-2 text-2xl font-semibold">{props.hrWidgets.pending_leave}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">Awaiting approval</div>
+                        </Link>
+                        <Link href="/hr/compliance" className="rounded-xl border p-4 hover:border-primary/50 transition-colors">
+                            <div className="text-xs text-muted-foreground">Expiring Compliance</div>
+                            <div className="mt-2 text-2xl font-semibold">{props.hrWidgets.expiring_compliance}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">Items expiring soon</div>
+                        </Link>
+                        <Link href="/hr/signatures/pending" className="rounded-xl border p-4 hover:border-primary/50 transition-colors">
+                            <div className="text-xs text-muted-foreground">Pending Signatures</div>
+                            <div className="mt-2 text-2xl font-semibold">{props.hrWidgets.pending_signatures}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">Documents to sign</div>
+                        </Link>
+                        <Link href="/hr/my/policies" className="rounded-xl border p-4 hover:border-primary/50 transition-colors">
+                            <div className="text-xs text-muted-foreground">Due Attestations</div>
+                            <div className="mt-2 text-2xl font-semibold">{props.hrWidgets.due_attestations}</div>
+                            <div className="mt-1 text-xs text-muted-foreground">Policies to acknowledge</div>
+                        </Link>
                     </div>
                 ) : null}
 
