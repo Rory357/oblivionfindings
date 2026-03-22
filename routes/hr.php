@@ -52,6 +52,8 @@ use App\Http\Controllers\Hr\AuditController;
 use App\Http\Controllers\Hr\LeaveReportController;
 use App\Http\Controllers\Hr\PipController;
 use App\Http\Controllers\Hr\CompetencyController;
+use App\Http\Controllers\Hr\ImportExportController;
+use App\Http\Controllers\Hr\ScorecardController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -96,6 +98,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.recruitment.view')->group(function () {
         Route::get('/recruitment', [RecruitmentController::class, 'index'])->name('recruitment.index');
+        Route::get('/recruitment/kanban', [RecruitmentController::class, 'kanban'])->name('recruitment.kanban');
+        Route::get('/recruitment/analytics', [RecruitmentController::class, 'analytics'])->name('recruitment.analytics');
 
         Route::get('/recruitment/candidates/create', [CandidateController::class, 'create'])->name('candidates.create')
             ->middleware('permission:hr.recruitment.manage');
@@ -110,6 +114,12 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         // Interviews
         Route::post('/recruitment/applications/{application}/interviews', [CandidateController::class, 'storeInterview'])->name('interviews.store')
             ->middleware('permission:hr.recruitment.manage');
+
+        // Interview Scorecards
+        Route::get('/recruitment/interviews/{interview}/scorecard', [ScorecardController::class, 'create'])->name('scorecards.create');
+        Route::post('/recruitment/interviews/{interview}/scorecard', [ScorecardController::class, 'store'])->name('scorecards.store')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::get('/recruitment/applications/{application}/scorecards', [ScorecardController::class, 'summary'])->name('scorecards.summary');
 
         // Reference Checks
         Route::post('/recruitment/applications/{application}/references', [CandidateController::class, 'storeReference'])->name('references.store')
@@ -143,6 +153,18 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/people/{profile}/edit', [EmployeeProfileController::class, 'edit'])->name('people.edit');
             Route::put('/people/{profile}', [EmployeeProfileController::class, 'update'])->name('people.update');
         });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Employee Import / Export
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.employees.manage')->prefix('import-export')->name('import-export.')->group(function () {
+        Route::get('/', [ImportExportController::class, 'index'])->name('index');
+        Route::post('/export', [ImportExportController::class, 'export'])->name('export');
+        Route::get('/template', [ImportExportController::class, 'template'])->name('template');
+        Route::post('/import', [ImportExportController::class, 'import'])->name('import');
     });
 
     /*
@@ -257,6 +279,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.leave.viewAny')->group(function () {
         Route::get('/leave', [LeaveController::class, 'index'])->name('leave.index');
         Route::get('/leave/balances', [LeaveController::class, 'balances'])->name('leave.balances');
+        Route::get('/leave/reports', [LeaveReportController::class, 'index'])->name('leave.reports');
         Route::get('/leave/holidays', [LeaveController::class, 'holidays'])->name('leave.holidays');
 
         Route::middleware('permission:hr.leave.manage')->group(function () {
@@ -756,13 +779,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.analytics.view')->group(function () {
         Route::get('/wellbeing', [WellbeingController::class, 'index'])->name('wellbeing.index');
     });
-
-    /*
-    |--------------------------------------------------------------------------
-    | Leave Reports
-    |--------------------------------------------------------------------------
-    */
-    Route::get('/leave/reports', [LeaveReportController::class, 'index'])->name('leave.reports');
 
     /*
     |--------------------------------------------------------------------------
