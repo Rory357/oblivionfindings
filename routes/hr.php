@@ -40,6 +40,7 @@ use App\Http\Controllers\Hr\ExitInterviewController;
 use App\Http\Controllers\Hr\ReportBuilderController;
 use App\Http\Controllers\Hr\ApprovalController;
 use App\Http\Controllers\Hr\ESignatureController;
+use App\Http\Controllers\Hr\PayslipController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -69,6 +70,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/goals', [MyHrController::class, 'goals'])->name('goals');
         Route::get('/expenses', [MyHrController::class, 'expenses'])->name('expenses');
         Route::post('/expenses', [MyHrController::class, 'storeExpense'])->name('expenses.store');
+        Route::get('/payslips', [PayslipController::class, 'myPayslips'])->name('payslips');
     });
 
     /*
@@ -410,11 +412,15 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.payroll.view')->group(function () {
         Route::get('/payroll', [PayrollExportController::class, 'index'])->name('payroll.index');
+        Route::get('/payroll/payslips', [PayslipController::class, 'index'])->name('payroll.payslips');
+        Route::get('/payroll/payslips/{payslip}', [PayslipController::class, 'show'])->name('payroll.payslips.show');
+        Route::get('/payroll/payslips/{payslip}/download', [PayslipController::class, 'download'])->name('payroll.payslips.download');
 
         Route::middleware('permission:hr.payroll.export')->group(function () {
             Route::post('/payroll/runs', [PayrollExportController::class, 'createRun'])->name('payroll.runs.store');
             Route::post('/payroll/runs/{run}/lock', [PayrollExportController::class, 'lockRun'])->name('payroll.runs.lock');
             Route::post('/payroll/runs/{run}/export', [PayrollExportController::class, 'export'])->name('payroll.runs.export');
+            Route::post('/payroll/payslips/generate', [PayslipController::class, 'generate'])->name('payroll.payslips.generate');
         });
     });
 
