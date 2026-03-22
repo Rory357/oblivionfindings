@@ -450,7 +450,7 @@ function SubPanel({
     return (
         <div
             ref={panelRef}
-            className="absolute left-14 top-0 bottom-0 z-50 w-60 border-r border-sidebar-border bg-sidebar text-sidebar-foreground overflow-y-auto shadow-lg"
+            className="fixed left-14 top-0 bottom-0 z-50 w-60 border-r border-sidebar-border bg-sidebar text-sidebar-foreground overflow-y-auto shadow-lg"
         >
             {/* Panel header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-sidebar-border/50">
@@ -540,9 +540,9 @@ export function AppSidebar() {
 
     return (
         <TooltipProvider delayDuration={0}>
-            <div className="relative hidden md:flex h-svh">
-                {/* Icon sidebar - 56px (w-14) */}
-                <nav className="flex h-full w-14 flex-col items-center bg-sidebar border-r border-sidebar-border py-3 shrink-0">
+            <div className="relative hidden md:flex">
+                {/* Icon sidebar - 56px (w-14), fixed position */}
+                <nav className="fixed top-0 left-0 z-40 flex h-svh w-14 flex-col items-center bg-sidebar border-r border-sidebar-border py-3 overflow-hidden">
                     {/* Top: Logo */}
                     <Tooltip>
                         <TooltipTrigger asChild>

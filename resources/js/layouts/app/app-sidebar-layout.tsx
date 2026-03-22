@@ -11,10 +11,11 @@ export default function AppSidebarLayout({
     const [mobileOpen, setMobileOpen] = useState(false);
 
     return (
-        <div className="flex min-h-svh w-full">
+        <div className="min-h-svh w-full">
             <FlashToaster />
             <AppSidebar />
-            <main className="bg-background relative flex min-h-svh flex-1 flex-col max-w-full">
+            {/* Main content offset by sidebar width (w-14 = 56px) */}
+            <main className="bg-background relative flex min-h-svh flex-col md:ml-14">
                 <AppSidebarHeader
                     breadcrumbs={breadcrumbs}
                     onMobileMenuToggle={() => setMobileOpen(true)}
