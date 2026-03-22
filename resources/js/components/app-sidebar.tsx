@@ -181,32 +181,49 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const items: NavItem[] = [
         { title: 'All Sites', href: '/sites', icon: Building2 },
     ];
+    if (can?.sites?.types?.headOfficeView) items.push({ title: 'Head Office', href: '/sites?type=head_office', icon: Building2 });
     if (can?.sites?.types?.houseView) items.push({ title: 'Houses', href: '/sites?type=house', icon: Home });
+    if (can?.sites?.types?.facilityView) items.push({ title: 'Facilities', href: '/sites?type=facility', icon: Building2 });
     if (can?.calendar?.viewAny) items.push({ title: 'Calendars', href: '/calendar', icon: CalendarDays });
     if (can?.checklists?.view) items.push({ title: 'Checklists', href: '/checklists', icon: ClipboardCheck });
     if (can?.hazards?.view) items.push({ title: 'Hazards', href: '/hazards', icon: ShieldAlert });
     if (can?.vendors?.view) items.push({ title: 'Vendors', href: '/vendors', icon: Package });
+    if (can?.siteHardware?.view) items.push({ title: 'Site Hardware', href: '/site-hardware', icon: Settings });
+    if (can?.unifi?.manage) items.push({ title: 'UniFi', href: '/unifi', icon: Settings });
     return [{ label: 'Sites & Locations', items }];
 }
 
 function buildOperationsSubPanelGroups({ can, role }: { can?: any; role?: string | null }): SubPanelGroup[] {
-    const items: NavItem[] = [];
-    if (can?.clients?.viewAny || role === 'support_worker') items.push({ title: 'Clients', href: '/clients', icon: Users });
-    if (can?.shifts?.viewAny || role === 'support_worker') items.push({ title: 'Shifts', href: '/shifts', icon: CalendarDays });
-    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned || role === 'support_worker') items.push({ title: 'Timesheets', href: '/timesheets', icon: Clock });
-    if (can?.rostering?.viewAny) items.push({ title: 'Rostering', href: '/rostering', icon: CalendarDays });
-    if (can?.medications?.view) items.push({ title: 'Medications', href: '/medications', icon: Shield });
-    if (can?.fleet?.viewAny) items.push({ title: 'Fleet', href: '/fleet', icon: Package });
-    return [{ label: 'Operations', items }];
+    const core: NavItem[] = [];
+    if (can?.clients?.viewAny || role === 'support_worker') core.push({ title: 'Clients', href: '/clients', icon: Users });
+    if (can?.shifts?.viewAny || role === 'support_worker') core.push({ title: 'Shifts', href: '/shifts', icon: CalendarDays });
+    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned || role === 'support_worker') core.push({ title: 'Timesheets', href: '/timesheets', icon: Clock });
+    if (can?.rostering?.viewAny) core.push({ title: 'Rostering', href: '/rostering', icon: CalendarDays });
+    if (can?.respite?.viewAny) core.push({ title: 'Respite', href: '/respite', icon: CalendarDays });
+    if (can?.medications?.view) core.push({ title: 'Medications', href: '/medications', icon: Shield });
+    if (can?.medications?.breakGlass) core.push({ title: 'Emergency Access', href: '/emergency-access', icon: ShieldAlert });
+    if (can?.consents?.viewAny) core.push({ title: 'Consents', href: '/consents', icon: ClipboardCheck });
+
+    const resources: NavItem[] = [];
+    if (can?.staff?.viewAny) resources.push({ title: 'Staff', href: '/staff', icon: Users });
+    if (can?.assets?.viewAny || can?.assets?.viewAssigned) resources.push({ title: 'Assets', href: '/assets', icon: Package });
+    if (can?.assets?.alertsView) resources.push({ title: 'Asset Alerts', href: '/assets/alerts', icon: ShieldAlert });
+    if (can?.fleet?.viewAny) resources.push({ title: 'Fleet Management', href: '/fleet-management', icon: Package });
+    if (can?.credentials?.view) resources.push({ title: 'Credentials', href: '/credentials', icon: Shield });
+
+    const groups: SubPanelGroup[] = [{ label: 'Operations', items: core }];
+    if (resources.length > 0) groups.push({ label: 'Resources', items: resources });
+    return groups;
 }
 
 function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const items: NavItem[] = [];
     if (can?.incidents?.viewAny || can?.incidents?.viewAssigned) items.push({ title: 'Incidents', href: '/incidents', icon: ShieldAlert });
-    if (can?.safeguarding?.viewAny) items.push({ title: 'Safeguarding', href: '/safeguarding', icon: Shield });
+    if (can?.safeguarding?.viewAny || can?.safeguarding?.create) items.push({ title: 'Safeguarding', href: '/safeguarding', icon: Shield });
+    if (can?.privacy?.viewRequests) items.push({ title: 'Privacy & GDPR', href: '/privacy/dashboard', icon: Shield });
     if (can?.compliance?.view) items.push({ title: 'Compliance', href: '/compliance', icon: Shield });
     if (can?.hazards?.view) items.push({ title: 'Hazards', href: '/hazards', icon: ShieldAlert });
-    if (can?.risks?.viewAny) items.push({ title: 'Risks', href: '/risks', icon: Target });
+    if (can?.risks?.viewAny || can?.risks?.viewAssigned) items.push({ title: 'Risks', href: '/risks', icon: Target });
     return [{ label: 'Compliance & Safety', items }];
 }
 
@@ -220,7 +237,9 @@ function buildGovernanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] 
     items.push({ title: 'Resolutions', href: '/governance/resolutions', icon: ClipboardCheck });
     items.push({ title: 'Compliance', href: '/governance/compliance', icon: Shield });
     items.push({ title: 'Strategy', href: '/governance/strategy', icon: Target });
+    items.push({ title: 'Performance', href: '/governance/performance', icon: ClipboardCheck });
     items.push({ title: 'Budgets', href: '/governance/budgets', icon: DollarSign });
+    items.push({ title: 'Board Packs', href: '/governance/packs', icon: FileText });
     items.push({ title: 'Action Items', href: '/governance/actions', icon: ClipboardList });
     return [{ label: 'Governance', items }];
 }
@@ -228,10 +247,15 @@ function buildGovernanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] 
 function buildSystemSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const items: NavItem[] = [];
     if (can?.reports?.viewAny) items.push({ title: 'Reports', href: '/reports', icon: FileText });
+    if (can?.sitesReports?.view) items.push({ title: 'Site Reports', href: '/reports/sites', icon: FileText });
     if (can?.calendar?.viewAny) items.push({ title: 'Calendar', href: '/calendar', icon: CalendarDays });
     if (can?.timeline?.viewAny) items.push({ title: 'Timeline', href: '/timeline', icon: Clock });
+    if (can?.summaries?.viewAny) items.push({ title: 'Summaries', href: '/summaries', icon: FileText });
     if (can?.audit?.viewAny) items.push({ title: 'Audit Logs', href: '/audit', icon: FileText });
+    if (can?.controlRoom?.viewAny) items.push({ title: 'Control Room', href: '/control-room', icon: LayoutGrid });
+    if (can?.integrations?.view) items.push({ title: 'Integrations', href: '/integrations', icon: Settings });
     if (can?.settings?.manageAccess) items.push({ title: 'Settings', href: '/settings', icon: Settings });
+    if (can?.settings?.rbacManage) items.push({ title: 'Roles & Permissions', href: '/settings/roles', icon: Shield });
     return [{ label: 'System', items }];
 }
 
@@ -347,16 +371,41 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.hr?.calendar?.view) {
         admin.items.push({ title: 'Calendar', href: '/hr/calendar', icon: CalendarDays });
     }
+    if (can?.hr?.vetting?.view) {
+        admin.items.push({ title: 'Vetting', href: '/hr/compliance/vetting', icon: Shield });
+    }
+    if (can?.hr?.driver?.view) {
+        admin.items.push({ title: 'Drivers', href: '/hr/compliance/drivers', icon: Users });
+    }
+    if (can?.hr?.onboarding?.view) {
+        admin.items.push({ title: 'Onboarding', href: '/hr/onboarding', icon: ClipboardCheck });
+        admin.items.push({ title: 'Onboarding Emails', href: '/hr/onboarding/emails', icon: MessageSquareText });
+    }
+    if (can?.hr?.documents?.view) {
+        admin.items.push({ title: 'Documents', href: '/hr/documents', icon: FileText });
+        admin.items.push({ title: 'Expiring Docs', href: '/hr/documents/expiring', icon: ShieldAlert });
+    }
     admin.items.push({ title: 'Approvals', href: '/hr/approvals/pending', icon: ClipboardCheck });
     admin.items.push({ title: 'Signatures', href: '/hr/signatures/pending', icon: FileText });
+    if (can?.hr?.cases?.view) {
+        admin.items.push({ title: 'HR Cases', href: '/hr/cases', icon: Shield });
+    }
+    if (can?.hr?.payroll?.view) {
+        admin.items.push({ title: 'Payroll', href: '/hr/payroll', icon: DollarSign });
+        admin.items.push({ title: 'Payslips', href: '/hr/payroll/payslips', icon: FileText });
+    }
     if (can?.hr?.policies?.view) {
         admin.items.push({ title: 'Policies', href: '/hr/policies', icon: FileText });
     }
+    admin.items.push({ title: 'Exit Interviews', href: '/hr/exit-interviews', icon: Users });
     if (can?.hr?.reports?.view) {
         admin.items.push({ title: 'Reports', href: '/hr/reports', icon: FileText });
+        admin.items.push({ title: 'Report Builder', href: '/hr/reports/builder', icon: LayoutGrid });
     }
     if (can?.hr?.settings?.manage) {
         admin.items.push({ title: 'Settings', href: '/hr/settings/webhooks', icon: Settings });
+        admin.items.push({ title: 'Custom Fields', href: '/hr/settings/custom-fields', icon: Settings });
+        admin.items.push({ title: 'Audit Log', href: '/hr/settings/audit-log', icon: FileText });
     }
     if (admin.items.length > 0) groups.push(admin);
 
