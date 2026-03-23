@@ -18,6 +18,7 @@ use App\Domain\Hr\Jobs\SendExpiryRemindersJob;
 use App\Domain\Hr\Jobs\CalculateWellbeingIndicatorsJob;
 use App\Domain\Hr\Jobs\ProcessLeaveBalanceAccrualJob;
 use App\Domain\Hr\Jobs\ArchiveCandidateDataJob;
+use App\Jobs\FleetAutoAlertJob;
 
 Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
@@ -140,3 +141,9 @@ app(Schedule::class)
     ->job(new ArchiveCandidateDataJob())
     ->timezone('Pacific/Auckland')
     ->weeklyOn(0, '03:00');
+
+// Fleet auto-alerts: WOF/Rego expiry, offline vehicles, maintenance overdue, low battery
+app(Schedule::class)
+    ->job(new FleetAutoAlertJob())
+    ->timezone('Pacific/Auckland')
+    ->everyFiveMinutes();

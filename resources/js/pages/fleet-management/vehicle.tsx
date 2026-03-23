@@ -1,4 +1,4 @@
-import FleetMap from '@/components/fleet-map';
+import LeafletMap from '@/components/leaflet-map';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -15,8 +15,7 @@ export default function FleetVehicle({
     trips,
     geofences,
 }) {
-    const { fleet, auth } = usePage().props as any;
-    const apiKey = fleet?.maps?.apiKey;
+    const { auth } = usePage().props as any;
     const canManageGeofences = !!auth?.can?.assets?.geofencesManage;
 
     useEffect(() => {
@@ -74,22 +73,12 @@ export default function FleetVehicle({
 
                 <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
                     <div className="space-y-3">
-                        {apiKey ? (
-                            <FleetMap
-                                apiKey={apiKey}
-                                center={center}
-                                zoom={14}
-                                markers={marker}
-                                height={420}
-                                usageContext="vehicle"
-                                usageAssetId={asset.id}
-                            />
-                        ) : (
-                            <div className="rounded-md border bg-muted/30 p-6 text-sm text-muted-foreground">
-                                Google Maps API key missing. Add
-                                GOOGLE_MAPS_API_KEY to enable live maps.
-                            </div>
-                        )}
+                        <LeafletMap
+                            center={center}
+                            zoom={14}
+                            markers={marker.map(m => ({ ...m, type: 'vehicle' as const, status: state?.status ?? 'offline' }))}
+                            height={420}
+                        />
 
                         <div className="rounded-md border p-4">
                             <div className="mb-3 text-sm font-medium">

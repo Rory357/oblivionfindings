@@ -10,30 +10,50 @@ import { useInitials } from '@/hooks/use-initials';
 import { cn } from '@/lib/utils';
 import { resolveUrl } from '@/lib/utils';
 import { type NavItem } from '@/types';
-import { dashboard } from '@/routes';
+const dashboard = () => '/dashboard';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    AlertOctagon,
+    AlertTriangle,
+    ArrowLeftRight,
+    Bell,
     BookOpen,
     Briefcase,
     Building2,
     CalendarDays,
+    CheckCircle2,
     ChevronRight,
     ClipboardCheck,
     ClipboardList,
     Clock,
     DollarSign,
     FileText,
+    Fuel,
     GitBranch,
     Home,
+    Key,
     Landmark,
     LayoutGrid,
+    Map,
+    MapPin,
     MessageSquareText,
     Package,
+    PieChart,
+    Pill,
+    Radio,
+    Receipt,
+    Route,
     Settings,
     Shield,
     ShieldAlert,
+    ShieldCheck,
+    Smartphone,
     Target,
+    Truck,
+    UserCheck,
     Users,
+    UserSearch,
+    Wrench,
     X,
     type LucideIcon,
 } from 'lucide-react';
@@ -153,7 +173,13 @@ function buildIconNavItems({
     // Compliance & Safety
     const hasSafety = can?.incidents?.viewAny || can?.incidents?.viewAssigned || can?.compliance?.view || can?.hazards?.view;
     if (hasSafety) {
-        items.push({ id: 'safety', icon: ShieldAlert, label: 'Compliance & Safety', subPanel: true, dividerAfter: true });
+        items.push({ id: 'safety', icon: ShieldAlert, label: 'Compliance & Safety', subPanel: true });
+    }
+
+    // Fleet & Assets
+    const hasFleetAssets = can?.fleet?.viewAny || can?.assets?.viewAny || can?.assets?.viewAssigned;
+    if (hasFleetAssets) {
+        items.push({ id: 'fleet-assets', icon: Truck, label: 'Fleet & Assets', subPanel: true, dividerAfter: true });
     } else if (items.length > 0) {
         items[items.length - 1].dividerAfter = true;
     }
@@ -190,6 +216,7 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.vendors?.view) items.push({ title: 'Vendors', href: '/vendors', icon: Package });
     if (can?.siteHardware?.view) items.push({ title: 'Site Hardware', href: '/site-hardware', icon: Settings });
     if (can?.unifi?.manage) items.push({ title: 'UniFi', href: '/unifi', icon: Settings });
+    if (can?.assets?.geofences?.manage || can?.fleet?.viewAny) items.push({ title: 'Geofences', href: '/fleet-assets/geofences', icon: MapPin });
     return [{ label: 'Sites & Locations', items }];
 }
 
@@ -206,9 +233,6 @@ function buildOperationsSubPanelGroups({ can, role }: { can?: any; role?: string
 
     const resources: NavItem[] = [];
     if (can?.staff?.viewAny) resources.push({ title: 'Staff', href: '/staff', icon: Users });
-    if (can?.assets?.viewAny || can?.assets?.viewAssigned) resources.push({ title: 'Assets', href: '/assets', icon: Package });
-    if (can?.assets?.alertsView) resources.push({ title: 'Asset Alerts', href: '/assets/alerts', icon: ShieldAlert });
-    if (can?.fleet?.viewAny) resources.push({ title: 'Fleet Management', href: '/fleet-management', icon: Package });
     if (can?.credentials?.view) resources.push({ title: 'Credentials', href: '/credentials', icon: Shield });
 
     const groups: SubPanelGroup[] = [{ label: 'Operations', items: core }];
@@ -225,6 +249,104 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.hazards?.view) items.push({ title: 'Hazards', href: '/hazards', icon: ShieldAlert });
     if (can?.risks?.viewAny || can?.risks?.viewAssigned) items.push({ title: 'Risks', href: '/risks', icon: Target });
     return [{ label: 'Compliance & Safety', items }];
+}
+
+function buildFleetAssetsSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    const groups: SubPanelGroup[] = [];
+
+    // Overview
+    const overview: SubPanelGroup = {
+        label: 'Overview',
+        items: [
+            { title: 'Dashboard', href: '/fleet-assets', icon: LayoutGrid },
+            { title: 'Live Map', href: '/fleet-assets/map', icon: Map },
+            { title: 'Daily Checks', href: '/fleet-assets/daily-check', icon: CheckCircle2 },
+            { title: 'Driver App', href: '/fleet-assets/mobile/dashboard', icon: Smartphone },
+        ],
+    };
+    groups.push(overview);
+
+    // Fleet
+    const fleet: SubPanelGroup = { label: 'Fleet', items: [] };
+    if (can?.fleet?.viewAny) {
+        fleet.items.push({ title: 'Vehicles', href: '/fleet-assets/vehicles', icon: Truck });
+        fleet.items.push({ title: 'Trips', href: '/fleet-assets/trips', icon: Route });
+        fleet.items.push({ title: 'Fuel Logs', href: '/fleet-assets/fuel', icon: Fuel });
+        fleet.items.push({ title: 'Compliance', href: '/fleet-assets/compliance', icon: ShieldCheck });
+    }
+    if (fleet.items.length > 0) groups.push(fleet);
+
+    // Assets
+    const assets: SubPanelGroup = { label: 'Assets', items: [] };
+    if (can?.assets?.viewAny || can?.assets?.viewAssigned) {
+        assets.items.push({ title: 'All Assets', href: '/fleet-assets/assets', icon: Package });
+    }
+    if (can?.assets?.alertsView) {
+        assets.items.push({ title: 'Alerts', href: '/fleet-assets/alerts', icon: AlertTriangle });
+    }
+    if (can?.assets?.geofences?.manage || can?.fleet?.viewAny) {
+        assets.items.push({ title: 'Geofences', href: '/fleet-assets/geofences', icon: MapPin });
+    }
+    if (assets.items.length > 0) groups.push(assets);
+
+    // Maintenance
+    const maintenance: SubPanelGroup = { label: 'Maintenance', items: [] };
+    if (can?.fleet?.viewAny || can?.assets?.viewAny) {
+        maintenance.items.push({ title: 'Overview', href: '/fleet-assets/maintenance/dashboard', icon: LayoutGrid });
+        maintenance.items.push({ title: 'Work Orders', href: '/fleet-assets/maintenance/work-orders', icon: Wrench });
+        maintenance.items.push({ title: 'Service Schedules', href: '/fleet-assets/maintenance/schedules', icon: CalendarDays });
+        maintenance.items.push({ title: 'Checklists', href: '/fleet-assets/maintenance/checklists', icon: ClipboardCheck });
+        maintenance.items.push({ title: 'Inspections', href: '/fleet-assets/inspections', icon: ClipboardList });
+    }
+    if (maintenance.items.length > 0) groups.push(maintenance);
+
+    // People
+    const people: SubPanelGroup = { label: 'People', items: [] };
+    if (can?.fleet?.viewAny || can?.hr?.driver?.view) {
+        people.items.push({ title: 'Drivers', href: '/fleet-assets/drivers', icon: Users });
+    }
+    if (can?.fleet?.viewAny || can?.assets?.viewAny) {
+        people.items.push({ title: 'Vehicle Bookings', href: '/fleet-assets/bookings', icon: CalendarDays });
+        people.items.push({ title: 'Key Management', href: '/fleet-assets/keys', icon: Key });
+        people.items.push({ title: 'Resident Tracking', href: '/fleet-assets/resident-tracking', icon: UserSearch });
+        people.items.push({ title: 'Transport Logs', href: '/fleet-assets/transports', icon: UserCheck });
+        people.items.push({ title: 'Medication Transit', href: '/fleet-assets/transports/medications', icon: Pill });
+        people.items.push({ title: 'Outings', href: '/fleet-assets/outings', icon: MapPin });
+        people.items.push({ title: 'Shift Handovers', href: '/fleet-assets/handovers', icon: ArrowLeftRight });
+    }
+    if (people.items.length > 0) groups.push(people);
+
+    // Devices
+    const devices: SubPanelGroup = { label: 'Devices', items: [] };
+    if (can?.assets?.trackers?.manage || can?.fleet?.viewAny) {
+        devices.items.push({ title: 'Tracking Devices', href: '/fleet-assets/devices', icon: Radio });
+    }
+    if (devices.items.length > 0) groups.push(devices);
+
+    // Safety
+    const safety: SubPanelGroup = { label: 'Safety', items: [] };
+    safety.items.push({ title: 'Incidents', href: '/fleet-assets/incidents', icon: AlertOctagon });
+    safety.items.push({ title: 'Wandering Alerts', href: '/fleet-assets/wandering-alerts', icon: ShieldAlert });
+    if (safety.items.length > 0) groups.push(safety);
+
+    // Reports
+    const reports: SubPanelGroup = { label: 'Reports', items: [] };
+    if (can?.fleet?.reports?.view || can?.fleet?.viewAny) {
+        reports.items.push({ title: 'Reports & Analytics', href: '/fleet-assets/reports', icon: FileText });
+        reports.items.push({ title: 'Usage by House', href: '/fleet-assets/reports/by-house', icon: Building2 });
+        reports.items.push({ title: 'Mileage Reimbursement', href: '/fleet-assets/reports/reimbursement', icon: Receipt });
+        reports.items.push({ title: 'Mileage Claims', href: '/fleet-assets/mileage', icon: Receipt });
+        reports.items.push({ title: 'Cost Allocation', href: '/fleet-assets/reports/cost-allocation', icon: PieChart });
+        reports.items.push({ title: 'Community Access', href: '/fleet-assets/reports/community-access', icon: Users });
+    }
+    if (reports.items.length > 0) groups.push(reports);
+
+    // Settings
+    const settings: SubPanelGroup = { label: 'Settings', items: [] };
+    settings.items.push({ title: 'Notifications', href: '/fleet-assets/settings/notifications', icon: Bell });
+    if (settings.items.length > 0) groups.push(settings);
+
+    return groups;
 }
 
 function buildGovernanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
@@ -520,6 +642,7 @@ export function AppSidebar() {
         sites: buildSitesSubPanelGroups({ can }),
         operations: buildOperationsSubPanelGroups({ can, role }),
         safety: buildSafetySubPanelGroups({ can }),
+        'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
         hr: buildHrSubPanelGroups({ can }),
         governance: buildGovernanceSubPanelGroups({ can }),
         system: buildSystemSubPanelGroups({ can }),
@@ -697,9 +820,18 @@ export function AppSidebarMobile({
     const currentUrl = page.url;
 
     const iconNavItems = useMemo(() => buildIconNavItems({ role, can }), [role, can]);
-    const hrSubPanelGroups = useMemo(() => buildHrSubPanelGroups({ can }), [can]);
 
-    const [hrExpanded, setHrExpanded] = useState(false);
+    const mobileSubPanelMap = useMemo(() => ({
+        sites: buildSitesSubPanelGroups({ can }),
+        operations: buildOperationsSubPanelGroups({ can, role }),
+        safety: buildSafetySubPanelGroups({ can }),
+        'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
+        hr: buildHrSubPanelGroups({ can }),
+        governance: buildGovernanceSubPanelGroups({ can }),
+        system: buildSystemSubPanelGroups({ can }),
+    }), [can, role]);
+
+    const [expandedId, setExpandedId] = useState<string | null>(null);
 
     // Close on navigation
     useEffect(() => {
@@ -726,11 +858,13 @@ export function AppSidebarMobile({
                 <div className="py-2">
                     {iconNavItems.map((item) => {
                         if (item.subPanel) {
-                            const active = isIconActive(currentUrl, item, hrSubPanelGroups);
+                            const groups = (mobileSubPanelMap as any)[item.id] as SubPanelGroup[] | undefined;
+                            const active = isIconActive(currentUrl, item, groups);
+                            const isExpanded = expandedId === item.id;
                             return (
                                 <div key={item.id}>
                                     <button
-                                        onClick={() => setHrExpanded(!hrExpanded)}
+                                        onClick={() => setExpandedId(isExpanded ? null : item.id)}
                                         className={cn(
                                             'flex items-center gap-3 w-full px-4 py-2 text-sm transition-colors',
                                             active
@@ -740,9 +874,9 @@ export function AppSidebarMobile({
                                     >
                                         <item.icon className="h-5 w-5 shrink-0" />
                                         <span>{item.label}</span>
-                                        <ChevronRight className={cn('ml-auto h-4 w-4 transition-transform', hrExpanded && 'rotate-90')} />
+                                        <ChevronRight className={cn('ml-auto h-4 w-4 transition-transform', isExpanded && 'rotate-90')} />
                                     </button>
-                                    {hrExpanded && hrSubPanelGroups.map((group) => (
+                                    {isExpanded && groups?.map((group) => (
                                         <div key={group.label} className="ml-4">
                                             <div className="px-4 py-1 text-[11px] font-medium uppercase tracking-wider text-sidebar-foreground/40">
                                                 {group.label}

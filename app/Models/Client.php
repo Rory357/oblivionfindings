@@ -32,10 +32,13 @@ class Client extends Model
         'funding_notes',
         'openai_vector_store_id',
         'profile_photo_path',
+        'transport_needs',
+        'transport_notes',
     ];
 
     protected $casts = [
         'date_of_birth' => 'date',
+        'transport_needs' => 'array',
     ];
 
     protected $appends = ['profile_photo_url', 'avatar'];

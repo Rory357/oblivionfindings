@@ -1,4 +1,4 @@
-import FleetMap from '@/components/fleet-map';
+import LeafletMap from '@/components/leaflet-map';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -12,12 +12,10 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import { useEffect, useMemo, useState } from 'react';
 
 export default function FleetManagementIndex({ vehicles }) {
-    const { fleet } = usePage().props as any;
-    const apiKey = fleet?.maps?.apiKey;
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
 
@@ -83,21 +81,12 @@ export default function FleetManagementIndex({ vehicles }) {
 
                 <div className="grid gap-4 lg:grid-cols-[2fr,1fr]">
                     <div className="space-y-3">
-                        {apiKey ? (
-                            <FleetMap
-                                apiKey={apiKey}
-                                center={center}
-                                zoom={12}
-                                markers={markers}
-                                height={420}
-                                usageContext="dashboard"
-                            />
-                        ) : (
-                            <div className="rounded-md border bg-muted/30 p-6 text-sm text-muted-foreground">
-                                Google Maps API key missing. Add
-                                GOOGLE_MAPS_API_KEY to enable live maps.
-                            </div>
-                        )}
+                        <LeafletMap
+                            center={center}
+                            zoom={12}
+                            markers={markers.map(m => ({ ...m, type: 'vehicle' as const, status: 'online' }))}
+                            height={420}
+                        />
 
                         <div className="rounded-md border p-4">
                             <div className="mb-3 text-sm font-medium">

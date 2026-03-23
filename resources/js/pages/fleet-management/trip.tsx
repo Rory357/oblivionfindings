@@ -1,4 +1,4 @@
-import FleetMap from '@/components/fleet-map';
+import LeafletMap from '@/components/leaflet-map';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -64,8 +64,6 @@ function formatDuration(seconds: number | null): string {
 }
 
 export default function FleetTrip({ trip, driver_sessions, can }: Props) {
-    const { fleet } = usePage().props as any;
-    const apiKey = fleet?.maps?.apiKey;
     const [points, setPoints] = useState<{ lat: number; lng: number }[]>([]);
     const [selectedDriver, setSelectedDriver] = useState(
         trip.driver_session_id?.toString() || '',
@@ -188,21 +186,12 @@ export default function FleetTrip({ trip, driver_sessions, can }: Props) {
                 <div className="grid gap-4 lg:grid-cols-3">
                     {/* Map */}
                     <div className="lg:col-span-2">
-                        {apiKey ? (
-                            <FleetMap
-                                apiKey={apiKey}
-                                center={center}
-                                zoom={12}
-                                polyline={points}
-                                height={480}
-                                usageContext="trip"
-                            />
-                        ) : (
-                            <div className="rounded-lg border bg-muted/30 p-6 text-sm text-muted-foreground">
-                                Google Maps API key missing. Add GOOGLE_MAPS_API_KEY to
-                                enable trip playback.
-                            </div>
-                        )}
+                        <LeafletMap
+                            center={center}
+                            zoom={12}
+                            polyline={points}
+                            height={480}
+                        />
                     </div>
 
                     {/* Trip Details */}

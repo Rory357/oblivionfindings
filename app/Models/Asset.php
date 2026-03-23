@@ -9,9 +9,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
+use App\Models\FleetChecklistRun;
+use App\Models\FleetKeyLog;
+use App\Models\FleetServiceSchedule;
 use App\Models\FleetSignal;
 use App\Models\FleetTrip;
+use App\Models\FleetVehicleBooking;
 use App\Models\FleetVehicleStateSnapshot;
+use App\Models\FleetWorkOrder;
+use App\Models\FleetIncident;
+use App\Models\FleetShiftHandover;
 
 class Asset extends Model
 {
@@ -31,6 +38,8 @@ class Asset extends Model
 
     protected $fillable = [
         'site_id',
+        'home_site_id',
+        'primary_driver_user_id',
         'client_id',
         'created_by_user_id',
         'updated_by_user_id',
@@ -43,6 +52,12 @@ class Asset extends Model
         'manufacturer',
         'model',
         'serial_number',
+        'registration_number',
+        'registration_expires_at',
+        'wof_expires_at',
+        'cof_expires_at',
+        'fuel_type',
+        'odometer_km',
         'purchase_date',
         'warranty_expires_at',
         'status',
@@ -53,15 +68,32 @@ class Asset extends Model
         'requires_maintenance',
         'maintenance_due_at',
         'notes',
+        'alert_config',
+        'has_wheelchair_ramp',
+        'has_hoist',
+        'has_child_seat_anchors',
+        'has_medical_storage',
+        'seating_capacity',
+        'accessibility_notes',
     ];
 
     protected $casts = [
         'purchase_date' => 'date',
         'warranty_expires_at' => 'date',
+        'registration_expires_at' => 'date',
+        'wof_expires_at' => 'date',
+        'cof_expires_at' => 'date',
+        'odometer_km' => 'decimal:1',
         'requires_inspection' => 'boolean',
         'inspection_due_at' => 'date',
         'requires_maintenance' => 'boolean',
         'maintenance_due_at' => 'date',
+        'alert_config' => 'array',
+        'has_wheelchair_ramp' => 'boolean',
+        'has_hoist' => 'boolean',
+        'has_child_seat_anchors' => 'boolean',
+        'has_medical_storage' => 'boolean',
+        'seating_capacity' => 'integer',
     ];
 
     public function site(): BelongsTo
@@ -172,5 +204,75 @@ class Asset extends Model
     public function linkedHardware(): HasMany
     {
         return $this->hasMany(LocationHardware::class, 'linked_asset_id');
+    }
+
+    public function homeSite(): BelongsTo
+    {
+        return $this->belongsTo(Site::class, 'home_site_id');
+    }
+
+    public function primaryDriver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'primary_driver_user_id');
+    }
+
+    public function bookings(): HasMany
+    {
+        return $this->hasMany(FleetVehicleBooking::class);
+    }
+
+    public function workOrders(): HasMany
+    {
+        return $this->hasMany(FleetWorkOrder::class);
+    }
+
+    public function checklistRuns(): HasMany
+    {
+        return $this->hasMany(FleetChecklistRun::class);
+    }
+
+    public function serviceSchedules(): HasMany
+    {
+        return $this->hasMany(FleetServiceSchedule::class);
+    }
+
+    public function fleetIncidents(): HasMany
+    {
+        return $this->hasMany(FleetIncident::class);
+    }
+
+    public function fleetHandovers(): HasMany
+    {
+        return $this->hasMany(FleetShiftHandover::class);
+    }
+
+    public function keyLogs(): HasMany
+    {
+        return $this->hasMany(FleetKeyLog::class);
+    }
+
+    public function latestKeyLog(): HasOne
+    {
+        return $this->hasOne(FleetKeyLog::class)->latestOfMany();
+    }
+
+    public function scopeWofExpiring($query, int $days = 30)
+    {
+        return $query->whereNotNull('wof_expires_at')
+            ->where('wof_expires_at', '<=', now()->addDays($days))
+            ->where('wof_expires_at', '>=', now());
+    }
+
+    public function scopeRegistrationExpiring($query, int $days = 30)
+    {
+        return $query->whereNotNull('registration_expires_at')
+            ->where('registration_expires_at', '<=', now()->addDays($days))
+            ->where('registration_expires_at', '>=', now());
+    }
+
+    public function scopeVehicles($query)
+    {
+        return $query->where('category', 'vehicle')
+            ->orWhereHas('categoryRef', fn($q) => $q->where('slug', 'vehicle'));
     }
 }
