@@ -45,7 +45,7 @@ function formatRelativeTime(iso: string): string {
     return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
 }
 
-export default function HandoversIndex({ handovers, filters }: Props) {
+export default function HandoversIndex({ handovers = { data: [], links: [], total: 0, last_page: 1 }, filters = {} as any }: Props) {
     return (
         <AppLayout>
             <Head title="Shift Handovers" />
@@ -54,14 +54,14 @@ export default function HandoversIndex({ handovers, filters }: Props) {
                 <div className="mb-4 flex flex-wrap items-center gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input placeholder="Search handovers..." className="h-9 pl-8 text-sm" defaultValue={filters.q ?? ''}
+                        <Input placeholder="Search handovers..." className="h-9 pl-8 text-sm" defaultValue={filters?.q ?? ''}
                             onChange={(e) => router.get('/operations/handovers', { ...filters, q: e.target.value || null }, { preserveState: true, replace: true })} />
                     </div>
-                    <Input type="date" className="h-9 w-[160px] text-xs" value={filters.date ?? ''}
+                    <Input type="date" className="h-9 w-[160px] text-xs" value={filters?.date ?? ''}
                         onChange={(e) => router.get('/operations/handovers', { ...filters, date: e.target.value || null }, { preserveState: true, replace: true })} />
                 </div>
                 <div className="space-y-2">
-                    {handovers.data.length === 0 && (
+                    {(handovers?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <GitBranch className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -70,7 +70,7 @@ export default function HandoversIndex({ handovers, filters }: Props) {
                             </CardContent>
                         </Card>
                     )}
-                    {handovers.data.map((h) => (
+                    {(handovers?.data ?? []).map((h) => (
                         <Card key={h.id} className="transition-all hover:shadow-sm">
                             <CardContent className="p-4">
                                 <div className="flex items-start gap-3">
@@ -118,9 +118,9 @@ export default function HandoversIndex({ handovers, filters }: Props) {
                         </Card>
                     ))}
                 </div>
-                {handovers.last_page > 1 && (
+                {(handovers?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {handovers.links.map((link: any, i: number) => (
+                        {(handovers?.links ?? []).map((link: any, i: number) => (
                             <Button key={i} size="sm" variant={link.active ? 'default' : 'outline'} className="h-7 min-w-[28px] px-2 text-xs" disabled={!link.url}
                                 onClick={() => link.url && router.get(link.url, {}, { preserveState: true })} dangerouslySetInnerHTML={{ __html: link.label }} />
                         ))}

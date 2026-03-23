@@ -75,7 +75,7 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function CarePlansIndex({ carePlans, filters, stats, clients }: Props) {
+export default function CarePlansIndex({ carePlans = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any, clients = [] }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/care-plans', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -104,11 +104,11 @@ export default function CarePlansIndex({ carePlans, filters, stats, clients }: P
                         <Input
                             placeholder="Search care plans..."
                             className="h-9 pl-8 text-sm"
-                            defaultValue={filters.q ?? ''}
+                            defaultValue={filters?.q ?? ''}
                             onChange={(e) => updateFilters('q', e.target.value || null)}
                         />
                     </div>
-                    <Select value={filters.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
+                    <Select value={filters?.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
                         <SelectTrigger className="h-9 w-[130px] text-xs">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
@@ -120,7 +120,7 @@ export default function CarePlansIndex({ carePlans, filters, stats, clients }: P
                             <SelectItem value="archived">Archived</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Select value={filters.plan_type ?? ANY} onValueChange={(v) => updateFilters('plan_type', v === ANY ? null : v)}>
+                    <Select value={filters?.plan_type ?? ANY} onValueChange={(v) => updateFilters('plan_type', v === ANY ? null : v)}>
                         <SelectTrigger className="h-9 w-[150px] text-xs">
                             <SelectValue placeholder="Plan Type" />
                         </SelectTrigger>
@@ -141,7 +141,7 @@ export default function CarePlansIndex({ carePlans, filters, stats, clients }: P
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {carePlans.data.length === 0 && (
+                    {(carePlans?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <ClipboardCheck className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -153,7 +153,7 @@ export default function CarePlansIndex({ carePlans, filters, stats, clients }: P
                             </CardContent>
                         </Card>
                     )}
-                    {carePlans.data.map((plan) => (
+                    {(carePlans?.data ?? []).map((plan) => (
                         <Card key={plan.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="flex items-center gap-4 p-4">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
@@ -207,9 +207,9 @@ export default function CarePlansIndex({ carePlans, filters, stats, clients }: P
                 </div>
 
                 {/* Pagination */}
-                {carePlans.last_page > 1 && (
+                {(carePlans?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {carePlans.links.map((link: any, i: number) => (
+                        {(carePlans?.links ?? []).map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"

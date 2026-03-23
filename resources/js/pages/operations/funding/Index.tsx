@@ -41,7 +41,7 @@ const CLAIM_COLORS: Record<string, string> = {
     rejected: OPS_COLORS.danger,
 };
 
-export default function FundingIndex({ stats, claims_by_status, top_agreements }: Props) {
+export default function FundingIndex({ stats = {} as any, claims_by_status = {} as any, top_agreements = [] }: Props) {
     const s = stats ?? { total_budget: 0, total_used: 0, total_remaining: 0, utilisation_percent: 0, active_agreements: 0, pending_claims: 0, expiring_soon: 0 };
 
     return (

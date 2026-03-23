@@ -44,7 +44,7 @@ const NOTIFICATION_LABELS: Record<string, { label: string; icon: typeof Bell }> 
     messages: { label: 'Messages', icon: Smartphone },
 };
 
-export default function FamilyPortalIndex({ clients, filters }: Props) {
+export default function FamilyPortalIndex({ clients = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/family-portal', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -65,7 +65,7 @@ export default function FamilyPortalIndex({ clients, filters }: Props) {
                         <Input
                             placeholder="Search clients..."
                             className="h-9 pl-8 text-sm"
-                            defaultValue={filters.q ?? ''}
+                            defaultValue={filters?.q ?? ''}
                             onChange={(e) => updateFilters('q', e.target.value || null)}
                         />
                     </div>
@@ -73,7 +73,7 @@ export default function FamilyPortalIndex({ clients, filters }: Props) {
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {clients.data.length === 0 && (
+                    {(clients?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <Users className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -82,7 +82,7 @@ export default function FamilyPortalIndex({ clients, filters }: Props) {
                             </CardContent>
                         </Card>
                     )}
-                    {clients.data.map((client) => (
+                    {(clients?.data ?? []).map((client) => (
                         <Card key={client.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="p-4">
                                 <div className="flex items-start gap-4">
@@ -137,9 +137,9 @@ export default function FamilyPortalIndex({ clients, filters }: Props) {
                 </div>
 
                 {/* Pagination */}
-                {clients.last_page > 1 && (
+                {(clients?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {clients.links.map((link: any, i: number) => (
+                        {(clients?.links ?? []).map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"

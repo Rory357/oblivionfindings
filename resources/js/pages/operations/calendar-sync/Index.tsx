@@ -52,7 +52,7 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function CalendarSyncIndex({ connections }: Props) {
+export default function CalendarSyncIndex({ connections = { data: [], links: [], current_page: 1, last_page: 1, total: 0 } }: Props) {
     const triggerSync = (id: number) => {
         router.post(`/operations/calendar-sync/${id}/sync`, {}, { preserveState: true });
     };
@@ -79,7 +79,7 @@ export default function CalendarSyncIndex({ connections }: Props) {
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {connections.data.length === 0 && (
+                    {(connections?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <Calendar className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -91,7 +91,7 @@ export default function CalendarSyncIndex({ connections }: Props) {
                             </CardContent>
                         </Card>
                     )}
-                    {connections.data.map((conn) => {
+                    {(connections?.data ?? []).map((conn) => {
                         const StatusIcon = STATUS_ICONS[conn.status] ?? Link2;
                         return (
                             <Card key={conn.id} className="transition-all hover:border-border hover:shadow-sm">
@@ -129,9 +129,9 @@ export default function CalendarSyncIndex({ connections }: Props) {
                 </div>
 
                 {/* Pagination */}
-                {connections.last_page > 1 && (
+                {(connections?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {connections.links.map((link: any, i: number) => (
+                        {(connections?.links ?? []).map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"

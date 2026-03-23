@@ -72,7 +72,7 @@ function formatDate(d: string): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function BillingIndex({ stats, entries, status_breakdown, filters }: Props) {
+export default function BillingIndex({ stats = {} as any, entries = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, status_breakdown = {} as any, filters = {} as any }: Props) {
     const s = stats ?? { billed_this_month: 0, outstanding: 0, paid_this_month: 0, pending_count: 0 };
 
     const updateFilters = (key: string, value: string | null) => {

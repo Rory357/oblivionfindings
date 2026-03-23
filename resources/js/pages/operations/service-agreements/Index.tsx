@@ -70,7 +70,7 @@ function formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
 }
 
-export default function ServiceAgreementsIndex({ agreements, filters, stats }: Props) {
+export default function ServiceAgreementsIndex({ agreements = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/service-agreements', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -92,9 +92,9 @@ export default function ServiceAgreementsIndex({ agreements, filters, stats }: P
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input placeholder="Search agreements..." className="h-9 pl-8 text-sm" defaultValue={filters.q ?? ''} onChange={(e) => updateFilters('q', e.target.value || null)} />
+                        <Input placeholder="Search agreements..." className="h-9 pl-8 text-sm" defaultValue={filters?.q ?? ''} onChange={(e) => updateFilters('q', e.target.value || null)} />
                     </div>
-                    <Select value={filters.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
+                    <Select value={filters?.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
                         <SelectTrigger className="h-9 w-[130px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value={ANY}>All Status</SelectItem>
@@ -104,7 +104,7 @@ export default function ServiceAgreementsIndex({ agreements, filters, stats }: P
                             <SelectItem value="terminated">Terminated</SelectItem>
                         </SelectContent>
                     </Select>
-                    <Select value={filters.agreement_type ?? ANY} onValueChange={(v) => updateFilters('agreement_type', v === ANY ? null : v)}>
+                    <Select value={filters?.agreement_type ?? ANY} onValueChange={(v) => updateFilters('agreement_type', v === ANY ? null : v)}>
                         <SelectTrigger className="h-9 w-[120px] text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value={ANY}>All Types</SelectItem>
@@ -122,7 +122,7 @@ export default function ServiceAgreementsIndex({ agreements, filters, stats }: P
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {agreements.data.length === 0 && (
+                    {(agreements?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <FileText className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -131,7 +131,7 @@ export default function ServiceAgreementsIndex({ agreements, filters, stats }: P
                             </CardContent>
                         </Card>
                     )}
-                    {agreements.data.map((ag) => (
+                    {(agreements?.data ?? []).map((ag) => (
                         <Card key={ag.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="flex items-center gap-4 p-4">
                                 <div className="min-w-0 flex-1">
@@ -175,9 +175,9 @@ export default function ServiceAgreementsIndex({ agreements, filters, stats }: P
                 </div>
 
                 {/* Pagination */}
-                {agreements.last_page > 1 && (
+                {(agreements?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {agreements.links.map((link: any, i: number) => (
+                        {(agreements?.links ?? []).map((link: any, i: number) => (
                             <Button key={i} size="sm" variant={link.active ? 'default' : 'outline'} className="h-7 min-w-[28px] px-2 text-xs" disabled={!link.url}
                                 onClick={() => link.url && router.get(link.url, {}, { preserveState: true })} dangerouslySetInnerHTML={{ __html: link.label }} />
                         ))}

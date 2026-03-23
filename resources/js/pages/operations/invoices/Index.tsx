@@ -63,7 +63,7 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function InvoicesIndex({ invoices, filters, stats }: Props) {
+export default function InvoicesIndex({ invoices = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
     const s = stats ?? { total: 0, draft: 0, sent: 0, paid: 0, overdue: 0 };
 
     const updateFilters = (key: string, value: string | null) => {

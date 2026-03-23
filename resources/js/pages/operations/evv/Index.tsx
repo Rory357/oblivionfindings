@@ -68,7 +68,7 @@ function formatTime(d: string | null): string {
     return new Date(d).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
 }
 
-export default function EvvIndex({ records, filters, stats }: Props) {
+export default function EvvIndex({ records = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/evv', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -121,11 +121,11 @@ export default function EvvIndex({ records, filters, stats }: Props) {
                         <Input
                             placeholder="Search EVV records..."
                             className="h-9 pl-8 text-sm"
-                            defaultValue={filters.q ?? ''}
+                            defaultValue={filters?.q ?? ''}
                             onChange={(e) => updateFilters('q', e.target.value || null)}
                         />
                     </div>
-                    <Select value={filters.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
+                    <Select value={filters?.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
                         <SelectTrigger className="h-9 w-[130px] text-xs">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
@@ -141,7 +141,7 @@ export default function EvvIndex({ records, filters, stats }: Props) {
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {records.data.length === 0 && (
+                    {(records?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <Shield className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -150,7 +150,7 @@ export default function EvvIndex({ records, filters, stats }: Props) {
                             </CardContent>
                         </Card>
                     )}
-                    {records.data.map((rec) => (
+                    {(records?.data ?? []).map((rec) => (
                         <Card key={rec.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="flex items-center gap-4 p-4">
                                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${rec.has_issues ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' : 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300'}`}>
@@ -200,9 +200,9 @@ export default function EvvIndex({ records, filters, stats }: Props) {
                 </div>
 
                 {/* Pagination */}
-                {records.last_page > 1 && (
+                {(records?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {records.links.map((link: any, i: number) => (
+                        {(records?.links ?? []).map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"

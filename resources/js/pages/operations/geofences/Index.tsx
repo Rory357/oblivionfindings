@@ -32,7 +32,7 @@ type Props = {
     };
 };
 
-export default function GeofencesIndex({ geofences, filters }: Props) {
+export default function GeofencesIndex({ geofences = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/geofences', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -53,7 +53,7 @@ export default function GeofencesIndex({ geofences, filters }: Props) {
                         <Input
                             placeholder="Search geofences..."
                             className="h-9 pl-8 text-sm"
-                            defaultValue={filters.q ?? ''}
+                            defaultValue={filters?.q ?? ''}
                             onChange={(e) => updateFilters('q', e.target.value || null)}
                         />
                     </div>
@@ -67,7 +67,7 @@ export default function GeofencesIndex({ geofences, filters }: Props) {
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {geofences.data.length === 0 && (
+                    {(geofences?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <MapPin className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -79,7 +79,7 @@ export default function GeofencesIndex({ geofences, filters }: Props) {
                             </CardContent>
                         </Card>
                     )}
-                    {geofences.data.map((fence) => (
+                    {(geofences?.data ?? []).map((fence) => (
                         <Card key={fence.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="flex items-center gap-4 p-4">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
@@ -125,9 +125,9 @@ export default function GeofencesIndex({ geofences, filters }: Props) {
                 </div>
 
                 {/* Pagination */}
-                {geofences.last_page > 1 && (
+                {(geofences?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {geofences.links.map((link: any, i: number) => (
+                        {(geofences?.links ?? []).map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"

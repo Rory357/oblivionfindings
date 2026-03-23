@@ -37,7 +37,7 @@ const MATCH_CONFIG: Record<string, { variant: 'default' | 'secondary' | 'destruc
     unmet: { variant: 'destructive', icon: XCircle, label: 'Unmet' },
 };
 
-export default function QualificationsIndex({ requirements, filters }: Props) {
+export default function QualificationsIndex({ requirements = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/qualifications', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -58,7 +58,7 @@ export default function QualificationsIndex({ requirements, filters }: Props) {
                         <Input
                             placeholder="Search qualifications..."
                             className="h-9 pl-8 text-sm"
-                            defaultValue={filters.q ?? ''}
+                            defaultValue={filters?.q ?? ''}
                             onChange={(e) => updateFilters('q', e.target.value || null)}
                         />
                     </div>
@@ -66,7 +66,7 @@ export default function QualificationsIndex({ requirements, filters }: Props) {
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {requirements.data.length === 0 && (
+                    {(requirements?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <Award className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -75,7 +75,7 @@ export default function QualificationsIndex({ requirements, filters }: Props) {
                             </CardContent>
                         </Card>
                     )}
-                    {requirements.data.map((req) => {
+                    {(requirements?.data ?? []).map((req) => {
                         const match = MATCH_CONFIG[req.match_status] ?? MATCH_CONFIG.unmet;
                         const MatchIcon = match.icon;
                         return (
@@ -122,9 +122,9 @@ export default function QualificationsIndex({ requirements, filters }: Props) {
                 </div>
 
                 {/* Pagination */}
-                {requirements.last_page > 1 && (
+                {(requirements?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {requirements.links.map((link: any, i: number) => (
+                        {(requirements?.links ?? []).map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"

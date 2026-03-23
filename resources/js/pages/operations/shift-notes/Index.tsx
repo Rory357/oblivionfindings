@@ -56,7 +56,7 @@ function formatRelativeTime(iso: string): string {
     return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
 }
 
-export default function ShiftNotesIndex({ notes, filters }: Props) {
+export default function ShiftNotesIndex({ notes = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/shift-notes', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -69,9 +69,9 @@ export default function ShiftNotesIndex({ notes, filters }: Props) {
                 <div className="mb-4 flex flex-wrap items-center gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input placeholder="Search notes..." className="h-9 pl-8 text-sm" defaultValue={filters.q ?? ''} onChange={(e) => updateFilters('q', e.target.value || null)} />
+                        <Input placeholder="Search notes..." className="h-9 pl-8 text-sm" defaultValue={filters?.q ?? ''} onChange={(e) => updateFilters('q', e.target.value || null)} />
                     </div>
-                    <Select value={filters.note_type ?? ANY} onValueChange={(v) => updateFilters('note_type', v === ANY ? null : v)}>
+                    <Select value={filters?.note_type ?? ANY} onValueChange={(v) => updateFilters('note_type', v === ANY ? null : v)}>
                         <SelectTrigger className="h-9 w-[140px] text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value={ANY}>All Types</SelectItem>
@@ -82,7 +82,7 @@ export default function ShiftNotesIndex({ notes, filters }: Props) {
                     </Select>
                 </div>
                 <div className="space-y-2">
-                    {notes.data.length === 0 && (
+                    {(notes?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <BookOpen className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -91,7 +91,7 @@ export default function ShiftNotesIndex({ notes, filters }: Props) {
                             </CardContent>
                         </Card>
                     )}
-                    {notes.data.map((note) => (
+                    {(notes?.data ?? []).map((note) => (
                         <Card key={note.id} className="transition-all hover:shadow-sm">
                             <CardContent className="p-3">
                                 <div className="flex items-start gap-3">
@@ -128,9 +128,9 @@ export default function ShiftNotesIndex({ notes, filters }: Props) {
                         </Card>
                     ))}
                 </div>
-                {notes.last_page > 1 && (
+                {(notes?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {notes.links.map((link: any, i: number) => (
+                        {(notes?.links ?? []).map((link: any, i: number) => (
                             <Button key={i} size="sm" variant={link.active ? 'default' : 'outline'} className="h-7 min-w-[28px] px-2 text-xs" disabled={!link.url}
                                 onClick={() => link.url && router.get(link.url, {}, { preserveState: true })} dangerouslySetInnerHTML={{ __html: link.label }} />
                         ))}

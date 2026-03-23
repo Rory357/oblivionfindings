@@ -46,7 +46,7 @@ const TYPE_LABELS: Record<string, string> = {
     family: 'Family',
 };
 
-export default function MessagesIndex({ conversations, filters }: Props) {
+export default function MessagesIndex({ conversations = [], filters = {} as any }: Props) {
     return (
         <AppLayout>
             <Head title="Messages" />

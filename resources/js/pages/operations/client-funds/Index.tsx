@@ -56,7 +56,7 @@ const FUND_TYPES: Record<string, string> = {
     activity: 'Activity',
 };
 
-export default function ClientFundsIndex({ funds, filters, stats }: Props) {
+export default function ClientFundsIndex({ funds = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/client-funds', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -84,11 +84,11 @@ export default function ClientFundsIndex({ funds, filters, stats }: Props) {
                         <Input
                             placeholder="Search client funds..."
                             className="h-9 pl-8 text-sm"
-                            defaultValue={filters.q ?? ''}
+                            defaultValue={filters?.q ?? ''}
                             onChange={(e) => updateFilters('q', e.target.value || null)}
                         />
                     </div>
-                    <Select value={filters.fund_type ?? ANY} onValueChange={(v) => updateFilters('fund_type', v === ANY ? null : v)}>
+                    <Select value={filters?.fund_type ?? ANY} onValueChange={(v) => updateFilters('fund_type', v === ANY ? null : v)}>
                         <SelectTrigger className="h-9 w-[140px] text-xs">
                             <SelectValue placeholder="Fund Type" />
                         </SelectTrigger>
@@ -109,7 +109,7 @@ export default function ClientFundsIndex({ funds, filters, stats }: Props) {
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {funds.data.length === 0 && (
+                    {(funds?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <Wallet className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -121,7 +121,7 @@ export default function ClientFundsIndex({ funds, filters, stats }: Props) {
                             </CardContent>
                         </Card>
                     )}
-                    {funds.data.map((fund) => {
+                    {(funds?.data ?? []).map((fund) => {
                         const isLow = fund.low_balance_threshold !== null && fund.balance <= fund.low_balance_threshold;
                         return (
                             <Card key={fund.id} className="transition-all hover:border-border hover:shadow-sm">
@@ -172,9 +172,9 @@ export default function ClientFundsIndex({ funds, filters, stats }: Props) {
                 </div>
 
                 {/* Pagination */}
-                {funds.last_page > 1 && (
+                {(funds?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {funds.links.map((link: any, i: number) => (
+                        {(funds?.links ?? []).map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"

@@ -52,7 +52,7 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
-export default function NotificationsIndex({ notifications, filters }: Props) {
+export default function NotificationsIndex({ notifications = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/notifications', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -76,7 +76,7 @@ export default function NotificationsIndex({ notifications, filters }: Props) {
             <PageShell>
                 {/* Filters + Actions */}
                 <div className="flex flex-wrap items-center gap-2">
-                    <Select value={filters.type ?? ANY} onValueChange={(v) => updateFilters('type', v === ANY ? null : v)}>
+                    <Select value={filters?.type ?? ANY} onValueChange={(v) => updateFilters('type', v === ANY ? null : v)}>
                         <SelectTrigger className="h-9 w-[140px] text-xs">
                             <SelectValue placeholder="Type" />
                         </SelectTrigger>
@@ -99,7 +99,7 @@ export default function NotificationsIndex({ notifications, filters }: Props) {
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {notifications.data.length === 0 && (
+                    {(notifications?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <BellOff className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -108,7 +108,7 @@ export default function NotificationsIndex({ notifications, filters }: Props) {
                             </CardContent>
                         </Card>
                     )}
-                    {notifications.data.map((notif) => {
+                    {(notifications?.data ?? []).map((notif) => {
                         const typeConf = TYPE_CONFIG[notif.type] ?? TYPE_CONFIG.info;
                         const Icon = typeConf.icon;
                         return (
@@ -146,9 +146,9 @@ export default function NotificationsIndex({ notifications, filters }: Props) {
                 </div>
 
                 {/* Pagination */}
-                {notifications.last_page > 1 && (
+                {(notifications?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {notifications.links.map((link: any, i: number) => (
+                        {(notifications?.links ?? []).map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"

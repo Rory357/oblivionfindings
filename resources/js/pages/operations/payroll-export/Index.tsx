@@ -61,7 +61,7 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function PayrollExportIndex({ exports: payrollExports, filters, stats }: Props) {
+export default function PayrollExportIndex({ exports: payrollExports = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/payroll-export', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -84,7 +84,7 @@ export default function PayrollExportIndex({ exports: payrollExports, filters, s
 
                 {/* Filters */}
                 <div className="mt-4 flex flex-wrap items-center gap-2">
-                    <Select value={filters.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
+                    <Select value={filters?.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
                         <SelectTrigger className="h-9 w-[130px] text-xs">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
@@ -107,7 +107,7 @@ export default function PayrollExportIndex({ exports: payrollExports, filters, s
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {payrollExports.data.length === 0 && (
+                    {(payrollExports?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <FileSpreadsheet className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -119,7 +119,7 @@ export default function PayrollExportIndex({ exports: payrollExports, filters, s
                             </CardContent>
                         </Card>
                     )}
-                    {payrollExports.data.map((exp) => (
+                    {(payrollExports?.data ?? []).map((exp) => (
                         <Card key={exp.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="flex items-center gap-4 p-4">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
@@ -164,9 +164,9 @@ export default function PayrollExportIndex({ exports: payrollExports, filters, s
                 </div>
 
                 {/* Pagination */}
-                {payrollExports.last_page > 1 && (
+                {(payrollExports?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {payrollExports.links.map((link: any, i: number) => (
+                        {(payrollExports?.links ?? []).map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"

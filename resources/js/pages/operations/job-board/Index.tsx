@@ -63,7 +63,7 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function JobBoardIndex({ jobs, filters, stats }: Props) {
+export default function JobBoardIndex({ jobs = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/job-board', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -91,11 +91,11 @@ export default function JobBoardIndex({ jobs, filters, stats }: Props) {
                         <Input
                             placeholder="Search positions..."
                             className="h-9 pl-8 text-sm"
-                            defaultValue={filters.q ?? ''}
+                            defaultValue={filters?.q ?? ''}
                             onChange={(e) => updateFilters('q', e.target.value || null)}
                         />
                     </div>
-                    <Select value={filters.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
+                    <Select value={filters?.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
                         <SelectTrigger className="h-9 w-[130px] text-xs">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
@@ -111,7 +111,7 @@ export default function JobBoardIndex({ jobs, filters, stats }: Props) {
 
                 {/* Card Grid */}
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {jobs.data.length === 0 && (
+                    {(jobs?.data ?? []).length === 0 && (
                         <div className="col-span-full">
                             <Card>
                                 <CardContent className="flex flex-col items-center justify-center py-16">
@@ -122,7 +122,7 @@ export default function JobBoardIndex({ jobs, filters, stats }: Props) {
                             </Card>
                         </div>
                     )}
-                    {jobs.data.map((job) => (
+                    {(jobs?.data ?? []).map((job) => (
                         <Card key={job.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="p-4">
                                 <div className="flex items-start justify-between">
@@ -189,9 +189,9 @@ export default function JobBoardIndex({ jobs, filters, stats }: Props) {
                 </div>
 
                 {/* Pagination */}
-                {jobs.last_page > 1 && (
+                {(jobs?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {jobs.links.map((link: any, i: number) => (
+                        {(jobs?.links ?? []).map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"
