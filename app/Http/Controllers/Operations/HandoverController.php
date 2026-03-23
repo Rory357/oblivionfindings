@@ -21,7 +21,7 @@ class HandoverController extends Controller
         ]);
 
         $handovers = ShiftHandover::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with([
                 'outgoingShift:id,starts_at,ends_at,client_id,user_id',
                 'incomingShift:id,starts_at,ends_at,client_id,user_id',

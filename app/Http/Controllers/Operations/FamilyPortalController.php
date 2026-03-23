@@ -15,7 +15,7 @@ class FamilyPortalController extends Controller
         abort_unless($auth && $auth->canDo('family_portal.viewAny'), 403);
 
         $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['familyPortalSetting'])
             ->orderBy('first_name')
             ->paginate(20)
@@ -32,7 +32,7 @@ class FamilyPortalController extends Controller
         abort_unless($auth && $auth->canDo('family_portal.view'), 403);
 
         $client = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['familyPortalSetting'])
             ->findOrFail($client);
 
@@ -47,7 +47,7 @@ class FamilyPortalController extends Controller
         abort_unless($auth && $auth->canDo('family_portal.edit'), 403);
 
         Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($client);
 
         $data = $request->validate([

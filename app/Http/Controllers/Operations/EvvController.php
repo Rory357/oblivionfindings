@@ -19,7 +19,7 @@ class EvvController extends Controller
         ]);
 
         $query = EvvRecord::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['staff:id,name', 'client:id,first_name,last_name', 'shift:id,starts_at,ends_at'])
             ->when(!empty($data['verification_status']), fn ($q) => $q->where('verification_status', $data['verification_status']))
             ->orderByDesc('check_in_time');
@@ -46,7 +46,7 @@ class EvvController extends Controller
         abort_unless($auth && $auth->canDo('evv.view'), 403);
 
         $record = EvvRecord::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['staff:id,name', 'client:id,first_name,last_name', 'shift:id,starts_at,ends_at,site_id', 'shift.site:id,name'])
             ->findOrFail($record);
 
@@ -100,7 +100,7 @@ class EvvController extends Controller
         abort_unless($auth && $auth->canDo('evv.checkOut'), 403);
 
         $record = EvvRecord::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($record);
 
         $data = $request->validate([
@@ -123,7 +123,7 @@ class EvvController extends Controller
         abort_unless($auth && $auth->canDo('evv.verify'), 403);
 
         $record = EvvRecord::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($record);
 
         $data = $request->validate([

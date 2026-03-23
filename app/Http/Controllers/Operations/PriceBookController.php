@@ -19,7 +19,7 @@ class PriceBookController extends Controller
         ]);
 
         $priceBooks = PriceBook::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->withCount('items')
             ->when(isset($data['active']), fn ($q) => $q->where('is_active', $data['active']))
             ->orderByDesc('updated_at')
@@ -38,7 +38,7 @@ class PriceBookController extends Controller
         abort_unless($auth && $auth->canDo('price_books.view'), 403);
 
         $priceBook = PriceBook::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['items' => fn ($q) => $q->orderBy('name')])
             ->findOrFail($priceBook);
 
@@ -86,7 +86,7 @@ class PriceBookController extends Controller
         abort_unless($auth && $auth->canDo('price_books.edit'), 403);
 
         $priceBook = PriceBook::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['items' => fn ($q) => $q->orderBy('name')])
             ->findOrFail($priceBook);
 
@@ -101,7 +101,7 @@ class PriceBookController extends Controller
         abort_unless($auth && $auth->canDo('price_books.edit'), 403);
 
         $priceBook = PriceBook::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($priceBook);
 
         $data = $request->validate([
@@ -123,7 +123,7 @@ class PriceBookController extends Controller
         abort_unless($auth && $auth->canDo('price_books.edit'), 403);
 
         $priceBook = PriceBook::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($priceBook);
 
         $data = $request->validate([
@@ -145,7 +145,7 @@ class PriceBookController extends Controller
         abort_unless($auth && $auth->canDo('price_books.edit'), 403);
 
         PriceBook::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($priceBook);
 
         $priceBookItem = PriceBookItem::where('price_book_id', $priceBook)->findOrFail($item);
@@ -169,7 +169,7 @@ class PriceBookController extends Controller
         abort_unless($auth && $auth->canDo('price_books.edit'), 403);
 
         PriceBook::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($priceBook);
 
         $priceBookItem = PriceBookItem::where('price_book_id', $priceBook)->findOrFail($item);

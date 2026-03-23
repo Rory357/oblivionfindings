@@ -14,7 +14,7 @@ class CareNoteTemplateController extends Controller
         abort_unless($auth && $auth->canDo('note_templates.viewAny'), 403);
 
         $templates = CareNoteTemplate::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString();
@@ -62,7 +62,7 @@ class CareNoteTemplateController extends Controller
         abort_unless($auth && $auth->canDo('note_templates.edit'), 403);
 
         $template = CareNoteTemplate::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($template);
 
         return inertia('operations/note-templates/Edit', [
@@ -76,7 +76,7 @@ class CareNoteTemplateController extends Controller
         abort_unless($auth && $auth->canDo('note_templates.edit'), 403);
 
         $template = CareNoteTemplate::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($template);
 
         $data = $request->validate([
@@ -97,7 +97,7 @@ class CareNoteTemplateController extends Controller
         abort_unless($auth && $auth->canDo('note_templates.delete'), 403);
 
         $template = CareNoteTemplate::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($template);
 
         $template->delete();

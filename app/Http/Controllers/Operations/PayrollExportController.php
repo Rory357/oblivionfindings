@@ -15,7 +15,7 @@ class PayrollExportController extends Controller
         abort_unless($auth && $auth->canDo('payroll_exports.viewAny'), 403);
 
         $exports = PayrollExport::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['createdBy:id,name'])
             ->orderByDesc('created_at')
             ->paginate(20)
@@ -38,7 +38,7 @@ class PayrollExportController extends Controller
         ]);
 
         $timesheets = Timesheet::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->where('status', 'approved')
             ->whereBetween('date', [$data['start_date'], $data['end_date']])
             ->get();
@@ -67,7 +67,7 @@ class PayrollExportController extends Controller
         abort_unless($auth && $auth->canDo('payroll_exports.view'), 403);
 
         $export = PayrollExport::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($export);
 
         if ($export->file_path && file_exists(storage_path('app/' . $export->file_path))) {
@@ -83,7 +83,7 @@ class PayrollExportController extends Controller
         abort_unless($auth && $auth->canDo('payroll_exports.confirm'), 403);
 
         $export = PayrollExport::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($export);
 
         $export->update([

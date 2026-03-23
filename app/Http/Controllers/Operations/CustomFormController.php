@@ -15,7 +15,7 @@ class CustomFormController extends Controller
         abort_unless($auth && $auth->canDo('custom_forms.viewAny'), 403);
 
         $forms = CustomForm::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->withCount('submissions')
             ->orderByDesc('updated_at')
             ->paginate(20)
@@ -32,7 +32,7 @@ class CustomFormController extends Controller
         abort_unless($auth && $auth->canDo('custom_forms.view'), 403);
 
         $form = CustomForm::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($form);
 
         return inertia('operations/forms/Show', [
@@ -78,7 +78,7 @@ class CustomFormController extends Controller
         abort_unless($auth && $auth->canDo('custom_forms.edit'), 403);
 
         $form = CustomForm::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($form);
 
         return inertia('operations/forms/Edit', [
@@ -92,7 +92,7 @@ class CustomFormController extends Controller
         abort_unless($auth && $auth->canDo('custom_forms.edit'), 403);
 
         $form = CustomForm::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($form);
 
         $data = $request->validate([
@@ -113,7 +113,7 @@ class CustomFormController extends Controller
         abort_unless($auth && $auth->canDo('custom_forms.view'), 403);
 
         $form = CustomForm::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($form);
 
         $submissions = CustomFormSubmission::query()
@@ -135,7 +135,7 @@ class CustomFormController extends Controller
         abort_unless($auth && $auth->canDo('custom_forms.submit'), 403);
 
         $form = CustomForm::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($form);
 
         $data = $request->validate([

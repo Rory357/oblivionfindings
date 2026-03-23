@@ -1,0 +1,128 @@
+<?php
+
+namespace Database\Seeders;
+
+use App\Models\Permission;
+use App\Models\Role;
+use Illuminate\Database\Seeder;
+
+class OperationsPermissionsSeeder extends Seeder
+{
+    public function run(): void
+    {
+        $permissions = [
+            // Operations Dashboard
+            ['key' => 'operations.dashboard.view', 'description' => 'View Operations Dashboard'],
+
+            // Care Plans
+            ['key' => 'care_plans.viewAny', 'description' => 'View Care Plans'],
+            ['key' => 'care_plans.create', 'description' => 'Create Care Plans'],
+            ['key' => 'care_plans.update', 'description' => 'Update Care Plans'],
+            ['key' => 'care_plans.delete', 'description' => 'Delete Care Plans'],
+            ['key' => 'care_plans.goals.manage', 'description' => 'Manage Care Plan Goals'],
+
+            // Progress Notes
+            ['key' => 'progress_notes.viewAny', 'description' => 'View Progress Notes'],
+            ['key' => 'progress_notes.create', 'description' => 'Create Progress Notes'],
+            ['key' => 'progress_notes.update', 'description' => 'Update Progress Notes'],
+
+            // Service Agreements
+            ['key' => 'service_agreements.viewAny', 'description' => 'View Service Agreements'],
+            ['key' => 'service_agreements.create', 'description' => 'Create Service Agreements'],
+            ['key' => 'service_agreements.update', 'description' => 'Update Service Agreements'],
+            ['key' => 'service_agreements.delete', 'description' => 'Delete Service Agreements'],
+
+            // Billing
+            ['key' => 'billing.viewAny', 'description' => 'View Billing'],
+            ['key' => 'billing.create', 'description' => 'Create Billing Entries'],
+            ['key' => 'billing.approve', 'description' => 'Approve Billing Entries'],
+
+            // Invoices
+            ['key' => 'invoices.viewAny', 'description' => 'View Invoices'],
+            ['key' => 'invoices.create', 'description' => 'Create Invoices'],
+            ['key' => 'invoices.send', 'description' => 'Send Invoices'],
+            ['key' => 'invoices.void', 'description' => 'Void Invoices'],
+
+            // Funding
+            ['key' => 'funding.viewAny', 'description' => 'View Funding'],
+            ['key' => 'funding.claims.create', 'description' => 'Create Funding Claims'],
+            ['key' => 'funding.claims.submit', 'description' => 'Submit Funding Claims'],
+
+            // Messages
+            ['key' => 'messages.viewAny', 'description' => 'View Messages'],
+            ['key' => 'messages.send', 'description' => 'Send Messages'],
+
+            // Handovers
+            ['key' => 'handovers.viewAny', 'description' => 'View Handovers'],
+            ['key' => 'handovers.create', 'description' => 'Create Handovers'],
+
+            // Roster Templates
+            ['key' => 'roster_templates.viewAny', 'description' => 'View Roster Templates'],
+            ['key' => 'roster_templates.create', 'description' => 'Create Roster Templates'],
+            ['key' => 'roster_templates.update', 'description' => 'Update Roster Templates'],
+            ['key' => 'rostering.autoSchedule', 'description' => 'Auto-schedule Roster'],
+            ['key' => 'rostering.publish', 'description' => 'Publish Roster'],
+
+            // Reports
+            ['key' => 'operations.reports.view', 'description' => 'View Operations Reports'],
+
+            // Price Books
+            ['key' => 'price_books.viewAny', 'description' => 'View Price Books'],
+            ['key' => 'price_books.create', 'description' => 'Create Price Books'],
+            ['key' => 'price_books.update', 'description' => 'Update Price Books'],
+
+            // Quotes
+            ['key' => 'quotes.viewAny', 'description' => 'View Quotes'],
+            ['key' => 'quotes.create', 'description' => 'Create Quotes'],
+            ['key' => 'quotes.update', 'description' => 'Update Quotes'],
+
+            // Client Funds
+            ['key' => 'client_funds.manage', 'description' => 'Manage Client Funds'],
+
+            // Custom Forms
+            ['key' => 'custom_forms.viewAny', 'description' => 'View Custom Forms'],
+            ['key' => 'custom_forms.create', 'description' => 'Create Custom Forms'],
+            ['key' => 'custom_forms.update', 'description' => 'Update Custom Forms'],
+            ['key' => 'custom_forms.submit', 'description' => 'Submit Custom Forms'],
+
+            // EVV
+            ['key' => 'evv.viewAny', 'description' => 'View EVV Records'],
+            ['key' => 'evv.record', 'description' => 'Record EVV Check-in/out'],
+            ['key' => 'evv.verify', 'description' => 'Verify EVV Records'],
+
+            // Mileage
+            ['key' => 'mileage.viewAny', 'description' => 'View All Mileage Claims'],
+            ['key' => 'mileage.viewOwn', 'description' => 'View Own Mileage Claims'],
+            ['key' => 'mileage.create', 'description' => 'Create Mileage Claims'],
+            ['key' => 'mileage.approve', 'description' => 'Approve Mileage Claims'],
+
+            // Care Note Templates
+            ['key' => 'care_note_templates.viewAny', 'description' => 'View Care Note Templates'],
+
+            // Payroll Export
+            ['key' => 'payroll.export', 'description' => 'Export Payroll Data'],
+
+            // eMAR
+            ['key' => 'emar.viewAny', 'description' => 'View eMAR Module'],
+            ['key' => 'emar.dashboard.view', 'description' => 'View eMAR Dashboard'],
+        ];
+
+        $created = 0;
+        foreach ($permissions as $perm) {
+            Permission::firstOrCreate(
+                ['key' => $perm['key']],
+                ['description' => $perm['description']]
+            );
+            $created++;
+        }
+
+        // Attach all to admin role
+        $adminRole = Role::where('name', 'admin')->first();
+        if ($adminRole) {
+            $allPermissionIds = Permission::pluck('id')->all();
+            $adminRole->permissions()->sync($allPermissionIds);
+        }
+
+        $this->command->info("Created/verified {$created} Operations permissions. Admin role synced.");
+    }
+}

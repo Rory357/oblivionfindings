@@ -15,7 +15,7 @@ class AvailabilityController extends Controller
         abort_unless($auth && $auth->canDo('rostering.viewAny'), 403);
 
         $staff = User::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->staff()
             ->with(['staffAvailability', 'staffTimeOff' => function ($q) {
                 $q->where('ends_at', '>=', now());

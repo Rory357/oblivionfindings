@@ -21,7 +21,7 @@ class QuoteController extends Controller
         ]);
 
         $quotes = Quote::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name'])
             ->when(!empty($data['status']), fn ($q) => $q->where('status', $data['status']))
             ->orderByDesc('created_at')
@@ -40,7 +40,7 @@ class QuoteController extends Controller
         abort_unless($auth && $auth->canDo('quotes.view'), 403);
 
         $quote = Quote::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name', 'lineItems'])
             ->findOrFail($quote);
 
@@ -55,12 +55,12 @@ class QuoteController extends Controller
         abort_unless($auth && $auth->canDo('quotes.create'), 403);
 
         $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
         $priceBooks = PriceBook::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->where('is_active', true)
             ->with(['items' => fn ($q) => $q->orderBy('name')])
             ->orderBy('name')
@@ -124,17 +124,17 @@ class QuoteController extends Controller
         abort_unless($auth && $auth->canDo('quotes.edit'), 403);
 
         $quote = Quote::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['lineItems'])
             ->findOrFail($quote);
 
         $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
         $priceBooks = PriceBook::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->where('is_active', true)
             ->with(['items' => fn ($q) => $q->orderBy('name')])
             ->orderBy('name')
@@ -153,7 +153,7 @@ class QuoteController extends Controller
         abort_unless($auth && $auth->canDo('quotes.edit'), 403);
 
         $quote = Quote::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($quote);
 
         $data = $request->validate([
@@ -175,7 +175,7 @@ class QuoteController extends Controller
         abort_unless($auth && $auth->canDo('quotes.edit'), 403);
 
         $quote = Quote::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($quote);
 
         $quote->update([
@@ -192,7 +192,7 @@ class QuoteController extends Controller
         abort_unless($auth && $auth->canDo('quotes.edit'), 403);
 
         $quote = Quote::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($quote);
 
         $quote->update([
@@ -209,7 +209,7 @@ class QuoteController extends Controller
         abort_unless($auth && $auth->canDo('quotes.edit'), 403);
 
         $quote = Quote::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['lineItems'])
             ->findOrFail($quote);
 

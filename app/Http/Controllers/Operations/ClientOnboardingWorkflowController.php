@@ -16,7 +16,7 @@ class ClientOnboardingWorkflowController extends Controller
         abort_unless($auth && $auth->canDo('onboarding.viewAny'), 403);
 
         $workflows = ClientOnboardingWorkflow::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name'])
             ->withCount(['steps', 'steps as completed_steps_count' => fn ($q) => $q->where('status', 'completed')])
             ->orderByDesc('created_at')
@@ -34,7 +34,7 @@ class ClientOnboardingWorkflowController extends Controller
         abort_unless($auth && $auth->canDo('onboarding.view'), 403);
 
         $workflow = ClientOnboardingWorkflow::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name', 'steps' => fn ($q) => $q->orderBy('order')])
             ->findOrFail($workflow);
 
@@ -86,7 +86,7 @@ class ClientOnboardingWorkflowController extends Controller
         abort_unless($auth && $auth->canDo('onboarding.edit'), 403);
 
         ClientOnboardingWorkflow::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($workflow);
 
         $step = ClientOnboardingStep::where('client_onboarding_workflow_id', $workflow)->findOrFail($step);
@@ -112,7 +112,7 @@ class ClientOnboardingWorkflowController extends Controller
         abort_unless($auth && $auth->canDo('onboarding.edit'), 403);
 
         $workflow = ClientOnboardingWorkflow::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($workflow);
 
         $workflow->update([

@@ -23,7 +23,7 @@ class FundingClaimController extends Controller
         ]);
 
         $claims = FundingClaim::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with([
                 'client:id,first_name,last_name',
                 'serviceAgreement:id,title,reference_number',
@@ -37,7 +37,7 @@ class FundingClaimController extends Controller
             ->withQueryString();
 
         $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -54,7 +54,7 @@ class FundingClaimController extends Controller
         abort_unless($auth && $auth->canDo('funding_claims.create'), 403);
 
         $agreements = ServiceAgreement::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->active()
             ->with(['client:id,first_name,last_name', 'lineItems'])
             ->orderBy('title')
@@ -130,7 +130,7 @@ class FundingClaimController extends Controller
         abort_unless($auth && $auth->canDo('funding_claims.view'), 403);
 
         $claim = FundingClaim::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with([
                 'client:id,first_name,last_name',
                 'serviceAgreement:id,title,reference_number,total_budget,budget_used',
@@ -152,7 +152,7 @@ class FundingClaimController extends Controller
         abort_unless($auth && $auth->canDo('funding_claims.submit'), 403);
 
         $claim = FundingClaim::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->where('status', 'draft')
             ->findOrFail($claim);
 
@@ -171,7 +171,7 @@ class FundingClaimController extends Controller
         abort_unless($auth && $auth->canDo('funding_claims.approve'), 403);
 
         $claim = FundingClaim::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->where('status', 'submitted')
             ->findOrFail($claim);
 

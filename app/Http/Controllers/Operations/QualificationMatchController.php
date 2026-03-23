@@ -16,7 +16,7 @@ class QualificationMatchController extends Controller
         abort_unless($auth && $auth->canDo('qualifications.viewAny'), 403);
 
         $requirements = StaffQualificationRequirement::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name'])
             ->orderBy('client_id')
             ->paginate(20)
@@ -56,7 +56,7 @@ class QualificationMatchController extends Controller
         abort_unless($auth && $auth->canDo('qualifications.edit'), 403);
 
         $requirement = StaffQualificationRequirement::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($requirement);
 
         $data = $request->validate([
@@ -76,7 +76,7 @@ class QualificationMatchController extends Controller
         abort_unless($auth && $auth->canDo('qualifications.delete'), 403);
 
         $requirement = StaffQualificationRequirement::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($requirement);
 
         $requirement->delete();
@@ -90,12 +90,12 @@ class QualificationMatchController extends Controller
         abort_unless($auth && $auth->canDo('qualifications.viewAny'), 403);
 
         $shift = Shift::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['staff.trainingRecords', 'staff.credentials', 'client'])
             ->findOrFail($shift);
 
         $requirements = StaffQualificationRequirement::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->where('client_id', $shift->client_id)
             ->get();
 

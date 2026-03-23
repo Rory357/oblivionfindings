@@ -15,7 +15,7 @@ class JobBoardController extends Controller
         abort_unless($auth && $auth->canDo('job_board.viewAny'), 403);
 
         $positions = ShiftOpenPosition::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with([
                 'shift:id,client_id,site_id,starts_at,ends_at',
                 'shift.client:id,first_name,last_name',
@@ -64,7 +64,7 @@ class JobBoardController extends Controller
         abort_unless($auth && $auth->canDo('job_board.claim'), 403);
 
         $position = ShiftOpenPosition::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->where('status', 'open')
             ->findOrFail($position);
 
@@ -83,7 +83,7 @@ class JobBoardController extends Controller
         abort_unless($auth && $auth->canDo('job_board.approve'), 403);
 
         $position = ShiftOpenPosition::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->where('status', 'claimed')
             ->findOrFail($position);
 

@@ -20,7 +20,7 @@ class MessageController extends Controller
             ->pluck('conversation_id');
 
         $conversations = OpsConversation::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->whereIn('id', $conversationIds)
             ->with([
                 'latestMessage:id,conversation_id,sender_id,content,created_at',
@@ -52,7 +52,7 @@ class MessageController extends Controller
         abort_unless($auth && $auth->canDo('messages.view'), 403);
 
         $conversation = OpsConversation::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with([
                 'participants.user:id,name',
                 'client:id,first_name,last_name',
@@ -82,7 +82,7 @@ class MessageController extends Controller
         abort_unless($auth && $auth->canDo('messages.create'), 403);
 
         $conversation = OpsConversation::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($conversation);
 
         // Verify user is a participant

@@ -22,7 +22,7 @@ class ShiftNoteController extends Controller
         ]);
 
         $notes = ShiftNote::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['shift.client:id,first_name,last_name', 'author:id,name'])
             ->when(!empty($filters['shift_id']), fn ($q) => $q->where('shift_id', $filters['shift_id']))
             ->when(!empty($filters['note_type']), fn ($q) => $q->where('note_type', $filters['note_type']))

@@ -22,7 +22,7 @@ class ServiceAgreementController extends Controller
         ]);
 
         $agreements = ServiceAgreement::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name', 'creator:id,name'])
             ->withCount(['lineItems', 'fundingClaims'])
             ->when(!empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
@@ -40,7 +40,7 @@ class ServiceAgreementController extends Controller
         });
 
         $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -57,7 +57,7 @@ class ServiceAgreementController extends Controller
         abort_unless($auth && $auth->canDo('service_agreements.create'), 403);
 
         $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -118,7 +118,7 @@ class ServiceAgreementController extends Controller
         abort_unless($auth && $auth->canDo('service_agreements.view'), 403);
 
         $agreement = ServiceAgreement::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with([
                 'client:id,first_name,last_name',
                 'creator:id,name',
@@ -142,12 +142,12 @@ class ServiceAgreementController extends Controller
         abort_unless($auth && $auth->canDo('service_agreements.edit'), 403);
 
         $agreement = ServiceAgreement::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name', 'lineItems'])
             ->findOrFail($agreement);
 
         $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -163,7 +163,7 @@ class ServiceAgreementController extends Controller
         abort_unless($auth && $auth->canDo('service_agreements.edit'), 403);
 
         $agreement = ServiceAgreement::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($agreement);
 
         $data = $request->validate([
@@ -195,7 +195,7 @@ class ServiceAgreementController extends Controller
         abort_unless($auth && $auth->canDo('service_agreements.delete'), 403);
 
         $agreement = ServiceAgreement::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($agreement);
 
         $agreement->delete();

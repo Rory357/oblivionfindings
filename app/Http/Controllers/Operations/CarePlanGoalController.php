@@ -15,7 +15,7 @@ class CarePlanGoalController extends Controller
         abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
 
         $carePlan = CarePlan::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($carePlan);
 
         $data = $request->validate([
@@ -50,7 +50,7 @@ class CarePlanGoalController extends Controller
         abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
 
         $carePlan = CarePlan::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($carePlan);
 
         $goal = CarePlanGoal::query()
@@ -78,7 +78,7 @@ class CarePlanGoalController extends Controller
         abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
 
         $carePlan = CarePlan::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($carePlan);
 
         $goal = CarePlanGoal::query()
@@ -96,7 +96,7 @@ class CarePlanGoalController extends Controller
         abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
 
         $carePlan = CarePlan::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($carePlan);
 
         $goal = CarePlanGoal::query()

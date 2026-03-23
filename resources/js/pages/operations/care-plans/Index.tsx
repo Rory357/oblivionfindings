@@ -34,7 +34,7 @@ type CarePlan = {
 };
 
 type Props = {
-    care_plans: {
+    carePlans: {
         data: CarePlan[];
         links: any[];
         current_page: number;
@@ -75,7 +75,7 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function CarePlansIndex({ care_plans, filters, stats, clients }: Props) {
+export default function CarePlansIndex({ carePlans, filters, stats, clients }: Props) {
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/care-plans', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -141,7 +141,7 @@ export default function CarePlansIndex({ care_plans, filters, stats, clients }: 
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {care_plans.data.length === 0 && (
+                    {carePlans.data.length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <ClipboardCheck className="mb-4 h-12 w-12 text-muted-foreground/30" />
@@ -153,7 +153,7 @@ export default function CarePlansIndex({ care_plans, filters, stats, clients }: 
                             </CardContent>
                         </Card>
                     )}
-                    {care_plans.data.map((plan) => (
+                    {carePlans.data.map((plan) => (
                         <Card key={plan.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="flex items-center gap-4 p-4">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
@@ -207,9 +207,9 @@ export default function CarePlansIndex({ care_plans, filters, stats, clients }: 
                 </div>
 
                 {/* Pagination */}
-                {care_plans.last_page > 1 && (
+                {carePlans.last_page > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {care_plans.links.map((link: any, i: number) => (
+                        {carePlans.links.map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"

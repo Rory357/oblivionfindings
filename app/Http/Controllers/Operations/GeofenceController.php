@@ -14,7 +14,7 @@ class GeofenceController extends Controller
         abort_unless($auth && $auth->canDo('geofences.viewAny'), 403);
 
         $zones = GeofenceZone::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('name')
             ->paginate(20)
             ->withQueryString();
@@ -58,7 +58,7 @@ class GeofenceController extends Controller
         abort_unless($auth && $auth->canDo('geofences.edit'), 403);
 
         $zone = GeofenceZone::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($zone);
 
         $data = $request->validate([
@@ -81,7 +81,7 @@ class GeofenceController extends Controller
         abort_unless($auth && $auth->canDo('geofences.delete'), 403);
 
         $zone = GeofenceZone::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($zone);
 
         $zone->delete();

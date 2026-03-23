@@ -16,7 +16,7 @@ class ClientFundController extends Controller
         abort_unless($auth && $auth->canDo('client_funds.viewAny'), 403);
 
         $funds = ClientFund::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name'])
             ->orderByDesc('updated_at')
             ->paginate(20)
@@ -33,7 +33,7 @@ class ClientFundController extends Controller
         abort_unless($auth && $auth->canDo('client_funds.view'), 403);
 
         $fund = ClientFund::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name', 'transactions' => fn ($q) => $q->orderByDesc('created_at')])
             ->findOrFail($fund);
 
@@ -77,7 +77,7 @@ class ClientFundController extends Controller
         abort_unless($auth && $auth->canDo('client_funds.edit'), 403);
 
         $fund = ClientFund::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($fund);
 
         $data = $request->validate([
@@ -99,7 +99,7 @@ class ClientFundController extends Controller
         abort_unless($auth && $auth->canDo('client_funds.edit'), 403);
 
         $fund = ClientFund::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($fund);
 
         $data = $request->validate([

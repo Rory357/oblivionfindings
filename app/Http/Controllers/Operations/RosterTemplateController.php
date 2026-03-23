@@ -16,7 +16,7 @@ class RosterTemplateController extends Controller
         abort_unless($auth && $auth->canDo('rostering.viewAny'), 403);
 
         $templates = RosterTemplate::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with('creator:id,name')
             ->withCount('templateShifts')
             ->orderByDesc('updated_at')

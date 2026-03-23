@@ -25,7 +25,7 @@ class ProgressNoteController extends Controller
         ]);
 
         $notes = ProgressNote::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with([
                 'client:id,first_name,last_name',
                 'author:id,name',
@@ -43,12 +43,12 @@ class ProgressNoteController extends Controller
             ->withQueryString();
 
         $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
         $authors = User::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -100,7 +100,7 @@ class ProgressNoteController extends Controller
         abort_unless($auth && $auth->canDo('progress_notes.edit'), 403);
 
         $note = ProgressNote::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($note);
 
         $data = $request->validate([
@@ -123,7 +123,7 @@ class ProgressNoteController extends Controller
         abort_unless($auth && $auth->canDo('progress_notes.delete'), 403);
 
         $note = ProgressNote::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($note);
 
         $note->delete();

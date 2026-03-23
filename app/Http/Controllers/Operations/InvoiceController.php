@@ -165,7 +165,7 @@ class InvoiceController extends Controller
         abort_unless($auth && $auth->canDo('invoices.view'), 403);
 
         $invoice = Invoice::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with([
                 'client:id,first_name,last_name',
                 'creator:id,name',
@@ -184,7 +184,7 @@ class InvoiceController extends Controller
         abort_unless($auth && $auth->canDo('invoices.edit'), 403);
 
         $invoice = Invoice::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($invoice);
 
         $invoice->update(['status' => 'sent']);
@@ -198,7 +198,7 @@ class InvoiceController extends Controller
         abort_unless($auth && $auth->canDo('invoices.edit'), 403);
 
         $invoice = Invoice::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($invoice);
 
         $invoice->update([
@@ -215,7 +215,7 @@ class InvoiceController extends Controller
         abort_unless($auth && $auth->canDo('invoices.edit'), 403);
 
         $invoice = Invoice::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($invoice);
 
         $invoice->update(['status' => 'cancelled']);

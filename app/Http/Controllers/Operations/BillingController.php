@@ -74,7 +74,7 @@ class BillingController extends Controller
         ]);
 
         $entries = BillingEntry::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name', 'staff:id,name', 'serviceAgreement:id,title'])
             ->when(!empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
             ->when(!empty($data['status']), fn ($q) => $q->where('status', $data['status']))
@@ -85,7 +85,7 @@ class BillingController extends Controller
             ->withQueryString();
 
         $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 

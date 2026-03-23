@@ -18,7 +18,7 @@ class MileageClaimController extends Controller
         ]);
 
         $claims = MileageClaim::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['staff:id,name'])
             ->when(!empty($data['status']), fn ($q) => $q->where('status', $data['status']))
             ->orderByDesc('created_at')
@@ -77,7 +77,7 @@ class MileageClaimController extends Controller
         abort_unless($auth && $auth->canDo('mileage_claims.create'), 403);
 
         $claim = MileageClaim::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->where('status', 'draft')
             ->findOrFail($claim);
 
@@ -95,7 +95,7 @@ class MileageClaimController extends Controller
         abort_unless($auth && $auth->canDo('mileage_claims.approve'), 403);
 
         $claim = MileageClaim::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->where('status', 'submitted')
             ->findOrFail($claim);
 

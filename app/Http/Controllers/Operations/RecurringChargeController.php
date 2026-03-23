@@ -15,7 +15,7 @@ class RecurringChargeController extends Controller
         abort_unless($auth && $auth->canDo('recurring_charges.viewAny'), 403);
 
         $charges = RecurringCharge::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name'])
             ->where('is_active', true)
             ->orderBy('next_charge_date')
@@ -33,7 +33,7 @@ class RecurringChargeController extends Controller
         abort_unless($auth && $auth->canDo('recurring_charges.create'), 403);
 
         $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -78,12 +78,12 @@ class RecurringChargeController extends Controller
         abort_unless($auth && $auth->canDo('recurring_charges.edit'), 403);
 
         $charge = RecurringCharge::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name'])
             ->findOrFail($charge);
 
         $clients = Client::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
@@ -99,7 +99,7 @@ class RecurringChargeController extends Controller
         abort_unless($auth && $auth->canDo('recurring_charges.edit'), 403);
 
         $charge = RecurringCharge::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($charge);
 
         $data = $request->validate([
@@ -123,7 +123,7 @@ class RecurringChargeController extends Controller
         abort_unless($auth && $auth->canDo('recurring_charges.delete'), 403);
 
         $charge = RecurringCharge::query()
-            ->where('organization_id', $auth->organization_id)
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($charge);
 
         $charge->delete();
