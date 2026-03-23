@@ -102,6 +102,46 @@ class OperationsPermissionsSeeder extends Seeder
             // Payroll Export
             ['key' => 'payroll.export', 'description' => 'Export Payroll Data'],
 
+            // Onboarding
+            ['key' => 'onboarding.viewAny', 'description' => 'View Onboarding Workflows'],
+            ['key' => 'onboarding.view', 'description' => 'View Onboarding Workflow Detail'],
+            ['key' => 'onboarding.create', 'description' => 'Create Onboarding Workflows'],
+            ['key' => 'onboarding.edit', 'description' => 'Edit Onboarding Workflows'],
+
+            // Job Board
+            ['key' => 'job_board.viewAny', 'description' => 'View Job Board'],
+            ['key' => 'job_board.create', 'description' => 'Create Open Positions'],
+            ['key' => 'job_board.claim', 'description' => 'Claim Open Positions'],
+            ['key' => 'job_board.approve', 'description' => 'Approve Position Claims'],
+
+            // Qualifications
+            ['key' => 'qualifications.viewAny', 'description' => 'View Qualification Requirements'],
+            ['key' => 'qualifications.create', 'description' => 'Create Qualification Requirements'],
+            ['key' => 'qualifications.edit', 'description' => 'Edit Qualification Requirements'],
+            ['key' => 'qualifications.delete', 'description' => 'Delete Qualification Requirements'],
+
+            // Geofences
+            ['key' => 'geofences.viewAny', 'description' => 'View Geofence Zones'],
+            ['key' => 'geofences.create', 'description' => 'Create Geofence Zones'],
+            ['key' => 'geofences.edit', 'description' => 'Edit Geofence Zones'],
+            ['key' => 'geofences.delete', 'description' => 'Delete Geofence Zones'],
+
+            // Recurring Charges
+            ['key' => 'recurring_charges.viewAny', 'description' => 'View Recurring Charges'],
+            ['key' => 'recurring_charges.manage', 'description' => 'Manage Recurring Charges'],
+
+            // Note Templates
+            ['key' => 'note_templates.viewAny', 'description' => 'View Care Note Templates'],
+            ['key' => 'note_templates.manage', 'description' => 'Manage Care Note Templates'],
+
+            // Payroll Exports
+            ['key' => 'payroll_exports.viewAny', 'description' => 'View Payroll Exports'],
+            ['key' => 'payroll_exports.manage', 'description' => 'Manage Payroll Exports'],
+
+            // Family Portal
+            ['key' => 'family_portal.viewAny', 'description' => 'View Family Portal Settings'],
+            ['key' => 'family_portal.manage', 'description' => 'Manage Family Portal Settings'],
+
             // eMAR
             ['key' => 'emar.viewAny', 'description' => 'View eMAR Module'],
             ['key' => 'emar.dashboard.view', 'description' => 'View eMAR Dashboard'],

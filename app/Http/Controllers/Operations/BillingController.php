@@ -50,14 +50,32 @@ class BillingController extends Controller
             ->limit(10)
             ->get();
 
+        $statusBreakdown = BillingEntry::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->selectRaw('status, COUNT(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
+
+        $entries = BillingEntry::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->with(['client:id,first_name,last_name', 'staff:id,name', 'serviceAgreement:id,title'])
+            ->when(!empty($request->get('status')), fn ($q) => $q->where('status', $request->get('status')))
+            ->when(!empty($request->get('q')), fn ($q) => $q->where('notes', 'like', '%' . $request->get('q') . '%'))
+            ->orderByDesc('service_date')
+            ->paginate(20)
+            ->withQueryString();
+
         return inertia('operations/billing/Index', [
             'stats' => [
-                'total_billed_this_month' => (float) $totalBilledThisMonth,
+                'billed_this_month' => (float) $totalBilledThisMonth,
                 'outstanding' => (float) $outstanding,
                 'paid_this_month' => (float) $paidThisMonth,
-                'pending_entries_count' => $pendingCount,
+                'pending_count' => $pendingCount,
             ],
-            'recentEntries' => $recentEntries,
+            'entries' => $entries,
+            'status_breakdown' => $statusBreakdown,
+            'filters' => $request->only(['status', 'q']),
         ]);
     }
 

@@ -27,7 +27,7 @@ class PriceBookController extends Controller
             ->withQueryString();
 
         return inertia('operations/price-books/Index', [
-            'priceBooks' => $priceBooks,
+            'price_books' => $priceBooks,
             'filters' => $request->only(['active']),
         ]);
     }

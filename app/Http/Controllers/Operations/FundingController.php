@@ -53,14 +53,24 @@ class FundingController extends Controller
         $topAgreements->each(fn ($a) => $a->append(['budget_utilisation_percent', 'budget_remaining']));
 
         return inertia('operations/funding/Index', [
-            'budgetStats' => [
+            'stats' => [
                 'total_budget' => (float) $budgetStats->total_budget,
                 'total_used' => (float) $budgetStats->total_used,
                 'total_remaining' => (float) $budgetStats->total_remaining,
                 'utilisation_percent' => $utilisationPercent,
+                'active_agreements' => ServiceAgreement::where('status', 'active')->count(),
+                'pending_claims' => FundingClaim::where('status', 'submitted')->count(),
+                'expiring_soon' => ServiceAgreement::active()->expiringSoon()->count(),
             ],
-            'claimsByStatus' => $claimsByStatus,
-            'topAgreements' => $topAgreements,
+            'claims_by_status' => $claimsByStatus,
+            'top_agreements' => $topAgreements->map(fn ($a) => [
+                'id' => $a->id,
+                'title' => $a->title,
+                'client_name' => $a->client ? $a->client->first_name . ' ' . $a->client->last_name : '',
+                'total_budget' => $a->total_budget,
+                'budget_used' => $a->budget_used,
+                'utilisation_percent' => $a->budget_utilisation_percent,
+            ]),
         ]);
     }
 }

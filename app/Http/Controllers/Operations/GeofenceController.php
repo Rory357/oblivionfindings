@@ -20,7 +20,7 @@ class GeofenceController extends Controller
             ->withQueryString();
 
         return inertia('operations/geofences/Index', [
-            'zones' => $zones,
+            'geofences' => $zones,
         ]);
     }
 

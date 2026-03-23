@@ -20,7 +20,7 @@ class CalendarSyncController extends Controller
             ->withQueryString();
 
         return inertia('operations/calendar-sync/Index', [
-            'syncs' => $syncs,
+            'connections' => $syncs,
         ]);
     }
 

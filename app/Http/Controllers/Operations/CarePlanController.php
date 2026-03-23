@@ -125,7 +125,7 @@ class CarePlanController extends Controller
         ];
 
         return inertia('operations/care-plans/Show', [
-            'carePlan' => $carePlan,
+            'care_plan' => $carePlan,
             'progressStats' => $progressStats,
         ]);
     }
@@ -146,7 +146,7 @@ class CarePlanController extends Controller
             ->get(['id', 'first_name', 'last_name']);
 
         return inertia('operations/care-plans/Edit', [
-            'carePlan' => $carePlan,
+            'care_plan' => $carePlan,
             'clients' => $clients,
         ]);
     }
