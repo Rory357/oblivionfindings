@@ -173,7 +173,7 @@ class ClientMedicalController extends Controller
                 ->values();
         }
 
-        return inertia('clients/medical', [
+        return inertia('operations/clients/medical', [
             'client' => $client->only(['id', 'first_name', 'last_name']),
             'can_edit' => $canEdit,
             'can_record' => $canRecord,

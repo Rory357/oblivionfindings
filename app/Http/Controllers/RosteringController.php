@@ -189,7 +189,7 @@ class RosteringController extends Controller
             }
         }
 
-        return inertia('rostering/index', [
+        return inertia('operations/rostering/index', [
             'canManageAny' => $canManageAny,
             'weekStart' => $weekStart->toDateString(),
             'weekEnd' => $weekEnd->toDateString(),

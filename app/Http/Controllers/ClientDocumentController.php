@@ -23,7 +23,7 @@ class ClientDocumentController extends Controller
             ->with(['uploadedBy:id,name,email'])
             ->get();
 
-        return inertia('clients/documents', [
+        return inertia('operations/clients/documents', [
             'client' => $client->only(['id', 'first_name', 'last_name']),
             'can_edit' => $request->user()?->canDo('clients.update') ?? false,
             'documents' => $documents->map(fn ($d) => [

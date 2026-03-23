@@ -168,6 +168,16 @@ class User extends Authenticatable
         return $this->hasMany(\App\Models\Shift::class);
     }
 
+    public function staffAvailability()
+    {
+        return $this->hasMany(\App\Models\StaffAvailability::class);
+    }
+
+    public function staffTimeOff()
+    {
+        return $this->hasMany(\App\Models\StaffTimeOff::class);
+    }
+
     public function timesheets()
     {
         return $this->hasMany(\App\Models\Timesheet::class);

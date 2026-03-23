@@ -96,7 +96,7 @@ class ShiftController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
-        return inertia('shifts/index', [
+        return inertia('operations/shifts/index', [
             'shifts' => $shifts,
             'filters' => [
                 'from' => $start->toDateString(),
@@ -161,7 +161,7 @@ class ShiftController extends Controller
             ->get();
 
 
-        return inertia('shifts/show', [
+        return inertia('operations/shifts/show', [
             'shift' => $shift,
             'handover' => $handover->map(fn($e) => [
                 'id' => $e->id,
@@ -204,7 +204,7 @@ class ShiftController extends Controller
 
         $defaultClientId = $request->query('client_id');
 
-        return inertia('shifts/create', [
+        return inertia('operations/shifts/create', [
             'clients' => $clients,
             'staff' => $staff,
             'serviceContexts' => $serviceContexts,
@@ -330,7 +330,7 @@ class ShiftController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'type', 'is_active']);
 
-        return inertia('shifts/edit', [
+        return inertia('operations/shifts/edit', [
             'shift' => $shift,
             'clients' => $clients,
             'staff' => $staff,

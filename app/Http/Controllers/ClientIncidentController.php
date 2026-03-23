@@ -38,7 +38,7 @@ class ClientIncidentController extends Controller
             ->orderBy('name')
             ->get();
 
-        return inertia('clients/incidents', [
+        return inertia('operations/clients/incidents', [
             'client' => $client->only(['id', 'first_name', 'last_name', 'status']),
             'incidents' => $incidents,
             'templates' => $templates,

@@ -79,7 +79,7 @@ class ClientController extends Controller
             ];
         })->values();
 
-        return inertia('clients/index', [
+        return inertia('operations/clients/index', [
             'clients' => $clients,
         ]);
     }
@@ -206,7 +206,7 @@ class ClientController extends Controller
             ->with(['actor:id,name'])
             ->get();
 
-        return inertia('clients/show', [
+        return inertia('operations/clients/show', [
             'client' => [
                 'id' => $client->id,
                 'first_name' => $client->first_name,
@@ -415,7 +415,7 @@ class ClientController extends Controller
     // {
     //     $this->authorize('view', $client);
 
-    //     return inertia('clients/show', [
+    //     return inertia('operations/clients/show', [
     //         'client' => $client->load('supportWorkers'),
     //     ]);
     // }
@@ -434,7 +434,7 @@ class ClientController extends Controller
             ->orderBy('name')
             ->get(['id', 'type', 'name']);
 
-        return inertia('clients/create', [
+        return inertia('operations/clients/create', [
             'sites' => $sites,
             'serviceContexts' => $serviceContexts,
             'defaultServiceContextId' => ServiceContext::defaultId(),
@@ -546,7 +546,7 @@ class ClientController extends Controller
         }
         $serviceContexts = $serviceContextsQuery->get(['id', 'type', 'name', 'is_active']);
 
-        return inertia('clients/edit', [
+        return inertia('operations/clients/edit', [
             'client' => $client->only([
                 'id','site_id','service_context_id','first_name','last_name','preferred_name','date_of_birth','gender','status',
                 'phone','email','address_line_1','address_line_2','suburb','city','postcode',

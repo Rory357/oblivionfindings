@@ -19,7 +19,7 @@ class ClientRiskController extends Controller
             ->orderBy('label')
             ->get();
 
-        return inertia('clients/risks', [
+        return inertia('operations/clients/risks', [
             'client' => $client->only(['id', 'first_name', 'last_name', 'status']),
             'risks' => $risks,
             'can' => [
