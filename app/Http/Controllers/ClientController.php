@@ -321,6 +321,24 @@ class ClientController extends Controller
                     ])->values()->toArray(),
                 ] : null,
             ],
+            'care_plans_summary' => [
+                'active_plan' => \App\Models\CarePlan::where('client_id', $client->id)
+                    ->where('status', 'active')
+                    ->withCount(['goals', 'goals as goals_completed' => fn($q) => $q->where('status', 'completed')])
+                    ->with('goals:id,care_plan_id,title,status,progress_percentage,priority')
+                    ->first(),
+                'total_plans' => \App\Models\CarePlan::where('client_id', $client->id)->count(),
+                'review_due' => \App\Models\CarePlan::where('client_id', $client->id)
+                    ->where('status', 'active')
+                    ->where(function ($q) {
+                        $q->whereNull('next_review_at')->orWhere('next_review_at', '<=', now());
+                    })->exists(),
+                'recent_notes' => \App\Models\ProgressNote::where('client_id', $client->id)
+                    ->with(['author:id,name', 'goal:id,title'])
+                    ->orderByDesc('created_at')
+                    ->limit(5)
+                    ->get(),
+            ],
             'respite' => [
                 'bookings' => RespiteBooking::query()
                     ->where('client_id', $client->id)

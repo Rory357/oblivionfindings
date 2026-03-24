@@ -15,33 +15,74 @@ class CarePlanController extends Controller
         abort_unless($auth && $auth->canDo('care_plans.viewAny'), 403);
 
         $data = $request->validate([
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-            'status' => ['nullable', 'string', 'in:draft,active,review,archived'],
+            'q' => ['nullable', 'string', 'max:255'],
+            'status' => ['nullable', 'string'],
             'plan_type' => ['nullable', 'string'],
+            'client_id' => ['nullable', 'integer'],
             'review_due' => ['nullable', 'boolean'],
         ]);
 
+        $baseQuery = CarePlan::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
+
+        // Stats
+        $stats = [
+            'total' => (clone $baseQuery)->count(),
+            'active' => (clone $baseQuery)->where('status', 'active')->count(),
+            'review_due' => (clone $baseQuery)->where('status', 'active')
+                ->where(function ($q) {
+                    $q->whereNull('next_review_at')
+                        ->orWhere('next_review_at', '<=', now());
+                })->count(),
+            'draft' => (clone $baseQuery)->where('status', 'draft')->count(),
+            'in_review' => (clone $baseQuery)->where('status', 'review')->count(),
+            'plans_without_goals' => (clone $baseQuery)->whereDoesntHave('goals')->where('status', '!=', 'archived')->count(),
+            'overdue_goals' => \App\Models\CarePlanGoal::query()
+                ->whereHas('carePlan', function ($q) use ($auth) {
+                    $q->where('status', 'active')
+                        ->when($auth->organization_id, fn ($q2) => $q2->where('organization_id', $auth->organization_id));
+                })
+                ->where('status', '!=', 'completed')
+                ->whereNotNull('target_date')
+                ->where('target_date', '<', now())
+                ->count(),
+        ];
+
+        // Charts
+        $plans_by_status = (clone $baseQuery)
+            ->selectRaw('status, count(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status')
+            ->toArray();
+
+        // Filtered query for listing
         $carePlans = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->with(['client:id,first_name,last_name', 'creator:id,name'])
-            ->withCount('goals')
-            ->when(!empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
+            ->when(!empty($data['q']), fn ($q) => $q->where('title', 'like', '%' . $data['q'] . '%'))
             ->when(!empty($data['status']), fn ($q) => $q->where('status', $data['status']))
             ->when(!empty($data['plan_type']), fn ($q) => $q->where('plan_type', $data['plan_type']))
-            ->when(!empty($data['review_due']), fn ($q) => $q->reviewDue())
+            ->when(!empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
+            ->when(!empty($data['review_due']), fn ($q) => $q->where('status', 'active')->where(function ($q2) {
+                $q2->whereNull('next_review_at')->orWhere('next_review_at', '<=', now());
+            }))
+            ->with(['client:id,first_name,last_name', 'creator:id,name'])
+            ->withCount(['goals', 'goals as goals_achieved_count' => fn ($q) => $q->where('status', 'completed')])
             ->orderByDesc('updated_at')
-            ->paginate(20)
+            ->paginate(15)
             ->withQueryString();
 
-        $clients = Client::query()
+        $clients = \App\Models\Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
+            ->select('id', 'first_name', 'last_name')
+            ->orderBy('last_name')
+            ->get();
 
         return inertia('operations/care-plans/Index', [
             'carePlans' => $carePlans,
             'clients' => $clients,
-            'filters' => $request->only(['client_id', 'status', 'plan_type', 'review_due']),
+            'filters' => $data,
+            'stats' => $stats,
+            'plans_by_status' => $plans_by_status,
         ]);
     }
 
@@ -90,6 +131,32 @@ class CarePlanController extends Controller
             'version' => 1,
         ]);
 
+        // Auto-complete onboarding step if from_onboarding
+        if ($request->boolean('from_onboarding')) {
+            $workflow = \App\Models\ClientOnboardingWorkflow::where('client_id', $data['client_id'])
+                ->where('status', 'in_progress')
+                ->first();
+
+            if ($workflow) {
+                $step = \App\Models\ClientOnboardingStep::where('workflow_id', $workflow->id)
+                    ->where('step_name', 'Care Plan Created')
+                    ->where('status', '!=', 'completed')
+                    ->first();
+
+                if ($step) {
+                    $step->update([
+                        'status' => 'completed',
+                        'completed_at' => now(),
+                        'completed_by' => $auth->id,
+                        'notes' => 'Auto-completed: Care plan #' . $carePlan->id . ' created.',
+                    ]);
+                }
+            }
+
+            return redirect("/operations/clients/{$data['client_id']}?tab=onboarding")
+                ->with('success', 'Care plan created and onboarding step completed.');
+        }
+
         return redirect()->route('operations.care_plans.show', $carePlan)
             ->with('success', 'Care plan created.');
     }
@@ -124,9 +191,37 @@ class CarePlanController extends Controller
                 : 0,
         ];
 
+        // Progress notes linked to this plan's goals
+        $progressNotes = \App\Models\ProgressNote::query()
+            ->whereHas('goal', fn ($q) => $q->where('care_plan_id', $carePlan->id))
+            ->with(['author:id,name', 'goal:id,title'])
+            ->orderByDesc('created_at')
+            ->get();
+
+        // Review history via parent_id chain
+        $reviewHistory = CarePlan::query()
+            ->where(function ($q) use ($carePlan) {
+                $q->where('parent_id', $carePlan->parent_id ?? $carePlan->id)
+                    ->orWhere('id', $carePlan->parent_id ?? $carePlan->id);
+            })
+            ->where('id', '!=', $carePlan->id)
+            ->with(['reviewer:id,name'])
+            ->orderByDesc('version')
+            ->get();
+
+        // Staff in same org for reviewer assignment
+        $staff = \App\Models\User::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
+
         return inertia('operations/care-plans/Show', [
             'care_plan' => $carePlan,
             'progressStats' => $progressStats,
+            'progressNotes' => $progressNotes,
+            'reviewHistory' => $reviewHistory,
+            'staff' => $staff,
         ]);
     }
 
@@ -175,6 +270,57 @@ class CarePlanController extends Controller
 
         return redirect()->route('operations.care_plans.show', $carePlan)
             ->with('success', 'Care plan updated.');
+    }
+
+    public function startReview(Request $request, CarePlan $carePlan)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
+
+        // Create new version
+        $newVersion = $carePlan->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
+        $newVersion->version = $carePlan->version + 1;
+        $newVersion->parent_id = $carePlan->parent_id ?? $carePlan->id;
+        $newVersion->status = 'review';
+        $newVersion->reviewed_at = null;
+        $newVersion->reviewed_by = null;
+        $newVersion->save();
+
+        // Copy goals to new version
+        foreach ($carePlan->goals as $goal) {
+            $newGoal = $goal->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
+            $newGoal->care_plan_id = $newVersion->id;
+            $newGoal->save();
+        }
+
+        return redirect()->route('operations.care_plans.edit', $newVersion->id)
+            ->with('success', 'Review started. Edit the plan and complete the review when ready.');
+    }
+
+    public function completeReview(Request $request, CarePlan $carePlan)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
+
+        $data = $request->validate([
+            'review_notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        // Archive the parent version
+        if ($carePlan->parent_id) {
+            CarePlan::where('id', $carePlan->parent_id)->update(['status' => 'archived']);
+        }
+
+        // Activate this version
+        $carePlan->update([
+            'status' => 'active',
+            'reviewed_at' => now(),
+            'reviewed_by' => $auth->id,
+            'next_review_at' => $carePlan->next_review_at ?? now()->addMonths(3),
+        ]);
+
+        return redirect()->route('operations.care_plans.show', $carePlan->id)
+            ->with('success', 'Review completed. Plan is now active.');
     }
 
     public function destroy(Request $request, $carePlan)

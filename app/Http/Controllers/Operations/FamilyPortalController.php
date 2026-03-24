@@ -51,26 +51,28 @@ class FamilyPortalController extends Controller
             ->findOrFail($client);
 
         $data = $request->validate([
-            'is_enabled' => ['required', 'boolean'],
-            'can_view_schedule' => ['nullable', 'boolean'],
-            'can_view_care_notes' => ['nullable', 'boolean'],
-            'can_view_medications' => ['nullable', 'boolean'],
-            'can_send_messages' => ['nullable', 'boolean'],
-            'portal_contacts' => ['nullable', 'array'],
-            'portal_contacts.*.name' => ['required', 'string', 'max:255'],
-            'portal_contacts.*.email' => ['required', 'email', 'max:255'],
-            'portal_contacts.*.relationship' => ['nullable', 'string', 'max:100'],
+            'show_shift_schedule' => ['nullable', 'boolean'],
+            'show_care_notes' => ['nullable', 'boolean'],
+            'show_care_plans' => ['nullable', 'boolean'],
+            'show_medication_status' => ['nullable', 'boolean'],
+            'show_incidents' => ['nullable', 'boolean'],
+            'notify_shift_arrival' => ['nullable', 'boolean'],
+            'notify_shift_completion' => ['nullable', 'boolean'],
+            'notify_incident' => ['nullable', 'boolean'],
         ]);
 
         FamilyPortalSetting::updateOrCreate(
             ['client_id' => $client],
             [
-                'is_enabled' => $data['is_enabled'],
-                'can_view_schedule' => $data['can_view_schedule'] ?? false,
-                'can_view_care_notes' => $data['can_view_care_notes'] ?? false,
-                'can_view_medications' => $data['can_view_medications'] ?? false,
-                'can_send_messages' => $data['can_send_messages'] ?? false,
-                'portal_contacts' => $data['portal_contacts'] ?? null,
+                'organization_id' => $auth->organization_id,
+                'show_shift_schedule' => $data['show_shift_schedule'] ?? true,
+                'show_care_notes' => $data['show_care_notes'] ?? true,
+                'show_care_plans' => $data['show_care_plans'] ?? false,
+                'show_medication_status' => $data['show_medication_status'] ?? false,
+                'show_incidents' => $data['show_incidents'] ?? false,
+                'notify_shift_arrival' => $data['notify_shift_arrival'] ?? true,
+                'notify_shift_completion' => $data['notify_shift_completion'] ?? true,
+                'notify_incident' => $data['notify_incident'] ?? true,
             ]
         );
 

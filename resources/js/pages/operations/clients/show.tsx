@@ -1115,31 +1115,137 @@ export default function ClientShow({
                     </div>
                 )}
 
-                {tab === 'care_plans' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-between text-base">
-                                <span>Care Plans</span>
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href={`/operations/care-plans?client_id=${client.id}`}>View All</Link>
-                                </Button>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                                Care plans for {client.first_name} are managed in the dedicated Care Plans section.
-                            </p>
-                            <div className="mt-3 flex gap-2">
-                                <Button size="sm" asChild>
-                                    <Link href={`/operations/care-plans?client_id=${client.id}`}>View Care Plans</Link>
-                                </Button>
-                                <Button size="sm" variant="outline" asChild>
-                                    <Link href={`/operations/care-plans/create?client_id=${client.id}`}>Create Care Plan</Link>
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                {tab === 'care_plans' && (() => {
+                    const summary = (props as any).care_plans_summary ?? {};
+                    const activePlan = summary.active_plan;
+                    const recentNotes = summary.recent_notes ?? [];
+                    const reviewDue = summary.review_due ?? false;
+
+                    return (
+                        <div className="space-y-4">
+                            {/* Review Due Alert */}
+                            {reviewDue && activePlan && (
+                                <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                                    <svg className="h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.072 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
+                                    <span>Care plan review is due. Please review and update the plan.</span>
+                                    <Button size="sm" variant="outline" className="ml-auto border-amber-300 text-amber-700 hover:bg-amber-100" asChild>
+                                        <Link href={`/operations/care-plans/${activePlan.id}`}>Start Review</Link>
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Active Plan Summary */}
+                            {activePlan ? (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center justify-between text-base">
+                                            <div className="flex items-center gap-2">
+                                                <span>{activePlan.title}</span>
+                                                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">Active</span>
+                                                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">{(activePlan.plan_type ?? '').replace(/_/g, ' ')}</span>
+                                            </div>
+                                            <div className="flex gap-2">
+                                                <Button variant="outline" size="sm" asChild>
+                                                    <Link href={`/operations/care-plans/${activePlan.id}`}>View Full Plan</Link>
+                                                </Button>
+                                                <Button variant="outline" size="sm" asChild>
+                                                    <Link href={`/operations/care-plans?client_id=${client.id}`}>All Plans ({summary.total_plans ?? 0})</Link>
+                                                </Button>
+                                            </div>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {/* Goals Progress */}
+                                        <div className="mb-4">
+                                            <div className="mb-2 flex items-center justify-between text-sm">
+                                                <span className="font-medium">Goals Progress</span>
+                                                <span className="text-muted-foreground">{activePlan.goals_completed ?? 0} / {activePlan.goals_count ?? 0} completed</span>
+                                            </div>
+                                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                                <div
+                                                    className="h-full rounded-full bg-emerald-500 transition-all"
+                                                    style={{ width: `${activePlan.goals_count > 0 ? Math.round(((activePlan.goals_completed ?? 0) / activePlan.goals_count) * 100) : 0}%` }}
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Individual Goals */}
+                                        {(activePlan.goals ?? []).length > 0 && (
+                                            <div className="space-y-2">
+                                                {(activePlan.goals ?? []).slice(0, 5).map((goal: any) => (
+                                                    <div key={goal.id} className="flex items-center gap-3 rounded border p-2 text-sm">
+                                                        <div className={`h-2 w-2 shrink-0 rounded-full ${goal.status === 'completed' ? 'bg-emerald-500' : goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-slate-300'}`} />
+                                                        <span className="flex-1 truncate">{goal.title}</span>
+                                                        <span className={`text-xs font-medium ${goal.priority === 'critical' ? 'text-red-600' : goal.priority === 'high' ? 'text-amber-600' : 'text-slate-500'}`}>{goal.priority}</span>
+                                                        <div className="w-16">
+                                                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                                                <div className={`h-full rounded-full ${goal.status === 'completed' ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${goal.progress_percentage ?? 0}%` }} />
+                                                            </div>
+                                                        </div>
+                                                        <span className="w-8 text-right text-xs text-muted-foreground">{goal.progress_percentage ?? 0}%</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+
+                                        {/* Dates */}
+                                        {(activePlan.starts_at || activePlan.next_review_at) && (
+                                            <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
+                                                {activePlan.starts_at && <span>Started: {new Date(activePlan.starts_at).toLocaleDateString('en-NZ')}</span>}
+                                                {activePlan.next_review_at && (
+                                                    <span className={reviewDue ? 'font-medium text-amber-600' : ''}>
+                                                        Next Review: {new Date(activePlan.next_review_at).toLocaleDateString('en-NZ')}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <Card>
+                                    <CardContent className="flex flex-col items-center justify-center py-12">
+                                        <svg className="mb-3 h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                                        <p className="mb-1 font-medium">No Active Care Plan</p>
+                                        <p className="mb-4 text-sm text-muted-foreground">Create a care plan to start tracking goals and progress for {client.first_name}.</p>
+                                        <Button size="sm" asChild>
+                                            <Link href={`/operations/care-plans/create?client_id=${client.id}`}>Create Care Plan</Link>
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Recent Progress Notes */}
+                            {recentNotes.length > 0 && (
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center justify-between text-base">
+                                            <span>Recent Progress Notes</span>
+                                            <Button variant="outline" size="sm" asChild>
+                                                <Link href={`/operations/progress-notes?client_id=${client.id}`}>View All</Link>
+                                            </Button>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-3">
+                                            {recentNotes.map((note: any) => (
+                                                <div key={note.id} className={`rounded-lg border p-3 text-sm ${note.is_flagged ? 'border-l-4 border-l-red-400' : ''}`}>
+                                                    <div className="mb-1 flex items-center justify-between">
+                                                        <span className="font-medium">{note.author?.name ?? 'Unknown'}</span>
+                                                        <span className="text-xs text-muted-foreground">{new Date(note.created_at).toLocaleDateString('en-NZ')}</span>
+                                                    </div>
+                                                    {note.goal && (
+                                                        <span className="mb-1 inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-600">Goal: {note.goal.title}</span>
+                                                    )}
+                                                    <p className="text-muted-foreground">{(note.content ?? '').slice(0, 200)}{(note.content ?? '').length > 200 ? '...' : ''}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    );
+                })()}
 
                 {tab === 'progress_notes' && (
                     <Card>

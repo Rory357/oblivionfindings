@@ -5,11 +5,13 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ProgressNote extends Model
 {
     use HasFactory;
     use AuditableChanges;
+    use SoftDeletes;
 
     protected $fillable = [
         'organization_id',

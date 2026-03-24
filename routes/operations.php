@@ -302,6 +302,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.care_plans.goals.destroy');
         Route::patch('/care-plans/{carePlan}/goals/{goal}/progress', [CarePlanGoalController::class, 'updateProgress'])
             ->name('operations.care_plans.goals.progress');
+
+        Route::post('/care-plans/{carePlan}/start-review', [CarePlanController::class, 'startReview'])->name('operations.care_plans.start_review');
+        Route::post('/care-plans/{carePlan}/complete-review', [CarePlanController::class, 'completeReview'])->name('operations.care_plans.complete_review');
     });
 
     Route::delete('/care-plans/{carePlan}', [CarePlanController::class, 'destroy'])

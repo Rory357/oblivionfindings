@@ -1,9 +1,9 @@
-import { OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
+import { CarePlanSummaryCard } from '@/components/care-plan-summary-card';
+import { DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -13,12 +13,20 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, CalendarDays, CheckCircle2, ClipboardCheck, Eye, Pencil, Plus, Search } from 'lucide-react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    CheckCircle2,
+    ClipboardCheck,
+    FileWarning,
+    Plus,
+    Search,
+    Target,
+} from 'lucide-react';
 
 const ANY = '__ANY__';
 
-type CarePlan = {
+type Plan = {
     id: number;
     title: string;
     status: string;
@@ -35,16 +43,18 @@ type CarePlan = {
 
 type Props = {
     carePlans: {
-        data: CarePlan[];
+        data: Plan[];
         links: any[];
         current_page: number;
         last_page: number;
         total: number;
     };
+    clients: { id: number; first_name: string; last_name: string }[];
     filters: {
         q?: string;
         status?: string;
         plan_type?: string;
+        client_id?: string;
         review_due?: string;
     };
     stats: {
@@ -52,15 +62,11 @@ type Props = {
         active: number;
         review_due: number;
         draft: number;
+        in_review: number;
+        plans_without_goals: number;
+        overdue_goals: number;
     };
-    clients: Array<{ id: number; first_name: string; last_name: string }>;
-};
-
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    active: 'default',
-    draft: 'outline',
-    review: 'secondary',
-    archived: 'secondary',
+    plans_by_status: Record<string, number>;
 };
 
 const PLAN_TYPES: Record<string, string> = {
@@ -70,15 +76,44 @@ const PLAN_TYPES: Record<string, string> = {
     transition_plan: 'Transition Plan',
 };
 
-function formatDate(d: string | null): string {
-    if (!d) return '-';
-    return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
-}
+const STATUS_DONUT_COLORS: Record<string, string> = {
+    active: OPS_COLORS.success,
+    draft: OPS_COLORS.neutral,
+    review: OPS_COLORS.warning,
+    archived: OPS_COLORS.muted,
+};
 
-export default function CarePlansIndex({ carePlans = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any, clients = [] }: Props) {
+export default function CarePlansIndex({
+    carePlans = { data: [], links: [], current_page: 1, last_page: 1, total: 0 },
+    clients = [],
+    filters = {} as any,
+    stats = {} as any,
+    plans_by_status = {} as any,
+}: Props) {
+    const { labels } = usePage().props as any;
+    const clientLabel = labels?.['client.singular'] ?? 'Client';
+
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/care-plans', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
+
+    const safeStats = {
+        total: stats?.total ?? 0,
+        active: stats?.active ?? 0,
+        review_due: stats?.review_due ?? 0,
+        draft: stats?.draft ?? 0,
+        in_review: stats?.in_review ?? 0,
+        plans_without_goals: stats?.plans_without_goals ?? 0,
+        overdue_goals: stats?.overdue_goals ?? 0,
+    };
+
+    const donutSegments = Object.entries(plans_by_status ?? {}).map(([key, value]) => ({
+        label: key.charAt(0).toUpperCase() + key.slice(1),
+        value: (value as number) ?? 0,
+        color: STATUS_DONUT_COLORS[key] ?? OPS_COLORS.muted,
+    }));
+
+    const showComplianceBanner = safeStats.review_due > 0 || safeStats.plans_without_goals > 0;
 
     return (
         <AppLayout>
@@ -87,17 +122,92 @@ export default function CarePlansIndex({ carePlans = { data: [], links: [], curr
                 title="Care Plans"
                 description="Manage support plans, behaviour plans, health plans, and transition plans."
                 backHref="/operations"
+                actions={
+                    <Button asChild size="sm">
+                        <Link href="/operations/care-plans/create">
+                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                            New Plan
+                        </Link>
+                    </Button>
+                }
             />
             <PageShell>
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <OpsStatCard label="Total Plans" value={stats?.total ?? 0} icon={ClipboardCheck} color="indigo" />
-                    <OpsStatCard label="Active" value={stats?.active ?? 0} icon={CheckCircle2} color="emerald" />
-                    <OpsStatCard label="Review Due" value={stats?.review_due ?? 0} icon={AlertTriangle} color={stats?.review_due > 0 ? 'amber' : 'slate'} />
-                    <OpsStatCard label="Draft" value={stats?.draft ?? 0} icon={ClipboardCheck} color="slate" />
+                {/* Stats Row */}
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    <OpsStatCard label="Total Plans" value={safeStats.total} icon={ClipboardCheck} color="indigo" />
+                    <OpsStatCard label="Active" value={safeStats.active} icon={CheckCircle2} color="emerald" />
+                    <OpsStatCard label="Review Due" value={safeStats.review_due} icon={AlertTriangle} color="amber" />
+                    <OpsStatCard label="Draft" value={safeStats.draft} icon={ClipboardCheck} color="slate" />
+                    <OpsStatCard label="Without Goals" value={safeStats.plans_without_goals} icon={Target} color="red" />
+                    <OpsStatCard label="Overdue Goals" value={safeStats.overdue_goals} icon={FileWarning} color="red" />
                 </div>
 
-                {/* Filters */}
+                {/* Compliance Alert Banner */}
+                {showComplianceBanner && (
+                    <div className="mt-4 flex items-start gap-3 rounded-lg border border-amber-300 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950/30">
+                        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600 dark:text-amber-400" />
+                        <div className="min-w-0 flex-1">
+                            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Compliance Attention Required</p>
+                            <p className="mt-0.5 text-xs text-amber-700 dark:text-amber-300">
+                                {safeStats.review_due > 0 && (
+                                    <span>{safeStats.review_due} plan{safeStats.review_due !== 1 ? 's' : ''} due for review. </span>
+                                )}
+                                {safeStats.plans_without_goals > 0 && (
+                                    <span>{safeStats.plans_without_goals} plan{safeStats.plans_without_goals !== 1 ? 's' : ''} have no goals defined. </span>
+                                )}
+                            </p>
+                            <div className="mt-2 flex gap-2">
+                                {safeStats.review_due > 0 && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 border-amber-400 text-xs text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300"
+                                        onClick={() => updateFilters('review_due', '1')}
+                                    >
+                                        View Due Reviews
+                                    </Button>
+                                )}
+                                {safeStats.plans_without_goals > 0 && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 border-amber-400 text-xs text-amber-700 hover:bg-amber-100 dark:border-amber-700 dark:text-amber-300"
+                                        onClick={() => updateFilters('status', 'active')}
+                                    >
+                                        View Plans Without Goals
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Charts Row */}
+                <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Plans by Status</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex justify-center pb-4">
+                            <DonutChart
+                                segments={donutSegments}
+                                centerLabel="Total"
+                                centerValue={safeStats.total}
+                                size={140}
+                            />
+                        </CardContent>
+                    </Card>
+                    <Card className="lg:col-span-2">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Analytics</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex items-center justify-center py-8">
+                            <p className="text-xs text-muted-foreground">Additional analytics coming soon</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Filter Bar */}
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
@@ -131,15 +241,31 @@ export default function CarePlansIndex({ carePlans = { data: [], links: [], curr
                             ))}
                         </SelectContent>
                     </Select>
-                    <Button asChild size="sm">
-                        <Link href="/operations/care-plans/create">
-                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            New Plan
-                        </Link>
+                    <Select value={filters?.client_id ?? ANY} onValueChange={(v) => updateFilters('client_id', v === ANY ? null : v)}>
+                        <SelectTrigger className="h-9 w-[160px] text-xs">
+                            <SelectValue placeholder={`All ${clientLabel}s`} />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ANY}>All {clientLabel}s</SelectItem>
+                            {(clients ?? []).map((c) => (
+                                <SelectItem key={c.id} value={String(c.id)}>
+                                    {c.first_name} {c.last_name}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Button
+                        size="sm"
+                        variant={filters?.review_due ? 'default' : 'outline'}
+                        className="h-9 gap-1 text-xs"
+                        onClick={() => updateFilters('review_due', filters?.review_due ? null : '1')}
+                    >
+                        <AlertTriangle className="h-3.5 w-3.5" />
+                        Review Due
                     </Button>
                 </div>
 
-                {/* List */}
+                {/* Card List */}
                 <div className="mt-4 space-y-2">
                     {(carePlans?.data ?? []).length === 0 && (
                         <Card>
@@ -154,72 +280,29 @@ export default function CarePlansIndex({ carePlans = { data: [], links: [], curr
                         </Card>
                     )}
                     {(carePlans?.data ?? []).map((plan) => (
-                        <Card key={plan.id} className="transition-all hover:border-border hover:shadow-sm">
-                            <CardContent className="flex items-center gap-4 p-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300">
-                                    <ClipboardCheck className="h-5 w-5" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2">
-                                        <Link href={`/operations/care-plans/${plan.id}`} className="text-sm font-semibold hover:underline">
-                                            {plan.title}
-                                        </Link>
-                                        <Badge variant={STATUS_VARIANTS[plan.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">
-                                            {plan.status}
-                                        </Badge>
-                                        <Badge variant="outline" className="h-4 px-1.5 text-[9px]">
-                                            {PLAN_TYPES[plan.plan_type] ?? plan.plan_type}
-                                        </Badge>
-                                    </div>
-                                    <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                                        {plan.client && (
-                                            <span>{plan.client.first_name} {plan.client.last_name}</span>
-                                        )}
-                                        {plan.starts_at && (
-                                            <span className="flex items-center gap-1">
-                                                <CalendarDays className="h-3 w-3" />
-                                                {formatDate(plan.starts_at)} - {formatDate(plan.ends_at)}
-                                            </span>
-                                        )}
-                                        <span>{plan.goals_count} goals ({plan.goals_achieved_count} achieved)</span>
-                                        {plan.next_review_at && (
-                                            <span className={new Date(plan.next_review_at) <= new Date() ? 'font-medium text-amber-600' : ''}>
-                                                Review: {formatDate(plan.next_review_at)}
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="flex shrink-0 gap-1">
-                                    <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/operations/care-plans/${plan.id}`}>
-                                            <Eye className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
-                                    <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/operations/care-plans/${plan.id}/edit`}>
-                                            <Pencil className="h-3.5 w-3.5" />
-                                        </Link>
-                                    </Button>
-                                </div>
-                            </CardContent>
-                        </Card>
+                        <CarePlanSummaryCard key={plan.id} plan={plan} showClient />
                     ))}
                 </div>
 
                 {/* Pagination */}
                 {(carePlans?.last_page ?? 1) > 1 && (
-                    <div className="mt-4 flex items-center justify-center gap-1">
-                        {(carePlans?.links ?? []).map((link: any, i: number) => (
-                            <Button
-                                key={i}
-                                size="sm"
-                                variant={link.active ? 'default' : 'outline'}
-                                className="h-7 min-w-[28px] px-2 text-xs"
-                                disabled={!link.url}
-                                onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                dangerouslySetInnerHTML={{ __html: link.label }}
-                            />
-                        ))}
+                    <div className="mt-4 flex flex-col items-center gap-2">
+                        <div className="flex items-center justify-center gap-1">
+                            {(carePlans?.links ?? []).map((link: any, i: number) => (
+                                <Button
+                                    key={i}
+                                    size="sm"
+                                    variant={link.active ? 'default' : 'outline'}
+                                    className="h-7 min-w-[28px] px-2 text-xs"
+                                    disabled={!link.url}
+                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                    dangerouslySetInnerHTML={{ __html: link.label }}
+                                />
+                            ))}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                            Showing page {carePlans?.current_page ?? 1} of {carePlans?.last_page ?? 1} ({carePlans?.total ?? 0} plans)
+                        </p>
                     </div>
                 )}
             </PageShell>
