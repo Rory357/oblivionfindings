@@ -86,7 +86,7 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
         if (onProgressUpdate) {
             onProgressUpdate(goal.id, 100, 'completed');
         } else {
-            router.patch(`/operations/care-plans/${carePlanId}/goals/${goal.id}`, {
+            router.patch(`/operations/care-plans/${carePlanId}/goals/${goal.id}/progress`, {
                 progress_percentage: 100,
                 status: 'completed',
             }, { preserveScroll: true });
@@ -97,7 +97,7 @@ export function CarePlanGoalCard({ goal, carePlanId, onProgressUpdate, compact =
         if (onProgressUpdate) {
             onProgressUpdate(goal.id, goal.progress_percentage, 'in_progress');
         } else {
-            router.patch(`/operations/care-plans/${carePlanId}/goals/${goal.id}`, {
+            router.patch(`/operations/care-plans/${carePlanId}/goals/${goal.id}/progress`, {
                 status: 'in_progress',
             }, { preserveScroll: true });
         }
