@@ -14,7 +14,10 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { BookOpen, Flag, MessageSquareText, Search, Smile } from 'lucide-react';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { BookOpen, Flag, MessageSquareText, Plus, Search } from 'lucide-react';
+import { useState } from 'react';
 
 const ANY = '__ANY__';
 
@@ -70,14 +73,38 @@ function formatRelativeTime(iso: string): string {
 export default function ProgressNotesIndex({ notes = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any, clients = [] }: Props) {
     const { labels } = usePage().props as any;
     const clientPlural = labels?.['client.plural'] ?? 'Clients';
+    const [showAddForm, setShowAddForm] = useState(false);
+    const [noteData, setNoteData] = useState({ client_id: '', content: '', note_type: 'general', mood_rating: '', visibility: 'staff_only' });
+
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/progress-notes', { ...filters, [key]: value }, { preserveState: true, replace: true });
+    };
+
+    const submitNote = () => {
+        if (!noteData.client_id || !noteData.content.trim()) return;
+        router.post('/operations/progress-notes', {
+            ...noteData,
+            mood_rating: noteData.mood_rating ? Number(noteData.mood_rating) : null,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => { setNoteData({ ...noteData, content: '', mood_rating: '' }); setShowAddForm(false); },
+        });
+    };
+
+    const toggleFlag = (noteId: number) => {
+        router.patch(`/operations/shift-notes/${noteId}/flag`, {}, { preserveScroll: true });
     };
 
     return (
         <AppLayout>
             <Head title="Progress Notes" />
-            <PageHeader title="Progress Notes" description="Goal updates, observations, and progress tracking across all clients." backHref="/operations" />
+            <PageHeader title="Progress Notes" description="Goal updates, observations, and progress tracking across all clients." backHref="/operations"
+                actions={
+                    <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => setShowAddForm(!showAddForm)}>
+                        <Plus className="h-4 w-4" /> Add Note
+                    </Button>
+                }
+            />
             <PageShell>
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
@@ -85,6 +112,61 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                     <OpsStatCard label="This Week" value={stats?.this_week ?? 0} icon={BookOpen} color="blue" />
                     <OpsStatCard label="Flagged" value={stats?.flagged ?? 0} icon={Flag} color={stats?.flagged > 0 ? 'red' : 'slate'} />
                 </div>
+
+                {/* Add Note Form */}
+                {showAddForm && (
+                    <Card className="overflow-hidden border-violet-200">
+                        <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
+                            <h3 className="text-sm font-semibold text-white">New Progress Note</h3>
+                        </div>
+                        <CardContent className="p-4">
+                            <div className="grid gap-3 sm:grid-cols-4">
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Client *</Label>
+                                    <Select value={noteData.client_id} onValueChange={(v) => setNoteData({ ...noteData, client_id: v })}>
+                                        <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Select client..." /></SelectTrigger>
+                                        <SelectContent>
+                                            {(clients ?? []).map((c) => (
+                                                <SelectItem key={c.id} value={String(c.id)}>{c.first_name} {c.last_name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Type</Label>
+                                    <Select value={noteData.note_type} onValueChange={(v) => setNoteData({ ...noteData, note_type: v })}>
+                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            {Object.entries(NOTE_TYPE_STYLES).map(([k, v]) => (
+                                                <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Mood (1-10)</Label>
+                                    <Input className="h-8 text-xs" type="number" min={1} max={10} placeholder="Optional" value={noteData.mood_rating} onChange={(e) => setNoteData({ ...noteData, mood_rating: e.target.value })} />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label className="text-xs">Visibility</Label>
+                                    <Select value={noteData.visibility} onValueChange={(v) => setNoteData({ ...noteData, visibility: v })}>
+                                        <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="staff_only">Staff Only</SelectItem>
+                                            <SelectItem value="include_family">Family Visible</SelectItem>
+                                            <SelectItem value="private">Private</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <Textarea className="mt-3 min-h-[80px] text-sm" placeholder="Write your progress note..." value={noteData.content} onChange={(e) => setNoteData({ ...noteData, content: e.target.value })} />
+                            <div className="mt-3 flex items-center justify-between">
+                                <Button size="sm" variant="ghost" className="text-xs" onClick={() => setShowAddForm(false)}>Cancel</Button>
+                                <Button size="sm" className="bg-violet-600 hover:bg-violet-700" onClick={submitNote} disabled={!noteData.client_id || !noteData.content.trim()}>Save Note</Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white/50 p-3 shadow-sm">
@@ -174,7 +256,13 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                                                 </div>
                                             )}
                                         </div>
-                                        <span className="shrink-0 text-[10px] text-muted-foreground">{formatRelativeTime(note.created_at)}</span>
+                                        <div className="flex shrink-0 flex-col items-end gap-1">
+                                            <span className="text-[10px] text-muted-foreground">{formatRelativeTime(note.created_at)}</span>
+                                            <Button variant="ghost" size="sm" className={`h-6 gap-1 px-1.5 text-[10px] ${note.is_flagged ? 'text-red-600' : 'text-muted-foreground hover:text-red-600'}`}
+                                                onClick={() => toggleFlag(note.id)} title={note.is_flagged ? 'Unflag' : 'Flag'}>
+                                                <Flag className="h-3 w-3" /> {note.is_flagged ? 'Unflag' : 'Flag'}
+                                            </Button>
+                                        </div>
                                     </div>
                                 </CardContent>
                             </Card>
