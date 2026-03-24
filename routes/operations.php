@@ -407,18 +407,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Shift Notes (NEW)
     // -------------------------------------------------------------------------
 
-    Route::get('/shift-notes', [ShiftNoteController::class, 'index'])
-        ->middleware('permission:shifts.viewAny')
-        ->name('operations.shift_notes.index');
-    Route::post('/shifts/{shift}/notes', [ShiftNoteController::class, 'store'])
-        ->middleware('permission:shifts.update|shifts.viewAssigned')
-        ->name('operations.shifts.notes.store');
-    Route::put('/shifts/{shift}/notes/{note}', [ShiftNoteController::class, 'update'])
-        ->middleware('permission:shifts.update|shifts.viewAssigned')
-        ->name('operations.shifts.notes.update');
-    Route::delete('/shifts/{shift}/notes/{note}', [ShiftNoteController::class, 'destroy'])
-        ->middleware('permission:shifts.update|shifts.viewAssigned')
-        ->name('operations.shifts.notes.destroy');
+    Route::get('/shift-notes', [ShiftNoteController::class, 'index'])->name('operations.shift_notes.index');
+    Route::get('/shift-notes/export', [ShiftNoteController::class, 'export'])->name('operations.shift_notes.export');
+    Route::patch('/shift-notes/{note}/flag', [ShiftNoteController::class, 'flag'])->name('operations.shift_notes.flag');
+    Route::patch('/shift-notes/{note}/review', [ShiftNoteController::class, 'markReviewed'])->name('operations.shift_notes.review');
 
     // -------------------------------------------------------------------------
     // Handovers (NEW)
