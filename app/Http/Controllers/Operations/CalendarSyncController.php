@@ -24,6 +24,14 @@ class CalendarSyncController extends Controller
         ]);
     }
 
+    public function create(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth, 403);
+
+        return inertia('operations/calendar-sync/Create');
+    }
+
     public function store(Request $request)
     {
         $auth = $request->user();

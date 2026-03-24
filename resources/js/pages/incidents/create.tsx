@@ -14,8 +14,9 @@ type Props = {
 };
 
 export default function IncidentCreate({ clients, templates }: Props) {
-    const { auth } = usePage().props as any;
+    const { auth, labels } = usePage().props as any;
     const can = auth?.can?.incidents ?? {};
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
     const form = useForm({
         client_id: '',
         template_id: '',
@@ -67,9 +68,9 @@ export default function IncidentCreate({ clients, templates }: Props) {
                     <CardContent className="space-y-3">
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                             <div className="space-y-1">
-                                <Label>Client</Label>
+                                <Label>{clientSingular}</Label>
                                 <Select value={form.data.client_id || '__none__'} onValueChange={(v) => form.setData('client_id', v === '__none__' ? '' : v)}>
-                                    <SelectTrigger><SelectValue placeholder="Select a client" /></SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder={`Select a ${clientSingular.toLowerCase()}`} /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value="__none__">Select...</SelectItem>
                                         {clients.map((c) => (

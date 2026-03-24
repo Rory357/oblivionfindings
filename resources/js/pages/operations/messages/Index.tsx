@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { MessageSquareText, Search, Users } from 'lucide-react';
 
 type Conversation = {
@@ -39,18 +39,21 @@ function formatRelativeTime(iso: string): string {
     return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
 }
 
-const TYPE_LABELS: Record<string, string> = {
-    direct: 'Direct',
-    group: 'Group',
-    client_team: 'Client Team',
-    family: 'Family',
-};
-
 export default function MessagesIndex({ conversations = [], filters = {} as any }: Props) {
+    const { labels } = usePage().props as any;
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
+
+    const TYPE_LABELS: Record<string, string> = {
+        direct: 'Direct',
+        group: 'Group',
+        client_team: `${clientSingular} Team`,
+        family: 'Family',
+    };
+
     return (
         <AppLayout>
             <Head title="Messages" />
-            <PageHeader title="Messages" description="Team messaging and client communications." backHref="/operations" />
+            <PageHeader title="Messages" description={`Team messaging and ${clientSingular.toLowerCase()} communications.`} backHref="/operations" />
             <PageShell>
                 <div className="mb-4">
                     <div className="relative">
@@ -65,7 +68,7 @@ export default function MessagesIndex({ conversations = [], filters = {} as any 
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <MessageSquareText className="mb-4 h-12 w-12 text-muted-foreground/30" />
                                 <h2 className="text-lg font-semibold text-muted-foreground">No Conversations</h2>
-                                <p className="mt-1 text-sm text-muted-foreground/80">Start a conversation with your team or client care teams.</p>
+                                <p className="mt-1 text-sm text-muted-foreground/80">Start a conversation with your team or {clientSingular.toLowerCase()} care teams.</p>
                             </CardContent>
                         </Card>
                     )}

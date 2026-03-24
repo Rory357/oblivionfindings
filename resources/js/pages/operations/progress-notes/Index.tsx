@@ -13,7 +13,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, BookOpen, Eye, Flag, MessageSquareText, Search, Smile } from 'lucide-react';
 
 const ANY = '__ANY__';
@@ -68,6 +68,9 @@ function formatRelativeTime(iso: string): string {
 }
 
 export default function ProgressNotesIndex({ notes = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any, clients = [] }: Props) {
+    const { labels } = usePage().props as any;
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
+    const clientPlural = labels?.['client.plural'] ?? 'Clients';
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/progress-notes', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
@@ -75,7 +78,7 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
     return (
         <AppLayout>
             <Head title="Progress Notes" />
-            <PageHeader title="Progress Notes" description="Client progress notes, observations, and goal updates." backHref="/operations" />
+            <PageHeader title="Progress Notes" description={`${clientSingular} progress notes, observations, and goal updates.`} backHref="/operations" />
             <PageShell>
                 {/* Stats */}
                 <div className="grid grid-cols-3 gap-3">
@@ -91,9 +94,9 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                         <Input placeholder="Search notes..." className="h-9 pl-8 text-sm" defaultValue={filters?.q ?? ''} onChange={(e) => updateFilters('q', e.target.value || null)} />
                     </div>
                     <Select value={filters?.client_id ?? ANY} onValueChange={(v) => updateFilters('client_id', v === ANY ? null : v)}>
-                        <SelectTrigger className="h-9 w-[160px] text-xs"><SelectValue placeholder="All Clients" /></SelectTrigger>
+                        <SelectTrigger className="h-9 w-[160px] text-xs"><SelectValue placeholder={`All ${clientPlural}`} /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value={ANY}>All Clients</SelectItem>
+                            <SelectItem value={ANY}>{`All ${clientPlural}`}</SelectItem>
                             {(clients ?? []).map((c) => (
                                 <SelectItem key={c.id} value={String(c.id)}>{c.first_name} {c.last_name}</SelectItem>
                             ))}

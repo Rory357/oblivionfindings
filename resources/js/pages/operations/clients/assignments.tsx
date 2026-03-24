@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from 'react';
 export default function ClientAssignments({ client, workers, assignedIds }) {
     const { props } = usePage() as any;
     const flash = props.flash;
+    const labels = props.labels;
 
     const [selected, setSelected] = useState<number[]>(assignedIds ?? []);
     const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>(
@@ -48,7 +49,7 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Clients', href: '/clients' },
+                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
                 // remove the show breadcrumb until you actually use /clients/{id}
                 {
                     title: 'Assignments',
@@ -76,7 +77,7 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                 )}
 
                 <div className="m-4 rounded-xl border p-4">
-                    <div className="text-sm text-slate-500">Client</div>
+                    <div className="text-sm text-slate-500">{labels?.['client.singular'] ?? 'Client'}</div>
                     <div className="text-lg font-semibold">
                         {client.first_name} {client.last_name}
                     </div>
@@ -92,7 +93,7 @@ export default function ClientAssignments({ client, workers, assignedIds }) {
                                 Assigned support workers
                             </div>
                             <div className="text-sm text-slate-500">
-                                Tick workers to assign them to this client.
+                                Tick workers to assign them to this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}.
                             </div>
                         </div>
 

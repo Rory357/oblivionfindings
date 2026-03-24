@@ -242,7 +242,7 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     return groups;
 }
 
-function buildOperationsSubPanelGroups({ can, role }: { can?: any; role?: string | null }): SubPanelGroup[] {
+function buildOperationsSubPanelGroups({ can, role, labels }: { can?: any; role?: string | null; labels?: any }): SubPanelGroup[] {
     const groups: SubPanelGroup[] = [];
 
     // Overview
@@ -253,14 +253,16 @@ function buildOperationsSubPanelGroups({ can, role }: { can?: any; role?: string
     groups.push({ label: 'Overview', items: overview });
 
     // Client Management
+    const clientLabel = labels?.['client.singular'] ?? 'Client';
+    const clientLabelPlural = labels?.['client.plural'] ?? 'Clients';
     const clientMgmt: NavItem[] = [];
-    if (can?.clients?.viewAny || role === 'support_worker') clientMgmt.push({ title: 'Clients', href: '/operations/clients', icon: Users });
-    if (can?.clients?.viewAny) clientMgmt.push({ title: 'Onboarding', href: '/operations/onboarding', icon: UserCheck });
+    if (can?.clients?.viewAny || role === 'support_worker') clientMgmt.push({ title: clientLabelPlural, href: '/operations/clients', icon: Users });
+    if (can?.clients?.viewAny) clientMgmt.push({ title: 'Onboarding Pipeline', href: '/operations/onboarding', icon: UserCheck });
     if (can?.care_plans?.viewAny || can?.clients?.viewAny) clientMgmt.push({ title: 'Care Plans', href: '/operations/care-plans', icon: ClipboardCheck });
     if (can?.service_agreements?.viewAny || can?.clients?.viewAny) clientMgmt.push({ title: 'Service Agreements', href: '/operations/service-agreements', icon: FileText });
     if (can?.progress_notes?.viewAny || can?.clients?.viewAny || role === 'support_worker') clientMgmt.push({ title: 'Progress Notes', href: '/operations/progress-notes', icon: MessageSquareText });
-    if (can?.clients?.viewAny) clientMgmt.push({ title: 'Client Funds', href: '/operations/client-funds', icon: DollarSign });
-    if (clientMgmt.length > 0) groups.push({ label: 'Client Management', items: clientMgmt });
+    if (can?.clients?.viewAny) clientMgmt.push({ title: `${clientLabel} Funds`, href: '/operations/client-funds', icon: DollarSign });
+    if (clientMgmt.length > 0) groups.push({ label: `${clientLabel} Management`, items: clientMgmt });
 
     // Scheduling
     const scheduling: NavItem[] = [];
@@ -732,7 +734,7 @@ function SubPanel({
 
 export function AppSidebar() {
     const page = usePage<PageProps & Record<string, any>>();
-    const { auth, branding, name: appName } = page.props;
+    const { auth, branding, name: appName, labels } = page.props;
     const role = auth.user?.role ?? null;
     const can = auth?.can;
     const currentUrl = page.url;
@@ -746,7 +748,7 @@ export function AppSidebar() {
 
     const subPanelMap = useMemo(() => ({
         sites: buildSitesSubPanelGroups({ can }),
-        operations: buildOperationsSubPanelGroups({ can, role }),
+        operations: buildOperationsSubPanelGroups({ can, role, labels: labels as any }),
         emar: buildEmarSubPanelGroups({ can }),
         safety: buildSafetySubPanelGroups({ can }),
         'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
@@ -921,7 +923,7 @@ export function AppSidebarMobile({
     onClose: () => void;
 }) {
     const page = usePage<PageProps & Record<string, any>>();
-    const { auth } = page.props;
+    const { auth, labels } = page.props as any;
     const role = auth.user?.role ?? null;
     const can = auth?.can;
     const currentUrl = page.url;
@@ -930,7 +932,7 @@ export function AppSidebarMobile({
 
     const mobileSubPanelMap = useMemo(() => ({
         sites: buildSitesSubPanelGroups({ can }),
-        operations: buildOperationsSubPanelGroups({ can, role }),
+        operations: buildOperationsSubPanelGroups({ can, role, labels: labels as any }),
         emar: buildEmarSubPanelGroups({ can }),
         safety: buildSafetySubPanelGroups({ can }),
         'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),

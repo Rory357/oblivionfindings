@@ -21,7 +21,7 @@ type RolePayload = {
     permission_keys: string[];
 };
 
-const GROUP_LABELS: Record<string, string> = {
+const _GROUP_LABELS: Record<string, string> = {
     clients: 'Clients',
     shifts: 'Shifts',
     incidents: 'Incidents',
@@ -35,15 +35,6 @@ const GROUP_LABELS: Record<string, string> = {
     governance: 'Governance',
 };
 
-function formatGroupName(group: string) {
-    if (GROUP_LABELS[group]) return GROUP_LABELS[group];
-    return group
-        .split('_')
-        .filter(Boolean)
-        .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
-        .join(' ');
-}
-
 type Props = {
     mode: 'create' | 'edit';
     role: RolePayload | null;
@@ -51,8 +42,20 @@ type Props = {
 };
 
 export default function RoleEdit(props: Props) {
-    const { auth } = usePage().props as any;
+    const { auth, labels } = usePage().props as any;
     const can = auth?.can;
+    const clientPlural = labels?.['client.plural'] ?? 'Clients';
+
+    const GROUP_LABELS: Record<string, string> = { ..._GROUP_LABELS, clients: clientPlural };
+
+    function formatGroupName(group: string) {
+        if (GROUP_LABELS[group]) return GROUP_LABELS[group];
+        return group
+            .split('_')
+            .filter(Boolean)
+            .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+            .join(' ');
+    }
 
     const [filter, setFilter] = useState('');
 

@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 type Props = {
@@ -17,6 +17,7 @@ type Props = {
 };
 
 export default function ClientIncidents({ client, incidents, templates, can }: Props) {
+    const { labels } = usePage().props as any;
     const name = `${client.first_name} ${client.last_name}`.trim();
     const [showNew, setShowNew] = useState(false);
 
@@ -58,7 +59,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Clients', href: '/clients' },
+                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
                 { title: name, href: `/clients/${client.id}` },
                 { title: 'Incidents', href: `/clients/${client.id}/incidents` },
             ]}
@@ -87,7 +88,7 @@ export default function ClientIncidents({ client, incidents, templates, can }: P
                             New (global)
                         </Link>
                         <Link href={`/clients/${client.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                            Back to client
+                            Back to {(labels?.['client.singular'] ?? 'Client').toLowerCase()}
                         </Link>
                         {can.create && (
                             <Button size="sm" onClick={() => setShowNew((v) => !v)}>

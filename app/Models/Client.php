@@ -157,4 +157,14 @@ class Client extends Model
     {
         return $this->hasMany(\App\Models\ClientOnboardingOverride::class);
     }
+
+    public function onboardingWorkflow()
+    {
+        return $this->hasOne(\App\Models\ClientOnboardingWorkflow::class, 'client_id')->latest();
+    }
+
+    public function onboardingWorkflows()
+    {
+        return $this->hasMany(\App\Models\ClientOnboardingWorkflow::class, 'client_id');
+    }
 }

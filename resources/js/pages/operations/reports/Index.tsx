@@ -2,7 +2,7 @@ import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Card, CardContent } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, usePage } from '@inertiajs/react';
 import {
     BarChart3,
     ClipboardCheck,
@@ -13,58 +13,62 @@ import {
     Users,
 } from 'lucide-react';
 
-const reportTypes = [
-    {
-        title: 'Client Summary',
-        description: 'Client activity, hours delivered, care plan progress, and goal outcomes.',
-        href: '/operations/reports/client-summary',
-        icon: Users,
-        color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
-    },
-    {
-        title: 'Staff Utilisation',
-        description: 'Staff hours worked, utilisation rates, overtime, and availability.',
-        href: '/operations/reports/staff-utilisation',
-        icon: Clock,
-        color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-    },
-    {
-        title: 'Shift Analytics',
-        description: 'Shift patterns, cancellations, no-shows, punctuality, and trends.',
-        href: '/operations/reports/shift-analytics',
-        icon: BarChart3,
-        color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
-    },
-    {
-        title: 'Billing Report',
-        description: 'Revenue summary, billing entries, outstanding amounts, and payment tracking.',
-        href: '/operations/reports/billing',
-        icon: DollarSign,
-        color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
-    },
-    {
-        title: 'Compliance Report',
-        description: 'Care plan reviews due, expired agreements, missing documents, and alerts.',
-        href: '/operations/reports/compliance',
-        icon: ClipboardCheck,
-        color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
-    },
-    {
-        title: 'Service Hours',
-        description: 'Hours delivered vs funded by client, service type, and period.',
-        href: '/operations/reports/service-hours',
-        icon: PieChart,
-        color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
-    },
-];
-
 export default function ReportsIndex() {
+    const { labels } = usePage().props as any;
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
+    const clientPlural = labels?.['client.plural'] ?? 'Clients';
+
+    const reportTypes = [
+        {
+            title: `${clientSingular} Summary`,
+            description: `${clientSingular} activity, hours delivered, care plan progress, and goal outcomes.`,
+            href: '/operations/reports/client-summary',
+            icon: Users,
+            color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+        },
+        {
+            title: 'Staff Utilisation',
+            description: 'Staff hours worked, utilisation rates, overtime, and availability.',
+            href: '/operations/reports/staff-utilisation',
+            icon: Clock,
+            color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+        },
+        {
+            title: 'Shift Analytics',
+            description: 'Shift patterns, cancellations, no-shows, punctuality, and trends.',
+            href: '/operations/reports/shift-analytics',
+            icon: BarChart3,
+            color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+        },
+        {
+            title: 'Billing Report',
+            description: 'Revenue summary, billing entries, outstanding amounts, and payment tracking.',
+            href: '/operations/reports/billing',
+            icon: DollarSign,
+            color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
+        },
+        {
+            title: 'Compliance Report',
+            description: 'Care plan reviews due, expired agreements, missing documents, and alerts.',
+            href: '/operations/reports/compliance',
+            icon: ClipboardCheck,
+            color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+        },
+        {
+            title: 'Service Hours',
+            description: `Hours delivered vs funded by ${clientSingular.toLowerCase()}, service type, and period.`,
+            href: '/operations/reports/service-hours',
+            icon: PieChart,
+            color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
+        },
+    ];
+
     return (
         <AppLayout>
             <Head title="Operations Reports" />
             <PageHeader
                 title="Reports & Analytics"
-                description="Operational reports across clients, staff, shifts, billing, and compliance."
+                description={`Operational reports across ${clientPlural.toLowerCase()}, staff, shifts, billing, and compliance.`}
                 backHref="/operations"
             />
             <PageShell>

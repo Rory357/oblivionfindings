@@ -107,6 +107,7 @@ type Props = {
 
 type TabKey =
     | 'profile'
+    | 'onboarding'
     | 'medical'
     | 'mar'
     | 'care_plans'
@@ -135,7 +136,7 @@ export default function ClientShow({
     respite,
     can,
 }: Props) {
-    const { auth } = usePage().props as any;
+    const { auth, labels } = usePage().props as any;
     const respiteCan = auth?.can?.respite ?? {};
     const name = `${client.first_name} ${client.last_name}`.trim();
     const getInitials = useInitials();
@@ -145,6 +146,7 @@ export default function ClientShow({
     const tabs: Array<{ key: TabKey; label: string; show: boolean }> = useMemo(
         () => [
             { key: 'profile', label: 'Profile', show: true },
+            { key: 'onboarding', label: 'Onboarding', show: client.status === 'onboarding' || !!onboarding?.workflow },
             { key: 'medical', label: 'Medical', show: true },
             { key: 'mar', label: 'MAR', show: true },
             { key: 'care_plans', label: 'Care Plans', show: true },
@@ -166,7 +168,11 @@ export default function ClientShow({
         [can.assign_workers, can.edit, respiteCan?.viewAny],
     );
 
-    const [tab, setTab] = useState<TabKey>('profile');
+    // Support ?tab=onboarding deep linking from dashboard
+    const initialTab = typeof window !== 'undefined'
+        ? (new URLSearchParams(window.location.search).get('tab') as TabKey) || 'profile'
+        : 'profile';
+    const [tab, setTab] = useState<TabKey>(initialTab);
 
     const templates = [
         { key: 'note', label: 'Note', body: '' },
@@ -204,7 +210,7 @@ export default function ClientShow({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Clients', href: '/clients' },
+                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
                 { title: name, href: `/operations/clients/${client.id}` },
             ]}
         >
@@ -382,193 +388,32 @@ export default function ClientShow({
                             <CardTitle className="text-base">Profile</CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
+                            {/* Onboarding Summary Card */}
                             <div className="rounded-md border p-3">
                                 <div className="flex items-center justify-between gap-3">
                                     <div>
-                                        <div className="text-sm font-medium">
-                                            Onboarding checklist
-                                        </div>
+                                        <div className="text-sm font-medium">Onboarding Progress</div>
                                         <div className="text-xs text-slate-500">
-                                            {onboarding.completed}/
-                                            {onboarding.total} complete •{' '}
-                                            {onboarding.percent}%
+                                            {onboarding?.checklist?.completed ?? onboarding?.completed ?? 0}/{onboarding?.checklist?.total ?? onboarding?.total ?? 0} data items complete • {onboarding?.checklist?.percent ?? onboarding?.percent ?? 0}%
                                         </div>
                                     </div>
-                                    <div
-                                        className={`rounded-full px-2 py-1 text-xs ${onboarding.status === 'complete' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}
-                                    >
-                                        {onboarding.status === 'complete'
-                                            ? 'Complete'
-                                            : 'In progress'}
+                                    <div className="flex items-center gap-2">
+                                        <div className={`rounded-full px-2 py-1 text-xs ${(onboarding?.checklist?.status ?? onboarding?.status) === 'complete' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
+                                            {(onboarding?.checklist?.status ?? onboarding?.status) === 'complete' ? 'Complete' : 'In progress'}
+                                        </div>
+                                        {(client.status === 'onboarding' || onboarding?.workflow) && (
+                                            <Button size="sm" variant="outline" onClick={() => setTab('onboarding')}>
+                                                View Onboarding
+                                            </Button>
+                                        )}
                                     </div>
                                 </div>
-
-                                <Separator className="my-3" />
-
-                                <div className="space-y-2">
-                                    {onboarding.items.map((item) => (
-                                        <div
-                                            key={item.key}
-                                            className="flex flex-col gap-2 rounded-md border p-2 sm:flex-row sm:items-center sm:justify-between"
-                                        >
-                                            <div className="flex items-start gap-2">
-                                                <div
-                                                    className={`mt-0.5 h-2 w-2 rounded-full ${item.complete ? 'bg-emerald-500' : 'bg-slate-300'}`}
-                                                />
-                                                <div>
-                                                    <div className="text-sm font-medium">
-                                                        {item.label}
-                                                    </div>
-                                                    <div className="text-xs text-slate-500">
-                                                        {item.complete
-                                                            ? item.has_data
-                                                                ? 'Added'
-                                                                : 'Marked as not applicable'
-                                                            : 'Not completed'}
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-3">
-                                                {!item.has_data &&
-                                                (can.manage_onboarding ||
-                                                    can.edit) ? (
-                                                    <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
-                                                        <Checkbox
-                                                            checked={
-                                                                item.override
-                                                            }
-                                                            onCheckedChange={(
-                                                                v,
-                                                            ) => {
-                                                                router.post(
-                                                                    `/operations/clients/${client.id}/onboarding/${item.key}`,
-                                                                    {
-                                                                        checked:
-                                                                            !!v,
-                                                                    },
-                                                                    {
-                                                                        preserveScroll: true,
-                                                                    },
-                                                                );
-                                                            }}
-                                                        />
-                                                        Doesn't have this
-                                                    </label>
-                                                ) : null}
-
-                                                {item.key === 'profile' ? (
-                                                    can.edit ? (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/edit`}
-                                                            >
-                                                                Open
-                                                            </Link>
-                                                        </Button>
-                                                    ) : (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            disabled
-                                                        >
-                                                            Review
-                                                        </Button>
-                                                    )
-                                                ) : item.key ===
-                                                  'medications' ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        asChild
-                                                    >
-                                                        <Link
-                                                            href={`/operations/clients/${client.id}/medical?section=medications`}
-                                                        >
-                                                            Open
-                                                        </Link>
-                                                    </Button>
-                                                ) : item.key ===
-                                                  'conditions' ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        asChild
-                                                    >
-                                                        <Link
-                                                            href={`/operations/clients/${client.id}/medical?section=conditions`}
-                                                        >
-                                                            Open
-                                                        </Link>
-                                                    </Button>
-                                                ) : item.key ===
-                                                  'emergency_contacts' ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        asChild
-                                                    >
-                                                        <Link
-                                                            href={`/operations/clients/${client.id}/medical?section=emergency_contacts`}
-                                                        >
-                                                            Open
-                                                        </Link>
-                                                    </Button>
-                                                ) : item.key ===
-                                                  'next_of_kin' ? (
-                                                    can.edit ? (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/portal-users`}
-                                                            >
-                                                                Open
-                                                            </Link>
-                                                        </Button>
-                                                    ) : null
-                                                ) : item.key === 'documents' ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        asChild
-                                                    >
-                                                        <Link
-                                                            href={`/operations/clients/${client.id}/documents`}
-                                                        >
-                                                            Open
-                                                        </Link>
-                                                    </Button>
-                                                ) : item.key === 'history' ? (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() =>
-                                                            setTab(
-                                                                'support_plan',
-                                                            )
-                                                        }
-                                                    >
-                                                        Open
-                                                    </Button>
-                                                ) : (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled
-                                                    >
-                                                        Review
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
+                                {/* Mini progress bar */}
+                                <div className="mt-2 h-1.5 rounded-full bg-muted">
+                                    <div
+                                        className="h-1.5 rounded-full bg-indigo-500 transition-all"
+                                        style={{ width: `${onboarding?.checklist?.percent ?? onboarding?.percent ?? 0}%` }}
+                                    />
                                 </div>
                             </div>
 
@@ -692,7 +537,7 @@ export default function ClientShow({
                                         </div>
                                         <div className="text-xs text-slate-500">
                                             Next and recent rostered shifts for
-                                            this client.
+                                            this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}.
                                         </div>
                                     </div>
                                     {can.create_shift ? (
@@ -831,6 +676,169 @@ export default function ClientShow({
                             </div>
                         </CardContent>
                     </Card>
+                )}
+
+                {tab === 'onboarding' && (
+                    <div className="space-y-4">
+                        {/* Workflow Progress Header */}
+                        {onboarding?.workflow ? (
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="text-base">Onboarding Workflow</CardTitle>
+                                        <Badge variant={onboarding.workflow.status === 'completed' ? 'secondary' : 'default'} className="capitalize">
+                                            {onboarding.workflow.status?.replace('_', ' ')}
+                                        </Badge>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                        {onboarding.workflow.assigned_to && (
+                                            <span>Coordinator: <strong>{onboarding.workflow.assigned_to.name}</strong></span>
+                                        )}
+                                        {onboarding.workflow.started_at && (
+                                            <span>Started: {new Date(onboarding.workflow.started_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                        )}
+                                    </div>
+                                    {/* Progress bar */}
+                                    {(() => {
+                                        const steps = onboarding.workflow.steps ?? [];
+                                        const done = steps.filter((s: any) => s.status === 'completed' || s.status === 'skipped').length;
+                                        const pct = steps.length > 0 ? Math.round((done / steps.length) * 100) : 0;
+                                        return (
+                                            <div className="mt-3">
+                                                <div className="flex justify-between text-xs text-muted-foreground">
+                                                    <span>{done}/{steps.length} steps complete</span>
+                                                    <span>{pct}%</span>
+                                                </div>
+                                                <div className="mt-1 h-2 rounded-full bg-muted">
+                                                    <div className="h-2 rounded-full bg-indigo-500 transition-all" style={{ width: `${pct}%` }} />
+                                                </div>
+                                            </div>
+                                        );
+                                    })()}
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <Card>
+                                <CardContent className="flex flex-col items-center justify-center py-8">
+                                    <p className="text-sm text-muted-foreground">No onboarding workflow found.</p>
+                                    {(can.manage_onboarding || can.edit) && (
+                                        <Button size="sm" className="mt-3" onClick={() => {
+                                            router.post(`/operations/clients/${client.id}/onboarding-workflow`, {}, { preserveScroll: true });
+                                        }}>
+                                            Start Onboarding Workflow
+                                        </Button>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Data Checklist */}
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-base">Data Checklist</CardTitle>
+                                <p className="text-xs text-muted-foreground">Auto-detected from {(labels?.['client.singular'] ?? 'client').toLowerCase()} profile data</p>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                {(onboarding?.checklist?.items ?? onboarding?.items ?? []).map((item: any) => (
+                                    <div key={item.key} className="flex items-center justify-between rounded-md border p-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className={`h-2 w-2 rounded-full ${item.complete ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                                            <div>
+                                                <div className="text-sm font-medium">{item.label}</div>
+                                                <div className="text-xs text-slate-500">
+                                                    {item.complete ? (item.has_data ? 'Added' : 'Not applicable') : 'Not completed'}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {!item.has_data && (can.manage_onboarding || can.edit) && (
+                                            <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-600">
+                                                <Checkbox
+                                                    checked={item.override}
+                                                    onCheckedChange={(v) => {
+                                                        router.post(`/operations/clients/${client.id}/onboarding/${item.key}`, { checked: !!v }, { preserveScroll: true });
+                                                    }}
+                                                />
+                                                Doesn't have this
+                                            </label>
+                                        )}
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+
+                        {/* Workflow Steps */}
+                        {onboarding?.workflow?.steps && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">Workflow Steps</CardTitle>
+                                    <p className="text-xs text-muted-foreground">Manual steps tracked by staff</p>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    {onboarding.workflow.steps.map((step: any) => (
+                                        <div key={step.id} className={`flex items-center justify-between rounded-md border p-3 ${step.status === 'completed' ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/30 dark:bg-emerald-950/20' : step.due_date && new Date(step.due_date) < new Date() && step.status === 'pending' ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20' : ''}`}>
+                                            <div className="flex items-center gap-3">
+                                                <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
+                                                    {step.step_order}
+                                                </div>
+                                                <div>
+                                                    <div className="text-sm font-medium">{step.step_name}</div>
+                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                        {step.status === 'completed' && step.completed_by && (
+                                                            <span>Completed by {step.completed_by.name}</span>
+                                                        )}
+                                                        {step.completed_at && (
+                                                            <span>{new Date(step.completed_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}</span>
+                                                        )}
+                                                        {step.due_date && step.status === 'pending' && (
+                                                            <span className={new Date(step.due_date) < new Date() ? 'text-red-600 font-medium' : ''}>
+                                                                Due: {new Date(step.due_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}
+                                                            </span>
+                                                        )}
+                                                        {step.notes && <span className="italic">"{step.notes}"</span>}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant={step.status === 'completed' ? 'secondary' : step.status === 'skipped' ? 'outline' : 'default'} className="h-5 text-[10px] capitalize">
+                                                    {step.status}
+                                                </Badge>
+                                                {step.status === 'pending' && (can.manage_onboarding || can.edit) && (
+                                                    <div className="flex gap-1">
+                                                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => {
+                                                            router.patch(`/operations/onboarding/${onboarding.workflow.id}/steps/${step.id}`, { status: 'completed' }, { preserveScroll: true });
+                                                        }}>
+                                                            Complete
+                                                        </Button>
+                                                        <Button size="sm" variant="ghost" className="h-7 text-xs text-muted-foreground" onClick={() => {
+                                                            router.patch(`/operations/onboarding/${onboarding.workflow.id}/steps/${step.id}`, { status: 'skipped' }, { preserveScroll: true });
+                                                        }}>
+                                                            Skip
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </CardContent>
+                                {/* Complete Onboarding Button */}
+                                {onboarding.workflow.status === 'in_progress' && (can.manage_onboarding || can.edit) && (() => {
+                                    const requiredSteps = onboarding.workflow.steps.filter((s: any) => s.is_required);
+                                    const allRequiredDone = requiredSteps.every((s: any) => s.status === 'completed' || s.status === 'skipped');
+                                    return allRequiredDone ? (
+                                        <div className="border-t p-4">
+                                            <Button className="w-full" onClick={() => {
+                                                router.post(`/operations/onboarding/${onboarding.workflow.id}/complete`, {}, { preserveScroll: true });
+                                            }}>
+                                                Complete Onboarding — Set Status to Active
+                                            </Button>
+                                        </div>
+                                    ) : null;
+                                })()}
+                            </Card>
+                        )}
+                    </div>
                 )}
 
                 {tab === 'medical' && (
@@ -1694,7 +1702,7 @@ export default function ClientShow({
                                 Manage consent records for {client.first_name} — medication consent, data sharing, photography, treatment authorisation, and more.
                             </p>
                             <p className="mt-2 text-xs text-muted-foreground">
-                                Consent management is tracked per client to ensure GDPR and privacy compliance.
+                                Consent management is tracked per {(labels?.['client.singular'] ?? 'Client').toLowerCase()} to ensure GDPR and privacy compliance.
                             </p>
                         </CardContent>
                     </Card>
@@ -1704,12 +1712,12 @@ export default function ClientShow({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">
-                                Portal access (Client / Next of Kin)
+                                Portal access ({labels?.['client.singular'] ?? 'Client'} / Next of Kin)
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             <div className="text-sm text-slate-600">
-                                Portal users can view this client’s medical,
+                                Portal users can view this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}{"'s"} medical,
                                 documents, and timeline, and can query the RAG
                                 assistant.
                             </div>
@@ -1763,8 +1771,8 @@ export default function ClientShow({
                         </CardHeader>
                         <CardContent className="space-y-2">
                             <div className="text-sm text-slate-600">
-                                Assign support workers to this client. This
-                                controls which staff can see the client.
+                                Assign support workers to this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}. This
+                                controls which staff can see the {(labels?.['client.singular'] ?? 'Client').toLowerCase()}.
                             </div>
                             <div className="pt-2">
                                 <Link

@@ -142,6 +142,7 @@ class ClientController extends Controller
             'supportPlan',
             'assessments',
             'onboardingOverrides',
+            'onboardingWorkflow.steps',
         ]);
 
         // For modal / async detail views, return JSON.
@@ -295,7 +296,31 @@ class ClientController extends Controller
                     'staff' => $lastShift->staff ? ['id' => $lastShift->staff->id, 'name' => $lastShift->staff->name, 'email' => $lastShift->staff->email] : null,
                 ] : null,
             ],
-            'onboarding' => $this->buildOnboardingChecklist($client),
+            'onboarding' => [
+                'checklist' => $this->buildOnboardingChecklist($client),
+                'workflow' => $client->onboardingWorkflow ? [
+                    'id' => $client->onboardingWorkflow->id,
+                    'status' => $client->onboardingWorkflow->status,
+                    'started_at' => $client->onboardingWorkflow->started_at?->toISOString(),
+                    'completed_at' => $client->onboardingWorkflow->completed_at?->toISOString(),
+                    'assigned_to' => $client->onboardingWorkflow->assignee ? [
+                        'id' => $client->onboardingWorkflow->assignee->id,
+                        'name' => $client->onboardingWorkflow->assignee->name,
+                    ] : null,
+                    'notes' => $client->onboardingWorkflow->notes,
+                    'steps' => $client->onboardingWorkflow->steps->sortBy('step_order')->map(fn($s) => [
+                        'id' => $s->id,
+                        'step_name' => $s->step_name,
+                        'step_order' => $s->step_order,
+                        'is_required' => $s->is_required,
+                        'status' => $s->status,
+                        'completed_at' => $s->completed_at?->toISOString(),
+                        'completed_by' => $s->completer ? ['id' => $s->completer->id, 'name' => $s->completer->name] : null,
+                        'notes' => $s->notes,
+                        'due_date' => $s->due_date?->toDateString(),
+                    ])->values()->toArray(),
+                ] : null,
+            ],
             'respite' => [
                 'bookings' => RespiteBooking::query()
                     ->where('client_id', $client->id)
@@ -330,6 +355,7 @@ class ClientController extends Controller
                 'pin_handover' => $request->user()?->canDo('timeline.pin') ?? false,
                 'manage_onboarding' => $request->user()?->canDo('clients.onboarding.manage') ?? false,
                 'create_shift' => $request->user()?->canDo('shifts.create') ?? false,
+                'manage_onboarding_workflow' => $request->user()?->canDo('onboarding.edit') ?? false,
             ],
         ]);
     }
@@ -457,8 +483,17 @@ class ClientController extends Controller
                 'create_client_portal_user',
             ])->all();
 
-            $client = DB::transaction(function () use ($clientFields, $data) {
+            // Default to onboarding status for new clients
+            if (!isset($clientFields['status']) || $clientFields['status'] === 'active') {
+                $clientFields['status'] = 'onboarding';
+            }
+
+            $auth = $request->user();
+
+            $client = DB::transaction(function () use ($clientFields, $data, $auth) {
                 $client = Client::create($clientFields);
+
+                \App\Models\ClientOnboardingWorkflow::createForClient($client, $auth->id);
 
                 if (!empty($data['create_client_portal_user'])) {
                     $clientEmail = trim((string) ($data['email'] ?? $client->email ?? ''));

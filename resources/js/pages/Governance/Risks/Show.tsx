@@ -1,4 +1,4 @@
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { index as risksIndex, update as updateRisk, accept as acceptRisk, close as closeRisk } from '@/routes/governance/risks';
@@ -75,6 +75,8 @@ interface Props extends PageProps {
 }
 
 export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: Props) {
+  const { labels: pageLabels } = usePage().props as any;
+  const clientSingular = pageLabels?.['client.singular'] ?? 'Client';
   const [showTreatmentDialog, setShowTreatmentDialog] = useState(false);
   const [showAcceptDialog, setShowAcceptDialog] = useState(false);
   const [treatmentForm, setTreatmentForm] = useState({
@@ -107,7 +109,7 @@ export default function RiskShow({ auth, risk, assignees, canEdit, canAccept }: 
 
   const getCategoryLabel = (category: string) => {
     const labels: Record<string, string> = {
-      client_safety: 'Client Safety',
+      client_safety: `${clientSingular} Safety`,
       reputational: 'Reputational',
       financial: 'Financial',
       it_cyber: 'IT/Cyber',

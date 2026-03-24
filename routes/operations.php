@@ -113,6 +113,11 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::post('/clients', [ClientController::class, 'store'])->name('operations.clients.store');
     });
 
+    // Client onboarding workflow (from client profile)
+    Route::post('/clients/{client}/onboarding-workflow', [ClientOnboardingWorkflowController::class, 'storeForClient'])
+        ->name('operations.clients.onboarding_workflow.store')
+        ->whereNumber('client');
+
     // Client updates
     Route::middleware('permission:clients.update')->group(function () {
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('operations.clients.edit');
@@ -274,14 +279,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Care Plans (NEW)
     // -------------------------------------------------------------------------
 
-    Route::middleware('permission:care_plans.viewAny')->group(function () {
-        Route::get('/care-plans', [CarePlanController::class, 'index'])->name('operations.care_plans.index');
-        Route::get('/care-plans/{carePlan}', [CarePlanController::class, 'show'])->name('operations.care_plans.show');
-    });
-
     Route::middleware('permission:care_plans.create')->group(function () {
         Route::get('/care-plans/create', [CarePlanController::class, 'create'])->name('operations.care_plans.create');
         Route::post('/care-plans', [CarePlanController::class, 'store'])->name('operations.care_plans.store');
+    });
+
+    Route::middleware('permission:care_plans.viewAny')->group(function () {
+        Route::get('/care-plans', [CarePlanController::class, 'index'])->name('operations.care_plans.index');
+        Route::get('/care-plans/{carePlan}', [CarePlanController::class, 'show'])->name('operations.care_plans.show');
     });
 
     Route::middleware('permission:care_plans.update')->group(function () {
@@ -307,14 +312,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Service Agreements (NEW)
     // -------------------------------------------------------------------------
 
-    Route::middleware('permission:service_agreements.viewAny')->group(function () {
-        Route::get('/service-agreements', [ServiceAgreementController::class, 'index'])->name('operations.service_agreements.index');
-        Route::get('/service-agreements/{agreement}', [ServiceAgreementController::class, 'show'])->name('operations.service_agreements.show');
-    });
-
     Route::middleware('permission:service_agreements.create')->group(function () {
         Route::get('/service-agreements/create', [ServiceAgreementController::class, 'create'])->name('operations.service_agreements.create');
         Route::post('/service-agreements', [ServiceAgreementController::class, 'store'])->name('operations.service_agreements.store');
+    });
+
+    Route::middleware('permission:service_agreements.viewAny')->group(function () {
+        Route::get('/service-agreements', [ServiceAgreementController::class, 'index'])->name('operations.service_agreements.index');
+        Route::get('/service-agreements/{agreement}', [ServiceAgreementController::class, 'show'])->name('operations.service_agreements.show');
     });
 
     Route::middleware('permission:service_agreements.update')->group(function () {
@@ -442,14 +447,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     });
 
     // Roster templates
-    Route::middleware('permission:roster_templates.viewAny')->group(function () {
-        Route::get('/rostering/templates', [RosterTemplateController::class, 'index'])->name('operations.rostering.templates.index');
-        Route::get('/rostering/templates/{template}', [RosterTemplateController::class, 'show'])->name('operations.rostering.templates.show');
-    });
-
     Route::middleware('permission:roster_templates.create')->group(function () {
         Route::get('/rostering/templates/create', [RosterTemplateController::class, 'create'])->name('operations.rostering.templates.create');
         Route::post('/rostering/templates', [RosterTemplateController::class, 'store'])->name('operations.rostering.templates.store');
+    });
+
+    Route::middleware('permission:roster_templates.viewAny')->group(function () {
+        Route::get('/rostering/templates', [RosterTemplateController::class, 'index'])->name('operations.rostering.templates.index');
+        Route::get('/rostering/templates/{template}', [RosterTemplateController::class, 'show'])->name('operations.rostering.templates.show');
     });
 
     Route::middleware('permission:roster_templates.update')->group(function () {
@@ -537,14 +542,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Invoices (NEW)
     // -------------------------------------------------------------------------
 
-    Route::middleware('permission:invoices.viewAny')->group(function () {
-        Route::get('/invoices', [InvoiceController::class, 'index'])->name('operations.invoices.index');
-        Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('operations.invoices.show');
-    });
-
     Route::middleware('permission:invoices.create')->group(function () {
         Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('operations.invoices.create');
         Route::post('/invoices', [InvoiceController::class, 'store'])->name('operations.invoices.store');
+    });
+
+    Route::middleware('permission:invoices.viewAny')->group(function () {
+        Route::get('/invoices', [InvoiceController::class, 'index'])->name('operations.invoices.index');
+        Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('operations.invoices.show');
     });
 
     Route::post('/invoices/{invoice}/send', [InvoiceController::class, 'send'])
@@ -569,14 +574,15 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::get('/funding/claims', [FundingClaimController::class, 'index'])
         ->middleware('permission:funding.viewAny')
         ->name('operations.funding.claims.index');
-    Route::get('/funding/claims/{claim}', [FundingClaimController::class, 'show'])
-        ->middleware('permission:funding.viewAny')
-        ->name('operations.funding.claims.show');
 
     Route::middleware('permission:funding.claims.create')->group(function () {
         Route::get('/funding/claims/create', [FundingClaimController::class, 'create'])->name('operations.funding.claims.create');
         Route::post('/funding/claims', [FundingClaimController::class, 'store'])->name('operations.funding.claims.store');
     });
+
+    Route::get('/funding/claims/{claim}', [FundingClaimController::class, 'show'])
+        ->middleware('permission:funding.viewAny')
+        ->name('operations.funding.claims.show');
 
     Route::post('/funding/claims/{claim}/submit', [FundingClaimController::class, 'submit'])
         ->middleware('permission:funding.claims.submit')
@@ -612,13 +618,13 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Price Books (Phase 7)
     // -------------------------------------------------------------------------
 
-    Route::middleware('permission:price_books.viewAny')->group(function () {
-        Route::get('/price-books', [PriceBookController::class, 'index'])->name('operations.price_books.index');
-        Route::get('/price-books/{priceBook}', [PriceBookController::class, 'show'])->name('operations.price_books.show');
-    });
     Route::middleware('permission:price_books.create')->group(function () {
         Route::get('/price-books/create', [PriceBookController::class, 'create'])->name('operations.price_books.create');
         Route::post('/price-books', [PriceBookController::class, 'store'])->name('operations.price_books.store');
+    });
+    Route::middleware('permission:price_books.viewAny')->group(function () {
+        Route::get('/price-books', [PriceBookController::class, 'index'])->name('operations.price_books.index');
+        Route::get('/price-books/{priceBook}', [PriceBookController::class, 'show'])->name('operations.price_books.show');
     });
     Route::middleware('permission:price_books.update')->group(function () {
         Route::get('/price-books/{priceBook}/edit', [PriceBookController::class, 'edit'])->name('operations.price_books.edit');
@@ -633,13 +639,13 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Quotes / Proposals (Phase 7)
     // -------------------------------------------------------------------------
 
-    Route::middleware('permission:quotes.viewAny')->group(function () {
-        Route::get('/quotes', [QuoteController::class, 'index'])->name('operations.quotes.index');
-        Route::get('/quotes/{quote}', [QuoteController::class, 'show'])->name('operations.quotes.show');
-    });
     Route::middleware('permission:quotes.create')->group(function () {
         Route::get('/quotes/create', [QuoteController::class, 'create'])->name('operations.quotes.create');
         Route::post('/quotes', [QuoteController::class, 'store'])->name('operations.quotes.store');
+    });
+    Route::middleware('permission:quotes.viewAny')->group(function () {
+        Route::get('/quotes', [QuoteController::class, 'index'])->name('operations.quotes.index');
+        Route::get('/quotes/{quote}', [QuoteController::class, 'show'])->name('operations.quotes.show');
     });
     Route::middleware('permission:quotes.update')->group(function () {
         Route::get('/quotes/{quote}/edit', [QuoteController::class, 'edit'])->name('operations.quotes.edit');
@@ -655,26 +661,30 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     Route::middleware('permission:clients.viewAny')->group(function () {
         Route::get('/onboarding', [ClientOnboardingWorkflowController::class, 'index'])->name('operations.onboarding.index');
-        Route::get('/onboarding/{workflow}', [ClientOnboardingWorkflowController::class, 'show'])->name('operations.onboarding.show');
     });
     Route::middleware('permission:clients.create')->group(function () {
+        Route::get('/onboarding/create', [ClientOnboardingWorkflowController::class, 'create'])->name('operations.onboarding.create');
         Route::post('/onboarding', [ClientOnboardingWorkflowController::class, 'store'])->name('operations.onboarding.store');
         Route::patch('/onboarding/{workflow}/steps/{step}', [ClientOnboardingWorkflowController::class, 'updateStep'])->name('operations.onboarding.steps.update');
         Route::post('/onboarding/{workflow}/complete', [ClientOnboardingWorkflowController::class, 'complete'])->name('operations.onboarding.complete');
+    });
+    Route::middleware('permission:clients.viewAny')->group(function () {
+        Route::get('/onboarding/{workflow}', [ClientOnboardingWorkflowController::class, 'show'])->name('operations.onboarding.show');
     });
 
     // -------------------------------------------------------------------------
     // Client Funds (Phase 7)
     // -------------------------------------------------------------------------
 
-    Route::middleware('permission:clients.viewAny')->group(function () {
-        Route::get('/client-funds', [ClientFundController::class, 'index'])->name('operations.client_funds.index');
-        Route::get('/client-funds/{fund}', [ClientFundController::class, 'show'])->name('operations.client_funds.show');
-    });
     Route::middleware('permission:client_funds.manage')->group(function () {
+        Route::get('/client-funds/create', [ClientFundController::class, 'create'])->name('operations.client_funds.create');
         Route::post('/client-funds', [ClientFundController::class, 'store'])->name('operations.client_funds.store');
         Route::put('/client-funds/{fund}', [ClientFundController::class, 'update'])->name('operations.client_funds.update');
         Route::post('/client-funds/{fund}/transactions', [ClientFundController::class, 'addTransaction'])->name('operations.client_funds.transactions.store');
+    });
+    Route::middleware('permission:clients.viewAny')->group(function () {
+        Route::get('/client-funds', [ClientFundController::class, 'index'])->name('operations.client_funds.index');
+        Route::get('/client-funds/{fund}', [ClientFundController::class, 'show'])->name('operations.client_funds.show');
     });
 
     // -------------------------------------------------------------------------
@@ -698,14 +708,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Custom Forms (Phase 8)
     // -------------------------------------------------------------------------
 
+    Route::middleware('permission:custom_forms.create')->group(function () {
+        Route::get('/forms/create', [CustomFormController::class, 'create'])->name('operations.forms.create');
+        Route::post('/forms', [CustomFormController::class, 'store'])->name('operations.forms.store');
+    });
     Route::middleware('permission:custom_forms.viewAny')->group(function () {
         Route::get('/forms', [CustomFormController::class, 'index'])->name('operations.forms.index');
         Route::get('/forms/{form}', [CustomFormController::class, 'show'])->name('operations.forms.show');
         Route::get('/forms/{form}/submissions', [CustomFormController::class, 'submissions'])->name('operations.forms.submissions');
-    });
-    Route::middleware('permission:custom_forms.create')->group(function () {
-        Route::get('/forms/create', [CustomFormController::class, 'create'])->name('operations.forms.create');
-        Route::post('/forms', [CustomFormController::class, 'store'])->name('operations.forms.store');
     });
     Route::middleware('permission:custom_forms.update')->group(function () {
         Route::get('/forms/{form}/edit', [CustomFormController::class, 'edit'])->name('operations.forms.edit');
@@ -815,6 +825,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     Route::middleware('permission:payroll.export')->group(function () {
         Route::get('/payroll-export', [PayrollExportController::class, 'index'])->name('operations.payroll_export.index');
+        Route::get('/payroll-export/create', [PayrollExportController::class, 'create'])->name('operations.payroll_export.create');
         Route::post('/payroll-export', [PayrollExportController::class, 'generate'])->name('operations.payroll_export.generate');
         Route::get('/payroll-export/{export}/download', [PayrollExportController::class, 'download'])->name('operations.payroll_export.download');
         Route::post('/payroll-export/{export}/confirm', [PayrollExportController::class, 'confirm'])->name('operations.payroll_export.confirm');
@@ -825,6 +836,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // -------------------------------------------------------------------------
 
     Route::get('/calendar-sync', [CalendarSyncController::class, 'index'])->name('operations.calendar_sync.index');
+    Route::get('/calendar-sync/create', [CalendarSyncController::class, 'create'])->name('operations.calendar_sync.create');
     Route::post('/calendar-sync', [CalendarSyncController::class, 'store'])->name('operations.calendar_sync.store');
     Route::delete('/calendar-sync/{sync}', [CalendarSyncController::class, 'destroy'])->name('operations.calendar_sync.destroy');
     Route::post('/calendar-sync/{sync}/trigger', [CalendarSyncController::class, 'triggerSync'])->name('operations.calendar_sync.trigger');
@@ -835,6 +847,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     Route::middleware('permission:evv.viewAny')->group(function () {
         Route::get('/geofences', [GeofenceController::class, 'index'])->name('operations.geofences.index');
+        Route::get('/geofences/create', [GeofenceController::class, 'create'])->name('operations.geofences.create');
         Route::post('/geofences', [GeofenceController::class, 'store'])->name('operations.geofences.store');
         Route::put('/geofences/{zone}', [GeofenceController::class, 'update'])->name('operations.geofences.update');
         Route::delete('/geofences/{zone}', [GeofenceController::class, 'destroy'])->name('operations.geofences.destroy');

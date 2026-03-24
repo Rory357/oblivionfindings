@@ -81,7 +81,7 @@ export default function ShiftsIndex({ shifts, filters, clients, staff, statuses,
                             }
                         />
                         <Input
-                            placeholder="Search client, staff, location"
+                            placeholder={`Search ${(labels?.['client.singular'] ?? 'Client').toLowerCase()}, staff, location`}
                             value={filters.q ?? ''}
                             onChange={(e) =>
                                 router.get('/operations/shifts', { ...filters, q: e.target.value || null }, { preserveState: true, replace: true })
@@ -107,9 +107,9 @@ export default function ShiftsIndex({ shifts, filters, clients, staff, statuses,
                                 router.get('/operations/shifts', { ...filters, client_id: v === ANY ? null : v }, { preserveState: true, replace: true })
                             }
                         >
-                            <SelectTrigger><SelectValue placeholder="Client" /></SelectTrigger>
+                            <SelectTrigger><SelectValue placeholder={labels?.['client.singular'] ?? 'Client'} /></SelectTrigger>
                             <SelectContent>
-                                <SelectItem value={ANY}>All clients</SelectItem>
+                                <SelectItem value={ANY}>{`All ${(labels?.['client.plural'] ?? 'Clients').toLowerCase()}`}</SelectItem>
                                 {clients.map((c) => (
                                     <SelectItem key={c.id} value={String(c.id)}>
                                         {c.first_name} {c.last_name}
@@ -160,7 +160,7 @@ export default function ShiftsIndex({ shifts, filters, clients, staff, statuses,
                             <tr>
                                 <th className="p-3 text-left font-medium">Time</th>
                                 <th className="p-3 text-left font-medium">Hours</th>
-                                <th className="p-3 text-left font-medium">Client</th>
+                                <th className="p-3 text-left font-medium">{labels?.['client.singular'] ?? 'Client'}</th>
                                 <th className="p-3 text-left font-medium">Staff</th>
                                 <th className="p-3 text-left font-medium">Status</th>
                                 <th className="p-3 text-right font-medium">Actions</th>

@@ -3,7 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 
 type Props = {
     client: { id: number; first_name: string; last_name: string };
@@ -12,6 +12,7 @@ type Props = {
 };
 
 export default function ClientPortalUsers({ client, portal_users, relation_options }: Props) {
+    const { labels } = usePage().props as any;
     const form = useForm({
         email: '',
         name: '',
@@ -43,7 +44,7 @@ export default function ClientPortalUsers({ client, portal_users, relation_optio
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Clients', href: '/clients' },
+                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
                 { title: name, href: `/clients/${client.id}` },
                 { title: 'Portal Users', href: `/clients/${client.id}/portal-users` },
             ]}
@@ -91,7 +92,7 @@ export default function ClientPortalUsers({ client, portal_users, relation_optio
                                     value={form.data.portal_role}
                                     onChange={(e) => form.setData('portal_role', e.target.value)}
                                 >
-                                    <option value="client">Client</option>
+                                    <option value="client">{labels?.['client.singular'] ?? 'Client'}</option>
                                     <option value="next_of_kin">Next of kin</option>
                                 </select>
                             </div>

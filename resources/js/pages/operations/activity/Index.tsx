@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Activity, CalendarDays, Clock, Filter, Users } from 'lucide-react';
 
 type ActivityItem = {
@@ -21,13 +21,6 @@ type Props = {
     activities: ActivityItem[];
     filter: string;
 };
-
-const FILTERS = [
-    { value: 'all', label: 'All Activity' },
-    { value: 'shifts', label: 'Shifts' },
-    { value: 'timesheets', label: 'Timesheets' },
-    { value: 'clients', label: 'Clients' },
-];
 
 function formatRelativeTime(iso: string): string {
     const d = new Date(iso);
@@ -70,6 +63,16 @@ function actionColor(action: string): string {
 }
 
 export default function ActivityFeed({ activities, filter }: Props) {
+    const { labels } = usePage().props as any;
+    const clientPlural = labels?.['client.plural'] ?? 'Clients';
+
+    const FILTERS = [
+        { value: 'all', label: 'All Activity' },
+        { value: 'shifts', label: 'Shifts' },
+        { value: 'timesheets', label: 'Timesheets' },
+        { value: 'clients', label: clientPlural },
+    ];
+
     const setFilter = (f: string) => {
         router.get('/operations/activity', { filter: f }, { preserveState: true, replace: true });
     };
@@ -77,7 +80,7 @@ export default function ActivityFeed({ activities, filter }: Props) {
     return (
         <AppLayout>
             <Head title="Activity Feed" />
-            <PageHeader title="Activity Feed" description="Recent operational activity across shifts, timesheets, and clients." backHref="/operations" />
+            <PageHeader title="Activity Feed" description={`Recent operational activity across shifts, timesheets, and ${clientPlural.toLowerCase()}.`} backHref="/operations" />
             <PageShell>
                 {/* Filters */}
                 <div className="mb-4 flex flex-wrap gap-1.5">

@@ -5,7 +5,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
 
 type Props = {
@@ -15,6 +15,7 @@ type Props = {
 };
 
 export default function ClientDocuments({ client, can_edit, documents }: Props) {
+    const { labels } = usePage().props as any;
     const name = `${client.first_name} ${client.last_name}`.trim();
 
     const uploadForm = useForm<{ file: File | null; title: string; category: string; version: string; effective_date: string; expiry_date: string; portal_visible: boolean; notes: string }>({
@@ -44,7 +45,7 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Clients', href: '/clients' },
+                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
                 { title: name, href: `/clients/${client.id}` },
                 { title: 'Documents', href: `/clients/${client.id}/documents` },
             ]}

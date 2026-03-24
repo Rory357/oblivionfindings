@@ -24,6 +24,22 @@ class GeofenceController extends Controller
         ]);
     }
 
+    public function create(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('geofences.create'), 403);
+
+        $clients = \App\Models\Client::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->select('id', 'first_name', 'last_name')
+            ->orderBy('last_name')
+            ->get();
+
+        return inertia('operations/geofences/Create', [
+            'clients' => $clients,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $auth = $request->user();

@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
 type Props = {
@@ -63,6 +63,7 @@ export default function ClientMedical({
     med_charts = [],
     has_open_controlled_discrepancy = false,
 }: Props) {
+    const { labels } = usePage().props as any;
     const name = `${client.first_name} ${client.last_name}`.trim();
     const [confirmAdminOpen, setConfirmAdminOpen] = useState(false);
 
@@ -172,7 +173,7 @@ export default function ClientMedical({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Clients', href: '/clients' },
+                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
                 { title: name, href: `/operations/clients/${client.id}` },
                 { title: 'Medical', href: `/operations/clients/${client.id}/medical` },
             ]}
@@ -194,7 +195,7 @@ export default function ClientMedical({
 
                 {has_open_controlled_discrepancy && (
                     <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                        There is an open controlled-drug discrepancy for this client. Review and resolve before further controlled stock edits (unless override is granted).
+                        There is an open controlled-drug discrepancy for this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}. Review and resolve before further controlled stock edits (unless override is granted).
                     </div>
                 )}
 

@@ -15,7 +15,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     Car,
     Check,
@@ -79,7 +79,7 @@ type Props = {
     is_manager?: boolean;
 };
 
-const PURPOSE_LABELS: Record<string, string> = {
+const _PURPOSE_LABELS: Record<string, string> = {
     client_visit: 'Client Visit',
     meeting: 'Meeting',
     training: 'Training',
@@ -103,6 +103,12 @@ function statusBadge(status: string) {
 }
 
 export default function MileageIndex({ trips, filters, staff, stats, staff_summary, is_manager }: Props) {
+    const { labels } = usePage().props as any;
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
+    const PURPOSE_LABELS: Record<string, string> = {
+        ..._PURPOSE_LABELS,
+        client_visit: `${clientSingular} Visit`,
+    };
     const safeData = trips?.data ?? [];
     const safeMeta = trips?.meta ?? { current_page: 1, last_page: 1, total: 0 };
     const safeStats = stats ?? { trips_this_month: 0, total_distance: 0, total_reimbursement: 0, pending_approval: 0 };
@@ -291,7 +297,7 @@ export default function MileageIndex({ trips, filters, staff, stats, staff_summa
                                                     {is_manager && <th className="px-4 py-3 text-left font-medium text-muted-foreground">Staff</th>}
                                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Route</th>
                                                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Distance</th>
-                                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">Client</th>
+                                                    <th className="px-4 py-3 text-left font-medium text-muted-foreground">{clientSingular}</th>
                                                     <th className="px-4 py-3 text-right font-medium text-muted-foreground">Amount</th>
                                                     <th className="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
                                                     {is_manager && <th className="px-4 py-3 text-right font-medium text-muted-foreground">Actions</th>}

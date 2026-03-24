@@ -26,6 +26,14 @@ class PayrollExportController extends Controller
         ]);
     }
 
+    public function create(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('payroll_exports.create'), 403);
+
+        return inertia('operations/payroll-export/Create');
+    }
+
     public function generate(Request $request)
     {
         $auth = $request->user();

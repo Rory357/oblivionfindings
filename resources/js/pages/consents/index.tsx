@@ -28,8 +28,9 @@ type Props = {
 
 export default function ConsentsIndex({ filters, consents, clients = [], consentTypes = [], stats }: Props) {
     const ANY = '__any__';
-    const { auth } = usePage().props as any;
+    const { auth, labels } = usePage().props as any;
     const can = auth?.can?.consents ?? {};
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get('/consents', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
@@ -127,12 +128,12 @@ export default function ConsentsIndex({ filters, consents, clients = [], consent
 
                         {clients.length > 0 && (
                             <div>
-                                <Label className="text-xs text-slate-500">Client</Label>
+                                <Label className="text-xs text-slate-500">{clientSingular}</Label>
                                 <Select
                                     value={filters.client_id ? String(filters.client_id) : ANY}
                                     onValueChange={(v) => onFilter({ client_id: v === ANY ? null : v })}
                                 >
-                                    <SelectTrigger><SelectValue placeholder="Client" /></SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder={clientSingular} /></SelectTrigger>
                                     <SelectContent>
                                         <SelectItem value={ANY}>Any</SelectItem>
                                         {clients.map((c) => (

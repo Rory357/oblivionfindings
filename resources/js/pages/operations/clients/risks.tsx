@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
 
 type Props = {
@@ -16,6 +16,7 @@ type Props = {
 };
 
 export default function ClientRisks({ client, risks, can }: Props) {
+    const { labels } = usePage().props as any;
     const name = `${client.first_name} ${client.last_name}`.trim();
     const [editingId, setEditingId] = useState<number | null>(null);
 
@@ -38,7 +39,7 @@ export default function ClientRisks({ client, risks, can }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Clients', href: '/clients' },
+                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
                 { title: name, href: `/operations/clients/${client.id}` },
                 { title: 'Risks', href: `/operations/clients/${client.id}/risks` },
             ]}
@@ -52,7 +53,7 @@ export default function ClientRisks({ client, risks, can }: Props) {
                         <div className="mt-1 text-sm text-slate-500">{name}</div>
                     </div>
                     <Link href={`/operations/clients/${client.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back to client
+                        Back to {(labels?.['client.singular'] ?? 'Client').toLowerCase()}
                     </Link>
                 </div>
 

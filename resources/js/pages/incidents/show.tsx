@@ -264,9 +264,10 @@ export default function IncidentShow({
     can,
     is_editable,
 }: Props) {
+    const { labels } = usePage().props as any;
     const clientName = incident.client
         ? `${incident.client.first_name} ${incident.client.last_name}`
-        : 'Client';
+        : (labels?.['client.singular'] ?? 'Client');
 
     // Core incident details are only editable while in draft (audit guardrail).
     const allowCoreEdit =

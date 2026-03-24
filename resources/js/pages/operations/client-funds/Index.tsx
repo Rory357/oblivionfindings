@@ -13,7 +13,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, DollarSign, Eye, Pencil, Plus, Search, Wallet } from 'lucide-react';
 
 const ANY = '__ANY__';
@@ -57,16 +57,19 @@ const FUND_TYPES: Record<string, string> = {
 };
 
 export default function ClientFundsIndex({ funds = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
+    const { labels } = usePage().props as any;
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
+    const clientPlural = labels?.['client.plural'] ?? 'Clients';
     const updateFilters = (key: string, value: string | null) => {
         router.get('/operations/client-funds', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
 
     return (
         <AppLayout>
-            <Head title="Client Funds" />
+            <Head title={`${clientSingular} Funds`} />
             <PageHeader
-                title="Client Funds"
-                description="Manage client trust funds, petty cash, and personal funds."
+                title={`${clientSingular} Funds`}
+                description={`Manage ${clientSingular.toLowerCase()} trust funds, petty cash, and personal funds.`}
                 backHref="/operations"
             />
             <PageShell>
@@ -82,7 +85,7 @@ export default function ClientFundsIndex({ funds = { data: [], links: [], curren
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                         <Input
-                            placeholder="Search client funds..."
+                            placeholder={`Search ${clientSingular.toLowerCase()} funds...`}
                             className="h-9 pl-8 text-sm"
                             defaultValue={filters?.q ?? ''}
                             onChange={(e) => updateFilters('q', e.target.value || null)}
@@ -113,8 +116,8 @@ export default function ClientFundsIndex({ funds = { data: [], links: [], curren
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
                                 <Wallet className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <h2 className="text-lg font-semibold text-muted-foreground">No Client Funds Found</h2>
-                                <p className="mt-1 text-sm text-muted-foreground/80">Create your first client fund to get started.</p>
+                                <h2 className="text-lg font-semibold text-muted-foreground">No {clientSingular} Funds Found</h2>
+                                <p className="mt-1 text-sm text-muted-foreground/80">Create your first {clientSingular.toLowerCase()} fund to get started.</p>
                                 <Button asChild size="sm" className="mt-4">
                                     <Link href="/operations/client-funds/create">Create Fund</Link>
                                 </Button>

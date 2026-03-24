@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
+import { Head, usePage } from '@inertiajs/react';
 import { Download, FileBarChart } from 'lucide-react';
 
 type Props = {
@@ -15,16 +15,18 @@ type Props = {
     filters: { from?: string; to?: string };
 };
 
-const REPORT_TITLES: Record<string, string> = {
-    'client-summary': 'Client Summary Report',
-    'staff-utilisation': 'Staff Utilisation Report',
-    'shift-analytics': 'Shift Analytics Report',
-    'billing': 'Billing Report',
-    'compliance': 'Compliance Report',
-    'service-hours': 'Service Hours Report',
-};
-
 export default function ReportShow({ report_type, title, description, data, filters }: Props) {
+    const { labels } = usePage().props as any;
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
+
+    const REPORT_TITLES: Record<string, string> = {
+        'client-summary': `${clientSingular} Summary Report`,
+        'staff-utilisation': 'Staff Utilisation Report',
+        'shift-analytics': 'Shift Analytics Report',
+        'billing': 'Billing Report',
+        'compliance': 'Compliance Report',
+        'service-hours': 'Service Hours Report',
+    };
     return (
         <AppLayout>
             <Head title={title || REPORT_TITLES[report_type] || 'Report'} />

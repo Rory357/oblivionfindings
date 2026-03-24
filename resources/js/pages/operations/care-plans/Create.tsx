@@ -13,13 +13,15 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 
 type Props = {
     clients: Array<{ id: number; first_name: string; last_name: string }>;
 };
 
 export default function CarePlanCreate({ clients }: Props) {
+    const { labels } = usePage().props as any;
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
     const { data, setData, post, processing, errors } = useForm({
         client_id: '',
         title: '',
@@ -39,7 +41,7 @@ export default function CarePlanCreate({ clients }: Props) {
     return (
         <AppLayout>
             <Head title="Create Care Plan" />
-            <PageHeader title="Create Care Plan" description="Create a new care plan for a client." backHref="/operations/care-plans" />
+            <PageHeader title="Create Care Plan" description={`Create a new care plan for a ${clientSingular.toLowerCase()}.`} backHref="/operations/care-plans" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>
@@ -49,10 +51,10 @@ export default function CarePlanCreate({ clients }: Props) {
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-1.5">
-                                    <Label htmlFor="client_id">Client *</Label>
+                                    <Label htmlFor="client_id">{clientSingular} *</Label>
                                     <Select value={data.client_id} onValueChange={(v) => setData('client_id', v)}>
                                         <SelectTrigger id="client_id">
-                                            <SelectValue placeholder="Select client" />
+                                            <SelectValue placeholder={`Select ${clientSingular.toLowerCase()}`} />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {clients.map((c) => (

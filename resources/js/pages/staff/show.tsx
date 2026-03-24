@@ -105,7 +105,7 @@ export default function StaffShow({ user, myDayItems, todayShifts, upcomingShift
                                     </div>
                                 ))
                             ) : (
-                                <div className="text-sm text-muted-foreground">No assigned clients.</div>
+                                <div className="text-sm text-muted-foreground">No assigned {clientPlural.toLowerCase()}.</div>
                             )}
                         </div>
                     </div>

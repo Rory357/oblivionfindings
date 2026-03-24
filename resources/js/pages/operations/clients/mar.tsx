@@ -76,6 +76,7 @@ export default function ClientMar() {
   const { client, date, rows, history, can, has_open_controlled_discrepancy, break_glass, witnesses = [] } = props;
 
   const auth: any = (usePage().props as any).auth;
+  const labels: any = (usePage().props as any).labels;
   const myUserId = auth?.user?.id;
 
   const clientName = `${client.first_name} ${client.last_name}`.trim();
@@ -218,13 +219,13 @@ export default function ClientMar() {
   }
 
   return (
-    <AppLayout breadcrumbs={[{ title: 'Clients', href: '/clients' }, { title: clientName, href: `/operations/clients/${client.id}` }, { title: 'MAR', href: `/operations/clients/${client.id}/mar` }]}>
+    <AppLayout breadcrumbs={[{ title: labels?.['client.plural'] ?? 'Clients', href: '/clients' }, { title: clientName, href: `/operations/clients/${client.id}` }, { title: 'MAR', href: `/operations/clients/${client.id}/mar` }]}>
       <Head title={`MAR • ${clientName}`} />
 
       <div className="space-y-4">
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div>
-            <div className="text-sm text-slate-500">Client</div>
+            <div className="text-sm text-slate-500">{labels?.['client.singular'] ?? 'Client'}</div>
             <div className="text-lg font-semibold">{clientName}</div>
             <div className="text-xs text-slate-500">Daily MAR</div>
           </div>

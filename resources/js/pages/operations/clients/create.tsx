@@ -240,7 +240,7 @@ export default function CreateClient({
                                 checked={data.create_client_portal_user}
                                 onChange={(e) => setData('create_client_portal_user', e.target.checked)}
                             />
-                            Create login account for this client
+                            Create login account for this {clientSingular.toLowerCase()}
                         </label>
                         <div className="mt-2 text-xs text-slate-500">
                             Uses the Contact email above. Contact email is required when this is checked.

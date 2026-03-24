@@ -42,6 +42,22 @@ class ClientFundController extends Controller
         ]);
     }
 
+    public function create(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('client_funds.create'), 403);
+
+        $clients = Client::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->select('id', 'first_name', 'last_name')
+            ->orderBy('last_name')
+            ->get();
+
+        return inertia('operations/client-funds/Create', [
+            'clients' => $clients,
+        ]);
+    }
+
     public function store(Request $request)
     {
         $auth = $request->user();
