@@ -1532,10 +1532,84 @@ export default function ClientShow({
                                 </div>
                             </div>
 
+                            {/* Add Note Form */}
+                            <Card className="overflow-hidden border-violet-200">
+                                <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
+                                    <h3 className="text-sm font-semibold text-white">Add Progress Note</h3>
+                                </div>
+                                <CardContent className="p-4">
+                                    <div className="grid gap-3 sm:grid-cols-3">
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">Note Type</Label>
+                                            <Select defaultValue="general" onValueChange={(v) => {
+                                                const el = document.getElementById('pn-type') as HTMLInputElement;
+                                                if (el) el.value = v;
+                                            }}>
+                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="general">General</SelectItem>
+                                                    <SelectItem value="goal_update">Goal Update</SelectItem>
+                                                    <SelectItem value="observation">Observation</SelectItem>
+                                                    <SelectItem value="handover">Handover</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <input id="pn-type" type="hidden" defaultValue="general" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">Mood (1-10)</Label>
+                                            <Input id="pn-mood" type="number" min={1} max={10} className="h-8 text-xs" placeholder="Optional" />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">Visibility</Label>
+                                            <Select defaultValue="staff_only" onValueChange={(v) => {
+                                                const el = document.getElementById('pn-vis') as HTMLInputElement;
+                                                if (el) el.value = v;
+                                            }}>
+                                                <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="staff_only">Staff Only</SelectItem>
+                                                    <SelectItem value="include_family">Family Visible</SelectItem>
+                                                    <SelectItem value="private">Private</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                            <input id="pn-vis" type="hidden" defaultValue="staff_only" />
+                                        </div>
+                                    </div>
+                                    <div className="mt-3">
+                                        <Textarea id="pn-content" className="min-h-[80px] text-sm" placeholder="Write your progress note here..." />
+                                    </div>
+                                    <div className="mt-3 flex items-center justify-between">
+                                        <p className="text-[10px] text-muted-foreground">Notes are saved immediately and visible to the care team.</p>
+                                        <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => {
+                                            const content = (document.getElementById('pn-content') as HTMLTextAreaElement)?.value;
+                                            const noteType = (document.getElementById('pn-type') as HTMLInputElement)?.value || 'general';
+                                            const mood = (document.getElementById('pn-mood') as HTMLInputElement)?.value;
+                                            const vis = (document.getElementById('pn-vis') as HTMLInputElement)?.value || 'staff_only';
+                                            if (!content?.trim()) return;
+                                            router.post('/operations/progress-notes', {
+                                                client_id: client.id,
+                                                content,
+                                                note_type: noteType,
+                                                mood_rating: mood ? Number(mood) : null,
+                                                visibility: vis,
+                                            }, {
+                                                preserveScroll: true,
+                                                onSuccess: () => {
+                                                    (document.getElementById('pn-content') as HTMLTextAreaElement).value = '';
+                                                    (document.getElementById('pn-mood') as HTMLInputElement).value = '';
+                                                },
+                                            });
+                                        }}>
+                                            Save Note
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+
                             {/* Header */}
                             <div className="flex items-center justify-between">
-                                <span className="text-sm font-medium">Recent Notes</span>
-                                <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700" asChild>
+                                <span className="text-sm font-medium">Recent Notes ({notes.length})</span>
+                                <Button size="sm" variant="outline" className="gap-1.5 text-xs" asChild>
                                     <Link href={`/operations/progress-notes?client_id=${client.id}`}>View All Notes</Link>
                                 </Button>
                             </div>
