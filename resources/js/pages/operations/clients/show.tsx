@@ -21,7 +21,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Car, ChevronDown, ChevronRight, DollarSign, Globe, GraduationCap, Heart, Pill, Search, ShieldAlert, Star } from 'lucide-react';
+import { Calendar, Car, ChevronDown, ChevronRight, DollarSign, FileText, FolderOpen, Globe, GraduationCap, Heart, Pill, Search, ShieldAlert, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { HalfMoonGauge, ProgressRing, HorizontalBarChart } from '@/components/fleet-charts';
 import { DonutChart } from '@/components/ops-stat-card';
@@ -1959,82 +1959,93 @@ export default function ClientShow({
                 )}
 
                 {tab === 'documents' && (() => {
-                    const grouped = documents.reduce((acc: Record<string, any[]>, d: any) => {
-                        const cat = d.category || 'Uncategorised';
+                    const FILE_ICONS: Record<string, { color: string; bg: string }> = {
+                        pdf: { color: 'text-red-600', bg: 'bg-red-100' },
+                        doc: { color: 'text-blue-600', bg: 'bg-blue-100' },
+                        docx: { color: 'text-blue-600', bg: 'bg-blue-100' },
+                        xls: { color: 'text-emerald-600', bg: 'bg-emerald-100' },
+                        xlsx: { color: 'text-emerald-600', bg: 'bg-emerald-100' },
+                        jpg: { color: 'text-amber-600', bg: 'bg-amber-100' },
+                        jpeg: { color: 'text-amber-600', bg: 'bg-amber-100' },
+                        png: { color: 'text-amber-600', bg: 'bg-amber-100' },
+                    };
+                    const getFileStyle = (name?: string) => {
+                        const ext = (name ?? '').split('.').pop()?.toLowerCase() ?? '';
+                        return FILE_ICONS[ext] ?? { color: 'text-violet-600', bg: 'bg-violet-100' };
+                    };
+                    const CAT_COLORS: Record<string, string> = {
+                        care_plan: 'bg-violet-100 text-violet-700', assessment: 'bg-blue-100 text-blue-700',
+                        medical: 'bg-red-100 text-red-700', legal: 'bg-amber-100 text-amber-700',
+                        policy: 'bg-emerald-100 text-emerald-700', consent: 'bg-purple-100 text-purple-700',
+                    };
+
+                    const grouped = (documents ?? []).reduce((acc: Record<string, any[]>, d: any) => {
+                        const cat = d.category || 'other';
                         if (!acc[cat]) acc[cat] = [];
                         acc[cat].push(d);
                         return acc;
                     }, {} as Record<string, any[]>);
-                    const categories = Object.keys(grouped).sort();
 
                     return (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-between text-base">
-                                <span>Documents</span>
-                                <Button size="sm" asChild>
-                                    <Link href={`/operations/clients/${client.id}/documents`}>Manage documents</Link>
-                                </Button>
-                            </CardTitle>
-                            {categories.length > 1 && (
-                                <p className="text-xs text-muted-foreground">Grouped by category. {categories.length} categories found.</p>
-                            )}
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {categories.map((cat) => (
-                                <div key={cat}>
-                                    {categories.length > 1 && (
-                                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{cat}</div>
+                        <div className="space-y-4">
+                            {/* Header */}
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm font-medium">{(documents ?? []).length} documents</span>
+                                    {(documents ?? []).some((d: any) => d.expires_at && new Date(d.expires_at) < new Date()) && (
+                                        <Badge className="border-0 bg-red-100 text-red-700 text-[10px]">Has expired</Badge>
                                     )}
-                                    <div className="space-y-2">
-                                        {grouped[cat].map((d: any) => {
-                                            const isExpired = d.expires_at && new Date(d.expires_at) < new Date();
-                                            const isExpiringSoon = d.expires_at && !isExpired && new Date(d.expires_at) < new Date(Date.now() + 30 * 86400000);
-                                            return (
-                                            <div
-                                                key={d.id}
-                                                className={`flex items-start justify-between gap-3 rounded-md border p-3 ${isExpired ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20' : isExpiringSoon ? 'border-amber-200 bg-amber-50/50 dark:border-amber-900/30 dark:bg-amber-950/20' : ''}`}
-                                            >
-                                                <div>
-                                                    <div className="flex items-center gap-2 text-sm font-medium">
-                                                        {d.title || d.original_name}
-                                                        {d.portal_visible && (
-                                                            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700">Portal</span>
-                                                        )}
-                                                    </div>
-                                                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
-                                                        {d.mime_type && <span>{d.mime_type}</span>}
-                                                        {d.expires_at && (
-                                                            <span className={isExpired ? 'text-red-600 font-medium' : isExpiringSoon ? 'text-amber-600 font-medium' : ''}>
-                                                                {isExpired ? 'Expired' : 'Expires'}: {new Date(d.expires_at).toLocaleDateString('en-NZ')}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {d.notes && (
-                                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
-                                                            {d.notes}
+                                </div>
+                                <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700" asChild>
+                                    <Link href={`/operations/clients/${client.id}/documents`}>Manage Documents</Link>
+                                </Button>
+                            </div>
+
+                            {/* Grid */}
+                            {(documents ?? []).length === 0 ? (
+                                <Card className="border-dashed">
+                                    <CardContent className="flex flex-col items-center justify-center py-12">
+                                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
+                                            <FolderOpen className="h-7 w-7 text-violet-400" />
+                                        </div>
+                                        <p className="font-medium">No Documents</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">Upload documents for {client.first_name}.</p>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                Object.entries(grouped).map(([cat, docs]) => (
+                                    <div key={cat}>
+                                        <div className="mb-2 flex items-center gap-2">
+                                            <FolderOpen className="h-4 w-4 text-violet-500" />
+                                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{cat.replace(/_/g, ' ')}</span>
+                                            <Badge variant="secondary" className="text-[10px]">{(docs as any[]).length}</Badge>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                                            {(docs as any[]).map((d: any) => {
+                                                const fi = getFileStyle(d.original_name);
+                                                const expired = d.expires_at && new Date(d.expires_at) < new Date();
+                                                const expiring = d.expires_at && !expired && new Date(d.expires_at).getTime() - Date.now() < 30 * 86400000;
+                                                return (
+                                                    <a key={d.id} href={`/operations/clients/${client.id}/documents/${d.id}/download`}
+                                                        className={`group rounded-xl border bg-white p-4 text-center transition-all hover:shadow-md hover:-translate-y-0.5 ${expired ? 'border-red-200' : expiring ? 'border-amber-200' : ''}`}>
+                                                        <div className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl ${fi.bg}`}>
+                                                            <FileText className={`h-6 w-6 ${fi.color}`} />
                                                         </div>
-                                                    )}
-                                                </div>
-                                                <a
-                                                    href={`/operations/clients/${client.id}/documents/${d.id}/download`}
-                                                    className="shrink-0 rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                                >
-                                                    Download
-                                                </a>
-                                            </div>
-                                            );
-                                        })}
+                                                        <p className="text-xs font-medium leading-tight line-clamp-2">{d.title || d.original_name}</p>
+                                                        <div className="mt-1.5 flex items-center justify-center gap-1">
+                                                            {d.portal_visible && <Globe className="h-3 w-3 text-blue-500" />}
+                                                            {expired && <Badge className="h-4 border-0 bg-red-100 px-1 text-[8px] text-red-600">Expired</Badge>}
+                                                            {expiring && <Badge className="h-4 border-0 bg-amber-100 px-1 text-[8px] text-amber-600">Expiring</Badge>}
+                                                            {d.category && <Badge className={`h-4 border-0 px-1 text-[8px] ${CAT_COLORS[d.category] ?? 'bg-slate-100 text-slate-600'}`}>{d.category.replace(/_/g, ' ')}</Badge>}
+                                                        </div>
+                                                    </a>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                            {!documents.length && (
-                                <div className="text-sm text-slate-500 text-center py-8">
-                                    No documents uploaded.
-                                </div>
+                                ))
                             )}
-                        </CardContent>
-                    </Card>
+                        </div>
                     );
                 })()}
 
