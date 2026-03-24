@@ -152,7 +152,7 @@ export default function ClientShow({
             { key: 'care_plans', label: 'Care Plans', show: true },
             { key: 'progress_notes', label: 'Progress Notes', show: true },
             { key: 'service_agreements', label: 'Agreements', show: true },
-            { key: 'support_plan', label: 'Support plan', show: true },
+            // Support plan merged into Care Plans tab
             { key: 'assessments', label: 'Assessments', show: true },
             { key: 'timeline', label: 'Timeline', show: true },
             { key: 'documents', label: 'Documents', show: true },
@@ -1214,6 +1214,69 @@ export default function ClientShow({
                                 </Card>
                             )}
 
+                            {/* About Me — from care plan content */}
+                            {activePlan && (() => {
+                                const content = typeof activePlan.content === 'string' ? JSON.parse(activePlan.content || '{}') : (activePlan.content ?? {});
+                                const aboutMe = content.about_me ?? {};
+                                const hasAboutMe = Object.values(aboutMe).some((v: any) => v && String(v).trim());
+                                if (!hasAboutMe) return null;
+                                return (
+                                    <Card className="border-rose-200 bg-rose-50/30">
+                                        <CardHeader>
+                                            <CardTitle className="text-base">About {client.first_name}</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-3">
+                                            {aboutMe.dreams && (
+                                                <div>
+                                                    <p className="text-xs font-semibold text-rose-600">Dreams & Aspirations</p>
+                                                    <p className="mt-0.5 text-sm text-slate-700">{aboutMe.dreams}</p>
+                                                </div>
+                                            )}
+                                            <div className="grid gap-3 sm:grid-cols-2">
+                                                {aboutMe.important_to_me && (
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-rose-600">What{"'"}s Important TO Me</p>
+                                                        <p className="mt-0.5 text-sm text-slate-700">{aboutMe.important_to_me}</p>
+                                                    </div>
+                                                )}
+                                                {aboutMe.important_for_me && (
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-rose-600">What{"'"}s Important FOR Me</p>
+                                                        <p className="mt-0.5 text-sm text-slate-700">{aboutMe.important_for_me}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {aboutMe.ideal_day && (
+                                                <div>
+                                                    <p className="text-xs font-semibold text-rose-600">My Ideal Day</p>
+                                                    <p className="mt-0.5 text-sm text-slate-700">{aboutMe.ideal_day}</p>
+                                                </div>
+                                            )}
+                                            <div className="grid gap-3 sm:grid-cols-2">
+                                                {aboutMe.likes && (
+                                                    <div className="rounded-md bg-emerald-50 p-2">
+                                                        <p className="text-xs font-semibold text-emerald-700">Things I Like</p>
+                                                        <p className="mt-0.5 text-sm text-emerald-800">{aboutMe.likes}</p>
+                                                    </div>
+                                                )}
+                                                {aboutMe.dislikes && (
+                                                    <div className="rounded-md bg-red-50 p-2">
+                                                        <p className="text-xs font-semibold text-red-700">Things I Don{"'"}t Like</p>
+                                                        <p className="mt-0.5 text-sm text-red-800">{aboutMe.dislikes}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {aboutMe.how_to_support && (
+                                                <div>
+                                                    <p className="text-xs font-semibold text-rose-600">How to Support Me Best</p>
+                                                    <p className="mt-0.5 text-sm text-slate-700">{aboutMe.how_to_support}</p>
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })()}
+
                             {/* Recent Progress Notes */}
                             {recentNotes.length > 0 && (
                                 <Card>
@@ -1296,13 +1359,7 @@ export default function ClientShow({
                     </Card>
                 )}
 
-                {tab === 'support_plan' && (
-                    <SupportPlanTab
-                        clientId={client.id}
-                        plan={support_plan}
-                        canEdit={can.edit}
-                    />
-                )}
+                {/* Support Plan merged into Care Plans tab */}
 
                 {tab === 'assessments' && (
                     <AssessmentsTab
