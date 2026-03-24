@@ -21,7 +21,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Car, ChevronDown, ChevronRight, DollarSign, FileText, FolderOpen, Globe, GraduationCap, Heart, Pill, Search, ShieldAlert, Star } from 'lucide-react';
+import { Calendar, Car, ChevronDown, ChevronRight, Clock, DollarSign, FileText, FolderOpen, Globe, GraduationCap, Heart, Pill, Search, ShieldAlert, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { HalfMoonGauge, ProgressRing, HorizontalBarChart } from '@/components/fleet-charts';
 import { DonutChart } from '@/components/ops-stat-card';
@@ -1909,50 +1909,87 @@ export default function ClientShow({
                                 </div>
                             )}
 
-                            {filteredEvents.map((e) => (
-                                <div
-                                    key={e.id}
-                                    className="rounded-md border p-3"
-                                >
-                                    <div className="flex items-center justify-between gap-3">
-                                        <div className="flex items-center gap-2 text-sm font-medium">
-                                            {e.subject || e.type}
-                                            {e.type && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">{e.type}</span>}
-                                        </div>
-                                        <div className="text-xs text-slate-500">
-                                            {e.occurred_at
-                                                ? new Date(
-                                                      e.occurred_at,
-                                                  ).toLocaleString()
-                                                : ''}
-                                        </div>
+                            {/* Visual Timeline */}
+                            {filteredEvents.length === 0 ? (
+                                <div className="flex flex-col items-center py-12 text-center">
+                                    <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
+                                        <Clock className="h-7 w-7 text-violet-400" />
                                     </div>
-                                    {e.body && (
-                                        <div className="mt-1 text-xs whitespace-pre-wrap text-slate-600">
-                                            {e.body}
-                                        </div>
-                                    )}
-                                    <div className="mt-2 text-xs text-slate-500">
-                                        {e.actor?.name
-                                            ? `By ${e.actor.name}`
-                                            : ''}{' '}
-                                        {e.site?.name ? `- ${e.site.name}` : ''}
-                                    </div>
+                                    <p className="font-medium">{events.length ? 'No events match your filters' : 'No timeline events yet'}</p>
+                                    <p className="mt-1 text-sm text-muted-foreground">Events will appear here as care is delivered.</p>
                                 </div>
-                            ))}
-                            {!filteredEvents.length && (
-                                <div className="text-sm text-slate-500 text-center py-4">
-                                    {events.length ? 'No events match your filters.' : 'No timeline events yet.'}
+                            ) : (
+                                <div className="relative ml-4">
+                                    {/* Vertical line */}
+                                    <div className="absolute left-3 top-0 bottom-0 w-0.5 bg-gradient-to-b from-violet-300 via-violet-200 to-transparent" />
+
+                                    <div className="space-y-0">
+                                        {filteredEvents.map((e, idx) => {
+                                            const TYPE_STYLES: Record<string, { dot: string; bg: string; icon: string }> = {
+                                                note: { dot: 'bg-violet-500', bg: 'bg-violet-50', icon: '📝' },
+                                                progress_note: { dot: 'bg-indigo-500', bg: 'bg-indigo-50', icon: '🎯' },
+                                                handover: { dot: 'bg-blue-500', bg: 'bg-blue-50', icon: '🤝' },
+                                                incident: { dot: 'bg-red-500', bg: 'bg-red-50', icon: '⚠️' },
+                                                shift: { dot: 'bg-emerald-500', bg: 'bg-emerald-50', icon: '📋' },
+                                                medication: { dot: 'bg-cyan-500', bg: 'bg-cyan-50', icon: '💊' },
+                                                assessment: { dot: 'bg-amber-500', bg: 'bg-amber-50', icon: '📊' },
+                                            };
+                                            const style = TYPE_STYLES[e.type] ?? { dot: 'bg-slate-400', bg: 'bg-slate-50', icon: '📌' };
+
+                                            // Date grouping
+                                            const eventDate = e.occurred_at ? new Date(e.occurred_at).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+                                            const prevDate = idx > 0 && filteredEvents[idx - 1].occurred_at ? new Date(filteredEvents[idx - 1].occurred_at).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' }) : '';
+                                            const showDateHeader = eventDate !== prevDate;
+
+                                            return (
+                                                <div key={e.id}>
+                                                    {showDateHeader && (
+                                                        <div className="relative mb-2 mt-4 flex items-center pl-8 first:mt-0">
+                                                            <div className="absolute left-0 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white bg-violet-200">
+                                                                <div className="h-2 w-2 rounded-full bg-violet-500" />
+                                                            </div>
+                                                            <span className="text-xs font-semibold text-violet-600">{eventDate}</span>
+                                                        </div>
+                                                    )}
+                                                    <div className="relative flex gap-3 pb-4 pl-8">
+                                                        {/* Dot on timeline */}
+                                                        <div className={`absolute left-0 top-1 flex h-6 w-6 items-center justify-center rounded-full border-2 border-white ${style.dot} shadow-sm`}>
+                                                            <span className="text-[10px]">{style.icon}</span>
+                                                        </div>
+                                                        {/* Event card */}
+                                                        <div className={`flex-1 rounded-xl border ${style.bg} p-3 transition-all hover:shadow-sm`}>
+                                                            <div className="flex items-start justify-between gap-2">
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="text-sm font-medium">{e.subject || e.type}</span>
+                                                                        <Badge variant="outline" className="h-4 px-1.5 text-[9px] capitalize">{e.type}</Badge>
+                                                                    </div>
+                                                                    {e.actor?.name && (
+                                                                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                                                                            {e.actor.name}{e.site?.name ? ` · ${e.site.name}` : ''}
+                                                                        </p>
+                                                                    )}
+                                                                </div>
+                                                                <span className="shrink-0 text-[10px] text-muted-foreground">
+                                                                    {e.occurred_at ? new Date(e.occurred_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' }) : ''}
+                                                                </span>
+                                                            </div>
+                                                            {e.body && (
+                                                                <p className="mt-1.5 text-xs leading-relaxed text-slate-600 whitespace-pre-wrap">{e.body.length > 250 ? e.body.slice(0, 250) + '...' : e.body}</p>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             )}
 
-                            <div className="pt-2">
-                                <Link
-                                    href={`/operations/clients/${client.id}/timeline`}
-                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                >
-                                    Open full timeline
-                                </Link>
+                            <div className="flex justify-center pt-2">
+                                <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+                                    <Link href={`/operations/clients/${client.id}/timeline`}>View Full Timeline</Link>
+                                </Button>
                             </div>
                         </CardContent>
                     </Card>
