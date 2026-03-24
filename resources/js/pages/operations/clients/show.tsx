@@ -23,6 +23,8 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, Car, ChevronDown, ChevronRight, DollarSign, Globe, GraduationCap, Heart, Pill, Search, ShieldAlert, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { HalfMoonGauge, ProgressRing, HorizontalBarChart } from '@/components/fleet-charts';
+import { DonutChart } from '@/components/ops-stat-card';
 
 function Field({ label, value }: { label: string; value: string }) {
     return (
@@ -441,573 +443,382 @@ export default function ClientShow({
                     </div>
                 </div>
 
-                {tab === 'profile' && (
-                    <>
-                    {/* Safeguarding Alert Banner */}
-                    {client.safeguarding_flag && (
-                        <div className="mb-4 flex items-center gap-3 rounded-lg border-2 border-red-300 bg-red-50 p-4">
-                            <ShieldAlert className="h-6 w-6 text-red-600" />
-                            <div>
-                                <p className="text-sm font-bold text-red-800">Safeguarding Alert</p>
-                                <p className="text-xs text-red-700">This person has an active safeguarding concern. Check risk assessments and follow safeguarding protocols.</p>
-                            </div>
-                        </div>
-                    )}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Profile</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            {/* Onboarding Summary Card */}
-                            <div className="rounded-md border p-3">
-                                <div className="flex items-center justify-between gap-3">
+                {tab === 'profile' && (() => {
+                    const summary = pageProps.care_plans_summary ?? {};
+                    const activePlan = summary.active_plan;
+                    const risks = pageProps.client_risks ?? [];
+                    const incidents = pageProps.client_incidents ?? [];
+                    const agreements = pageProps.client_agreements ?? [];
+                    const profileConsents = pageProps.consents ?? [];
+                    const notes = pageProps.client_progress_notes ?? [];
+
+                    // Parse about me from care plan content
+                    const planContent = activePlan?.content ? (typeof activePlan.content === 'string' ? JSON.parse(activePlan.content || '{}') : activePlan.content) : {};
+                    const aboutMe = planContent.about_me ?? {};
+                    const hasAboutMe = Object.values(aboutMe).some((v: any) => v && String(v).trim());
+
+                    // Goal stats
+                    const goals = activePlan?.goals ?? [];
+                    const goalsCompleted = goals.filter((g: any) => g.status === 'completed').length;
+                    const goalsPct = goals.length > 0 ? Math.round((goalsCompleted / goals.length) * 100) : 0;
+
+                    // Risk donut data
+                    const riskCounts: Record<string, number> = {};
+                    risks.forEach((r: any) => { riskCounts[r.severity] = (riskCounts[r.severity] ?? 0) + 1; });
+                    const riskDonutSegments = Object.entries(riskCounts).map(([sev, count]) => ({
+                        label: sev, value: count,
+                        color: sev === 'critical' ? '#dc2626' : sev === 'high' ? '#ea580c' : sev === 'medium' ? '#d97706' : '#16a34a',
+                    }));
+
+                    // Budget from first active agreement
+                    const activeAg = agreements.find((a: any) => a.status === 'active');
+                    const budgetPct = activeAg?.total_budget > 0 ? Math.round(((activeAg.budget_used ?? 0) / activeAg.total_budget) * 100) : 0;
+
+                    // Active consents count
+                    const activeConsents = profileConsents.filter((c: any) => c.status === 'given' && !c.is_expired).length;
+
+                    // Review countdown
+                    const reviewDays = activePlan?.next_review_at ? Math.ceil((new Date(activePlan.next_review_at).getTime() - Date.now()) / 86400000) : null;
+
+                    return (
+                        <>
+                            {/* Safeguarding Alert */}
+                            {client.safeguarding_flag && (
+                                <div className="mb-4 flex items-center gap-3 rounded-xl border-2 border-red-300 bg-red-50 p-4">
+                                    <ShieldAlert className="h-6 w-6 text-red-600" />
                                     <div>
-                                        <div className="text-sm font-medium">Onboarding Progress</div>
-                                        <div className="text-xs text-slate-500">
-                                            {onboarding?.checklist?.completed ?? onboarding?.completed ?? 0}/{onboarding?.checklist?.total ?? onboarding?.total ?? 0} data items complete • {onboarding?.checklist?.percent ?? onboarding?.percent ?? 0}%
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className={`rounded-full px-2 py-1 text-xs ${(onboarding?.checklist?.status ?? onboarding?.status) === 'complete' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'}`}>
-                                            {(onboarding?.checklist?.status ?? onboarding?.status) === 'complete' ? 'Complete' : 'In progress'}
-                                        </div>
-                                        {(client.status === 'onboarding' || onboarding?.workflow) && (
-                                            <Button size="sm" variant="outline" onClick={() => setTab('onboarding')}>
-                                                View Onboarding
-                                            </Button>
-                                        )}
+                                        <p className="text-sm font-bold text-red-800">Safeguarding Alert</p>
+                                        <p className="text-xs text-red-700">Active safeguarding concern. Follow protocols.</p>
                                     </div>
                                 </div>
-                                {/* Mini progress bar */}
-                                <div className="mt-2 h-1.5 rounded-full bg-muted">
-                                    <div
-                                        className="h-1.5 rounded-full bg-indigo-500 transition-all"
-                                        style={{ width: `${onboarding?.checklist?.percent ?? onboarding?.percent ?? 0}%` }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="rounded-md border p-3">
-                                <div className="text-sm font-medium">
-                                    Details
-                                </div>
-                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                    <div className="text-sm">
-                                        <div className="text-xs text-slate-500">
-                                            Preferred name
-                                        </div>
-                                        <div className="font-medium">
-                                            {client.preferred_name || '—'}
-                                        </div>
-                                    </div>
-                                    <div className="text-sm">
-                                        <div className="text-xs text-slate-500">
-                                            Date of birth
-                                        </div>
-                                        <div className="font-medium">
-                                            {client.date_of_birth || '—'}
-                                        </div>
-                                    </div>
-                                    <div className="text-sm">
-                                        <div className="text-xs text-slate-500">
-                                            Gender
-                                        </div>
-                                        <div className="font-medium">
-                                            {client.gender || '—'}
-                                        </div>
-                                    </div>
-                                    <div className="text-sm">
-                                        <div className="text-xs text-slate-500">
-                                            Phone
-                                        </div>
-                                        <div className="font-medium">
-                                            {client.phone || '—'}
-                                        </div>
-                                    </div>
-                                    <div className="text-sm">
-                                        <div className="text-xs text-slate-500">
-                                            Email
-                                        </div>
-                                        <div className="font-medium">
-                                            {client.email || '—'}
-                                        </div>
-                                    </div>
-                                    <div className="text-sm">
-                                        <div className="text-xs text-slate-500">
-                                            Funding
-                                        </div>
-                                        <div className="font-medium">
-                                            {client.funding_type || '—'}
-                                        </div>
-                                    </div>
-                                </div>
-                                {(client.address_line_1 ||
-                                    client.city ||
-                                    client.postcode) && (
-                                    <div className="mt-3 text-sm">
-                                        <div className="text-xs text-slate-500">
-                                            Address
-                                        </div>
-                                        <div className="font-medium">
-                                            {[
-                                                client.address_line_1,
-                                                client.address_line_2,
-                                                client.suburb,
-                                                client.city,
-                                                client.postcode,
-                                            ]
-                                                .filter(Boolean)
-                                                .join(', ')}
-                                        </div>
-                                    </div>
-                                )}
-                                {client.funding_notes && (
-                                    <div className="mt-3 text-sm">
-                                        <div className="text-xs text-slate-500">
-                                            Funding notes
-                                        </div>
-                                        <div className="whitespace-pre-wrap">
-                                            {client.funding_notes}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Identity & Culture */}
-                            {(client.ethnicity || client.preferred_pronouns || client.religion || (client.languages ?? []).length > 0 || client.education_level || client.employment_status) && (
-                                <Card className="mt-4">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
-                                                <Globe className="h-4 w-4" />
-                                            </div>
-                                            Identity &amp; Culture
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                            {client.ethnicity && <Field label="Ethnicity" value={client.ethnicity} />}
-                                            {client.preferred_pronouns && <Field label="Pronouns" value={client.preferred_pronouns} />}
-                                            {client.religion && <Field label="Religion / Spirituality" value={client.religion} />}
-                                            {(client.languages ?? []).length > 0 && (
-                                                <Field label="Languages" value={(client.languages ?? []).join(', ')} />
-                                            )}
-                                            {client.education_level && <Field label="Education" value={client.education_level} />}
-                                            {client.employment_status && <Field label="Employment" value={client.employment_status} />}
-                                        </div>
-                                    </CardContent>
-                                </Card>
                             )}
 
-                            {/* Interests & Strengths */}
-                            {(client.interests_hobbies || client.strengths_abilities || client.life_story) && (
-                                <Card className="mt-4">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
-                                                <Star className="h-4 w-4" />
-                                            </div>
-                                            Interests &amp; Strengths
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-3">
-                                        {client.interests_hobbies && (
-                                            <div>
-                                                <p className="text-xs font-semibold text-amber-600">Interests &amp; Hobbies</p>
-                                                <p className="mt-0.5 text-sm">{client.interests_hobbies}</p>
-                                            </div>
-                                        )}
-                                        {client.strengths_abilities && (
-                                            <div>
-                                                <p className="text-xs font-semibold text-emerald-600">Strengths &amp; Abilities</p>
-                                                <p className="mt-0.5 text-sm">{client.strengths_abilities}</p>
-                                            </div>
-                                        )}
-                                        {client.life_story && (
-                                            <div>
-                                                <p className="text-xs font-semibold text-indigo-600">Life Story</p>
-                                                <p className="mt-0.5 text-sm">{client.life_story}</p>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {/* Health & Support Needs */}
-                            {(client.mobility_needs || client.sensory_needs || client.cognitive_needs || client.dietary_requirements || client.sleep_preferences) && (
-                                <Card className="mt-4">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
-                                                <Heart className="h-4 w-4" />
-                                            </div>
-                                            Health &amp; Support Needs
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                            {client.mobility_needs && <Field label="Mobility Needs" value={client.mobility_needs} />}
-                                            {client.sensory_needs && <Field label="Sensory Needs" value={client.sensory_needs} />}
-                                            {client.cognitive_needs && <Field label="Cognitive Needs" value={client.cognitive_needs} />}
-                                            {client.dietary_requirements && <Field label="Dietary Requirements" value={client.dietary_requirements} />}
-                                            {client.sleep_preferences && <Field label="Sleep Preferences" value={client.sleep_preferences} />}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {/* Service Details */}
-                            {(client.service_start_date || client.key_worker || client.risk_level || client.funding_type) && (
-                                <Card className="mt-4">
-                                    <CardHeader>
-                                        <CardTitle className="text-base">Service Details</CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                            {client.service_start_date && <Field label="Service Start Date" value={client.service_start_date} />}
-                                            {client.key_worker && <Field label="Key Worker" value={client.key_worker.name} />}
-                                            {client.risk_level && (
-                                                <div>
-                                                    <p className="text-xs text-muted-foreground">Risk Level</p>
-                                                    <span className={`mt-0.5 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                                        client.risk_level === 'low' ? 'bg-emerald-100 text-emerald-800' :
-                                                        client.risk_level === 'medium' ? 'bg-amber-100 text-amber-800' :
-                                                        client.risk_level === 'high' ? 'bg-red-100 text-red-800' :
-                                                        'bg-red-100 text-red-800 animate-pulse'
-                                                    }`}>
-                                                        {client.risk_level.charAt(0).toUpperCase() + client.risk_level.slice(1)}
-                                                    </span>
-                                                </div>
-                                            )}
-                                            {client.funding_type && <Field label="Funding Type" value={client.funding_type} />}
-                                        </div>
-                                        {client.funding_notes && (
-                                            <div className="mt-3">
-                                                <p className="text-xs text-muted-foreground">Funding Notes</p>
-                                                <p className="mt-0.5 whitespace-pre-wrap text-sm">{client.funding_notes}</p>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            <Card className="mt-4 border-emerald-200 bg-emerald-50/30">
-                                <CardContent className="flex items-center gap-4 p-4">
-                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
-                                        <DollarSign className="h-5 w-5" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <p className="text-sm font-medium">Funding & Billing</p>
-                                        <p className="text-xs text-muted-foreground">Budget tracking, invoice history, and funding utilisation will appear here once billing is configured.</p>
-                                    </div>
-                                    <Button variant="outline" size="sm" asChild>
-                                        <Link href={`/operations/billing?client_id=${client.id}`}>View Billing</Link>
-                                    </Button>
-                                </CardContent>
-                            </Card>
-
-                            {/* Active Risks */}
-                            {(() => {
-                                const pageProps = usePage().props as any;
-                                const risks = pageProps.client_risks ?? [];
-                                if (risks.length === 0) return null;
-
-                                const SEVERITY_COLORS: Record<string, string> = {
-                                    low: 'bg-emerald-100 text-emerald-700',
-                                    medium: 'bg-amber-100 text-amber-700',
-                                    high: 'bg-red-100 text-red-700',
-                                    critical: 'bg-red-200 text-red-800 animate-pulse',
-                                };
-
-                                return (
-                                    <Card className="mt-4 border-red-200">
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center gap-2 text-base">
-                                                <ShieldAlert className="h-4 w-4 text-red-500" />
-                                                Active Risks ({risks.length})
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-2">
-                                                {risks.map((risk: any) => (
-                                                    <div key={risk.id} className="flex items-center justify-between rounded border p-2 text-sm">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${SEVERITY_COLORS[risk.severity] ?? ''}`}>{risk.severity}</span>
-                                                            <span>{risk.label}</span>
-                                                        </div>
-                                                        {risk.review_date && (
-                                                            <span className={`text-[10px] ${new Date(risk.review_date) < new Date() ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
-                                                                Review: {new Date(risk.review_date).toLocaleDateString('en-NZ')}
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })()}
-
-                            {/* Recent Incidents */}
-                            {(() => {
-                                const pageProps = usePage().props as any;
-                                const incidents = pageProps.client_incidents ?? [];
-                                if (incidents.length === 0) return null;
-
-                                const thirtyDaysAgo = new Date();
-                                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-                                const recentCount = incidents.filter((i: any) => new Date(i.occurred_at) >= thirtyDaysAgo).length;
-
-                                const SEVERITY_COLORS: Record<string, string> = {
-                                    low: 'bg-emerald-100 text-emerald-700',
-                                    medium: 'bg-amber-100 text-amber-700',
-                                    high: 'bg-red-100 text-red-700',
-                                };
-                                const STATUS_COLORS: Record<string, string> = {
-                                    draft: 'bg-slate-100 text-slate-600',
-                                    submitted: 'bg-blue-100 text-blue-700',
-                                    reviewed: 'bg-indigo-100 text-indigo-700',
-                                    closed: 'bg-slate-100 text-slate-500',
-                                };
-
-                                return (
-                                    <Card className="mt-4 border-amber-200">
-                                        <CardHeader>
-                                            <CardTitle className="flex items-center justify-between text-base">
-                                                <span className="flex items-center gap-2">
-                                                    <ShieldAlert className="h-4 w-4 text-amber-500" />
-                                                    Recent Incidents ({incidents.length})
-                                                </span>
-                                                {recentCount > 3 && (
-                                                    <span className="rounded bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 animate-pulse">
-                                                        Pattern Alert: {recentCount} in 30 days
-                                                    </span>
-                                                )}
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent>
-                                            <div className="space-y-2">
-                                                {incidents.map((inc: any) => (
-                                                    <div key={inc.id} className="flex items-center justify-between rounded border p-2 text-sm">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${SEVERITY_COLORS[inc.severity] ?? 'bg-slate-100 text-slate-600'}`}>{inc.severity}</span>
-                                                            <span className="font-medium">{inc.type}</span>
-                                                            {inc.reporter?.name && <span className="text-muted-foreground">by {inc.reporter.name}</span>}
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_COLORS[inc.status] ?? ''}`}>{inc.status}</span>
-                                                            <span className="text-[10px] text-muted-foreground">{new Date(inc.occurred_at).toLocaleDateString('en-NZ')}</span>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })()}
-
-                            <div className="text-sm">
-                                <div className="font-medium">
-                                    Assigned support workers
-                                </div>
-                                <div className="mt-2 space-y-2">
-                                    {client.support_workers.map((w) => (
-                                        <div
-                                            key={w.id}
-                                            className="rounded-md border p-2"
-                                        >
-                                            <div className="text-sm font-medium">
-                                                {w.name}
-                                            </div>
-                                            <div className="text-xs text-slate-500">
-                                                {w.email}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {!client.support_workers.length && (
-                                        <div className="text-sm text-slate-500">
-                                            No workers assigned.
-                                        </div>
+                            {/* Row 1: Quick Stats */}
+                            <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                                {/* Care Plan Status */}
+                                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500">Care Plan</p>
+                                    <p className="mt-1 text-lg font-bold text-violet-900">{activePlan ? 'Active' : 'None'}</p>
+                                    {reviewDays !== null && (
+                                        <p className={`mt-0.5 text-xs ${reviewDays < 0 ? 'font-semibold text-red-600' : 'text-violet-600'}`}>
+                                            Review: {reviewDays < 0 ? `${Math.abs(reviewDays)}d overdue` : `${reviewDays}d`}
+                                        </p>
                                     )}
                                 </div>
-                            </div>
 
-                            <div className="rounded-md border p-3">
-                                <div className="flex items-center justify-between gap-3">
-                                    <div>
-                                        <div className="text-sm font-medium">
-                                            Shifts
-                                        </div>
-                                        <div className="text-xs text-slate-500">
-                                            Next and recent rostered shifts for
-                                            this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}.
-                                        </div>
+                                {/* Goals */}
+                                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500">Goals</p>
+                                    <p className="mt-1 text-lg font-bold text-violet-900">{goalsCompleted}/{goals.length}</p>
+                                    <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-violet-200">
+                                        <div className="h-full rounded-full bg-violet-600 transition-all" style={{ width: `${goalsPct}%` }} />
                                     </div>
-                                    {can.create_shift ? (
-                                        <Button size="sm" asChild>
-                                            <Link
-                                                href={`/operations/shifts/create?client_id=${client.id}`}
-                                            >
-                                                Create shift
-                                            </Link>
-                                        </Button>
-                                    ) : null}
                                 </div>
 
-                                <Separator className="my-3" />
+                                {/* Shifts */}
+                                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500">Shifts</p>
+                                    <p className="mt-1 text-lg font-bold text-violet-900">{shifts_summary?.next ? 'Upcoming' : 'None'}</p>
+                                    {shifts_summary?.next?.starts_at && (
+                                        <p className="mt-0.5 text-xs text-violet-600">{new Date(shifts_summary.next.starts_at).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}</p>
+                                    )}
+                                </div>
 
-                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                    <div className="rounded-md border p-3">
-                                        <div className="text-xs text-slate-500">
-                                            Next shift
-                                        </div>
-                                        {shifts_summary?.next ? (
-                                            <div className="mt-1 space-y-1">
-                                                <div className="text-sm font-medium">
-                                                    {new Date(
-                                                        shifts_summary.next
-                                                            .starts_at,
-                                                    ).toLocaleString()}{' '}
-                                                    –{' '}
-                                                    {new Date(
-                                                        shifts_summary.next
-                                                            .ends_at,
-                                                    ).toLocaleTimeString()}
-                                                </div>
-                                                <div className="text-xs text-slate-500">
-                                                    {shifts_summary.next.staff
-                                                        ?.name
-                                                        ? `Staff: ${shifts_summary.next.staff.name}`
-                                                        : 'Staff: —'}
-                                                    {shifts_summary.next
-                                                        .location
-                                                        ? ` • ${shifts_summary.next.location}`
-                                                        : ''}
-                                                </div>
-                                                <div className="mt-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        asChild
-                                                    >
-                                                        <Link
-                                                            href={`/operations/shifts/${shifts_summary.next.id}`}
-                                                        >
-                                                            Open
-                                                        </Link>
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="mt-1 text-sm text-slate-500">
-                                                No upcoming shifts.
-                                            </div>
-                                        )}
+                                {/* Risk Level */}
+                                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
+                                    <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500">Risk Level</p>
+                                    <div className="mt-1 flex items-center gap-2">
+                                        <span className={`inline-flex rounded-full px-2.5 py-1 text-sm font-bold ${
+                                            client.risk_level === 'critical' ? 'bg-red-100 text-red-700 animate-pulse' :
+                                            client.risk_level === 'high' ? 'bg-red-100 text-red-700' :
+                                            client.risk_level === 'medium' ? 'bg-amber-100 text-amber-700' :
+                                            client.risk_level === 'low' ? 'bg-emerald-100 text-emerald-700' :
+                                            'bg-slate-100 text-slate-500'
+                                        }`}>
+                                            {(client.risk_level ?? 'Not Set').charAt(0).toUpperCase() + (client.risk_level ?? 'not set').slice(1)}
+                                        </span>
                                     </div>
-
-                                    <div className="rounded-md border p-3">
-                                        <div className="text-xs text-slate-500">
-                                            Most recent shift
-                                        </div>
-                                        {shifts_summary?.last ? (
-                                            <div className="mt-1 space-y-1">
-                                                <div className="text-sm font-medium">
-                                                    {new Date(
-                                                        shifts_summary.last
-                                                            .starts_at,
-                                                    ).toLocaleString()}{' '}
-                                                    –{' '}
-                                                    {new Date(
-                                                        shifts_summary.last
-                                                            .ends_at,
-                                                    ).toLocaleTimeString()}
-                                                </div>
-                                                <div className="text-xs text-slate-500">
-                                                    {shifts_summary.last.staff
-                                                        ?.name
-                                                        ? `Staff: ${shifts_summary.last.staff.name}`
-                                                        : 'Staff: —'}
-                                                    {shifts_summary.last
-                                                        .location
-                                                        ? ` • ${shifts_summary.last.location}`
-                                                        : ''}
-                                                </div>
-                                                <div className="mt-2">
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        asChild
-                                                    >
-                                                        <Link
-                                                            href={`/operations/shifts/${shifts_summary.last.id}`}
-                                                        >
-                                                            Open
-                                                        </Link>
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="mt-1 text-sm text-slate-500">
-                                                No previous shifts yet.
-                                            </div>
-                                        )}
-                                    </div>
+                                    <p className="mt-0.5 text-xs text-violet-600">{risks.length} active risk{risks.length !== 1 ? 's' : ''}</p>
                                 </div>
                             </div>
 
-                            <Card className="mt-4">
-                                <CardHeader>
-                                    <CardTitle className="flex items-center justify-between text-base">
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
-                                                <Calendar className="h-4 w-4" />
-                                            </div>
-                                            Upcoming Schedule
-                                        </div>
-                                        <Button variant="outline" size="sm" asChild>
-                                            <Link href={`/operations/rostering?client_id=${client.id}`}>View Full Schedule</Link>
-                                        </Button>
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <p className="text-xs text-muted-foreground text-center py-4">Weekly schedule view will be available here once rostering is fully integrated.</p>
-                                </CardContent>
-                            </Card>
+                            {/* Row 2: Main Dashboard Grid */}
+                            <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                                {/* LEFT COLUMN */}
+                                <div className="space-y-4 lg:col-span-2">
 
-                            {(client.transport_needs || client.transport_notes) && (
-                                <Card className="mt-4">
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center gap-2 text-base">
-                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-100 text-purple-600">
-                                                <Car className="h-4 w-4" />
+                                    {/* About Me Card */}
+                                    {hasAboutMe && (
+                                        <Card className="overflow-hidden border-violet-200">
+                                            <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-5 py-3">
+                                                <h3 className="text-sm font-semibold text-white">About {client.first_name}</h3>
+                                                <p className="text-xs text-violet-200">What matters most to this person</p>
                                             </div>
-                                            Transport & Mobility
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-2">
-                                        {client.transport_needs && Array.isArray(client.transport_needs) && client.transport_needs.length > 0 && (
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Transport Needs</p>
-                                                <div className="mt-1 flex flex-wrap gap-1">
-                                                    {client.transport_needs.map((need: string, i: number) => (
-                                                        <span key={i} className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700">{need}</span>
+                                            <CardContent className="space-y-3 p-5">
+                                                {aboutMe.dreams && (
+                                                    <div className="rounded-lg bg-violet-50 p-3">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500">Dreams &amp; Aspirations</p>
+                                                        <p className="mt-1 text-sm text-slate-700">{aboutMe.dreams}</p>
+                                                    </div>
+                                                )}
+                                                <div className="grid gap-3 sm:grid-cols-2">
+                                                    {aboutMe.important_to_me && (
+                                                        <div className="rounded-lg bg-purple-50 p-3">
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-purple-500">Important TO Me</p>
+                                                            <p className="mt-1 text-sm text-slate-700">{aboutMe.important_to_me}</p>
+                                                        </div>
+                                                    )}
+                                                    {aboutMe.important_for_me && (
+                                                        <div className="rounded-lg bg-purple-50 p-3">
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-purple-500">Important FOR Me</p>
+                                                            <p className="mt-1 text-sm text-slate-700">{aboutMe.important_for_me}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {aboutMe.ideal_day && (
+                                                    <div className="rounded-lg bg-violet-50 p-3">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500">My Ideal Day</p>
+                                                        <p className="mt-1 text-sm text-slate-700">{aboutMe.ideal_day}</p>
+                                                    </div>
+                                                )}
+                                                <div className="grid gap-3 sm:grid-cols-2">
+                                                    {aboutMe.likes && (
+                                                        <div className="rounded-lg bg-emerald-50 p-3">
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Things I Like</p>
+                                                            <p className="mt-1 text-sm text-emerald-800">{aboutMe.likes}</p>
+                                                        </div>
+                                                    )}
+                                                    {aboutMe.dislikes && (
+                                                        <div className="rounded-lg bg-red-50 p-3">
+                                                            <p className="text-[10px] font-bold uppercase tracking-wider text-red-500">Things I Don't Like</p>
+                                                            <p className="mt-1 text-sm text-red-800">{aboutMe.dislikes}</p>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {aboutMe.how_to_support && (
+                                                    <div className="rounded-lg border border-violet-200 bg-white p-3">
+                                                        <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500">How to Support Me Best</p>
+                                                        <p className="mt-1 text-sm text-slate-700">{aboutMe.how_to_support}</p>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {/* Goals Progress Card */}
+                                    {goals.length > 0 && (
+                                        <Card className="overflow-hidden">
+                                            <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                                <CardTitle className="text-sm font-semibold">Goals Progress</CardTitle>
+                                                {activePlan && (
+                                                    <Button variant="ghost" size="sm" className="text-xs text-violet-600" asChild>
+                                                        <Link href={`/operations/care-plans/${activePlan.id}`}>View Plan</Link>
+                                                    </Button>
+                                                )}
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="flex items-start gap-6">
+                                                    <div className="shrink-0">
+                                                        <HalfMoonGauge value={goalsPct} label="Complete" size={140} color="#7c3aed" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <HorizontalBarChart
+                                                            items={goals.slice(0, 6).map((g: any) => ({
+                                                                label: g.title.length > 25 ? g.title.slice(0, 25) + '...' : g.title,
+                                                                value: g.progress_percentage ?? 0,
+                                                                maxValue: 100,
+                                                                color: g.status === 'completed' ? '#16a34a' : '#7c3aed',
+                                                            }))}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {/* Recent Activity Card */}
+                                    <Card>
+                                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                                            <CardTitle className="text-sm font-semibold">Recent Activity</CardTitle>
+                                            <Button variant="ghost" size="sm" className="text-xs text-violet-600" onClick={() => setTab('timeline')}>
+                                                View All
+                                            </Button>
+                                        </CardHeader>
+                                        <CardContent>
+                                            {notes.length === 0 && incidents.length === 0 ? (
+                                                <p className="py-4 text-center text-xs text-muted-foreground">No recent activity</p>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {[...notes.slice(0, 3).map((n: any) => ({
+                                                        id: 'n' + n.id,
+                                                        icon: '\u{1F4DD}',
+                                                        text: `${n.author?.name ?? 'Unknown'}: ${(n.content ?? '').slice(0, 80)}${(n.content ?? '').length > 80 ? '...' : ''}`,
+                                                        date: n.created_at,
+                                                    })), ...incidents.slice(0, 2).map((inc: any) => ({
+                                                        id: 'i' + inc.id,
+                                                        icon: '\u26A0\uFE0F',
+                                                        text: `Incident: ${inc.type ?? 'Unknown'} (${inc.severity ?? ''})`,
+                                                        date: inc.occurred_at,
+                                                    }))].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5).map((item) => (
+                                                        <div key={item.id} className="flex items-start gap-2 rounded-lg border border-slate-100 bg-slate-50/50 p-2.5 text-sm">
+                                                            <span className="shrink-0 text-base">{item.icon}</span>
+                                                            <span className="flex-1 text-xs text-slate-700">{item.text}</span>
+                                                            <span className="shrink-0 text-[10px] text-muted-foreground">{new Date(item.date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}</span>
+                                                        </div>
                                                     ))}
                                                 </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+                                </div>
+
+                                {/* RIGHT COLUMN */}
+                                <div className="space-y-4">
+                                    {/* Profile Summary */}
+                                    <Card className="overflow-hidden">
+                                        <div className="bg-gradient-to-b from-violet-100 to-white px-4 pb-2 pt-4 text-center">
+                                            <Avatar className="mx-auto h-16 w-16 border-2 border-white shadow">
+                                                <AvatarImage src={client.avatar ?? ''} />
+                                                <AvatarFallback className="bg-violet-200 text-violet-700 text-lg">{getInitials(`${client.first_name} ${client.last_name}`)}</AvatarFallback>
+                                            </Avatar>
+                                            <h3 className="mt-2 text-sm font-bold">{client.preferred_name || client.first_name} {client.last_name}</h3>
+                                            {client.preferred_pronouns && <p className="text-xs text-muted-foreground">{client.preferred_pronouns}</p>}
+                                        </div>
+                                        <CardContent className="space-y-1.5 px-4 pb-4 pt-2 text-xs">
+                                            {client.date_of_birth && <div className="flex justify-between"><span className="text-muted-foreground">DOB</span><span>{new Date(client.date_of_birth).toLocaleDateString('en-NZ')}</span></div>}
+                                            {client.phone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span>{client.phone}</span></div>}
+                                            {client.email && <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span className="truncate ml-2">{client.email}</span></div>}
+                                            {client.city && <div className="flex justify-between"><span className="text-muted-foreground">Location</span><span>{client.suburb ? `${client.suburb}, ` : ''}{client.city}</span></div>}
+                                            {(client.ethnicity || client.religion || (client.languages ?? []).length > 0) && (
+                                                <>
+                                                    <Separator className="my-2" />
+                                                    {client.ethnicity && <div className="flex justify-between"><span className="text-muted-foreground">Ethnicity</span><span>{client.ethnicity}</span></div>}
+                                                    {(client.languages ?? []).length > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Languages</span><span>{(client.languages ?? []).join(', ')}</span></div>}
+                                                    {client.religion && <div className="flex justify-between"><span className="text-muted-foreground">Religion</span><span>{client.religion}</span></div>}
+                                                </>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Risk & Safety */}
+                                    {risks.length > 0 && (
+                                        <Card>
+                                            <CardHeader className="pb-2">
+                                                <CardTitle className="text-sm font-semibold">Risk &amp; Safety</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="flex justify-center">
+                                                    <DonutChart segments={riskDonutSegments} size={110} strokeWidth={16} centerLabel="Risks" centerValue={risks.length} />
+                                                </div>
+                                                <div className="mt-3 flex flex-wrap justify-center gap-2">
+                                                    {riskDonutSegments.map((seg) => (
+                                                        <div key={seg.label} className="flex items-center gap-1 text-[10px]">
+                                                            <div className="h-2 w-2 rounded-full" style={{ backgroundColor: seg.color }} />
+                                                            <span className="capitalize">{seg.label}: {seg.value}</span>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                                {incidents.length > 0 && (
+                                                    <div className="mt-3 rounded-lg bg-amber-50 p-2 text-center text-xs text-amber-700">
+                                                        {incidents.length} recent incident{incidents.length !== 1 ? 's' : ''}
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {/* Support Team */}
+                                    <Card>
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-sm font-semibold">Support Team</CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-2">
+                                            {client.key_worker && (
+                                                <div className="flex items-center gap-2 rounded-lg bg-violet-50 p-2">
+                                                    <div className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-200 text-xs font-bold text-violet-700">KW</div>
+                                                    <div>
+                                                        <p className="text-xs font-medium">{client.key_worker.name}</p>
+                                                        <p className="text-[10px] text-violet-500">Key Worker</p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            {(client.support_workers ?? []).slice(0, 4).map((sw: any) => (
+                                                <div key={sw.id} className="flex items-center gap-2 p-1">
+                                                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">SW</div>
+                                                    <p className="text-xs">{sw.name}</p>
+                                                </div>
+                                            ))}
+                                            {client.funding_type && (
+                                                <div className="mt-2 rounded bg-violet-50 px-2 py-1 text-center text-xs text-violet-600">
+                                                    Funding: {client.funding_type}
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
+
+                                    {/* Service Overview */}
+                                    <Card>
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="text-sm font-semibold">Service Overview</CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="flex justify-center">
+                                                <ProgressRing value={budgetPct} size={90} color="#7c3aed" label="Budget Used" />
                                             </div>
-                                        )}
-                                        {client.transport_notes && (
-                                            <div>
-                                                <p className="text-xs text-muted-foreground">Notes</p>
-                                                <p className="text-sm">{client.transport_notes}</p>
+                                            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                                                <div className="rounded-lg bg-slate-50 p-2">
+                                                    <div className="text-sm font-bold text-violet-600">{activeConsents}</div>
+                                                    <div className="text-[9px] uppercase text-muted-foreground">Consents</div>
+                                                </div>
+                                                <div className="rounded-lg bg-slate-50 p-2">
+                                                    <div className="text-sm font-bold text-violet-600">{(documents ?? []).length}</div>
+                                                    <div className="text-[9px] uppercase text-muted-foreground">Documents</div>
+                                                </div>
+                                                <div className="rounded-lg bg-slate-50 p-2">
+                                                    <div className="text-sm font-bold text-violet-600">{(assessments ?? []).length}</div>
+                                                    <div className="text-[9px] uppercase text-muted-foreground">Assessments</div>
+                                                </div>
                                             </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            </div>
+
+                            {/* Row 3: Health & Needs */}
+                            {(client.mobility_needs || client.sensory_needs || client.cognitive_needs || client.dietary_requirements || client.sleep_preferences) && (
+                                <div className="mt-4 grid gap-3 sm:grid-cols-3">
+                                    {(client.mobility_needs || client.sensory_needs || client.cognitive_needs) && (
+                                        <Card className="border-violet-100">
+                                            <CardContent className="p-4">
+                                                <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500">Health &amp; Support Needs</p>
+                                                {client.mobility_needs && <p className="mt-2 text-xs"><span className="font-medium">Mobility:</span> {client.mobility_needs}</p>}
+                                                {client.sensory_needs && <p className="mt-1 text-xs"><span className="font-medium">Sensory:</span> {client.sensory_needs}</p>}
+                                                {client.cognitive_needs && <p className="mt-1 text-xs"><span className="font-medium">Cognitive:</span> {client.cognitive_needs}</p>}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                    {client.dietary_requirements && (
+                                        <Card className="border-violet-100">
+                                            <CardContent className="p-4">
+                                                <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500">Dietary Requirements</p>
+                                                <p className="mt-2 text-xs">{client.dietary_requirements}</p>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                    {client.sleep_preferences && (
+                                        <Card className="border-violet-100">
+                                            <CardContent className="p-4">
+                                                <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500">Sleep Preferences</p>
+                                                <p className="mt-2 text-xs">{client.sleep_preferences}</p>
+                                            </CardContent>
+                                        </Card>
+                                    )}
+                                </div>
                             )}
 
-                            <Separator />
-
-                            <div className="flex flex-wrap gap-2">
+                            {/* Footer Links */}
+                            <Separator className="mt-4" />
+                            <div className="mt-3 flex flex-wrap gap-2">
                                 <Link
                                     href={`/operations/clients/${client.id}/medical`}
                                     className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
@@ -1027,10 +838,9 @@ export default function ClientShow({
                                     Manage portal users
                                 </Link>
                             </div>
-                        </CardContent>
-                    </Card>
-                    </>
-                )}
+                        </>
+                    );
+                })()}
 
                 {tab === 'onboarding' && (
                     <div className="space-y-4">
