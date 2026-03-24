@@ -600,6 +600,12 @@ export default function CarePlanShow({
                                     {goal.description && (
                                         <p className="mt-0.5 text-xs text-muted-foreground">{goal.description}</p>
                                     )}
+                                    {goal.outcome_notes && (
+                                        <div className="mt-1.5 rounded-md border border-amber-200 bg-amber-50/50 px-2.5 py-1.5">
+                                            <p className="text-[10px] font-medium uppercase tracking-wide text-amber-600">Notes</p>
+                                            <p className="mt-0.5 text-xs text-amber-800">{goal.outcome_notes}</p>
+                                        </div>
+                                    )}
                                     {/* Progress bar + slider */}
                                     <div className="mt-2 flex items-center gap-3">
                                         <div className="relative h-2 flex-1 cursor-pointer rounded-full bg-muted"
