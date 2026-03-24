@@ -21,7 +21,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Globe, Heart, Search, ShieldAlert, Star } from 'lucide-react';
+import { Calendar, Car, ChevronDown, ChevronRight, DollarSign, Globe, GraduationCap, Heart, Pill, Search, ShieldAlert, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -81,6 +81,8 @@ type Props = {
             type: string | null;
             name: string;
         } | null;
+        transport_needs?: string[] | null;
+        transport_notes?: string | null;
         support_workers: Array<{ id: number; name: string; email: string }>;
     };
     medical: {
@@ -689,6 +691,21 @@ export default function ClientShow({
                                 </Card>
                             )}
 
+                            <Card className="mt-4 border-emerald-200 bg-emerald-50/30">
+                                <CardContent className="flex items-center gap-4 p-4">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600">
+                                        <DollarSign className="h-5 w-5" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-medium">Funding & Billing</p>
+                                        <p className="text-xs text-muted-foreground">Budget tracking, invoice history, and funding utilisation will appear here once billing is configured.</p>
+                                    </div>
+                                    <Button variant="outline" size="sm" asChild>
+                                        <Link href={`/operations/billing?client_id=${client.id}`}>View Billing</Link>
+                                    </Button>
+                                </CardContent>
+                            </Card>
+
                             {/* Active Risks */}
                             {(() => {
                                 const pageProps = usePage().props as any;
@@ -938,6 +955,56 @@ export default function ClientShow({
                                 </div>
                             </div>
 
+                            <Card className="mt-4">
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-between text-base">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                                                <Calendar className="h-4 w-4" />
+                                            </div>
+                                            Upcoming Schedule
+                                        </div>
+                                        <Button variant="outline" size="sm" asChild>
+                                            <Link href={`/operations/rostering?client_id=${client.id}`}>View Full Schedule</Link>
+                                        </Button>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-xs text-muted-foreground text-center py-4">Weekly schedule view will be available here once rostering is fully integrated.</p>
+                                </CardContent>
+                            </Card>
+
+                            {(client.transport_needs || client.transport_notes) && (
+                                <Card className="mt-4">
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-purple-100 text-purple-600">
+                                                <Car className="h-4 w-4" />
+                                            </div>
+                                            Transport & Mobility
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-2">
+                                        {client.transport_needs && Array.isArray(client.transport_needs) && client.transport_needs.length > 0 && (
+                                            <div>
+                                                <p className="text-xs text-muted-foreground">Transport Needs</p>
+                                                <div className="mt-1 flex flex-wrap gap-1">
+                                                    {client.transport_needs.map((need: string, i: number) => (
+                                                        <span key={i} className="rounded-full bg-purple-100 px-2 py-0.5 text-xs text-purple-700">{need}</span>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {client.transport_notes && (
+                                            <div>
+                                                <p className="text-xs text-muted-foreground">Notes</p>
+                                                <p className="text-sm">{client.transport_notes}</p>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )}
+
                             <Separator />
 
                             <div className="flex flex-wrap gap-2">
@@ -1138,11 +1205,40 @@ export default function ClientShow({
                                 })()}
                             </Card>
                         )}
+
+                        <Card className="mt-4 border-orange-200 bg-orange-50/30">
+                            <CardContent className="flex items-center gap-4 p-4">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-orange-100 text-orange-600">
+                                    <GraduationCap className="h-5 w-5" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium">Staff Preparation</p>
+                                    <p className="text-xs text-muted-foreground">Staff training status and induction progress for assigned support workers will be shown here once HR integration is complete.</p>
+                                </div>
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href="/hr">Open HR</Link>
+                                </Button>
+                            </CardContent>
+                        </Card>
                     </div>
                 )}
 
                 {tab === 'medical' && (
                     <div className="space-y-4">
+                        <Card className="mb-4 border-cyan-200 bg-cyan-50/30">
+                            <CardContent className="flex items-center gap-4 p-4">
+                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600">
+                                    <Pill className="h-5 w-5" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium">Medication Compliance</p>
+                                    <p className="text-xs text-muted-foreground">eMAR compliance tracking and medication administration records will be available here.</p>
+                                </div>
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href="/emar">Open eMAR</Link>
+                                </Button>
+                            </CardContent>
+                        </Card>
                         <Tabs
                             tabs={[
                                 {
