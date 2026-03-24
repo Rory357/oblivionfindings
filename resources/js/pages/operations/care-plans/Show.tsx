@@ -588,10 +588,13 @@ export default function CarePlanShow({
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm font-medium">{goal.title}</span>
-                                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
-                                            onClick={() => openGoalEditor(goal)} title="Edit goal">
-                                            <Pencil className="h-3 w-3" />
-                                        </Button>
+                                        {goal.status !== 'completed' && (
+                                            <Button variant="outline" size="sm" className="h-6 gap-1 px-2 text-[10px] text-indigo-600 border-indigo-200 hover:bg-indigo-50"
+                                                onClick={() => openGoalEditor(goal)} title="Edit goal">
+                                                <Pencil className="h-3 w-3" />
+                                                Edit
+                                            </Button>
+                                        )}
                                         <Badge variant="outline" className="h-4 px-1.5 text-[9px] capitalize">{goal.category}</Badge>
                                         <span className={`text-[10px] font-medium capitalize ${PRIORITY_COLORS[goal.priority] ?? ''}`}>
                                             {goal.priority}
