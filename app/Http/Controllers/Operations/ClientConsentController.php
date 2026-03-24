@@ -68,6 +68,8 @@ class ClientConsentController extends Controller
             'best_interests_consultees' => ['nullable', 'array'],
             // Refusal
             'refusal_reason' => ['nullable', 'string', 'max:2000'],
+            // Document upload
+            'signed_document' => ['nullable', 'file', 'max:10240'],
         ]);
 
         $consent = ClientConsent::create([
@@ -97,6 +99,12 @@ class ClientConsentController extends Controller
             'refusal_reason' => $data['refusal_reason'] ?? null,
             'created_by' => $auth->id,
         ]);
+
+        // Handle document upload
+        if ($request->hasFile('signed_document')) {
+            $path = $request->file('signed_document')->store("consent-documents/{$client->id}", 'public');
+            $consent->update(['signed_document_path' => $path]);
+        }
 
         return redirect()->back()->with('success', 'Consent recorded successfully.');
     }

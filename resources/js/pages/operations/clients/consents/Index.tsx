@@ -30,6 +30,7 @@ import {
     FileCheck,
     Plus,
     ShieldCheck,
+    Upload,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -72,13 +73,17 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
         refusal_reason: '',
     });
     const [withdrawReason, setWithdrawReason] = useState('');
+    const [consentFile, setConsentFile] = useState<File | null>(null);
 
     const s = { total: stats?.total ?? 0, active: stats?.active ?? 0, expiring_soon: stats?.expiring_soon ?? 0, expired: stats?.expired ?? 0, withdrawn: stats?.withdrawn ?? 0 };
 
     const submitConsent = () => {
-        router.post(`/operations/clients/${client.id}/consents`, formData, {
+        const payload: any = { ...formData };
+        if (consentFile) payload.signed_document = consentFile;
+        router.post(`/operations/clients/${client.id}/consents`, payload, {
+            forceFormData: !!consentFile,
             preserveScroll: true,
-            onSuccess: () => { setShowRecord(false); setFormData({ ...formData, consent_type_id: '', given_notes: '', expires_at: '', capacity_assessed: false, capacity_notes: '', refusal_reason: '' }); },
+            onSuccess: () => { setShowRecord(false); setConsentFile(null); setFormData({ ...formData, consent_type_id: '', given_notes: '', expires_at: '', capacity_assessed: false, capacity_notes: '', refusal_reason: '' }); },
         });
     };
 
@@ -268,6 +273,18 @@ export default function ConsentsIndex({ client, consents = [], stats = {} as any
                         <div className="space-y-1.5">
                             <Label>Notes</Label>
                             <Textarea value={formData.given_notes} onChange={(e) => setFormData({ ...formData, given_notes: e.target.value })} placeholder="Additional notes..." className="min-h-[60px]" />
+                        </div>
+                        {/* Signed Document Upload */}
+                        <div className="space-y-1.5">
+                            <Label>Signed Document</Label>
+                            <label className="flex cursor-pointer items-center gap-3 rounded-xl border-2 border-dashed border-violet-300 bg-violet-50/50 p-4 transition-colors hover:bg-violet-50">
+                                <Upload className="h-5 w-5 text-violet-400" />
+                                <div>
+                                    <p className="text-sm font-medium text-violet-700">{consentFile ? consentFile.name : 'Click to upload signed consent form'}</p>
+                                    <p className="text-[10px] text-violet-500">PDF, Image, or scanned document</p>
+                                </div>
+                                <input type="file" className="hidden" accept=".pdf,.jpg,.jpeg,.png,.doc,.docx" onChange={(e) => setConsentFile(e.target.files?.[0] ?? null)} />
+                            </label>
                         </div>
                     </div>
                     <DialogFooter>
