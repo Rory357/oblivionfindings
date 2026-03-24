@@ -1046,289 +1046,221 @@ export default function ClientShow({
 
                 {tab === 'medical' && (
                     <div className="space-y-4">
-                        <Card className="mb-4 border-cyan-200 bg-cyan-50/30">
-                            <CardContent className="flex items-center gap-4 p-4">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-cyan-100 text-cyan-600">
-                                    <Pill className="h-5 w-5" />
+                        {/* Allergy Alert */}
+                        {medical.profile?.allergies && medical.profile.allergies !== '-' && (
+                            <div className="flex items-center gap-3 rounded-xl border-2 border-red-300 bg-red-50 p-4">
+                                <ShieldAlert className="h-6 w-6 shrink-0 text-red-600" />
+                                <div>
+                                    <p className="text-sm font-bold text-red-800">Allergies</p>
+                                    <p className="text-sm text-red-700">{medical.profile.allergies}</p>
                                 </div>
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium">Medication Compliance</p>
-                                    <p className="text-xs text-muted-foreground">eMAR compliance tracking and medication administration records will be available here.</p>
-                                </div>
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href="/emar">Open eMAR</Link>
+                            </div>
+                        )}
+
+                        {/* Quick Stats */}
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                <div className="text-xl font-bold text-violet-700">{medical.medications?.length ?? 0}</div>
+                                <div className="text-[10px] uppercase tracking-wider text-violet-500">Medications</div>
+                            </div>
+                            <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-yellow-50 p-3 text-center">
+                                <div className="text-xl font-bold text-amber-700">{medical.conditions?.length ?? 0}</div>
+                                <div className="text-[10px] uppercase tracking-wider text-amber-500">Conditions</div>
+                            </div>
+                            <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-cyan-50 p-3 text-center">
+                                <div className="text-xl font-bold text-blue-700">{medical.emergency_contacts?.length ?? 0}</div>
+                                <div className="text-[10px] uppercase tracking-wider text-blue-500">Emergency Contacts</div>
+                            </div>
+                            <div className="rounded-xl border bg-gradient-to-br from-cyan-50 to-teal-50 p-3 text-center">
+                                <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
+                                    <Link href="/emar"><Pill className="h-3.5 w-3.5" /> Open eMAR</Link>
                                 </Button>
-                            </CardContent>
-                        </Card>
-                        <Tabs
-                            tabs={[
-                                {
-                                    key: 'medical_profile',
-                                    label: 'Medical profile',
-                                    content: (
-                                        <Card>
-                                            <CardHeader>
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <CardTitle className="text-base">
-                                                        Medical profile
-                                                    </CardTitle>
-                                                    {can.edit ? (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/medical`}
-                                                            >
-                                                                Edit
-                                                            </Link>
-                                                        </Button>
-                                                    ) : null}
+                            </div>
+                        </div>
+
+                        {/* Main Grid */}
+                        <div className="grid gap-4 lg:grid-cols-3">
+                            {/* Left Column — Profile + Medications */}
+                            <div className="space-y-4 lg:col-span-2">
+                                {/* GP Card */}
+                                {(medical.profile?.gp_name || medical.profile?.gp_practice) && (
+                                    <Card className="border-emerald-200 bg-emerald-50/30">
+                                        <CardContent className="p-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                                                    <Heart className="h-4 w-4" />
                                                 </div>
-                                            </CardHeader>
-                                            <CardContent className="space-y-3 text-sm">
-                                                <div>
-                                                    <div className="font-medium">
-                                                        Medical history
-                                                    </div>
-                                                    <div className="whitespace-pre-wrap text-slate-600">
-                                                        {medical.profile
-                                                            ?.medical_history ||
-                                                            '-'}
-                                                    </div>
+                                                <span className="text-sm font-semibold">GP / Primary Care</span>
+                                            </div>
+                                            <div className="grid gap-2 sm:grid-cols-3 text-sm">
+                                                {medical.profile.gp_name && <div><p className="text-[10px] uppercase text-muted-foreground">Doctor</p><p className="font-medium">{medical.profile.gp_name}</p></div>}
+                                                {medical.profile.gp_practice && <div><p className="text-[10px] uppercase text-muted-foreground">Practice</p><p className="font-medium">{medical.profile.gp_practice}</p></div>}
+                                                {medical.profile.gp_phone && <div><p className="text-[10px] uppercase text-muted-foreground">Phone</p><p className="font-medium">{medical.profile.gp_phone}</p></div>}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* Medical Profile */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center justify-between text-base">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                                                    <FileText className="h-4 w-4" />
                                                 </div>
-                                                <div>
-                                                    <div className="font-medium">
-                                                        Disabilities
-                                                    </div>
-                                                    <div className="whitespace-pre-wrap text-slate-600">
-                                                        {medical.profile
-                                                            ?.disabilities ||
-                                                            '-'}
-                                                    </div>
+                                                Medical Profile
+                                            </div>
+                                            {can.edit && <Button variant="outline" size="sm" asChild><Link href={`/operations/clients/${client.id}/medical`}>Edit</Link></Button>}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="grid gap-4 sm:grid-cols-2">
+                                            {[
+                                                { label: 'Medical History', value: medical.profile?.medical_history },
+                                                { label: 'Disabilities', value: medical.profile?.disabilities },
+                                                { label: 'Blood Type', value: medical.profile?.blood_type },
+                                                { label: 'Hospital Preference', value: medical.profile?.hospital_preference },
+                                            ].filter(f => f.value && f.value !== '-').map(f => (
+                                                <div key={f.label} className="rounded-lg bg-slate-50 p-3">
+                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">{f.label}</p>
+                                                    <p className="mt-1 text-sm">{f.value}</p>
                                                 </div>
-                                                <div>
-                                                    <div className="font-medium">
-                                                        Allergies
-                                                    </div>
-                                                    <div className="whitespace-pre-wrap text-slate-600">
-                                                        {medical.profile
-                                                            ?.allergies || '-'}
-                                                    </div>
+                                            ))}
+                                        </div>
+                                        {medical.profile?.notes && medical.profile.notes !== '-' && (
+                                            <div className="mt-3 rounded-lg bg-slate-50 p-3">
+                                                <p className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Notes</p>
+                                                <p className="mt-1 text-sm whitespace-pre-wrap">{medical.profile.notes}</p>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+
+                                {/* Medications */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center justify-between text-base">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                                                    <Pill className="h-4 w-4" />
                                                 </div>
-                                                <div>
-                                                    <div className="font-medium">
-                                                        Notes
-                                                    </div>
-                                                    <div className="whitespace-pre-wrap text-slate-600">
-                                                        {medical.profile
-                                                            ?.notes || '-'}
-                                                    </div>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-                                    ),
-                                },
-                                {
-                                    key: 'medications',
-                                    label: `Medications${medical.medications.length ? ` (${medical.medications.length})` : ''}`,
-                                    content: (
-                                        <Card>
-                                            <CardHeader>
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <CardTitle className="text-base">
-                                                        Medications
-                                                    </CardTitle>
-                                                    {can.edit ? (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/medical?section=medications`}
-                                                            >
-                                                                Manage
-                                                            </Link>
-                                                        </Button>
-                                                    ) : null}
-                                                </div>
-                                            </CardHeader>
-                                            <CardContent className="space-y-2">
-                                                {medical.medications.map(
-                                                    (m) => (
-                                                        <div
-                                                            key={m.id}
-                                                            className="rounded-md border p-3"
-                                                        >
-                                                            <div className="text-sm font-medium">
-                                                                {m.name}
-                                                            </div>
-                                                            <div className="mt-1 text-xs text-slate-500">
-                                                                {[
-                                                                    m.dosage &&
-                                                                        `Dosage: ${m.dosage}`,
-                                                                    m.frequency &&
-                                                                        `Frequency: ${m.frequency}`,
-                                                                    m.route &&
-                                                                        `Route: ${m.route}`,
-                                                                ]
-                                                                    .filter(
-                                                                        Boolean,
-                                                                    )
-                                                                    .join(
-                                                                        ' - ',
-                                                                    ) || '-'}
-                                                            </div>
-                                                            {m.instructions ? (
-                                                                <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
-                                                                    {
-                                                                        m.instructions
-                                                                    }
-                                                                </div>
-                                                            ) : null}
+                                                Medications
+                                                <Badge variant="secondary" className="text-[10px]">{medical.medications?.length ?? 0}</Badge>
+                                            </div>
+                                            {can.edit && <Button variant="outline" size="sm" asChild><Link href={`/operations/clients/${client.id}/medical?section=medications`}>Manage</Link></Button>}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {(medical.medications ?? []).length === 0 ? (
+                                            <p className="py-4 text-center text-sm text-muted-foreground">No medications listed.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {medical.medications.map((m: any) => (
+                                                    <div key={m.id} className="flex items-start gap-3 rounded-xl border-l-4 border-l-violet-400 bg-white p-3 shadow-sm">
+                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-violet-100">
+                                                            <Pill className="h-4 w-4 text-violet-600" />
                                                         </div>
-                                                    ),
-                                                )}
-                                                {!medical.medications.length ? (
-                                                    <div className="text-sm text-slate-500">
-                                                        No medications listed.
-                                                    </div>
-                                                ) : null}
-                                            </CardContent>
-                                        </Card>
-                                    ),
-                                },
-                                {
-                                    key: 'conditions',
-                                    label: `Conditions${medical.conditions.length ? ` (${medical.conditions.length})` : ''}`,
-                                    content: (
-                                        <Card>
-                                            <CardHeader>
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <CardTitle className="text-base">
-                                                        Conditions
-                                                    </CardTitle>
-                                                    {can.edit ? (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/medical?section=conditions`}
-                                                            >
-                                                                Manage
-                                                            </Link>
-                                                        </Button>
-                                                    ) : null}
-                                                </div>
-                                            </CardHeader>
-                                            <CardContent className="space-y-2">
-                                                {medical.conditions.map((c) => (
-                                                    <div
-                                                        key={c.id}
-                                                        className="rounded-md border p-3"
-                                                    >
-                                                        <div className="text-sm font-medium">
-                                                            {c.label}
-                                                            {c.severity ? (
-                                                                <span className="ml-2 text-xs text-slate-500">
-                                                                    (
-                                                                    {c.severity}
-                                                                    )
-                                                                </span>
-                                                            ) : null}
-                                                        </div>
-                                                        {c.notes ? (
-                                                            <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
-                                                                {c.notes}
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-semibold">{m.name}</span>
+                                                                {m.is_controlled && <Badge className="border-0 bg-red-100 text-red-700 text-[9px]">Controlled</Badge>}
+                                                                {m.is_prn && <Badge className="border-0 bg-amber-100 text-amber-700 text-[9px]">PRN</Badge>}
                                                             </div>
-                                                        ) : null}
+                                                            <div className="mt-0.5 flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+                                                                {m.dosage && <span>{m.dosage}</span>}
+                                                                {m.frequency && <span>{m.frequency}</span>}
+                                                                {m.route && <span>{m.route}</span>}
+                                                            </div>
+                                                            {m.instructions && <p className="mt-1 text-xs text-slate-600">{m.instructions}</p>}
+                                                        </div>
                                                     </div>
                                                 ))}
-                                                {!medical.conditions.length ? (
-                                                    <div className="text-sm text-slate-500">
-                                                        No conditions listed.
-                                                    </div>
-                                                ) : null}
-                                            </CardContent>
-                                        </Card>
-                                    ),
-                                },
-                                {
-                                    key: 'emergency_contacts',
-                                    label: `Emergency contacts${medical.emergency_contacts.length ? ` (${medical.emergency_contacts.length})` : ''}`,
-                                    content: (
-                                        <Card>
-                                            <CardHeader>
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <CardTitle className="text-base">
-                                                        Emergency contacts
-                                                    </CardTitle>
-                                                    {can.edit ? (
-                                                        <Button
-                                                            variant="outline"
-                                                            size="sm"
-                                                            asChild
-                                                        >
-                                                            <Link
-                                                                href={`/operations/clients/${client.id}/medical?section=emergency_contacts`}
-                                                            >
-                                                                Manage
-                                                            </Link>
-                                                        </Button>
-                                                    ) : null}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
+
+                            {/* Right Column — Conditions + Emergency Contacts */}
+                            <div className="space-y-4">
+                                {/* Conditions */}
+                                <Card>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="flex items-center justify-between text-sm font-semibold">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-100 text-amber-600">
+                                                    <ShieldAlert className="h-3.5 w-3.5" />
                                                 </div>
-                                            </CardHeader>
-                                            <CardContent className="space-y-2">
-                                                {medical.emergency_contacts.map(
-                                                    (e) => (
-                                                        <div
-                                                            key={e.id}
-                                                            className="rounded-md border p-3"
-                                                        >
-                                                            <div className="text-sm font-medium">
-                                                                {e.name}
-                                                            </div>
-                                                            <div className="mt-1 text-xs text-slate-500">
-                                                                {[
-                                                                    e.relationship &&
-                                                                        `Relationship: ${e.relationship}`,
-                                                                    e.phone &&
-                                                                        `Phone: ${e.phone}`,
-                                                                    e.email &&
-                                                                        `Email: ${e.email}`,
-                                                                ]
-                                                                    .filter(
-                                                                        Boolean,
-                                                                    )
-                                                                    .join(
-                                                                        ' - ',
-                                                                    ) || '-'}
-                                                            </div>
-                                                            {e.notes ? (
-                                                                <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
-                                                                    {e.notes}
-                                                                </div>
-                                                            ) : null}
+                                                Conditions
+                                            </div>
+                                            {can.edit && <Button variant="ghost" size="sm" className="h-6 text-xs" asChild><Link href={`/operations/clients/${client.id}/medical?section=conditions`}>Manage</Link></Button>}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {(medical.conditions ?? []).length === 0 ? (
+                                            <p className="py-4 text-center text-xs text-muted-foreground">No conditions listed.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {medical.conditions.map((c: any) => (
+                                                    <div key={c.id} className="rounded-lg border p-2.5">
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-xs font-medium">{c.label}</span>
+                                                            {c.severity && (
+                                                                <Badge className={`border-0 text-[9px] ${
+                                                                    c.severity === 'severe' ? 'bg-red-100 text-red-700' :
+                                                                    c.severity === 'moderate' ? 'bg-amber-100 text-amber-700' :
+                                                                    'bg-emerald-100 text-emerald-700'
+                                                                }`}>{c.severity}</Badge>
+                                                            )}
                                                         </div>
-                                                    ),
-                                                )}
-                                                {!medical.emergency_contacts
-                                                    .length ? (
-                                                    <div className="text-sm text-slate-500">
-                                                        No emergency contacts
-                                                        listed.
+                                                        {c.notes && <p className="mt-1 text-[11px] text-muted-foreground">{c.notes}</p>}
                                                     </div>
-                                                ) : null}
-                                            </CardContent>
-                                        </Card>
-                                    ),
-                                },
-                            ]}
-                        />
+                                                ))}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+
+                                {/* Emergency Contacts */}
+                                <Card>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="flex items-center justify-between text-sm font-semibold">
+                                            <div className="flex items-center gap-2">
+                                                <div className="flex h-6 w-6 items-center justify-center rounded-md bg-blue-100 text-blue-600">
+                                                    <Heart className="h-3.5 w-3.5" />
+                                                </div>
+                                                Emergency Contacts
+                                            </div>
+                                            {can.edit && <Button variant="ghost" size="sm" className="h-6 text-xs" asChild><Link href={`/operations/clients/${client.id}/medical?section=emergency_contacts`}>Manage</Link></Button>}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {(medical.emergency_contacts ?? []).length === 0 ? (
+                                            <p className="py-4 text-center text-xs text-muted-foreground">No emergency contacts listed.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {medical.emergency_contacts.map((e: any) => (
+                                                    <div key={e.id} className="flex items-start gap-2.5 rounded-lg border p-2.5">
+                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-700">
+                                                            {(e.name ?? '?').charAt(0)}
+                                                        </div>
+                                                        <div className="flex-1 text-xs">
+                                                            <div className="flex items-center gap-1.5">
+                                                                <span className="font-medium">{e.name}</span>
+                                                                {e.relationship && <Badge variant="outline" className="h-4 px-1 text-[9px]">{e.relationship}</Badge>}
+                                                            </div>
+                                                            {e.phone && <p className="mt-0.5 text-muted-foreground">{e.phone}</p>}
+                                                            {e.email && <p className="text-muted-foreground">{e.email}</p>}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
                     </div>
                 )}
 
