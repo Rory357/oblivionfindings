@@ -1340,8 +1340,8 @@ export default function ClientShow({
                                                             <h3 className="text-sm font-semibold text-white">{activePlan.title}</h3>
                                                             <p className="text-xs text-violet-200">{(activePlan.plan_type ?? '').replace(/_/g, ' ')} · Version {activePlan.version ?? 1}</p>
                                                         </div>
-                                                        <Button size="sm" variant="outline" className="border-white/30 text-white hover:bg-white/20" asChild>
-                                                            <Link href={`/operations/care-plans/${activePlan.id}`}>View Plan</Link>
+                                                        <Button size="sm" className="bg-white text-violet-700 font-semibold hover:bg-violet-100 shadow-sm" asChild>
+                                                            <Link href={`/operations/care-plans/${activePlan.id}`}>View Full Plan</Link>
                                                         </Button>
                                                     </div>
                                                 </div>
