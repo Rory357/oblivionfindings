@@ -207,6 +207,33 @@ export default function CarePlanShow({
     const [editTitle, setEditTitle] = useState('');
     const [editDescription, setEditDescription] = useState('');
 
+    // Quick note for a goal
+    const [noteGoalId, setNoteGoalId] = useState<number | null>(null);
+    const [quickNote, setQuickNote] = useState('');
+    const [expandedGoalNotes, setExpandedGoalNotes] = useState<Record<number, boolean>>({});
+
+    const submitQuickNote = () => {
+        if (!noteGoalId || !quickNote.trim()) return;
+        router.post('/operations/progress-notes', {
+            client_id: plan.client?.id,
+            care_plan_goal_id: noteGoalId,
+            content: quickNote,
+            note_type: 'goal_update',
+            visibility: 'staff_only',
+        }, {
+            preserveScroll: true,
+            onSuccess: () => { setQuickNote(''); setNoteGoalId(null); },
+        });
+    };
+
+    const toggleGoalNotes = (goalId: number) => {
+        setExpandedGoalNotes(prev => ({ ...prev, [goalId]: !prev[goalId] }));
+    };
+
+    const getGoalNotes = (goalId: number) => {
+        return (progressNotes ?? []).filter((n: any) => n.care_plan_goal_id === goalId);
+    };
+
     const openGoalEditor = (goal: Goal) => {
         setEditingGoal(goal);
         setEditProgress(goal.progress_percentage);
@@ -651,12 +678,59 @@ export default function CarePlanShow({
                                                 Completed
                                             </span>
                                         )}
+                                        {/* Add Note button */}
+                                        <Button size="sm" variant="outline" className="h-7 gap-1 px-3 text-xs"
+                                            onClick={() => { setNoteGoalId(goal.id); setQuickNote(''); }}>
+                                            <MessageSquare className="h-3.5 w-3.5" />
+                                            Add Note
+                                        </Button>
+                                        {/* Show/Hide Notes History */}
+                                        {getGoalNotes(goal.id).length > 0 && (
+                                            <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+                                                onClick={() => toggleGoalNotes(goal.id)}>
+                                                <Clock className="h-3 w-3" />
+                                                {expandedGoalNotes[goal.id] ? 'Hide' : 'Show'} Notes ({getGoalNotes(goal.id).length})
+                                            </Button>
+                                        )}
                                         {goal.target_date && (
                                             <span className="ml-auto text-[11px] text-muted-foreground">
                                                 Target: {formatDate(goal.target_date)}
                                             </span>
                                         )}
                                     </div>
+
+                                    {/* Quick Note Input (inline) */}
+                                    {noteGoalId === goal.id && (
+                                        <div className="mt-2 rounded-lg border border-indigo-200 bg-indigo-50/30 p-3">
+                                            <Textarea
+                                                className="min-h-[60px] bg-white text-sm"
+                                                value={quickNote}
+                                                onChange={(e) => setQuickNote(e.target.value)}
+                                                placeholder="Add a progress note for this goal..."
+                                                autoFocus
+                                            />
+                                            <div className="mt-2 flex justify-end gap-2">
+                                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setNoteGoalId(null)}>Cancel</Button>
+                                                <Button size="sm" className="h-7 text-xs" onClick={submitQuickNote} disabled={!quickNote.trim()}>Save Note</Button>
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Notes History (expandable) */}
+                                    {expandedGoalNotes[goal.id] && getGoalNotes(goal.id).length > 0 && (
+                                        <div className="mt-2 space-y-1.5 rounded-lg border bg-slate-50/50 p-2.5">
+                                            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">Note History</p>
+                                            {getGoalNotes(goal.id).map((note: any) => (
+                                                <div key={note.id} className="rounded border bg-white p-2 text-xs">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="font-medium">{note.author?.name ?? 'Unknown'}</span>
+                                                        <span className="text-[10px] text-muted-foreground">{formatDate(note.created_at)}</span>
+                                                    </div>
+                                                    <p className="mt-0.5 text-muted-foreground">{note.content}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </CardContent>
