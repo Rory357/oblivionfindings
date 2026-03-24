@@ -98,7 +98,8 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
     return (
         <AppLayout>
             <Head title="Progress Notes" />
-            <PageHeader title="Progress Notes" description="Goal updates, observations, and progress tracking across all clients." backHref="/operations"
+            <PageHeader title="Progress Notes" description="Goal updates, observations, and progress tracking across all clients."
+                backHref={filters?.client_id ? `/operations/clients/${filters.client_id}` : '/operations'}
                 actions={
                     <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => setShowAddForm(!showAddForm)}>
                         <Plus className="h-4 w-4" /> Add Note
