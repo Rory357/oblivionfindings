@@ -1116,7 +1116,8 @@ export default function ClientShow({
                 )}
 
                 {tab === 'care_plans' && (() => {
-                    const summary = (props as any).care_plans_summary ?? {};
+                    const pageProps = usePage().props as any;
+                    const summary = pageProps.care_plans_summary ?? {};
                     const activePlan = summary.active_plan;
                     const recentNotes = summary.recent_notes ?? [];
                     const reviewDue = summary.review_due ?? false;

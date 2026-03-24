@@ -355,7 +355,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                 <Label className="font-medium">My Dreams & Aspirations</Label>
                                 <Textarea
                                     className="min-h-[100px] border-rose-200 bg-white"
-                                    value={data.content.about_me.dreams}
+                                    value={data.content.about_me?.dreams}
                                     onChange={(e) => setAboutMeField('dreams', e.target.value)}
                                     placeholder="What are their big dreams, hopes, and goals for the future?"
                                 />
@@ -366,7 +366,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                     <Label className="font-medium">What{"'"}s Important TO Me</Label>
                                     <Textarea
                                         className="min-h-[100px] border-rose-200 bg-white"
-                                        value={data.content.about_me.important_to_me}
+                                        value={data.content.about_me?.important_to_me}
                                         onChange={(e) => setAboutMeField('important_to_me', e.target.value)}
                                         placeholder="Relationships, routines, interests, passions — the things that matter most to this person"
                                     />
@@ -375,7 +375,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                     <Label className="font-medium">What{"'"}s Important FOR Me</Label>
                                     <Textarea
                                         className="min-h-[100px] border-rose-200 bg-white"
-                                        value={data.content.about_me.important_for_me}
+                                        value={data.content.about_me?.important_for_me}
                                         onChange={(e) => setAboutMeField('important_for_me', e.target.value)}
                                         placeholder="Health, safety, and wellbeing needs that must be maintained"
                                     />
@@ -386,7 +386,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                 <Label className="font-medium">My Ideal Day</Label>
                                 <Textarea
                                     className="min-h-[100px] border-rose-200 bg-white"
-                                    value={data.content.about_me.ideal_day}
+                                    value={data.content.about_me?.ideal_day}
                                     onChange={(e) => setAboutMeField('ideal_day', e.target.value)}
                                     placeholder="Describe what a good day looks like for this person — morning routine, activities, meals, social time..."
                                 />
@@ -397,7 +397,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                     <Label className="font-medium text-emerald-700">Things I Like</Label>
                                     <Textarea
                                         className="min-h-[80px] border-emerald-200 bg-emerald-50/50"
-                                        value={data.content.about_me.likes}
+                                        value={data.content.about_me?.likes}
                                         onChange={(e) => setAboutMeField('likes', e.target.value)}
                                         placeholder="Favourite foods, activities, music, places, people..."
                                     />
@@ -406,7 +406,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                     <Label className="font-medium text-red-700">Things I Don{"'"}t Like</Label>
                                     <Textarea
                                         className="min-h-[80px] border-red-200 bg-red-50/50"
-                                        value={data.content.about_me.dislikes}
+                                        value={data.content.about_me?.dislikes}
                                         onChange={(e) => setAboutMeField('dislikes', e.target.value)}
                                         placeholder="Things to avoid, triggers, dislikes..."
                                     />
@@ -417,7 +417,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                                 <Label className="font-medium">How to Support Me Best</Label>
                                 <Textarea
                                     className="min-h-[100px] border-rose-200 bg-white"
-                                    value={data.content.about_me.how_to_support}
+                                    value={data.content.about_me?.how_to_support}
                                     onChange={(e) => setAboutMeField('how_to_support', e.target.value)}
                                     placeholder="Tips for support workers — communication style, motivation, boundaries, things to remember..."
                                 />
