@@ -13,7 +13,7 @@ class MessageController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('messages.viewAny'), 403);
+        abort_unless($auth, 403);
 
         $conversationIds = OpsConversationParticipant::query()
             ->where('user_id', $auth->id)
@@ -21,35 +21,80 @@ class MessageController extends Controller
 
         $conversations = OpsConversation::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->whereIn('id', $conversationIds)
+            ->when($conversationIds->isNotEmpty(), fn ($q) => $q->whereIn('id', $conversationIds))
+            ->when($conversationIds->isEmpty(), fn ($q) => $q->whereRaw('1=0')) // no results if not in any conversation
             ->with([
                 'latestMessage:id,conversation_id,sender_id,content,created_at',
                 'latestMessage.sender:id,name',
                 'participants.user:id,name',
                 'client:id,first_name,last_name',
             ])
-            ->withCount([
-                'messages as unread_count' => function ($q) use ($auth) {
-                    $q->where('sender_id', '!=', $auth->id)
-                        ->whereDoesntHave('conversation.participants', function ($pq) use ($auth) {
-                            $pq->where('user_id', $auth->id)
-                                ->whereColumn('ops_conversation_participants.last_read_at', '>=', 'ops_messages.created_at');
-                        });
-                },
-            ])
             ->orderByDesc('updated_at')
-            ->paginate(25)
-            ->withQueryString();
+            ->get();
+
+        // Load users for "New Chat" dropdown
+        $users = \App\Models\User::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->where('id', '!=', $auth->id)
+            ->select('id', 'name', 'email')
+            ->orderBy('name')
+            ->get();
 
         return inertia('operations/messages/Index', [
             'conversations' => $conversations,
+            'users' => $users,
+            'currentUserId' => $auth->id,
         ]);
+    }
+
+    public function createConversation(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth, 403);
+
+        $data = $request->validate([
+            'participant_ids' => ['required', 'array', 'min:1'],
+            'participant_ids.*' => ['integer', 'exists:users,id'],
+            'title' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $participantIds = collect($data['participant_ids'])->push($auth->id)->unique()->values();
+
+        // Check if a direct conversation already exists between these 2 users
+        if ($participantIds->count() === 2) {
+            $existing = OpsConversation::query()
+                ->where('conversation_type', 'direct')
+                ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                ->whereHas('participants', fn ($q) => $q->where('user_id', $participantIds[0]))
+                ->whereHas('participants', fn ($q) => $q->where('user_id', $participantIds[1]))
+                ->first();
+
+            if ($existing) {
+                return redirect()->back()->with('selected_conversation_id', $existing->id);
+            }
+        }
+
+        $conversation = OpsConversation::create([
+            'organization_id' => $auth->organization_id,
+            'conversation_type' => $participantIds->count() > 2 ? 'group' : 'direct',
+            'title' => $data['title'] ?? null,
+        ]);
+
+        foreach ($participantIds as $uid) {
+            OpsConversationParticipant::create([
+                'conversation_id' => $conversation->id,
+                'user_id' => $uid,
+                'role' => $uid === $auth->id ? 'admin' : 'member',
+            ]);
+        }
+
+        return redirect()->back()->with('selected_conversation_id', $conversation->id);
     }
 
     public function show(Request $request, $conversation)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('messages.view'), 403);
+        abort_unless($auth, 403);
 
         $conversation = OpsConversation::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -79,7 +124,7 @@ class MessageController extends Controller
     public function store(Request $request, $conversation)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('messages.create'), 403);
+        abort_unless($auth, 403);
 
         $conversation = OpsConversation::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -114,7 +159,7 @@ class MessageController extends Controller
     public function markRead(Request $request, $conversation)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('messages.view'), 403);
+        abort_unless($auth, 403);
 
         $participant = OpsConversationParticipant::query()
             ->where('conversation_id', $conversation)

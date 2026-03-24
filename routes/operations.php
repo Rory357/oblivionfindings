@@ -595,15 +595,11 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Messages (NEW)
     // -------------------------------------------------------------------------
 
-    Route::middleware('permission:messages.viewAny')->group(function () {
-        Route::get('/messages', [MessageController::class, 'index'])->name('operations.messages.index');
-        Route::get('/messages/{conversation}', [MessageController::class, 'show'])->name('operations.messages.show');
-        Route::patch('/messages/{conversation}/read', [MessageController::class, 'markRead'])->name('operations.messages.read');
-    });
-
-    Route::post('/messages/{conversation}', [MessageController::class, 'store'])
-        ->middleware('permission:messages.send')
-        ->name('operations.messages.store');
+    Route::get('/messages', [MessageController::class, 'index'])->name('operations.messages.index');
+    Route::post('/messages/create', [MessageController::class, 'createConversation'])->name('operations.messages.create');
+    Route::get('/messages/{conversation}', [MessageController::class, 'show'])->name('operations.messages.show');
+    Route::post('/messages/{conversation}', [MessageController::class, 'store'])->name('operations.messages.store');
+    Route::patch('/messages/{conversation}/read', [MessageController::class, 'markRead'])->name('operations.messages.read');
 
     // -------------------------------------------------------------------------
     // Reports (NEW)
