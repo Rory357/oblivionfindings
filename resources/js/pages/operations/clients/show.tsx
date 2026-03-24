@@ -20,7 +20,8 @@ import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { Globe, Heart, ShieldAlert, Star } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { ChevronDown, ChevronRight, Globe, Heart, Search, ShieldAlert, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 function Field({ label, value }: { label: string; value: string }) {
@@ -168,8 +169,10 @@ export default function ClientShow({
     respite,
     can,
 }: Props) {
-    const { auth, labels } = usePage().props as any;
+    const pageProps = usePage().props as any;
+    const { auth, labels } = pageProps;
     const respiteCan = auth?.can?.respite ?? {};
+    const consents = pageProps.consents ?? [];
     const name = `${client.first_name} ${client.last_name}`.trim();
     const getInitials = useInitials();
     const photoForm = useForm<{ photo: File | null }>({ photo: null });
@@ -238,6 +241,28 @@ export default function ClientShow({
 
     const respiteBookings = respite?.bookings ?? [];
     const respiteRequests = respite?.requests ?? [];
+
+    // Timeline filter state
+    const [timelineSearch, setTimelineSearch] = useState('');
+    const [timelineTypeFilter, setTimelineTypeFilter] = useState('all');
+
+    const eventTypes = useMemo(() => {
+        const types = new Set<string>();
+        events.forEach((e) => { if (e.type) types.add(e.type); });
+        return Array.from(types).sort();
+    }, [events]);
+
+    const filteredEvents = useMemo(() => {
+        return events.filter((e) => {
+            if (timelineTypeFilter !== 'all' && e.type !== timelineTypeFilter) return false;
+            if (timelineSearch) {
+                const q = timelineSearch.toLowerCase();
+                const searchable = [e.subject, e.body, e.type, e.actor?.name].filter(Boolean).join(' ').toLowerCase();
+                if (!searchable.includes(q)) return false;
+            }
+            return true;
+        });
+    }, [events, timelineSearch, timelineTypeFilter]);
 
     return (
         <AppLayout
@@ -1038,14 +1063,26 @@ export default function ClientShow({
                                     <p className="text-xs text-muted-foreground">Manual steps tracked by staff</p>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
-                                    {onboarding.workflow.steps.map((step: any) => (
+                                    {onboarding.workflow.steps.map((step: any) => {
+                                        const stepCategory = /DBS|Health Screening|GDPR|Safeguarding/i.test(step.step_name ?? '')
+                                            ? { label: 'Compliance', color: 'bg-purple-100 text-purple-700' }
+                                            : /Referral|Assessment|Care Plan|Agreement|Staff|Introduction/i.test(step.step_name ?? '')
+                                            ? { label: 'Service', color: 'bg-blue-100 text-blue-700' }
+                                            : { label: 'Admin', color: 'bg-slate-100 text-slate-600' };
+                                        return (
                                         <div key={step.id} className={`flex items-center justify-between rounded-md border p-3 ${step.status === 'completed' ? 'border-emerald-200 bg-emerald-50/50 dark:border-emerald-900/30 dark:bg-emerald-950/20' : step.due_date && new Date(step.due_date) < new Date() && step.status === 'pending' ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20' : ''}`}>
                                             <div className="flex items-center gap-3">
                                                 <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-muted text-xs font-medium">
                                                     {step.step_order}
                                                 </div>
                                                 <div>
-                                                    <div className="text-sm font-medium">{step.step_name}</div>
+                                                    <div className="flex items-center gap-2 text-sm font-medium">
+                                                        <span className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${stepCategory.color}`}>{stepCategory.label}</span>
+                                                        {step.step_name}
+                                                    </div>
+                                                    {step.description && (
+                                                        <div className="mt-0.5 text-xs text-slate-500">{step.description}</div>
+                                                    )}
                                                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                                                         {step.status === 'completed' && step.completed_by && (
                                                             <span>Completed by {step.completed_by.name}</span>
@@ -1082,7 +1119,8 @@ export default function ClientShow({
                                                 )}
                                             </div>
                                         </div>
-                                    ))}
+                                        );
+                                    })}
                                 </CardContent>
                                 {/* Complete Onboarding Button */}
                                 {onboarding.workflow.status === 'in_progress' && (can.manage_onboarding || can.edit) && (() => {
@@ -1695,6 +1733,28 @@ export default function ClientShow({
                             <CardTitle className="text-base">
                                 Timeline
                             </CardTitle>
+                            <div className="flex flex-wrap items-center gap-2 pt-2">
+                                <div className="relative flex-1 min-w-[180px]">
+                                    <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Search events..."
+                                        value={timelineSearch}
+                                        onChange={(e) => setTimelineSearch(e.target.value)}
+                                        className="h-8 pl-8 text-xs"
+                                    />
+                                </div>
+                                <Select value={timelineTypeFilter} onValueChange={setTimelineTypeFilter}>
+                                    <SelectTrigger className="h-8 w-[160px] text-xs">
+                                        <SelectValue placeholder="All types" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All types</SelectItem>
+                                        {eventTypes.map((t) => (
+                                            <SelectItem key={t} value={t}>{t}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {handover.length ? (
@@ -1932,14 +1992,15 @@ export default function ClientShow({
                                 </div>
                             )}
 
-                            {events.map((e) => (
+                            {filteredEvents.map((e) => (
                                 <div
                                     key={e.id}
                                     className="rounded-md border p-3"
                                 >
                                     <div className="flex items-center justify-between gap-3">
-                                        <div className="text-sm font-medium">
+                                        <div className="flex items-center gap-2 text-sm font-medium">
                                             {e.subject || e.type}
+                                            {e.type && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-500">{e.type}</span>}
                                         </div>
                                         <div className="text-xs text-slate-500">
                                             {e.occurred_at
@@ -1962,9 +2023,9 @@ export default function ClientShow({
                                     </div>
                                 </div>
                             ))}
-                            {!events.length && (
-                                <div className="text-sm text-slate-500">
-                                    No timeline events yet.
+                            {!filteredEvents.length && (
+                                <div className="text-sm text-slate-500 text-center py-4">
+                                    {events.length ? 'No events match your filters.' : 'No timeline events yet.'}
                                 </div>
                             )}
 
@@ -1980,63 +2041,85 @@ export default function ClientShow({
                     </Card>
                 )}
 
-                {tab === 'documents' && (
+                {tab === 'documents' && (() => {
+                    const grouped = documents.reduce((acc: Record<string, any[]>, d: any) => {
+                        const cat = d.category || 'Uncategorised';
+                        if (!acc[cat]) acc[cat] = [];
+                        acc[cat].push(d);
+                        return acc;
+                    }, {} as Record<string, any[]>);
+                    const categories = Object.keys(grouped).sort();
+
+                    return (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">
-                                Documents
+                            <CardTitle className="flex items-center justify-between text-base">
+                                <span>Documents</span>
+                                <Button size="sm" asChild>
+                                    <Link href={`/operations/clients/${client.id}/documents`}>Manage documents</Link>
+                                </Button>
                             </CardTitle>
+                            {categories.length > 1 && (
+                                <p className="text-xs text-muted-foreground">Grouped by category. {categories.length} categories found.</p>
+                            )}
                         </CardHeader>
-                        <CardContent className="space-y-2">
-                            {documents.map((d) => (
-                                <div
-                                    key={d.id}
-                                    className="flex items-start justify-between gap-3 rounded-md border p-3"
-                                >
-                                    <div>
-                                        <div className="text-sm font-medium">
-                                            {d.title || d.original_name}
-                                        </div>
-                                        <div className="mt-1 text-xs text-slate-500">
-                                            {[
-                                                d.category &&
-                                                    `Category: ${d.category}`,
-                                                d.mime_type && d.mime_type,
-                                            ]
-                                                .filter(Boolean)
-                                                .join(' - ') || '-'}
-                                        </div>
-                                        {d.notes && (
-                                            <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
-                                                {d.notes}
+                        <CardContent className="space-y-4">
+                            {categories.map((cat) => (
+                                <div key={cat}>
+                                    {categories.length > 1 && (
+                                        <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{cat}</div>
+                                    )}
+                                    <div className="space-y-2">
+                                        {grouped[cat].map((d: any) => {
+                                            const isExpired = d.expires_at && new Date(d.expires_at) < new Date();
+                                            const isExpiringSoon = d.expires_at && !isExpired && new Date(d.expires_at) < new Date(Date.now() + 30 * 86400000);
+                                            return (
+                                            <div
+                                                key={d.id}
+                                                className={`flex items-start justify-between gap-3 rounded-md border p-3 ${isExpired ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20' : isExpiringSoon ? 'border-amber-200 bg-amber-50/50 dark:border-amber-900/30 dark:bg-amber-950/20' : ''}`}
+                                            >
+                                                <div>
+                                                    <div className="flex items-center gap-2 text-sm font-medium">
+                                                        {d.title || d.original_name}
+                                                        {d.portal_visible && (
+                                                            <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700">Portal</span>
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
+                                                        {d.mime_type && <span>{d.mime_type}</span>}
+                                                        {d.expires_at && (
+                                                            <span className={isExpired ? 'text-red-600 font-medium' : isExpiringSoon ? 'text-amber-600 font-medium' : ''}>
+                                                                {isExpired ? 'Expired' : 'Expires'}: {new Date(d.expires_at).toLocaleDateString('en-NZ')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {d.notes && (
+                                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
+                                                            {d.notes}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <a
+                                                    href={`/operations/clients/${client.id}/documents/${d.id}/download`}
+                                                    className="shrink-0 rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                                >
+                                                    Download
+                                                </a>
                                             </div>
-                                        )}
+                                            );
+                                        })}
                                     </div>
-                                    <a
-                                        href={`/operations/clients/${client.id}/documents/${d.id}/download`}
-                                        className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                    >
-                                        Download
-                                    </a>
                                 </div>
                             ))}
                             {!documents.length && (
-                                <div className="text-sm text-slate-500">
+                                <div className="text-sm text-slate-500 text-center py-8">
                                     No documents uploaded.
                                 </div>
                             )}
-
-                            <div className="pt-2">
-                                <Link
-                                    href={`/operations/clients/${client.id}/documents`}
-                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                >
-                                    Manage documents
-                                </Link>
-                            </div>
                         </CardContent>
                     </Card>
-                )}
+                    );
+                })()}
 
                 {tab === 'respite' && (
                     <Card>
@@ -2173,29 +2256,97 @@ export default function ClientShow({
                     </Card>
                 )}
 
-                {tab === 'consents' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-between text-base">
-                                <span>Consents</span>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                                Manage consent records for {client.first_name} — medication consent, data sharing, photography, treatment authorisation, and more.
-                            </p>
-                            <p className="mt-2 text-xs text-muted-foreground">
-                                Consent management is tracked per {(labels?.['client.singular'] ?? 'Client').toLowerCase()} to ensure GDPR and privacy compliance.
-                            </p>
-                        </CardContent>
-                    </Card>
-                )}
+                {tab === 'consents' && (() => {
+                    const activeCount = consents.filter((c: any) => c.status === 'given' && !c.is_expired).length;
+                    const expiredCount = consents.filter((c: any) => c.is_expired).length;
+                    const expiringCount = consents.filter((c: any) => c.is_expiring_soon).length;
+
+                    const STATUS_COLORS: Record<string, string> = {
+                        given: 'bg-emerald-100 text-emerald-700',
+                        refused: 'bg-red-100 text-red-700',
+                        withdrawn: 'bg-slate-100 text-slate-600',
+                        expired: 'bg-amber-100 text-amber-700',
+                    };
+
+                    return (
+                        <div className="space-y-4">
+                            {/* Stats */}
+                            <div className="grid grid-cols-4 gap-3">
+                                <div className="rounded-lg border p-3 text-center">
+                                    <div className="text-lg font-bold text-indigo-600">{consents.length}</div>
+                                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</div>
+                                </div>
+                                <div className="rounded-lg border p-3 text-center">
+                                    <div className="text-lg font-bold text-emerald-600">{activeCount}</div>
+                                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Active</div>
+                                </div>
+                                <div className="rounded-lg border p-3 text-center">
+                                    <div className={`text-lg font-bold ${expiringCount > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{expiringCount}</div>
+                                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Expiring</div>
+                                </div>
+                                <div className="rounded-lg border p-3 text-center">
+                                    <div className={`text-lg font-bold ${expiredCount > 0 ? 'text-red-600' : 'text-slate-400'}`}>{expiredCount}</div>
+                                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground">Expired</div>
+                                </div>
+                            </div>
+
+                            {/* Consent List */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-between text-base">
+                                        <span>Consent Records</span>
+                                        <Button size="sm" asChild>
+                                            <Link href={`/operations/clients/${client.id}/consents`}>Manage Consents</Link>
+                                        </Button>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {consents.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground text-center py-8">No consent records. Record the first consent for {client.first_name}.</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {consents.map((c: any) => {
+                                                const displayStatus = c.is_expired ? 'expired' : c.status;
+                                                return (
+                                                    <div key={c.id} className="flex items-center justify-between rounded-lg border p-3">
+                                                        <div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-medium">{c.consent_type}</span>
+                                                                <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ${STATUS_COLORS[displayStatus] ?? 'bg-slate-100 text-slate-600'}`}>{displayStatus}</span>
+                                                                {c.capacity_assessed && (
+                                                                    <span className="rounded bg-purple-100 px-1.5 py-0.5 text-[10px] text-purple-700">Capacity Assessed</span>
+                                                                )}
+                                                            </div>
+                                                            <div className="mt-0.5 flex gap-3 text-xs text-muted-foreground">
+                                                                {c.given_at && <span>Given: {new Date(c.given_at).toLocaleDateString('en-NZ')}</span>}
+                                                                {c.expires_at && <span className={c.is_expired ? 'text-red-600 font-medium' : c.is_expiring_soon ? 'text-amber-600 font-medium' : ''}>Expires: {new Date(c.expires_at).toLocaleDateString('en-NZ')}</span>}
+                                                                {c.given_method && <span>Method: {c.given_method}</span>}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    );
+                })()}
 
                 {tab === 'portal' && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">
-                                Portal access ({labels?.['client.singular'] ?? 'Client'} / Next of Kin)
+                            <CardTitle className="flex items-center justify-between text-base">
+                                <div className="flex items-center gap-2">
+                                    <span>Portal access ({labels?.['client.singular'] ?? 'Client'} / Next of Kin)</span>
+                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">{portal_users.length}</span>
+                                </div>
+                                {can.edit && (
+                                    <Button size="sm" asChild>
+                                        <Link href={`/operations/clients/${client.id}/portal-users`}>Quick Add</Link>
+                                    </Button>
+                                )}
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
@@ -2209,38 +2360,42 @@ export default function ClientShow({
                                 {portal_users.map((u) => (
                                     <div
                                         key={u.id}
-                                        className="rounded-md border p-3"
+                                        className="flex items-center justify-between rounded-md border p-3"
                                     >
-                                        <div className="text-sm font-medium">
-                                            {u.name}
-                                        </div>
-                                        <div className="text-xs text-slate-500">
-                                            {u.email}
-                                        </div>
-                                        {u.relation && (
-                                            <div className="mt-1 text-xs text-slate-500">
-                                                Relation: {u.relation}
+                                        <div>
+                                            <div className="flex items-center gap-2 text-sm font-medium">
+                                                {u.name}
+                                                {u.is_legal_guardian && (
+                                                    <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">Legal Guardian</span>
+                                                )}
+                                                {u.is_emergency_contact && (
+                                                    <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">Emergency</span>
+                                                )}
                                             </div>
-                                        )}
+                                            <div className="text-xs text-slate-500">
+                                                {u.email}
+                                            </div>
+                                            {u.relation && (
+                                                <div className="mt-0.5 text-xs text-slate-500">
+                                                    Relation: {u.relation}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            {u.status === 'active' || u.is_active !== false ? (
+                                                <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-medium text-emerald-700">Active</span>
+                                            ) : (
+                                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">Inactive</span>
+                                            )}
+                                        </div>
                                     </div>
                                 ))}
                                 {!portal_users.length && (
-                                    <div className="text-sm text-slate-500">
-                                        No portal users linked.
+                                    <div className="text-sm text-slate-500 text-center py-8">
+                                        No portal users linked. Add a next of kin or family member to get started.
                                     </div>
                                 )}
                             </div>
-
-                            {can.edit && (
-                                <div className="pt-2">
-                                    <Link
-                                        href={`/operations/clients/${client.id}/portal-users`}
-                                        className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                    >
-                                        Manage portal users
-                                    </Link>
-                                </div>
-                            )}
                         </CardContent>
                     </Card>
                 )}
@@ -2248,23 +2403,46 @@ export default function ClientShow({
                 {tab === 'assignments' && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">
-                                Assignments
+                            <CardTitle className="flex items-center justify-between text-base">
+                                <div className="flex items-center gap-2">
+                                    <span>Assigned Workers</span>
+                                    <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">{client.support_workers?.length ?? 0}</span>
+                                </div>
+                                {can.assign_workers && (
+                                    <Button size="sm" asChild>
+                                        <Link href={`/operations/clients/${client.id}/assignments`}>Manage Assignments</Link>
+                                    </Button>
+                                )}
                             </CardTitle>
+                            <p className="text-xs text-muted-foreground">
+                                Controls which staff can see and work with this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}.
+                            </p>
                         </CardHeader>
                         <CardContent className="space-y-2">
-                            <div className="text-sm text-slate-600">
-                                Assign support workers to this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}. This
-                                controls which staff can see the {(labels?.['client.singular'] ?? 'Client').toLowerCase()}.
-                            </div>
-                            <div className="pt-2">
-                                <Link
-                                    href={`/operations/clients/${client.id}/assignments`}
-                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                >
-                                    Open assignments
-                                </Link>
-                            </div>
+                            {(client.support_workers ?? []).length > 0 ? (
+                                <div className="space-y-2">
+                                    {client.support_workers.map((w) => (
+                                        <div key={w.id} className="flex items-center justify-between rounded-md border p-3">
+                                            <div className="flex items-center gap-3">
+                                                <Avatar className="h-8 w-8">
+                                                    <AvatarFallback className="text-xs">{getInitials(w.name)}</AvatarFallback>
+                                                </Avatar>
+                                                <div>
+                                                    <div className="text-sm font-medium">{w.name}</div>
+                                                    {w.email && <div className="text-xs text-muted-foreground">{w.email}</div>}
+                                                </div>
+                                            </div>
+                                            {client.key_worker?.id === w.id && (
+                                                <span className="rounded-full bg-indigo-100 px-2 py-0.5 text-[10px] font-medium text-indigo-700">Key Worker</span>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-sm text-slate-500 text-center py-8">
+                                    No workers assigned yet.
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 )}
@@ -2437,6 +2615,8 @@ function AssessmentsTab({
     canEdit: boolean;
 }) {
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [showForm, setShowForm] = useState(false);
 
     const form = useForm<{
         type: string;
@@ -2454,6 +2634,7 @@ function AssessmentsTab({
 
     function startEdit(a: any) {
         setEditingId(a.id);
+        setShowForm(true);
         form.setData({
             type: a.type ?? '',
             score: a.score ?? '',
@@ -2465,16 +2646,31 @@ function AssessmentsTab({
 
     function resetForm() {
         setEditingId(null);
+        setShowForm(false);
         form.reset();
     }
+
+    const overdueCount = assessments.filter((a) => a.next_review_at && new Date(a.next_review_at) < new Date()).length;
 
     return (
         <Card>
             <CardHeader>
-                <CardTitle className="text-base">Assessments</CardTitle>
+                <CardTitle className="flex items-center justify-between text-base">
+                    <div className="flex items-center gap-2">
+                        <span>Assessments</span>
+                        {overdueCount > 0 && (
+                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">{overdueCount} overdue</span>
+                        )}
+                    </div>
+                    {canEdit && !showForm && (
+                        <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
+                            New Assessment
+                        </Button>
+                    )}
+                </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-                {canEdit && (
+                {canEdit && showForm && (
                     <div className="rounded-md border p-3">
                         <div className="flex items-center justify-between gap-3">
                             <div className="text-sm font-medium">
@@ -2482,11 +2678,9 @@ function AssessmentsTab({
                                     ? 'Edit assessment'
                                     : 'Add assessment'}
                             </div>
-                            {editingId ? (
-                                <Button variant="ghost" onClick={resetForm}>
-                                    Cancel
-                                </Button>
-                            ) : null}
+                            <Button variant="ghost" size="sm" onClick={resetForm}>
+                                Cancel
+                            </Button>
                         </div>
                         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                             <div>
@@ -2567,40 +2761,47 @@ function AssessmentsTab({
                 )}
 
                 <div className="space-y-2">
-                    {assessments.map((a) => (
-                        <div key={a.id} className="rounded-md border p-3">
-                            <div className="flex items-start justify-between gap-3">
-                                <div>
-                                    <div className="text-sm font-medium">
-                                        {a.type}
+                    {assessments.map((a) => {
+                        const isOverdue = a.next_review_at && new Date(a.next_review_at) < new Date();
+                        const isExpanded = expandedId === a.id;
+                        return (
+                        <div key={a.id} className={`rounded-md border p-3 ${isOverdue ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20' : ''}`}>
+                            <div
+                                className="flex items-start justify-between gap-3 cursor-pointer"
+                                onClick={() => setExpandedId(isExpanded ? null : a.id)}
+                            >
+                                <div className="flex items-start gap-2">
+                                    <div className="mt-0.5 text-muted-foreground">
+                                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                                     </div>
-                                    <div className="mt-1 text-xs text-slate-500">
-                                        {[
-                                            a.score && `Score: ${a.score}`,
-                                            a.assessed_at &&
-                                                `Assessed: ${a.assessed_at}`,
-                                            a.next_review_at &&
-                                                `Next review: ${a.next_review_at}`,
-                                        ]
-                                            .filter(Boolean)
-                                            .join(' • ') || '-'}
-                                    </div>
-                                    {a.notes && (
-                                        <div className="mt-2 text-xs whitespace-pre-wrap text-slate-600">
-                                            {a.notes}
+                                    <div>
+                                        <div className="flex items-center gap-2 text-sm font-medium">
+                                            {a.type}
+                                            {a.score && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">Score: {a.score}</span>}
+                                            {isOverdue && (
+                                                <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">Review overdue</span>
+                                            )}
                                         </div>
-                                    )}
+                                        <div className="mt-0.5 text-xs text-slate-500">
+                                            {[
+                                                a.assessed_at && `Assessed: ${new Date(a.assessed_at).toLocaleDateString('en-NZ')}`,
+                                                a.next_review_at && `Next review: ${new Date(a.next_review_at).toLocaleDateString('en-NZ')}`,
+                                            ].filter(Boolean).join(' · ') || '-'}
+                                        </div>
+                                    </div>
                                 </div>
 
                                 {canEdit && (
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex shrink-0 items-center gap-2" onClick={(ev) => ev.stopPropagation()}>
                                         <Button
+                                            size="sm"
                                             variant="secondary"
                                             onClick={() => startEdit(a)}
                                         >
                                             Edit
                                         </Button>
                                         <Button
+                                            size="sm"
                                             variant="destructive"
                                             onClick={() =>
                                                 form.delete(
@@ -2616,11 +2817,17 @@ function AssessmentsTab({
                                     </div>
                                 )}
                             </div>
+                            {isExpanded && a.notes && (
+                                <div className="mt-2 ml-6 text-xs whitespace-pre-wrap text-slate-600 border-l-2 border-slate-200 pl-3">
+                                    {a.notes}
+                                </div>
+                            )}
                         </div>
-                    ))}
+                        );
+                    })}
 
                     {!assessments.length && (
-                        <div className="text-sm text-slate-500">
+                        <div className="text-sm text-slate-500 text-center py-8">
                             No assessments recorded.
                         </div>
                     )}
