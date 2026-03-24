@@ -164,7 +164,7 @@ class CarePlanController extends Controller
     public function show(Request $request, $carePlan)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.view'), 403);
+        abort_unless($auth && $auth->canDo('care_plans.viewAny'), 403);
 
         $carePlan = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -228,7 +228,7 @@ class CarePlanController extends Controller
     public function edit(Request $request, $carePlan)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
+        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
         $carePlan = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -249,7 +249,7 @@ class CarePlanController extends Controller
     public function update(Request $request, $carePlan)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
+        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
         $carePlan = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -275,7 +275,7 @@ class CarePlanController extends Controller
     public function startReview(Request $request, CarePlan $carePlan)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
+        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
         // Create new version
         $newVersion = $carePlan->replicate(['id', 'created_at', 'updated_at', 'deleted_at']);
@@ -300,7 +300,7 @@ class CarePlanController extends Controller
     public function completeReview(Request $request, CarePlan $carePlan)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
+        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
         $data = $request->validate([
             'review_notes' => ['nullable', 'string', 'max:2000'],
@@ -326,7 +326,7 @@ class CarePlanController extends Controller
     public function destroy(Request $request, $carePlan)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.delete'), 403);
+        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
         $carePlan = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))

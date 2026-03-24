@@ -12,7 +12,7 @@ class CarePlanGoalController extends Controller
     public function store(Request $request, $carePlan)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
+        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
         $carePlan = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -47,7 +47,7 @@ class CarePlanGoalController extends Controller
     public function update(Request $request, $carePlan, $goal)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
+        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
         $carePlan = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -75,7 +75,7 @@ class CarePlanGoalController extends Controller
     public function destroy(Request $request, $carePlan, $goal)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
+        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
         $carePlan = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -93,7 +93,7 @@ class CarePlanGoalController extends Controller
     public function updateProgress(Request $request, $carePlan, $goal)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('care_plans.edit'), 403);
+        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
 
         $carePlan = CarePlan::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
