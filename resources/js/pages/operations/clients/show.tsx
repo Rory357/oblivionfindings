@@ -524,19 +524,30 @@ export default function ClientShow({
                                     )}
                                 </div>
 
-                                {/* Risk Level */}
+                                {/* Risk Level — clickable dropdown */}
                                 <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4">
                                     <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500">Risk Level</p>
-                                    <div className="mt-1 flex items-center gap-2">
-                                        <span className={`inline-flex rounded-full px-2.5 py-1 text-sm font-bold ${
-                                            client.risk_level === 'critical' ? 'bg-red-100 text-red-700 animate-pulse' :
-                                            client.risk_level === 'high' ? 'bg-red-100 text-red-700' :
-                                            client.risk_level === 'medium' ? 'bg-amber-100 text-amber-700' :
-                                            client.risk_level === 'low' ? 'bg-emerald-100 text-emerald-700' :
-                                            'bg-slate-100 text-slate-500'
-                                        }`}>
-                                            {(client.risk_level ?? 'Not Set').charAt(0).toUpperCase() + (client.risk_level ?? 'not set').slice(1)}
-                                        </span>
+                                    <div className="mt-1">
+                                        <Select
+                                            value={client.risk_level ?? ''}
+                                            onValueChange={(v) => router.patch(`/operations/clients/${client.id}/quick-update`, { risk_level: v }, { preserveScroll: true })}
+                                        >
+                                            <SelectTrigger className={`h-8 w-full border-0 text-sm font-bold shadow-none ${
+                                                client.risk_level === 'critical' ? 'bg-red-100 text-red-700' :
+                                                client.risk_level === 'high' ? 'bg-red-100 text-red-700' :
+                                                client.risk_level === 'medium' ? 'bg-amber-100 text-amber-700' :
+                                                client.risk_level === 'low' ? 'bg-emerald-100 text-emerald-700' :
+                                                'bg-slate-100 text-slate-500'
+                                            } rounded-full px-3`}>
+                                                <SelectValue placeholder="Set level..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="low">Low</SelectItem>
+                                                <SelectItem value="medium">Medium</SelectItem>
+                                                <SelectItem value="high">High</SelectItem>
+                                                <SelectItem value="critical">Critical</SelectItem>
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <p className="mt-0.5 text-xs text-violet-600">{risks.length} active risk{risks.length !== 1 ? 's' : ''}</p>
                                 </div>

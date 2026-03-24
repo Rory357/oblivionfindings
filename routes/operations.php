@@ -128,6 +128,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::middleware('permission:clients.update')->group(function () {
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('operations.clients.edit');
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('operations.clients.update');
+        Route::patch('/clients/{client}/quick-update', [ClientController::class, 'quickUpdate'])->name('operations.clients.quick_update');
         Route::post('/clients/{client}/photo', [ClientController::class, 'updatePhoto'])
             ->name('operations.clients.photo.update');
         Route::delete('/clients/{client}/photo', [ClientController::class, 'destroyPhoto'])

@@ -682,6 +682,25 @@ class ClientController extends Controller
         }
     }
 
+    /**
+     * Quick-update a single field on a client (e.g. risk_level, safeguarding_flag).
+     */
+    public function quickUpdate(Request $request, Client $client)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('clients.update'), 403);
+
+        $data = $request->validate([
+            'risk_level' => ['nullable', 'in:low,medium,high,critical'],
+            'safeguarding_flag' => ['nullable', 'boolean'],
+            'key_worker_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $client->update(array_filter($data, fn ($v) => $v !== null));
+
+        return redirect()->back()->with('success', 'Updated.');
+    }
+
 
     public function updatePhoto(Request $request, Client $client)
     {
