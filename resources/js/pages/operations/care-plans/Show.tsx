@@ -558,33 +558,50 @@ export default function CarePlanShow({
                                     {goal.description && (
                                         <p className="mt-0.5 text-xs text-muted-foreground">{goal.description}</p>
                                     )}
+                                    {/* Progress bar + slider */}
                                     <div className="mt-2 flex items-center gap-3">
-                                        <div className="h-1.5 flex-1 rounded-full bg-muted">
+                                        <div className="relative h-2 flex-1 cursor-pointer rounded-full bg-muted"
+                                            onClick={(e) => {
+                                                if (goal.status === 'completed') return;
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                const pct = Math.min(100, Math.max(0, Math.round(((e.clientX - rect.left) / rect.width) * 100)));
+                                                updateGoalProgress(goal.id, pct, pct >= 100 ? 'completed' : pct > 0 ? 'in_progress' : 'not_started');
+                                            }}
+                                            title={goal.status !== 'completed' ? 'Click to set progress' : ''}
+                                        >
                                             <div
-                                                className="h-1.5 rounded-full transition-all"
+                                                className="h-2 rounded-full transition-all"
                                                 style={{
                                                     width: `${goal.progress_percentage}%`,
                                                     backgroundColor: GOAL_STATUS_COLORS[goal.status] ?? OPS_COLORS.muted,
                                                 }}
                                             />
                                         </div>
-                                        <span className="text-xs font-medium tabular-nums">{goal.progress_percentage}%</span>
+                                        <span className="w-10 text-right text-xs font-semibold tabular-nums">{goal.progress_percentage}%</span>
                                     </div>
-                                    <div className="mt-2 flex items-center gap-1">
+                                    {/* Actions row */}
+                                    <div className="mt-2.5 flex items-center gap-2">
                                         {goal.status !== 'completed' && (
-                                            <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]"
+                                            <Button size="sm" className="h-7 gap-1 bg-emerald-600 px-3 text-xs text-white hover:bg-emerald-700"
                                                 onClick={() => updateGoalProgress(goal.id, 100, 'completed')}>
+                                                <CheckCircle2 className="h-3.5 w-3.5" />
                                                 Mark Achieved
                                             </Button>
                                         )}
                                         {goal.status === 'not_started' && (
-                                            <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]"
+                                            <Button size="sm" variant="outline" className="h-7 gap-1 border-indigo-300 px-3 text-xs text-indigo-600 hover:bg-indigo-50"
                                                 onClick={() => updateGoalProgress(goal.id, 10, 'in_progress')}>
                                                 Start
                                             </Button>
                                         )}
+                                        {goal.status === 'completed' && (
+                                            <span className="flex items-center gap-1 text-xs font-medium text-emerald-600">
+                                                <CheckCircle2 className="h-4 w-4" />
+                                                Completed
+                                            </span>
+                                        )}
                                         {goal.target_date && (
-                                            <span className="ml-2 text-[10px] text-muted-foreground">
+                                            <span className="ml-auto text-[11px] text-muted-foreground">
                                                 Target: {formatDate(goal.target_date)}
                                             </span>
                                         )}
