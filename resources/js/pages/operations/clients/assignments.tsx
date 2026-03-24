@@ -1,147 +1,173 @@
+import PageHeader from '@/components/page-header';
+import PageShell from '@/components/page-shell';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
+import { CheckCircle2, Search, Star, UserPlus, Users, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
-export default function ClientAssignments({ client, workers, assignedIds }) {
-    const { props } = usePage() as any;
-    const flash = props.flash;
-    const labels = props.labels;
+export default function ClientAssignments({ client, workers, assignedIds }: { client: any; workers: any[]; assignedIds: number[] }) {
+    const { labels } = usePage().props as any;
+    const name = `${client.first_name} ${client.last_name}`;
+    const getInitials = useInitials();
 
     const [selected, setSelected] = useState<number[]>(assignedIds ?? []);
-    const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>(
-        'idle',
-    );
+    const [search, setSearch] = useState('');
+    const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
 
-    useEffect(() => {
-        setSelected(assignedIds ?? []);
-    }, [assignedIds]);
+    useEffect(() => { setSelected(assignedIds ?? []); }, [assignedIds]);
 
     const isSelected = useMemo(() => new Set(selected), [selected]);
 
+    const filteredWorkers = useMemo(() => {
+        if (!search) return workers ?? [];
+        const q = search.toLowerCase();
+        return (workers ?? []).filter(w => w.name?.toLowerCase().includes(q) || w.email?.toLowerCase().includes(q));
+    }, [workers, search]);
+
+    const assignedWorkers = useMemo(() => (workers ?? []).filter(w => isSelected.has(w.id)), [workers, isSelected]);
+    const unassignedWorkers = useMemo(() => filteredWorkers.filter(w => !isSelected.has(w.id)), [filteredWorkers, isSelected]);
+
     function toggle(id: number) {
-        setSelected((prev) =>
-            prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
-        );
+        setSelected(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
     }
 
     function save() {
         setStatus('saving');
-
-        router.put(
-            `/operations/clients/${client.id}/assignments`,
-            { user_ids: selected },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setStatus('saved');
-                    router.reload({ only: ['assignedIds'] });
-
-                    // reset "Saved" after a moment
-                    setTimeout(() => setStatus('idle'), 1500);
-                },
-                onError: () => {
-                    setStatus('error');
-                },
-            },
-        );
+        router.put(`/operations/clients/${client.id}/assignments`, { user_ids: selected }, {
+            preserveScroll: true,
+            onSuccess: () => { setStatus('saved'); setTimeout(() => setStatus('idle'), 2000); },
+            onError: () => setStatus('error'),
+        });
     }
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
-                // remove the show breadcrumb until you actually use /clients/{id}
-                {
-                    title: 'Assignments',
-                    href: `/operations/clients/${client.id}/assignments`,
-                },
-            ]}
-        >
-            <Head
-                title={`Assignments • ${client.first_name} ${client.last_name}`}
+        <AppLayout breadcrumbs={[
+            { title: labels?.['client.plural'] ?? 'Clients', href: '/operations/clients' },
+            { title: name, href: `/operations/clients/${client.id}` },
+            { title: 'Assign Workers' },
+        ]}>
+            <Head title={`Assign Workers - ${name}`} />
+            <PageHeader
+                title="Assign Workers"
+                description={`Manage which support workers are assigned to ${client.first_name}.`}
+                backHref={`/operations/clients/${client.id}`}
+                actions={
+                    <Button className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={save} disabled={status === 'saving'}>
+                        {status === 'saving' ? 'Saving...' : status === 'saved' ? 'Saved!' : 'Save Changes'}
+                    </Button>
+                }
             />
-
-            <div className="space-y-4">
-                {/* Visible messages */}
-                {flash?.success && (
-                    <div className="rounded-md border p-3 text-sm">
-                        {flash.success}
-                    </div>
-                )}
-
+            <PageShell>
                 {status === 'error' && (
-                    <div className="rounded-md border border-red-500/40 p-3 text-sm">
-                        Something went wrong saving assignments. Check the
-                        network response.
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                        Something went wrong saving assignments. Please try again.
                     </div>
                 )}
 
-                <div className="m-4 rounded-xl border p-4">
-                    <div className="text-sm text-slate-500">{labels?.['client.singular'] ?? 'Client'}</div>
-                    <div className="text-lg font-semibold">
-                        {client.first_name} {client.last_name}
-                    </div>
-                    <div className="text-sm text-slate-500">
-                        Status: {client.status}
-                    </div>
-                </div>
-
-                <div className="m-4 rounded-xl border p-4">
-                    <div className="flex items-center justify-between gap-3">
-                        <div>
-                            <div className="text-lg font-semibold">
-                                Assigned support workers
+                <div className="grid gap-6 lg:grid-cols-2">
+                    {/* Left: Currently Assigned */}
+                    <div>
+                        <div className="mb-3 flex items-center gap-2">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                                <Users className="h-4 w-4" />
                             </div>
-                            <div className="text-sm text-slate-500">
-                                Tick workers to assign them to this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}.
-                            </div>
+                            <h2 className="text-sm font-semibold">Assigned Workers</h2>
+                            <Badge variant="secondary" className="text-[10px]">{assignedWorkers.length}</Badge>
                         </div>
 
-                        <button
-                            onClick={save}
-                            disabled={status === 'saving'}
-                            className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-500 disabled:opacity-60"
-                            type="button"
-                        >
-                            {status === 'saving'
-                                ? 'Saving…'
-                                : status === 'saved'
-                                  ? 'Saved ✅'
-                                  : 'Save'}
-                        </button>
+                        {assignedWorkers.length === 0 ? (
+                            <Card className="border-dashed">
+                                <CardContent className="flex flex-col items-center justify-center py-10">
+                                    <Users className="mb-2 h-8 w-8 text-slate-300" />
+                                    <p className="text-sm text-muted-foreground">No workers assigned yet</p>
+                                    <p className="text-xs text-muted-foreground">Select workers from the list on the right</p>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <div className="space-y-2">
+                                {assignedWorkers.map(w => (
+                                    <Card key={w.id} className="border-violet-200 bg-violet-50/30 transition-all hover:shadow-sm">
+                                        <CardContent className="flex items-center justify-between p-3">
+                                            <div className="flex items-center gap-3">
+                                                <Avatar className="h-9 w-9 border-2 border-violet-200">
+                                                    <AvatarFallback className="bg-violet-200 text-xs font-bold text-violet-700">{getInitials(w.name)}</AvatarFallback>
+                                                </Avatar>
+                                                <div>
+                                                    <div className="flex items-center gap-1.5">
+                                                        <span className="text-sm font-medium">{w.name}</span>
+                                                        {client.key_worker_id === w.id && (
+                                                            <span className="flex items-center gap-0.5 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-medium text-amber-700">
+                                                                <Star className="h-2.5 w-2.5" /> Key Worker
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-muted-foreground">{w.email}</p>
+                                                </div>
+                                            </div>
+                                            <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:bg-red-50 hover:text-red-600"
+                                                onClick={() => toggle(w.id)} title="Remove">
+                                                <X className="h-4 w-4" />
+                                            </Button>
+                                        </CardContent>
+                                    </Card>
+                                ))}
+                            </div>
+                        )}
                     </div>
 
-                    <div className="mt-4 divide-y">
-                        {workers.map((w) => (
-                            <label
-                                key={w.id}
-                                className="flex cursor-pointer items-center gap-3 py-3"
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={isSelected.has(w.id)}
-                                    onChange={() => toggle(w.id)}
-                                    className="h-4 w-4"
-                                />
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium">
-                                        {w.name}
-                                    </span>
-                                    <span className="text-xs text-slate-500">
-                                        {w.email}
-                                    </span>
-                                </div>
-                            </label>
-                        ))}
+                    {/* Right: Available Workers */}
+                    <div>
+                        <div className="mb-3 flex items-center gap-2">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                                <UserPlus className="h-4 w-4" />
+                            </div>
+                            <h2 className="text-sm font-semibold">Available Workers</h2>
+                            <Badge variant="secondary" className="text-[10px]">{unassignedWorkers.length}</Badge>
+                        </div>
 
-                        {workers.length === 0 && (
-                            <div className="py-6 text-sm text-slate-500">
-                                No support workers exist yet.
+                        {/* Search */}
+                        <div className="relative mb-3">
+                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input placeholder="Search workers..." className="h-9 pl-8 text-sm" value={search} onChange={(e) => setSearch(e.target.value)} />
+                        </div>
+
+                        {unassignedWorkers.length === 0 ? (
+                            <Card className="border-dashed">
+                                <CardContent className="flex flex-col items-center justify-center py-10">
+                                    <CheckCircle2 className="mb-2 h-8 w-8 text-emerald-300" />
+                                    <p className="text-sm text-muted-foreground">
+                                        {search ? 'No workers match your search' : 'All workers are assigned!'}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            <div className="space-y-1.5 rounded-xl border bg-white p-2">
+                                {unassignedWorkers.map(w => (
+                                    <button key={w.id} onClick={() => toggle(w.id)}
+                                        className="flex w-full items-center gap-3 rounded-lg p-2.5 text-left transition-all hover:bg-emerald-50">
+                                        <Avatar className="h-8 w-8">
+                                            <AvatarFallback className="bg-slate-100 text-xs">{getInitials(w.name)}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1">
+                                            <span className="text-sm font-medium">{w.name}</span>
+                                            <p className="text-xs text-muted-foreground">{w.email}</p>
+                                        </div>
+                                        <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-dashed border-emerald-300 text-emerald-500">
+                                            <UserPlus className="h-3.5 w-3.5" />
+                                        </div>
+                                    </button>
+                                ))}
                             </div>
                         )}
                     </div>
                 </div>
-            </div>
+            </PageShell>
         </AppLayout>
     );
 }
