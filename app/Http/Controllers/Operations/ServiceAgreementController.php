@@ -116,7 +116,7 @@ class ServiceAgreementController extends Controller
     public function show(Request $request, $agreement)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('service_agreements.view'), 403);
+        abort_unless($auth && $auth->canDo('service_agreements.viewAny'), 403);
 
         $agreement = ServiceAgreement::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -142,7 +142,7 @@ class ServiceAgreementController extends Controller
     public function edit(Request $request, $agreement)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('service_agreements.edit'), 403);
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
         $agreement = ServiceAgreement::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -163,7 +163,7 @@ class ServiceAgreementController extends Controller
     public function update(Request $request, $agreement)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('service_agreements.edit'), 403);
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
         $agreement = ServiceAgreement::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -239,7 +239,7 @@ class ServiceAgreementController extends Controller
     public function destroy(Request $request, $agreement)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('service_agreements.delete'), 403);
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
         $agreement = ServiceAgreement::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
