@@ -32,7 +32,8 @@ class ClientConsentController extends Controller
 
         $consentTypes = ConsentType::active()->orderBy('name')->get(['id', 'name', 'category', 'is_mandatory', 'requires_capacity_assessment']);
 
-        return response()->json([
+        return inertia('operations/clients/consents/Index', [
+            'client' => $client,
             'consents' => $consents,
             'stats' => $stats,
             'consent_types' => $consentTypes,
