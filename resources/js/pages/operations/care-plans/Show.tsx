@@ -571,9 +571,9 @@ export default function CarePlanShow({
                                         <span className="text-xs font-medium tabular-nums">{goal.progress_percentage}%</span>
                                     </div>
                                     <div className="mt-2 flex items-center gap-1">
-                                        {goal.status !== 'achieved' && (
+                                        {goal.status !== 'completed' && (
                                             <Button size="sm" variant="ghost" className="h-6 px-2 text-[10px]"
-                                                onClick={() => updateGoalProgress(goal.id, 100, 'achieved')}>
+                                                onClick={() => updateGoalProgress(goal.id, 100, 'completed')}>
                                                 Mark Achieved
                                             </Button>
                                         )}
