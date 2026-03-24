@@ -343,6 +343,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::middleware('permission:service_agreements.update')->group(function () {
         Route::get('/service-agreements/{agreement}/edit', [ServiceAgreementController::class, 'edit'])->name('operations.service_agreements.edit');
         Route::put('/service-agreements/{agreement}', [ServiceAgreementController::class, 'update'])->name('operations.service_agreements.update');
+        Route::post('/service-agreements/{serviceAgreement}/transition', [ServiceAgreementController::class, 'transition'])->name('operations.service_agreements.transition');
     });
 
     Route::delete('/service-agreements/{agreement}', [ServiceAgreementController::class, 'destroy'])

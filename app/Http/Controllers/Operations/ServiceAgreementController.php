@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Operations;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ServiceAgreement;
+use App\Models\ServiceAgreementStatusChange;
 use Illuminate\Http\Request;
 
 class ServiceAgreementController extends Controller
@@ -125,6 +126,8 @@ class ServiceAgreementController extends Controller
                 'lineItems',
                 'fundingClaims' => fn ($q) => $q->orderByDesc('created_at'),
                 'fundingClaims.submitter:id,name',
+                'statusChanges' => fn ($q) => $q->orderByDesc('created_at'),
+                'statusChanges.user:id,name',
             ])
             ->withCount('fundingClaims')
             ->findOrFail($agreement);
@@ -187,6 +190,50 @@ class ServiceAgreementController extends Controller
 
         return redirect()->route('operations.service_agreements.show', $agreement)
             ->with('success', 'Service agreement updated.');
+    }
+
+    public function transition(Request $request, $serviceAgreement)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
+
+        $agreement = ServiceAgreement::findOrFail($serviceAgreement);
+
+        $data = $request->validate([
+            'status' => ['required', 'in:draft,pending_approval,active,under_review,renewed,expired,terminated,suspended'],
+            'reason' => ['nullable', 'string', 'max:2000'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $fromStatus = $agreement->status;
+
+        // Record status change
+        ServiceAgreementStatusChange::create([
+            'service_agreement_id' => $agreement->id,
+            'from_status' => $fromStatus,
+            'to_status' => $data['status'],
+            'changed_by' => $auth->id,
+            'reason' => $data['reason'] ?? null,
+            'notes' => $data['notes'] ?? null,
+        ]);
+
+        // Update agreement
+        $updates = ['status' => $data['status']];
+        if ($data['status'] === 'terminated') {
+            $updates['terminated_at'] = now();
+            $updates['terminated_reason'] = $data['reason'] ?? null;
+        }
+        if ($data['status'] === 'suspended') {
+            $updates['suspended_at'] = now();
+            $updates['suspended_reason'] = $data['reason'] ?? null;
+        }
+        if ($data['status'] === 'active' && $fromStatus === 'suspended') {
+            $updates['resumed_at'] = now();
+        }
+
+        $agreement->update($updates);
+
+        return redirect()->back()->with('success', "Agreement status changed to {$data['status']}.");
     }
 
     public function destroy(Request $request, $agreement)

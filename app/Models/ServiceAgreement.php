@@ -31,6 +31,17 @@ class ServiceAgreement extends Model
         'signed_at',
         'signed_by',
         'created_by',
+        'nasc_assessment_date',
+        'funding_approved_date',
+        'signed_date',
+        'first_service_date',
+        'review_due_date',
+        'renewal_date',
+        'terminated_at',
+        'terminated_reason',
+        'suspended_at',
+        'suspended_reason',
+        'resumed_at',
     ];
 
     protected $casts = [
@@ -41,6 +52,15 @@ class ServiceAgreement extends Model
         'budget_used' => 'decimal:2',
         'hourly_rate' => 'decimal:2',
         'daily_rate' => 'decimal:2',
+        'nasc_assessment_date' => 'date',
+        'funding_approved_date' => 'date',
+        'signed_date' => 'date',
+        'first_service_date' => 'date',
+        'review_due_date' => 'date',
+        'renewal_date' => 'date',
+        'terminated_at' => 'datetime',
+        'suspended_at' => 'datetime',
+        'resumed_at' => 'datetime',
     ];
 
     public function client()
@@ -61,6 +81,11 @@ class ServiceAgreement extends Model
     public function fundingClaims()
     {
         return $this->hasMany(FundingClaim::class);
+    }
+
+    public function statusChanges()
+    {
+        return $this->hasMany(ServiceAgreementStatusChange::class);
     }
 
     public function getBudgetRemainingAttribute()
