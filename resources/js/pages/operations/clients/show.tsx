@@ -1365,60 +1365,14 @@ export default function ClientShow({
                                                                 </div>
                                                             ))}
                                                         </div>
-                                                        {/* Progress Overview Area Chart */}
-                                                        <div className="mt-4 relative h-[120px] w-full overflow-hidden rounded-xl border bg-gradient-to-b from-violet-50/80 to-white">
-                                                            <svg viewBox="0 0 400 120" className="h-full w-full" preserveAspectRatio="none">
-                                                                <defs>
-                                                                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
-                                                                        <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.35" />
-                                                                        <stop offset="50%" stopColor="#a78bfa" stopOpacity="0.15" />
-                                                                        <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
-                                                                    </linearGradient>
-                                                                    {/* Grid lines */}
-                                                                </defs>
-                                                                {/* Horizontal grid lines */}
-                                                                {[25, 50, 75].map(pct => (
-                                                                    <line key={pct} x1="0" y1={110 - (pct / 100) * 100} x2="400" y2={110 - (pct / 100) * 100} stroke="#e2e8f0" strokeWidth="0.5" strokeDasharray="4 4" />
-                                                                ))}
-                                                                {/* Y-axis labels */}
-                                                                {[0, 25, 50, 75, 100].map(pct => (
-                                                                    <text key={pct} x="4" y={112 - (pct / 100) * 100} fill="#94a3b8" fontSize="7" dominantBaseline="middle">{pct}%</text>
-                                                                ))}
-                                                                {(() => {
-                                                                    const sorted = [...goals].sort((a: any, b: any) => (a.progress_percentage ?? 0) - (b.progress_percentage ?? 0));
-                                                                    if (sorted.length === 0) return null;
-                                                                    const pad = 30;
-                                                                    const pts = sorted.map((g: any, i: number) => {
-                                                                        const x = pad + (sorted.length > 1 ? (i / (sorted.length - 1)) * (400 - pad * 2) : (400 - pad * 2) / 2);
-                                                                        const y = 110 - ((g.progress_percentage ?? 0) / 100) * 100;
-                                                                        return { x, y, g };
-                                                                    });
-                                                                    // Smooth cubic bezier
-                                                                    let pathD = `M${pts[0].x},${pts[0].y}`;
-                                                                    for (let i = 1; i < pts.length; i++) {
-                                                                        const cp1x = pts[i - 1].x + (pts[i].x - pts[i - 1].x) * 0.4;
-                                                                        const cp2x = pts[i].x - (pts[i].x - pts[i - 1].x) * 0.4;
-                                                                        pathD += ` C${cp1x},${pts[i - 1].y} ${cp2x},${pts[i].y} ${pts[i].x},${pts[i].y}`;
-                                                                    }
-                                                                    const areaD = `${pathD} L${pts[pts.length - 1].x},115 L${pts[0].x},115 Z`;
-                                                                    return (
-                                                                        <>
-                                                                            <path d={areaD} fill="url(#areaGrad)" />
-                                                                            <path d={pathD} fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
-                                                                            {pts.map((p, i) => (
-                                                                                <g key={i}>
-                                                                                    <circle cx={p.x} cy={p.y} r="5" fill={p.g.status === 'completed' ? '#10b981' : '#7c3aed'} stroke="white" strokeWidth="2" />
-                                                                                </g>
-                                                                            ))}
-                                                                        </>
-                                                                    );
-                                                                })()}
-                                                            </svg>
-                                                            {/* Legend */}
-                                                            <div className="absolute top-2 right-3 flex items-center gap-3">
-                                                                <span className="flex items-center gap-1 text-[9px] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-violet-500" /> In Progress</span>
-                                                                <span className="flex items-center gap-1 text-[9px] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Completed</span>
+                                                        {/* Summary row */}
+                                                        <div className="mt-4 flex items-center justify-between rounded-xl bg-violet-50 px-4 py-3">
+                                                            <div className="flex items-center gap-4">
+                                                                <span className="flex items-center gap-1.5 text-xs"><span className="h-3 w-3 rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500" /> Completed: {goalsCompleted}</span>
+                                                                <span className="flex items-center gap-1.5 text-xs"><span className="h-3 w-3 rounded-full bg-gradient-to-r from-violet-400 to-purple-500" /> In Progress: {goalsInProgress}</span>
+                                                                <span className="flex items-center gap-1.5 text-xs"><span className="h-3 w-3 rounded-full bg-slate-300" /> Not Started: {goals.length - goalsCompleted - goalsInProgress}</span>
                                                             </div>
+                                                            <span className="text-xs font-bold text-violet-700">Avg: {avgProgress}%</span>
                                                         </div>
                                                     </div>
 
