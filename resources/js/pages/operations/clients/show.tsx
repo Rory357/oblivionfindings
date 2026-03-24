@@ -20,7 +20,17 @@ import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Globe, Heart, ShieldAlert, Star } from 'lucide-react';
 import { useMemo, useState } from 'react';
+
+function Field({ label, value }: { label: string; value: string }) {
+    return (
+        <div>
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="text-sm font-medium">{value}</p>
+        </div>
+    );
+}
 
 type Props = {
     client: {
@@ -42,6 +52,28 @@ type Props = {
         postcode?: string | null;
         funding_type?: string | null;
         funding_notes?: string | null;
+        // Identity & Culture
+        ethnicity?: string | null;
+        preferred_pronouns?: string | null;
+        religion?: string | null;
+        languages?: string[] | null;
+        education_level?: string | null;
+        employment_status?: string | null;
+        // Interests & Strengths
+        interests_hobbies?: string | null;
+        strengths_abilities?: string | null;
+        life_story?: string | null;
+        // Health & Support Needs
+        mobility_needs?: string | null;
+        sensory_needs?: string | null;
+        cognitive_needs?: string | null;
+        dietary_requirements?: string | null;
+        sleep_preferences?: string | null;
+        // Service Details
+        service_start_date?: string | null;
+        risk_level?: 'low' | 'medium' | 'high' | 'critical' | null;
+        safeguarding_flag?: boolean | null;
+        key_worker?: { id: number; name: string } | null;
         site: { id: number; name: string } | null;
         service_context?: {
             id: number;
@@ -383,6 +415,17 @@ export default function ClientShow({
                 </div>
 
                 {tab === 'profile' && (
+                    <>
+                    {/* Safeguarding Alert Banner */}
+                    {client.safeguarding_flag && (
+                        <div className="mb-4 flex items-center gap-3 rounded-lg border-2 border-red-300 bg-red-50 p-4">
+                            <ShieldAlert className="h-6 w-6 text-red-600" />
+                            <div>
+                                <p className="text-sm font-bold text-red-800">Safeguarding Alert</p>
+                                <p className="text-xs text-red-700">This person has an active safeguarding concern. Check risk assessments and follow safeguarding protocols.</p>
+                            </div>
+                        </div>
+                    )}
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Profile</CardTitle>
@@ -502,6 +545,124 @@ export default function ClientShow({
                                     </div>
                                 )}
                             </div>
+
+                            {/* Identity & Culture */}
+                            {(client.ethnicity || client.preferred_pronouns || client.religion || (client.languages ?? []).length > 0 || client.education_level || client.employment_status) && (
+                                <Card className="mt-4">
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                                                <Globe className="h-4 w-4" />
+                                            </div>
+                                            Identity &amp; Culture
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                            {client.ethnicity && <Field label="Ethnicity" value={client.ethnicity} />}
+                                            {client.preferred_pronouns && <Field label="Pronouns" value={client.preferred_pronouns} />}
+                                            {client.religion && <Field label="Religion / Spirituality" value={client.religion} />}
+                                            {(client.languages ?? []).length > 0 && (
+                                                <Field label="Languages" value={(client.languages ?? []).join(', ')} />
+                                            )}
+                                            {client.education_level && <Field label="Education" value={client.education_level} />}
+                                            {client.employment_status && <Field label="Employment" value={client.employment_status} />}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Interests & Strengths */}
+                            {(client.interests_hobbies || client.strengths_abilities || client.life_story) && (
+                                <Card className="mt-4">
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                                <Star className="h-4 w-4" />
+                                            </div>
+                                            Interests &amp; Strengths
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        {client.interests_hobbies && (
+                                            <div>
+                                                <p className="text-xs font-semibold text-amber-600">Interests &amp; Hobbies</p>
+                                                <p className="mt-0.5 text-sm">{client.interests_hobbies}</p>
+                                            </div>
+                                        )}
+                                        {client.strengths_abilities && (
+                                            <div>
+                                                <p className="text-xs font-semibold text-emerald-600">Strengths &amp; Abilities</p>
+                                                <p className="mt-0.5 text-sm">{client.strengths_abilities}</p>
+                                            </div>
+                                        )}
+                                        {client.life_story && (
+                                            <div>
+                                                <p className="text-xs font-semibold text-indigo-600">Life Story</p>
+                                                <p className="mt-0.5 text-sm">{client.life_story}</p>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Health & Support Needs */}
+                            {(client.mobility_needs || client.sensory_needs || client.cognitive_needs || client.dietary_requirements || client.sleep_preferences) && (
+                                <Card className="mt-4">
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2 text-base">
+                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
+                                                <Heart className="h-4 w-4" />
+                                            </div>
+                                            Health &amp; Support Needs
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                            {client.mobility_needs && <Field label="Mobility Needs" value={client.mobility_needs} />}
+                                            {client.sensory_needs && <Field label="Sensory Needs" value={client.sensory_needs} />}
+                                            {client.cognitive_needs && <Field label="Cognitive Needs" value={client.cognitive_needs} />}
+                                            {client.dietary_requirements && <Field label="Dietary Requirements" value={client.dietary_requirements} />}
+                                            {client.sleep_preferences && <Field label="Sleep Preferences" value={client.sleep_preferences} />}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Service Details */}
+                            {(client.service_start_date || client.key_worker || client.risk_level || client.funding_type) && (
+                                <Card className="mt-4">
+                                    <CardHeader>
+                                        <CardTitle className="text-base">Service Details</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                            {client.service_start_date && <Field label="Service Start Date" value={client.service_start_date} />}
+                                            {client.key_worker && <Field label="Key Worker" value={client.key_worker.name} />}
+                                            {client.risk_level && (
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Risk Level</p>
+                                                    <span className={`mt-0.5 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                                        client.risk_level === 'low' ? 'bg-emerald-100 text-emerald-800' :
+                                                        client.risk_level === 'medium' ? 'bg-amber-100 text-amber-800' :
+                                                        client.risk_level === 'high' ? 'bg-red-100 text-red-800' :
+                                                        'bg-red-100 text-red-800 animate-pulse'
+                                                    }`}>
+                                                        {client.risk_level.charAt(0).toUpperCase() + client.risk_level.slice(1)}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {client.funding_type && <Field label="Funding Type" value={client.funding_type} />}
+                                        </div>
+                                        {client.funding_notes && (
+                                            <div className="mt-3">
+                                                <p className="text-xs text-muted-foreground">Funding Notes</p>
+                                                <p className="mt-0.5 whitespace-pre-wrap text-sm">{client.funding_notes}</p>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            )}
 
                             <div className="text-sm">
                                 <div className="font-medium">
@@ -676,6 +837,7 @@ export default function ClientShow({
                             </div>
                         </CardContent>
                     </Card>
+                    </>
                 )}
 
                 {tab === 'onboarding' && (

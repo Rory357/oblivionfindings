@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::table('assets', function (Blueprint $table) {
             if (!Schema::hasColumn('assets', 'has_wheelchair_ramp')) {
-                $table->boolean('has_wheelchair_ramp')->default(false)->after('alert_config');
+                $table->boolean('has_wheelchair_ramp')->default(false);
                 $table->boolean('has_hoist')->default(false);
                 $table->boolean('has_child_seat_anchors')->default(false);
                 $table->boolean('has_medical_storage')->default(false);
