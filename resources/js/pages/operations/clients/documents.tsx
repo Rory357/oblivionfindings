@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     Dialog,
@@ -24,18 +24,17 @@ import { Textarea } from '@/components/ui/textarea';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import {
     Download,
-    Eye,
     File,
     FileImage,
     FileSpreadsheet,
     FileText,
     Filter,
     FolderOpen,
+    FolderPlus,
     Globe,
     Grid3X3,
     List,
     Pencil,
-    Plus,
     Search,
     Trash2,
     Upload,
@@ -93,10 +92,6 @@ const CATEGORIES = [
     { value: 'other', label: 'Other', color: 'bg-slate-100 text-slate-700' },
 ];
 
-function getCategoryStyle(cat?: string) {
-    return CATEGORIES.find(c => c.value === cat)?.color ?? 'bg-slate-100 text-slate-600';
-}
-
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -116,33 +111,57 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
     const [categoryFilter, setCategoryFilter] = useState('');
     const [showUpload, setShowUpload] = useState(false);
     const [editingDoc, setEditingDoc] = useState<any>(null);
+    const [currentFolder, setCurrentFolder] = useState<string | null>(null);
+    const [showNewFolder, setShowNewFolder] = useState(false);
+    const [newFolderName, setNewFolderName] = useState('');
 
-    const uploadForm = useForm<{ file: File | null; title: string; category: string; version: string; effective_date: string; expiry_date: string; portal_visible: boolean; notes: string }>({
-        file: null, title: '', category: '', version: '', effective_date: '', expiry_date: '', portal_visible: false, notes: '',
+    const uploadForm = useForm<{ file: File | null; title: string; category: string; folder: string; version: string; effective_date: string; expiry_date: string; portal_visible: boolean; notes: string }>({
+        file: null, title: '', category: '', folder: '', version: '', effective_date: '', expiry_date: '', portal_visible: false, notes: '',
     });
 
-    const editForm = useForm<{ title: string; category: string; version: string; effective_date: string; expiry_date: string; portal_visible: boolean; notes: string }>({
-        title: '', category: '', version: '', effective_date: '', expiry_date: '', portal_visible: false, notes: '',
+    const editForm = useForm<{ title: string; category: string; folder: string; version: string; effective_date: string; expiry_date: string; portal_visible: boolean; notes: string }>({
+        title: '', category: '', folder: '', version: '', effective_date: '', expiry_date: '', portal_visible: false, notes: '',
     });
+
+    // Derive unique folder names from all documents
+    const allFolders = useMemo(() => {
+        const set = new Set<string>();
+        documents.forEach(d => { if (d.folder) set.add(d.folder); });
+        return Array.from(set).sort();
+    }, [documents]);
 
     const filtered = useMemo(() => {
         return documents.filter(d => {
             if (search && !(d.title ?? d.original_name ?? '').toLowerCase().includes(search.toLowerCase())) return false;
             if (categoryFilter && d.category !== categoryFilter) return false;
+            // Folder filtering
+            if (currentFolder !== null) {
+                if ((d.folder || '') !== currentFolder) return false;
+            }
             return true;
         });
-    }, [documents, search, categoryFilter]);
+    }, [documents, search, categoryFilter, currentFolder]);
 
-    // Group by category for grid view
-    const grouped = useMemo(() => {
-        const groups: Record<string, any[]> = {};
-        filtered.forEach(d => {
-            const cat = d.category || 'other';
-            if (!groups[cat]) groups[cat] = [];
-            groups[cat].push(d);
+    // Documents in the current view (root = no folder selected, shows unfiled + folder cards)
+    const filesInCurrentView = useMemo(() => {
+        if (currentFolder !== null) return filtered;
+        // At root level, show documents without a folder
+        return filtered.filter(d => !d.folder);
+    }, [filtered, currentFolder]);
+
+    // Folder counts for root view
+    const folderCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        documents.forEach(d => {
+            if (d.folder) {
+                // Apply search filter to folder counts
+                if (search && !(d.title ?? d.original_name ?? '').toLowerCase().includes(search.toLowerCase())) return;
+                if (categoryFilter && d.category !== categoryFilter) return;
+                counts[d.folder] = (counts[d.folder] || 0) + 1;
+            }
         });
-        return groups;
-    }, [filtered]);
+        return counts;
+    }, [documents, search, categoryFilter]);
 
     const stats = {
         total: documents.length,
@@ -154,10 +173,18 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
     const openEdit = (doc: any) => {
         setEditingDoc(doc);
         editForm.setData({
-            title: doc.title ?? '', category: doc.category ?? '', version: doc.version ?? '',
+            title: doc.title ?? '', category: doc.category ?? '', folder: doc.folder ?? '', version: doc.version ?? '',
             effective_date: doc.effective_date ?? '', expiry_date: doc.expiry_date ?? '',
             portal_visible: !!doc.portal_visible, notes: doc.notes ?? '',
         });
+    };
+
+    const handleCreateFolder = () => {
+        const trimmed = newFolderName.trim();
+        if (!trimmed) return;
+        setCurrentFolder(trimmed);
+        setShowNewFolder(false);
+        setNewFolderName('');
     };
 
     return (
@@ -177,12 +204,23 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                         <h1 className="text-xl font-bold">Documents</h1>
                         <p className="text-sm text-muted-foreground">{name}&apos;s document library</p>
                     </div>
-                    {can_edit && (
-                        <Button className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => setShowUpload(true)}>
-                            <Upload className="h-4 w-4" />
-                            Upload Document
-                        </Button>
-                    )}
+                    <div className="flex items-center gap-2">
+                        {can_edit && (
+                            <>
+                                <Button variant="outline" className="gap-1.5" size="sm" onClick={() => setShowNewFolder(true)}>
+                                    <FolderPlus className="h-4 w-4" />
+                                    New Folder
+                                </Button>
+                                <Button className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => {
+                                    uploadForm.setData('folder', currentFolder ?? '');
+                                    setShowUpload(true);
+                                }}>
+                                    <Upload className="h-4 w-4" />
+                                    Upload Document
+                                </Button>
+                            </>
+                        )}
+                    </div>
                 </div>
 
                 {/* Stats Bar */}
@@ -204,6 +242,15 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                         <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Expired</div>
                     </div>
                 </div>
+
+                {/* Breadcrumb */}
+                {currentFolder && (
+                    <div className="flex items-center gap-2 text-sm">
+                        <button onClick={() => setCurrentFolder(null)} className="text-violet-600 hover:underline">All Documents</button>
+                        <span className="text-muted-foreground">/</span>
+                        <span className="font-medium">{currentFolder}</span>
+                    </div>
+                )}
 
                 {/* Toolbar */}
                 <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white/50 p-3 shadow-sm">
@@ -232,7 +279,7 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                 </div>
 
                 {/* Documents */}
-                {filtered.length === 0 ? (
+                {filesInCurrentView.length === 0 && (currentFolder !== null || Object.keys(folderCounts).length === 0) ? (
                     <Card className="border-dashed">
                         <CardContent className="flex flex-col items-center justify-center py-16">
                             <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
@@ -240,27 +287,51 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                             </div>
                             <p className="font-medium">No Documents</p>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                {search || categoryFilter ? 'No documents match your filters.' : `Upload documents for ${client.first_name}.`}
+                                {search || categoryFilter ? 'No documents match your filters.' : currentFolder ? `No documents in this folder yet.` : `Upload documents for ${client.first_name}.`}
                             </p>
                             {can_edit && !search && !categoryFilter && (
-                                <Button className="mt-4 gap-1.5 bg-violet-600 hover:bg-violet-700" size="sm" onClick={() => setShowUpload(true)}>
+                                <Button className="mt-4 gap-1.5 bg-violet-600 hover:bg-violet-700" size="sm" onClick={() => {
+                                    uploadForm.setData('folder', currentFolder ?? '');
+                                    setShowUpload(true);
+                                }}>
                                     <Upload className="h-3.5 w-3.5" /> Upload
                                 </Button>
                             )}
                         </CardContent>
                     </Card>
                 ) : viewMode === 'grid' ? (
-                    /* Grid View — grouped by category */
+                    /* Grid View */
                     <div className="space-y-6">
-                        {Object.entries(grouped).map(([cat, docs]) => (
-                            <div key={cat}>
+                        {/* Folder cards (only at root level) */}
+                        {currentFolder === null && Object.keys(folderCounts).length > 0 && (
+                            <div>
                                 <div className="mb-2 flex items-center gap-2">
                                     <FolderOpen className="h-4 w-4 text-violet-500" />
-                                    <span className="text-sm font-semibold capitalize">{CATEGORIES.find(c => c.value === cat)?.label ?? cat}</span>
-                                    <Badge variant="secondary" className="text-[10px]">{docs.length}</Badge>
+                                    <span className="text-sm font-semibold">Folders</span>
                                 </div>
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                                    {Object.entries(folderCounts).sort(([a], [b]) => a.localeCompare(b)).map(([folder, count]) => (
+                                        <button key={folder} onClick={() => setCurrentFolder(folder)}
+                                            className="flex flex-col items-center rounded-xl border bg-white p-4 transition-all hover:shadow-md hover:-translate-y-0.5 hover:border-violet-300">
+                                            <FolderOpen className="h-10 w-10 text-amber-500" />
+                                            <span className="mt-2 text-xs font-medium">{folder}</span>
+                                            <span className="text-[10px] text-muted-foreground">{count} file{count !== 1 ? 's' : ''}</span>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* File cards */}
+                        {filesInCurrentView.length > 0 && (
+                            <div>
+                                {currentFolder === null && <div className="mb-2 flex items-center gap-2">
+                                    <FileText className="h-4 w-4 text-violet-500" />
+                                    <span className="text-sm font-semibold">Unfiled Documents</span>
+                                    <Badge variant="secondary" className="text-[10px]">{filesInCurrentView.length}</Badge>
+                                </div>}
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                                    {docs.map((d: any) => {
+                                    {filesInCurrentView.map((d: any) => {
                                         const fi = getFileInfo(d.mime_type, d.original_name);
                                         const IconComp = fi.icon;
                                         const expired = isExpired(d.expiry_date);
@@ -275,7 +346,7 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                                 <h3 className="text-center text-xs font-medium leading-tight line-clamp-2">{d.title || d.original_name}</h3>
                                                 {/* Meta */}
                                                 <div className="mt-2 flex items-center justify-center gap-1">
-                                                    {d.portal_visible && <Globe className="h-3 w-3 text-blue-500" title="Shared in portal" />}
+                                                    {d.portal_visible && <span title="Shared in portal"><Globe className="h-3 w-3 text-blue-500" /></span>}
                                                     {expired && <Badge className="h-4 border-0 bg-red-100 px-1 text-[8px] text-red-600">Expired</Badge>}
                                                     {expiring && !expired && <Badge className="h-4 border-0 bg-amber-100 px-1 text-[8px] text-amber-600">Expiring</Badge>}
                                                     {d.version && <span className="text-[9px] text-muted-foreground">{d.version}</span>}
@@ -301,16 +372,39 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                     })}
                                 </div>
                             </div>
-                        ))}
+                        )}
                     </div>
                 ) : (
                     /* List View */
                     <Card>
                         <CardContent className="p-0">
+                            {/* Folder rows at root level */}
+                            {currentFolder === null && Object.keys(folderCounts).length > 0 && (
+                                <table className="w-full text-sm">
+                                    <tbody>
+                                        {Object.entries(folderCounts).sort(([a], [b]) => a.localeCompare(b)).map(([folder, count]) => (
+                                            <tr key={folder} className="border-b hover:bg-slate-50 cursor-pointer" onClick={() => setCurrentFolder(folder)}>
+                                                <td className="px-4 py-2.5" colSpan={6}>
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100">
+                                                            <FolderOpen className="h-4 w-4 text-amber-600" />
+                                                        </div>
+                                                        <div>
+                                                            <p className="font-medium">{folder}</p>
+                                                            <p className="text-[10px] text-muted-foreground">{count} file{count !== 1 ? 's' : ''}</p>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
                             <table className="w-full text-sm">
                                 <thead>
                                     <tr className="border-b bg-slate-50 text-left text-xs text-muted-foreground">
                                         <th className="px-4 py-2.5 font-medium">Name</th>
+                                        <th className="px-4 py-2.5 font-medium">Folder</th>
                                         <th className="px-4 py-2.5 font-medium">Category</th>
                                         <th className="px-4 py-2.5 font-medium">Version</th>
                                         <th className="px-4 py-2.5 font-medium">Expiry</th>
@@ -319,7 +413,7 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {filtered.map((d: any) => {
+                                    {filesInCurrentView.map((d: any) => {
                                         const fi = getFileInfo(d.mime_type, d.original_name);
                                         const IconComp = fi.icon;
                                         const expired = isExpired(d.expiry_date);
@@ -337,8 +431,9 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                                         </div>
                                                     </div>
                                                 </td>
+                                                <td className="px-4 py-2.5 text-muted-foreground">{d.folder || '—'}</td>
                                                 <td className="px-4 py-2.5">
-                                                    {d.category && <Badge className={`border-0 text-[10px] capitalize ${getCategoryStyle(d.category)}`}>{d.category}</Badge>}
+                                                    {d.category && <Badge className={`border-0 text-[10px] capitalize ${CATEGORIES.find(c => c.value === d.category)?.color ?? 'bg-slate-100 text-slate-600'}`}>{d.category}</Badge>}
                                                 </td>
                                                 <td className="px-4 py-2.5 text-muted-foreground">{d.version || '—'}</td>
                                                 <td className="px-4 py-2.5">
@@ -403,6 +498,20 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                                 <Input value={uploadForm.data.title} onChange={(e) => uploadForm.setData('title', e.target.value)} />
                             </div>
                             <div className="space-y-1.5">
+                                <Label>Folder</Label>
+                                {allFolders.length > 0 ? (
+                                    <Select value={uploadForm.data.folder || '__none__'} onValueChange={(v) => uploadForm.setData('folder', v === '__none__' ? '' : v)}>
+                                        <SelectTrigger><SelectValue placeholder="No folder" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">No folder</SelectItem>
+                                            {allFolders.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <Input value={uploadForm.data.folder} onChange={(e) => uploadForm.setData('folder', e.target.value)} placeholder="Optional folder name" />
+                                )}
+                            </div>
+                            <div className="space-y-1.5">
                                 <Label>Category</Label>
                                 <Select value={uploadForm.data.category} onValueChange={(v) => uploadForm.setData('category', v)}>
                                     <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
@@ -449,6 +558,20 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                         <div className="grid gap-3 sm:grid-cols-2">
                             <div className="space-y-1.5"><Label>Title</Label><Input value={editForm.data.title} onChange={(e) => editForm.setData('title', e.target.value)} /></div>
                             <div className="space-y-1.5">
+                                <Label>Folder</Label>
+                                {allFolders.length > 0 ? (
+                                    <Select value={editForm.data.folder || '__none__'} onValueChange={(v) => editForm.setData('folder', v === '__none__' ? '' : v)}>
+                                        <SelectTrigger><SelectValue placeholder="No folder" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">No folder</SelectItem>
+                                            {allFolders.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                ) : (
+                                    <Input value={editForm.data.folder} onChange={(e) => editForm.setData('folder', e.target.value)} placeholder="Optional folder name" />
+                                )}
+                            </div>
+                            <div className="space-y-1.5">
                                 <Label>Category</Label>
                                 <Select value={editForm.data.category} onValueChange={(v) => editForm.setData('category', v)}>
                                     <SelectTrigger><SelectValue /></SelectTrigger>
@@ -469,6 +592,29 @@ export default function ClientDocuments({ client, can_edit, documents }: Props) 
                         <Button disabled={editForm.processing}
                             onClick={() => editForm.put(`/operations/clients/${client.id}/documents/${editingDoc?.id}`, { preserveScroll: true, onSuccess: () => setEditingDoc(null) })}>
                             Save
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* New Folder Dialog */}
+            <Dialog open={showNewFolder} onOpenChange={setShowNewFolder}>
+                <DialogContent className="sm:max-w-sm">
+                    <DialogHeader>
+                        <DialogTitle>New Folder</DialogTitle>
+                        <DialogDescription>Enter a name for the new folder.</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="space-y-1.5">
+                            <Label>Folder Name</Label>
+                            <Input value={newFolderName} onChange={(e) => setNewFolderName(e.target.value)} placeholder="e.g. Medical Records"
+                                onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFolder(); }} autoFocus />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => { setShowNewFolder(false); setNewFolderName(''); }}>Cancel</Button>
+                        <Button className="bg-violet-600 hover:bg-violet-700" disabled={!newFolderName.trim()} onClick={handleCreateFolder}>
+                            Create Folder
                         </Button>
                     </DialogFooter>
                 </DialogContent>

@@ -15,6 +15,7 @@ class ClientDocument extends Model
         'uploaded_by_user_id',
         'title',
         'category',
+        'folder',
         'version',
         'effective_date',
         'expiry_date',

@@ -1980,9 +1980,9 @@ export default function ClientShow({
                     };
 
                     const grouped = (documents ?? []).reduce((acc: Record<string, any[]>, d: any) => {
-                        const cat = d.category || 'other';
-                        if (!acc[cat]) acc[cat] = [];
-                        acc[cat].push(d);
+                        const folder = d.folder || 'Unfiled';
+                        if (!acc[folder]) acc[folder] = [];
+                        acc[folder].push(d);
                         return acc;
                     }, {} as Record<string, any[]>);
 
@@ -2013,11 +2013,11 @@ export default function ClientShow({
                                     </CardContent>
                                 </Card>
                             ) : (
-                                Object.entries(grouped).map(([cat, docs]) => (
-                                    <div key={cat}>
+                                Object.entries(grouped).map(([folder, docs]) => (
+                                    <div key={folder}>
                                         <div className="mb-2 flex items-center gap-2">
-                                            <FolderOpen className="h-4 w-4 text-violet-500" />
-                                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{cat.replace(/_/g, ' ')}</span>
+                                            <FolderOpen className="h-4 w-4 text-amber-500" />
+                                            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{folder}</span>
                                             <Badge variant="secondary" className="text-[10px]">{(docs as any[]).length}</Badge>
                                         </div>
                                         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
