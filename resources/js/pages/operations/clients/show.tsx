@@ -1494,49 +1494,106 @@ export default function ClientShow({
                 {tab === 'progress_notes' && (() => {
                     const pageProps = usePage().props as any;
                     const notes = pageProps.client_progress_notes ?? [];
+                    const flaggedCount = notes.filter((n: any) => n.is_flagged).length;
+                    const familyCount = notes.filter((n: any) => n.visibility === 'include_family').length;
+                    const avgMood = notes.filter((n: any) => n.mood_rating).length > 0
+                        ? Math.round(notes.filter((n: any) => n.mood_rating).reduce((s: number, n: any) => s + n.mood_rating, 0) / notes.filter((n: any) => n.mood_rating).length)
+                        : null;
+
+                    const NOTE_TYPE_STYLES: Record<string, { border: string; bg: string; label: string }> = {
+                        general: { border: 'border-l-violet-400', bg: 'bg-violet-50', label: 'General' },
+                        goal_update: { border: 'border-l-indigo-400', bg: 'bg-indigo-50', label: 'Goal Update' },
+                        observation: { border: 'border-l-blue-400', bg: 'bg-blue-50', label: 'Observation' },
+                        handover: { border: 'border-l-cyan-400', bg: 'bg-cyan-50', label: 'Handover' },
+                        incident: { border: 'border-l-red-400', bg: 'bg-red-50', label: 'Incident' },
+                    };
 
                     return (
                         <div className="space-y-4">
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center justify-between text-base">
-                                        <span>Progress Notes ({notes.length})</span>
-                                        <Button variant="outline" size="sm" asChild>
-                                            <Link href={`/operations/progress-notes?client_id=${client.id}`}>View All</Link>
-                                        </Button>
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {notes.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground text-center py-8">No progress notes yet.</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {notes.map((note: any) => (
-                                                <div key={note.id} className={`rounded-lg border p-3 text-sm ${note.is_flagged ? 'border-l-4 border-l-red-400' : ''}`}>
-                                                    <div className="flex items-center justify-between mb-1">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="font-medium">{note.author?.name ?? 'Unknown'}</span>
-                                                            {note.mood_rating && (
-                                                                <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${
-                                                                    note.mood_rating >= 7 ? 'bg-emerald-500' : note.mood_rating >= 4 ? 'bg-amber-500' : 'bg-red-500'
-                                                                }`}>{note.mood_rating}</span>
-                                                            )}
-                                                            {note.visibility === 'include_family' && (
-                                                                <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700">Family Visible</span>
-                                                            )}
-                                                        </div>
-                                                        <span className="text-xs text-muted-foreground">{new Date(note.created_at).toLocaleDateString('en-NZ')}</span>
-                                                    </div>
-                                                    {note.goal && (
-                                                        <span className="inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-600 mb-1">Goal: {note.goal.title}</span>
-                                                    )}
-                                                    <p className="text-muted-foreground">{(note.content ?? '').slice(0, 300)}{(note.content ?? '').length > 300 ? '...' : ''}</p>
-                                                </div>
-                                            ))}
+                            {/* Stats */}
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                    <div className="text-xl font-bold text-violet-700">{notes.length}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-violet-500">Total Notes</div>
+                                </div>
+                                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                    <div className={`text-xl font-bold ${avgMood !== null ? (avgMood >= 7 ? 'text-emerald-600' : avgMood >= 4 ? 'text-amber-600' : 'text-red-600') : 'text-slate-400'}`}>
+                                        {avgMood !== null ? `${avgMood}/10` : '—'}
+                                    </div>
+                                    <div className="text-[10px] uppercase tracking-wider text-violet-500">Avg Mood</div>
+                                </div>
+                                <div className="rounded-xl border p-3 text-center">
+                                    <div className={`text-xl font-bold ${flaggedCount > 0 ? 'text-red-600' : 'text-slate-400'}`}>{flaggedCount}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Flagged</div>
+                                </div>
+                                <div className="rounded-xl border p-3 text-center">
+                                    <div className="text-xl font-bold text-blue-600">{familyCount}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Family Visible</div>
+                                </div>
+                            </div>
+
+                            {/* Header */}
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">Recent Notes</span>
+                                <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700" asChild>
+                                    <Link href={`/operations/progress-notes?client_id=${client.id}`}>View All Notes</Link>
+                                </Button>
+                            </div>
+
+                            {/* Notes list */}
+                            {notes.length === 0 ? (
+                                <Card className="border-dashed">
+                                    <CardContent className="flex flex-col items-center justify-center py-12">
+                                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
+                                            <FileText className="h-7 w-7 text-violet-400" />
                                         </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                        <p className="font-medium">No Progress Notes</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">Notes from shifts and care activities will appear here.</p>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <div className="space-y-2">
+                                    {notes.map((note: any) => {
+                                        const typeStyle = NOTE_TYPE_STYLES[note.note_type] ?? NOTE_TYPE_STYLES.general;
+                                        return (
+                                            <Card key={note.id} className={`overflow-hidden border-l-4 ${note.is_flagged ? 'border-l-red-500 bg-red-50/30' : typeStyle.border}`}>
+                                                <CardContent className="p-4">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex items-start gap-3">
+                                                            {/* Avatar */}
+                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
+                                                                {(note.author?.name ?? '?').split(' ').map((w: string) => w[0]).join('').slice(0, 2)}
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="text-sm font-semibold">{note.author?.name ?? 'Unknown'}</span>
+                                                                    <Badge className={`border-0 text-[9px] ${typeStyle.bg} ${typeStyle.border.replace('border-l-', 'text-').replace('-400', '-700')}`}>{typeStyle.label}</Badge>
+                                                                    {note.mood_rating && (
+                                                                        <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${
+                                                                            note.mood_rating >= 7 ? 'bg-emerald-500' : note.mood_rating >= 4 ? 'bg-amber-500' : 'bg-red-500'
+                                                                        }`}>{note.mood_rating}</span>
+                                                                    )}
+                                                                    {note.visibility === 'include_family' && (
+                                                                        <Badge className="border-0 bg-blue-100 text-blue-700 text-[9px]">Family</Badge>
+                                                                    )}
+                                                                    {note.is_flagged && (
+                                                                        <Badge className="border-0 bg-red-100 text-red-700 text-[9px]">Flagged</Badge>
+                                                                    )}
+                                                                </div>
+                                                                {note.goal && (
+                                                                    <span className="mt-0.5 inline-block rounded bg-violet-50 px-1.5 py-0.5 text-[10px] text-violet-600">Goal: {note.goal.title}</span>
+                                                                )}
+                                                                <p className="mt-1 text-xs text-slate-600 leading-relaxed">{(note.content ?? '').slice(0, 300)}{(note.content ?? '').length > 300 ? '...' : ''}</p>
+                                                            </div>
+                                                        </div>
+                                                        <span className="shrink-0 text-[10px] text-muted-foreground">{new Date(note.created_at).toLocaleDateString('en-NZ')}</span>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
+                                </div>
+                            )}
                         </div>
                     );
                 })()}
