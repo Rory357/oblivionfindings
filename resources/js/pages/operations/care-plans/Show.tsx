@@ -4,6 +4,14 @@ import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -192,6 +200,36 @@ export default function CarePlanShow({
 
     // Goal form
     const [showGoalForm, setShowGoalForm] = useState(false);
+    const [editingGoal, setEditingGoal] = useState<Goal | null>(null);
+    const [editProgress, setEditProgress] = useState(0);
+    const [editNotes, setEditNotes] = useState('');
+    const [editStatus, setEditStatus] = useState('');
+    const [editTitle, setEditTitle] = useState('');
+    const [editDescription, setEditDescription] = useState('');
+
+    const openGoalEditor = (goal: Goal) => {
+        setEditingGoal(goal);
+        setEditProgress(goal.progress_percentage);
+        setEditNotes(goal.outcome_notes ?? '');
+        setEditStatus(goal.status);
+        setEditTitle(goal.title);
+        setEditDescription(goal.description ?? '');
+    };
+
+    const saveGoalEdit = () => {
+        if (!editingGoal) return;
+        // Update goal details (title, description, outcome_notes)
+        router.put(`/operations/care-plans/${plan.id}/goals/${editingGoal.id}`, {
+            title: editTitle,
+            description: editDescription,
+            outcome_notes: editNotes,
+            status: editStatus,
+            progress_percentage: editProgress,
+        }, {
+            preserveScroll: true,
+            onSuccess: () => setEditingGoal(null),
+        });
+    };
     const goalForm = useForm({
         title: '',
         description: '',
@@ -539,7 +577,7 @@ export default function CarePlanShow({
                         <CardContent className="p-4">
                             <div className="flex items-start gap-3">
                                 <div className="mt-0.5">
-                                    {goal.status === 'achieved' ? (
+                                    {goal.status === 'completed' ? (
                                         <CheckCircle2 className="h-5 w-5 text-emerald-500" />
                                     ) : goal.status === 'in_progress' ? (
                                         <Circle className="h-5 w-5 text-indigo-500" />
@@ -550,6 +588,10 @@ export default function CarePlanShow({
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
                                         <span className="text-sm font-medium">{goal.title}</span>
+                                        <Button variant="ghost" size="sm" className="h-5 w-5 p-0 text-muted-foreground hover:text-foreground"
+                                            onClick={() => openGoalEditor(goal)} title="Edit goal">
+                                            <Pencil className="h-3 w-3" />
+                                        </Button>
                                         <Badge variant="outline" className="h-4 px-1.5 text-[9px] capitalize">{goal.category}</Badge>
                                         <span className={`text-[10px] font-medium capitalize ${PRIORITY_COLORS[goal.priority] ?? ''}`}>
                                             {goal.priority}
@@ -612,6 +654,74 @@ export default function CarePlanShow({
                     </Card>
                 ))}
             </div>
+
+            {/* Edit Goal Dialog */}
+            <Dialog open={!!editingGoal} onOpenChange={(open) => !open && setEditingGoal(null)}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Edit Goal</DialogTitle>
+                        <DialogDescription>Update progress, add notes, and modify goal details.</DialogDescription>
+                    </DialogHeader>
+                    {editingGoal && (
+                        <div className="space-y-5 py-2">
+                            <div className="space-y-1.5">
+                                <Label className="text-sm font-medium">Goal Title</Label>
+                                <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-sm font-medium">Description</Label>
+                                <Textarea className="min-h-[60px]" value={editDescription} onChange={(e) => setEditDescription(e.target.value)} placeholder="Describe the goal..." />
+                            </div>
+
+                            <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                    <Label className="text-sm font-medium">Progress</Label>
+                                    <span className="text-lg font-bold tabular-nums text-indigo-600">{editProgress}%</span>
+                                </div>
+                                <input
+                                    type="range" min={0} max={100} step={5} value={editProgress}
+                                    onChange={(e) => {
+                                        const val = Number(e.target.value);
+                                        setEditProgress(val);
+                                        if (val >= 100) setEditStatus('completed');
+                                        else if (val > 0) setEditStatus('in_progress');
+                                        else setEditStatus('not_started');
+                                    }}
+                                    className="h-2 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-indigo-600 [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-indigo-600 [&::-webkit-slider-thumb]:shadow"
+                                />
+                                <div className="flex justify-between text-[10px] text-muted-foreground">
+                                    <span>Not Started</span>
+                                    <span>In Progress</span>
+                                    <span>Completed</span>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-sm font-medium">Status</Label>
+                                <Select value={editStatus} onValueChange={setEditStatus}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="not_started">Not Started</SelectItem>
+                                        <SelectItem value="in_progress">In Progress</SelectItem>
+                                        <SelectItem value="completed">Completed</SelectItem>
+                                        <SelectItem value="on_hold">On Hold</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-sm font-medium">Outcome Notes</Label>
+                                <Textarea className="min-h-[80px]" value={editNotes} onChange={(e) => setEditNotes(e.target.value)} placeholder="Add notes about progress, observations, or outcomes..." />
+                            </div>
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingGoal(null)}>Cancel</Button>
+                        <Button onClick={saveGoalEdit}>Save Changes</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 
