@@ -678,12 +678,14 @@ export default function CarePlanShow({
                                                 Completed
                                             </span>
                                         )}
-                                        {/* Add Note button */}
-                                        <Button size="sm" variant="outline" className="h-7 gap-1 px-3 text-xs"
-                                            onClick={() => { setNoteGoalId(goal.id); setQuickNote(''); }}>
-                                            <MessageSquare className="h-3.5 w-3.5" />
-                                            Add Note
-                                        </Button>
+                                        {/* Add Note button (hidden when completed) */}
+                                        {goal.status !== 'completed' && (
+                                            <Button size="sm" variant="outline" className="h-7 gap-1 px-3 text-xs"
+                                                onClick={() => { setNoteGoalId(goal.id); setQuickNote(''); }}>
+                                                <MessageSquare className="h-3.5 w-3.5" />
+                                                Add Note
+                                            </Button>
+                                        )}
                                         {/* Show/Hide Notes History */}
                                         {getGoalNotes(goal.id).length > 0 && (
                                             <Button size="sm" variant="ghost" className="h-7 gap-1 px-2 text-xs text-muted-foreground"
