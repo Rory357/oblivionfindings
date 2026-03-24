@@ -22,23 +22,40 @@ class MessageController extends Controller
         $conversations = OpsConversation::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->when($conversationIds->isNotEmpty(), fn ($q) => $q->whereIn('id', $conversationIds))
-            ->when($conversationIds->isEmpty(), fn ($q) => $q->whereRaw('1=0')) // no results if not in any conversation
+            ->when($conversationIds->isEmpty(), fn ($q) => $q->whereRaw('1=0'))
             ->with([
-                'latestMessage:id,conversation_id,sender_id,content,created_at',
-                'latestMessage.sender:id,name',
                 'participants.user:id,name',
                 'client:id,first_name,last_name',
+                'messages' => fn ($q) => $q->with('sender:id,name')->latest()->limit(1),
             ])
             ->orderByDesc('updated_at')
-            ->get();
+            ->get()
+            ->map(function ($conv) {
+                $conv->latest_message = $conv->messages->first();
+                unset($conv->messages);
+                return $conv;
+            });
 
-        // Load users for "New Chat" dropdown
+        // Update current user's presence
+        $auth->update(['last_seen_at' => now(), 'presence_status' => 'online']);
+
+        // Load users for "New Chat" dropdown with presence
         $users = \App\Models\User::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->where('id', '!=', $auth->id)
-            ->select('id', 'name', 'email')
+            ->select('id', 'name', 'email', 'last_seen_at', 'presence_status')
             ->orderBy('name')
-            ->get();
+            ->get()
+            ->map(function ($user) {
+                // Derive status: if last_seen_at > 5 min ago and status is 'online', show as 'away'
+                if ($user->presence_status === 'online' && $user->last_seen_at && $user->last_seen_at->lt(now()->subMinutes(5))) {
+                    $user->presence_status = 'away';
+                }
+                if (!$user->last_seen_at || $user->last_seen_at->lt(now()->subMinutes(15))) {
+                    $user->presence_status = 'offline';
+                }
+                return $user;
+            });
 
         return inertia('operations/messages/Index', [
             'conversations' => $conversations,

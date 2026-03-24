@@ -7,7 +7,7 @@ import { Head, router, usePage } from '@inertiajs/react';
 import { Hash, MessageSquareText, Plus, Search, Send, Users, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-type User = { id: number; name: string; email: string };
+type User = { id: number; name: string; email: string; presence_status: 'online' | 'offline' | 'busy' | 'away'; last_seen_at: string | null };
 type Message = {
     id: number;
     content: string;
@@ -51,6 +51,28 @@ function formatTime(iso: string): string {
 
 function formatMessageTime(iso: string): string {
     return new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+}
+
+const PRESENCE_COLORS: Record<string, string> = {
+    online: 'bg-emerald-500',
+    away: 'bg-amber-500',
+    busy: 'bg-red-500',
+    offline: 'bg-slate-300',
+};
+
+const PRESENCE_LABELS: Record<string, string> = {
+    online: 'Online',
+    away: 'Away',
+    busy: 'Busy',
+    offline: 'Offline',
+};
+
+function PresenceDot({ status, size = 'sm' }: { status: string; size?: 'sm' | 'md' }) {
+    const s = size === 'md' ? 'h-3 w-3' : 'h-2.5 w-2.5';
+    return (
+        <span className={`inline-block rounded-full border-2 border-background ${s} ${PRESENCE_COLORS[status] ?? PRESENCE_COLORS.offline}`}
+            title={PRESENCE_LABELS[status] ?? 'Offline'} />
+    );
 }
 
 function getConversationName(conv: Conversation, currentUserId: number): string {
@@ -181,11 +203,18 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                     className={`flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent ${isSelected ? 'bg-accent' : ''}`}
                                     onClick={() => selectConversation(conv)}
                                 >
-                                    <Avatar className="h-9 w-9 shrink-0">
-                                        <AvatarFallback className={`text-xs ${conv.conversation_type === 'group' || conv.conversation_type === 'client_team' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'}`}>
-                                            {conv.conversation_type === 'group' || conv.conversation_type === 'client_team' ? <Users className="h-4 w-4" /> : getInitials(name)}
-                                        </AvatarFallback>
-                                    </Avatar>
+                                    <div className="relative shrink-0">
+                                        <Avatar className="h-9 w-9">
+                                            <AvatarFallback className={`text-xs ${conv.conversation_type === 'group' || conv.conversation_type === 'client_team' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'}`}>
+                                                {conv.conversation_type === 'group' || conv.conversation_type === 'client_team' ? <Users className="h-4 w-4" /> : getInitials(name)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        {conv.conversation_type === 'direct' && (() => {
+                                            const otherId = conv.participants?.find(p => p.user?.id !== currentUserId)?.user?.id;
+                                            const otherUser = users.find(u => u.id === otherId);
+                                            return otherUser ? <div className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={otherUser.presence_status} /></div> : null;
+                                        })()}
+                                    </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center justify-between">
                                             <span className={`truncate text-sm ${conv.unread_count > 0 ? 'font-bold' : 'font-medium'}`}>{name}</span>
@@ -238,11 +267,19 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                         className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-accent"
                                         onClick={() => startNewChat(user.id)}
                                     >
-                                        <Avatar className="h-9 w-9">
-                                            <AvatarFallback className="bg-slate-100 text-xs text-slate-700">{getInitials(user.name)}</AvatarFallback>
-                                        </Avatar>
-                                        <div>
-                                            <div className="text-sm font-medium">{user.name}</div>
+                                        <div className="relative">
+                                            <Avatar className="h-9 w-9">
+                                                <AvatarFallback className="bg-slate-100 text-xs text-slate-700">{getInitials(user.name)}</AvatarFallback>
+                                            </Avatar>
+                                            <div className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={user.presence_status} /></div>
+                                        </div>
+                                        <div className="flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm font-medium">{user.name}</span>
+                                                <span className={`text-[10px] ${user.presence_status === 'online' ? 'text-emerald-600' : user.presence_status === 'busy' ? 'text-red-600' : 'text-muted-foreground'}`}>
+                                                    {PRESENCE_LABELS[user.presence_status] ?? 'Offline'}
+                                                </span>
+                                            </div>
                                             <div className="text-xs text-muted-foreground">{user.email}</div>
                                         </div>
                                     </button>
@@ -254,15 +291,26 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                         <>
                             {/* Chat Header */}
                             <div className="flex items-center gap-3 border-b px-4 py-3">
-                                <Avatar className="h-8 w-8">
-                                    <AvatarFallback className="bg-indigo-100 text-xs text-indigo-700">
-                                        {activeConversation.conversation_type === 'group' ? <Hash className="h-4 w-4" /> : getInitials(getConversationName(activeConversation, currentUserId))}
-                                    </AvatarFallback>
-                                </Avatar>
+                                <div className="relative">
+                                    <Avatar className="h-8 w-8">
+                                        <AvatarFallback className="bg-indigo-100 text-xs text-indigo-700">
+                                            {activeConversation.conversation_type === 'group' ? <Hash className="h-4 w-4" /> : getInitials(getConversationName(activeConversation, currentUserId))}
+                                        </AvatarFallback>
+                                    </Avatar>
+                                    {activeConversation.conversation_type === 'direct' && (() => {
+                                        const otherId = activeConversation.participants?.find(p => p.user?.id !== currentUserId)?.user?.id;
+                                        const otherUser = users.find(u => u.id === otherId);
+                                        return otherUser ? <div className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={otherUser.presence_status} size="md" /></div> : null;
+                                    })()}
+                                </div>
                                 <div>
                                     <h2 className="text-sm font-semibold">{getConversationName(activeConversation, currentUserId)}</h2>
                                     <p className="text-xs text-muted-foreground">
-                                        {activeConversation.participants?.length ?? 0} members
+                                        {activeConversation.conversation_type === 'direct' ? (() => {
+                                            const otherId = activeConversation.participants?.find(p => p.user?.id !== currentUserId)?.user?.id;
+                                            const otherUser = users.find(u => u.id === otherId);
+                                            return PRESENCE_LABELS[otherUser?.presence_status ?? 'offline'] ?? 'Offline';
+                                        })() : `${activeConversation.participants?.length ?? 0} members`}
                                     </p>
                                 </div>
                             </div>

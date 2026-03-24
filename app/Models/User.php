@@ -32,6 +32,10 @@ class User extends Authenticatable
         'approved_by',
 
         'profile_photo_path',
+
+        // Presence / chat
+        'last_seen_at',
+        'presence_status',
     ];
 
     /**
@@ -61,6 +65,7 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'approved_at' => 'datetime',
+            'last_seen_at' => 'datetime',
         ];
     }
 
