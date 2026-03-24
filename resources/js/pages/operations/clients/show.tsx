@@ -1346,47 +1346,62 @@ export default function ClientShow({
                                                     </div>
                                                 </div>
                                                 <CardContent className="p-5">
-                                                    {/* Progress Area Chart (SVG stream graph) */}
+                                                    {/* Goal Progress Bar Chart */}
                                                     <div className="mb-4">
-                                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Goal Progress Distribution</p>
-                                                        <div className="relative h-[100px] w-full overflow-hidden rounded-xl bg-slate-50">
-                                                            <svg viewBox="0 0 400 100" className="h-full w-full" preserveAspectRatio="none">
+                                                        <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Goal Progress</p>
+                                                        <div className="space-y-3">
+                                                            {[...goals].sort((a: any, b: any) => (b.progress_percentage ?? 0) - (a.progress_percentage ?? 0)).map((g: any) => (
+                                                                <div key={g.id}>
+                                                                    <div className="mb-1 flex items-center justify-between">
+                                                                        <span className="text-xs font-medium truncate max-w-[70%]">{g.title}</span>
+                                                                        <span className={`text-xs font-bold tabular-nums ${g.status === 'completed' ? 'text-emerald-600' : 'text-violet-600'}`}>{g.progress_percentage ?? 0}%</span>
+                                                                    </div>
+                                                                    <div className="relative h-3 w-full overflow-hidden rounded-full bg-slate-100">
+                                                                        <div
+                                                                            className={`h-full rounded-full transition-all ${g.status === 'completed' ? 'bg-gradient-to-r from-emerald-400 to-emerald-500' : 'bg-gradient-to-r from-violet-400 to-purple-500'}`}
+                                                                            style={{ width: `${g.progress_percentage ?? 0}%` }}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                        {/* Summary sparkline area */}
+                                                        <div className="mt-4 relative h-[60px] w-full overflow-hidden rounded-xl bg-gradient-to-b from-violet-50 to-white">
+                                                            <svg viewBox="0 0 400 60" className="h-full w-full" preserveAspectRatio="none">
                                                                 <defs>
-                                                                    <linearGradient id="streamGrad" x1="0" y1="0" x2="0" y2="1">
-                                                                        <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.4" />
-                                                                        <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.05" />
+                                                                    <linearGradient id="areaGrad" x1="0" y1="0" x2="0" y2="1">
+                                                                        <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.3" />
+                                                                        <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
                                                                     </linearGradient>
                                                                 </defs>
-                                                                {/* Area fill */}
-                                                                <path d={(() => {
-                                                                    const pts = goals.length > 0 ? goals.map((g: any, i: number) => {
-                                                                        const x = goals.length > 1 ? (i / (goals.length - 1)) * 400 : 200;
-                                                                        const y = 100 - (g.progress_percentage ?? 0);
-                                                                        return `${x},${y}`;
-                                                                    }) : ['0,100', '400,100'];
-                                                                    return `M0,100 L${pts.join(' L')} L400,100 Z`;
-                                                                })()} fill="url(#streamGrad)" />
-                                                                {/* Line */}
-                                                                <polyline
-                                                                    points={goals.length > 0 ? goals.map((g: any, i: number) => {
-                                                                        const x = goals.length > 1 ? (i / (goals.length - 1)) * 400 : 200;
-                                                                        const y = 100 - (g.progress_percentage ?? 0);
-                                                                        return `${x},${y}`;
-                                                                    }).join(' ') : '0,100 400,100'}
-                                                                    fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
-                                                                />
-                                                                {/* Dots */}
-                                                                {goals.map((g: any, i: number) => {
-                                                                    const x = goals.length > 1 ? (i / (goals.length - 1)) * 400 : 200;
-                                                                    const y = 100 - (g.progress_percentage ?? 0);
-                                                                    return <circle key={g.id} cx={x} cy={y} r="4" fill={g.status === 'completed' ? '#10b981' : '#7c3aed'} stroke="white" strokeWidth="2" />;
-                                                                })}
+                                                                {(() => {
+                                                                    const sorted = [...goals].sort((a: any, b: any) => (a.progress_percentage ?? 0) - (b.progress_percentage ?? 0));
+                                                                    const pts = sorted.map((g: any, i: number) => {
+                                                                        const x = 20 + (sorted.length > 1 ? (i / (sorted.length - 1)) * 360 : 180);
+                                                                        const y = 55 - ((g.progress_percentage ?? 0) / 100) * 50;
+                                                                        return { x, y, g };
+                                                                    });
+                                                                    // Smooth curve using quadratic bezier
+                                                                    let pathD = `M${pts[0]?.x ?? 20},${pts[0]?.y ?? 55}`;
+                                                                    for (let i = 1; i < pts.length; i++) {
+                                                                        const cx = (pts[i - 1].x + pts[i].x) / 2;
+                                                                        pathD += ` Q${pts[i - 1].x + (pts[i].x - pts[i - 1].x) * 0.5},${pts[i - 1].y} ${pts[i].x},${pts[i].y}`;
+                                                                    }
+                                                                    const areaD = `${pathD} L${pts[pts.length - 1]?.x ?? 380},58 L${pts[0]?.x ?? 20},58 Z`;
+                                                                    return (
+                                                                        <>
+                                                                            <path d={areaD} fill="url(#areaGrad)" />
+                                                                            <path d={pathD} fill="none" stroke="#7c3aed" strokeWidth="2" strokeLinecap="round" />
+                                                                            {pts.map((p, i) => (
+                                                                                <circle key={i} cx={p.x} cy={p.y} r="3.5" fill={p.g.status === 'completed' ? '#10b981' : '#7c3aed'} stroke="white" strokeWidth="1.5" />
+                                                                            ))}
+                                                                        </>
+                                                                    );
+                                                                })()}
                                                             </svg>
-                                                            {/* Labels */}
-                                                            <div className="absolute bottom-1 left-0 right-0 flex justify-between px-2">
-                                                                {goals.slice(0, 5).map((g: any) => (
-                                                                    <span key={g.id} className="text-[8px] text-muted-foreground truncate max-w-[70px]">{g.title.split(' ').slice(0, 2).join(' ')}</span>
-                                                                ))}
+                                                            <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-3 pb-1">
+                                                                <span className="flex items-center gap-1 text-[9px] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-violet-500" /> In Progress</span>
+                                                                <span className="flex items-center gap-1 text-[9px] text-muted-foreground"><span className="h-2 w-2 rounded-full bg-emerald-500" /> Completed</span>
                                                             </div>
                                                         </div>
                                                     </div>
