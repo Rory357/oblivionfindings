@@ -664,6 +664,106 @@ export default function ClientShow({
                                 </Card>
                             )}
 
+                            {/* Active Risks */}
+                            {(() => {
+                                const pageProps = usePage().props as any;
+                                const risks = pageProps.client_risks ?? [];
+                                if (risks.length === 0) return null;
+
+                                const SEVERITY_COLORS: Record<string, string> = {
+                                    low: 'bg-emerald-100 text-emerald-700',
+                                    medium: 'bg-amber-100 text-amber-700',
+                                    high: 'bg-red-100 text-red-700',
+                                    critical: 'bg-red-200 text-red-800 animate-pulse',
+                                };
+
+                                return (
+                                    <Card className="mt-4 border-red-200">
+                                        <CardHeader>
+                                            <CardTitle className="flex items-center gap-2 text-base">
+                                                <ShieldAlert className="h-4 w-4 text-red-500" />
+                                                Active Risks ({risks.length})
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-2">
+                                                {risks.map((risk: any) => (
+                                                    <div key={risk.id} className="flex items-center justify-between rounded border p-2 text-sm">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${SEVERITY_COLORS[risk.severity] ?? ''}`}>{risk.severity}</span>
+                                                            <span>{risk.label}</span>
+                                                        </div>
+                                                        {risk.review_date && (
+                                                            <span className={`text-[10px] ${new Date(risk.review_date) < new Date() ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}>
+                                                                Review: {new Date(risk.review_date).toLocaleDateString('en-NZ')}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })()}
+
+                            {/* Recent Incidents */}
+                            {(() => {
+                                const pageProps = usePage().props as any;
+                                const incidents = pageProps.client_incidents ?? [];
+                                if (incidents.length === 0) return null;
+
+                                const thirtyDaysAgo = new Date();
+                                thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+                                const recentCount = incidents.filter((i: any) => new Date(i.occurred_at) >= thirtyDaysAgo).length;
+
+                                const SEVERITY_COLORS: Record<string, string> = {
+                                    low: 'bg-emerald-100 text-emerald-700',
+                                    medium: 'bg-amber-100 text-amber-700',
+                                    high: 'bg-red-100 text-red-700',
+                                };
+                                const STATUS_COLORS: Record<string, string> = {
+                                    draft: 'bg-slate-100 text-slate-600',
+                                    submitted: 'bg-blue-100 text-blue-700',
+                                    reviewed: 'bg-indigo-100 text-indigo-700',
+                                    closed: 'bg-slate-100 text-slate-500',
+                                };
+
+                                return (
+                                    <Card className="mt-4 border-amber-200">
+                                        <CardHeader>
+                                            <CardTitle className="flex items-center justify-between text-base">
+                                                <span className="flex items-center gap-2">
+                                                    <ShieldAlert className="h-4 w-4 text-amber-500" />
+                                                    Recent Incidents ({incidents.length})
+                                                </span>
+                                                {recentCount > 3 && (
+                                                    <span className="rounded bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700 animate-pulse">
+                                                        Pattern Alert: {recentCount} in 30 days
+                                                    </span>
+                                                )}
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-2">
+                                                {incidents.map((inc: any) => (
+                                                    <div key={inc.id} className="flex items-center justify-between rounded border p-2 text-sm">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${SEVERITY_COLORS[inc.severity] ?? 'bg-slate-100 text-slate-600'}`}>{inc.severity}</span>
+                                                            <span className="font-medium">{inc.type}</span>
+                                                            {inc.reporter?.name && <span className="text-muted-foreground">by {inc.reporter.name}</span>}
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_COLORS[inc.status] ?? ''}`}>{inc.status}</span>
+                                                            <span className="text-[10px] text-muted-foreground">{new Date(inc.occurred_at).toLocaleDateString('en-NZ')}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                );
+                            })()}
+
                             <div className="text-sm">
                                 <div className="font-medium">
                                     Assigned support workers
@@ -1473,54 +1573,111 @@ export default function ClientShow({
                     );
                 })()}
 
-                {tab === 'progress_notes' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-between text-base">
-                                <span>Progress Notes</span>
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href={`/operations/progress-notes?client_id=${client.id}`}>View All</Link>
-                                </Button>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                                Progress notes, observations, and goal updates for {client.first_name}.
-                            </p>
-                            <div className="mt-3">
-                                <Button size="sm" asChild>
-                                    <Link href={`/operations/progress-notes?client_id=${client.id}`}>View Progress Notes</Link>
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                {tab === 'progress_notes' && (() => {
+                    const pageProps = usePage().props as any;
+                    const notes = pageProps.client_progress_notes ?? [];
 
-                {tab === 'service_agreements' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-between text-base">
-                                <span>Service Agreements</span>
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href={`/operations/service-agreements?client_id=${client.id}`}>View All</Link>
-                                </Button>
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-sm text-muted-foreground">
-                                Funding agreements, budgets, and service contracts for {client.first_name}.
-                            </p>
-                            <div className="mt-3 flex gap-2">
-                                <Button size="sm" asChild>
-                                    <Link href={`/operations/service-agreements?client_id=${client.id}`}>View Agreements</Link>
-                                </Button>
-                                <Button size="sm" variant="outline" asChild>
-                                    <Link href={`/operations/service-agreements/create?client_id=${client.id}`}>New Agreement</Link>
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                )}
+                    return (
+                        <div className="space-y-4">
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-between text-base">
+                                        <span>Progress Notes ({notes.length})</span>
+                                        <Button variant="outline" size="sm" asChild>
+                                            <Link href={`/operations/progress-notes?client_id=${client.id}`}>View All</Link>
+                                        </Button>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {notes.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground text-center py-8">No progress notes yet.</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {notes.map((note: any) => (
+                                                <div key={note.id} className={`rounded-lg border p-3 text-sm ${note.is_flagged ? 'border-l-4 border-l-red-400' : ''}`}>
+                                                    <div className="flex items-center justify-between mb-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="font-medium">{note.author?.name ?? 'Unknown'}</span>
+                                                            {note.mood_rating && (
+                                                                <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${
+                                                                    note.mood_rating >= 7 ? 'bg-emerald-500' : note.mood_rating >= 4 ? 'bg-amber-500' : 'bg-red-500'
+                                                                }`}>{note.mood_rating}</span>
+                                                            )}
+                                                            {note.visibility === 'include_family' && (
+                                                                <span className="rounded bg-blue-100 px-1.5 py-0.5 text-[10px] text-blue-700">Family Visible</span>
+                                                            )}
+                                                        </div>
+                                                        <span className="text-xs text-muted-foreground">{new Date(note.created_at).toLocaleDateString('en-NZ')}</span>
+                                                    </div>
+                                                    {note.goal && (
+                                                        <span className="inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-[10px] text-indigo-600 mb-1">Goal: {note.goal.title}</span>
+                                                    )}
+                                                    <p className="text-muted-foreground">{(note.content ?? '').slice(0, 300)}{(note.content ?? '').length > 300 ? '...' : ''}</p>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    );
+                })()}
+
+                {tab === 'service_agreements' && (() => {
+                    const pageProps = usePage().props as any;
+                    const agreements = pageProps.client_agreements ?? [];
+
+                    return (
+                        <div className="space-y-4">
+                            {agreements.length === 0 ? (
+                                <Card>
+                                    <CardContent className="flex flex-col items-center justify-center py-12">
+                                        <p className="mb-1 font-medium">No Service Agreements</p>
+                                        <p className="mb-4 text-sm text-muted-foreground">Create a service agreement for {client.first_name}.</p>
+                                        <Button size="sm" asChild>
+                                            <Link href={`/operations/service-agreements/create?client_id=${client.id}`}>New Agreement</Link>
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                agreements.map((ag: any) => {
+                                    const budgetPct = ag.total_budget > 0 ? Math.round(((ag.budget_used ?? 0) / ag.total_budget) * 100) : 0;
+                                    const budgetColor = budgetPct > 90 ? 'bg-red-500' : budgetPct > 70 ? 'bg-amber-500' : 'bg-emerald-500';
+                                    return (
+                                        <Card key={ag.id} className={`border-l-4 ${ag.status === 'active' ? 'border-l-emerald-500' : 'border-l-slate-300'}`}>
+                                            <CardContent className="p-4">
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <h3 className="font-medium text-sm">{ag.title}</h3>
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${ag.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{ag.status}</span>
+                                                            {ag.funding_body && <span className="text-xs text-muted-foreground">{ag.funding_body}</span>}
+                                                            {ag.starts_at && <span className="text-xs text-muted-foreground">{new Date(ag.starts_at).toLocaleDateString('en-NZ')} — {ag.ends_at ? new Date(ag.ends_at).toLocaleDateString('en-NZ') : 'Ongoing'}</span>}
+                                                        </div>
+                                                    </div>
+                                                    <Button variant="outline" size="sm" asChild>
+                                                        <Link href={`/operations/service-agreements/${ag.id}`}>View</Link>
+                                                    </Button>
+                                                </div>
+                                                {ag.total_budget > 0 && (
+                                                    <div className="mt-3">
+                                                        <div className="flex items-center justify-between text-xs mb-1">
+                                                            <span className="text-muted-foreground">Budget</span>
+                                                            <span className="font-medium">${new Intl.NumberFormat('en-NZ').format(ag.budget_used ?? 0)} / ${new Intl.NumberFormat('en-NZ').format(ag.total_budget)}</span>
+                                                        </div>
+                                                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                                                            <div className={`h-full rounded-full ${budgetColor} transition-all`} style={{ width: `${Math.min(budgetPct, 100)}%` }} />
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })
+                            )}
+                        </div>
+                    );
+                })()}
 
                 {/* Support Plan merged into Care Plans tab */}
 

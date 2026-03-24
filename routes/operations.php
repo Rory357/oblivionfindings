@@ -57,6 +57,7 @@ use App\Http\Controllers\Operations\CareNoteTemplateController;
 use App\Http\Controllers\Operations\PayrollExportController;
 use App\Http\Controllers\Operations\CalendarSyncController;
 use App\Http\Controllers\Operations\GeofenceController;
+use App\Http\Controllers\Operations\ClientConsentController;
 
 /**
  * Operations Module Routes
@@ -105,6 +106,11 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::get('/clients/{client}/mar/export.csv', [ClientMarController::class, 'exportCsv'])
             ->whereNumber('client')
             ->name('operations.clients.mar.export_csv');
+
+        // Consents (read)
+        Route::get('/clients/{client}/consents', [ClientConsentController::class, 'index'])
+            ->whereNumber('client')
+            ->name('operations.clients.consents.index');
     });
 
     // Client creation
@@ -193,6 +199,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.clients.assessments.update');
         Route::delete('/clients/{client}/assessments/{assessment}', [ClientAssessmentController::class, 'destroy'])
             ->name('operations.clients.assessments.destroy');
+
+        // Consents
+        Route::post('/clients/{client}/consents', [ClientConsentController::class, 'store'])
+            ->whereNumber('client')
+            ->name('operations.clients.consents.store');
+        Route::post('/clients/{client}/consents/{consent}/withdraw', [ClientConsentController::class, 'withdraw'])
+            ->whereNumber('client')
+            ->name('operations.clients.consents.withdraw');
     });
 
     // Client assignments

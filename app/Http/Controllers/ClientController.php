@@ -321,6 +321,32 @@ class ClientController extends Controller
                     ])->values()->toArray(),
                 ] : null,
             ],
+            // Progress notes for client (last 20)
+            'client_progress_notes' => \App\Models\ProgressNote::where('client_id', $client->id)
+                ->with(['author:id,name', 'goal:id,title'])
+                ->orderByDesc('created_at')
+                ->limit(20)
+                ->get(),
+
+            // Service agreements
+            'client_agreements' => \App\Models\ServiceAgreement::where('client_id', $client->id)
+                ->orderByDesc('created_at')
+                ->get(),
+
+            // Active risks
+            'client_risks' => \App\Models\ClientRisk::where('client_id', $client->id)
+                ->where('active', true)
+                ->orderByDesc('severity')
+                ->limit(10)
+                ->get(),
+
+            // Recent incidents (last 5)
+            'client_incidents' => \App\Models\ClientIncident::where('client_id', $client->id)
+                ->with(['reporter:id,name'])
+                ->orderByDesc('occurred_at')
+                ->limit(5)
+                ->get(),
+
             'care_plans_summary' => [
                 'active_plan' => \App\Models\CarePlan::where('client_id', $client->id)
                     ->where('status', 'active')
@@ -366,6 +392,28 @@ class ClientController extends Controller
                         'status' => $r->status,
                     ])->values(),
             ],
+            'consents' => \App\Models\ClientConsent::where('client_id', $client->id)
+                ->with('consentType:id,name,category')
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(fn($c) => [
+                    'id' => $c->id,
+                    'consent_type' => $c->consentType?->name ?? 'Unknown',
+                    'consent_type_category' => $c->consentType?->category,
+                    'status' => $c->status,
+                    'given_at' => $c->given_at?->toISOString(),
+                    'given_method' => $c->given_method,
+                    'expires_at' => $c->expires_at?->toISOString(),
+                    'is_expired' => $c->isExpired(),
+                    'is_expiring_soon' => $c->isExpiringSoon(),
+                    'withdrawn_at' => $c->withdrawn_at?->toISOString(),
+                    'withdrawal_reason' => $c->withdrawal_reason,
+                    'conditions' => $c->conditions,
+                    'special_conditions' => $c->special_conditions,
+                    'capacity_assessed' => $c->capacity_assessed,
+                    'capacity_outcome' => $c->capacity_outcome,
+                    'best_interests_decision' => $c->best_interests_decision,
+                ]),
             'can' => [
                 'edit' => $request->user()?->canDo('clients.update') ?? false,
                 'assign_workers' => $request->user()?->canDo('clients.assignments.update') ?? false,
