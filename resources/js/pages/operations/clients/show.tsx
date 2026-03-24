@@ -1675,54 +1675,124 @@ export default function ClientShow({
                 {tab === 'service_agreements' && (() => {
                     const pageProps = usePage().props as any;
                     const agreements = pageProps.client_agreements ?? [];
+                    const activeAgs = agreements.filter((a: any) => a.status === 'active');
+                    const totalBudget = agreements.reduce((s: number, a: any) => s + (a.total_budget ?? 0), 0);
+                    const totalUsed = agreements.reduce((s: number, a: any) => s + (a.budget_used ?? 0), 0);
+                    const overallPct = totalBudget > 0 ? Math.round((totalUsed / totalBudget) * 100) : 0;
+                    const expiringSoon = agreements.filter((a: any) => a.ends_at && new Date(a.ends_at).getTime() - Date.now() < 30 * 86400000 && new Date(a.ends_at) > new Date()).length;
 
                     return (
                         <div className="space-y-4">
+                            {/* Stats */}
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                    <div className="text-xl font-bold text-violet-700">{agreements.length}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-violet-500">Total</div>
+                                </div>
+                                <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
+                                    <div className="text-xl font-bold text-emerald-700">{activeAgs.length}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-emerald-500">Active</div>
+                                </div>
+                                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                    <div className={`text-xl font-bold ${overallPct > 90 ? 'text-red-600' : overallPct > 70 ? 'text-amber-600' : 'text-violet-700'}`}>{overallPct}%</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-violet-500">Budget Used</div>
+                                </div>
+                                <div className="rounded-xl border p-3 text-center">
+                                    <div className={`text-xl font-bold ${expiringSoon > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{expiringSoon}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Expiring Soon</div>
+                                </div>
+                            </div>
+
+                            {/* Overall Budget Bar */}
+                            {totalBudget > 0 && (
+                                <Card className="border-violet-200 bg-violet-50/30">
+                                    <CardContent className="p-4">
+                                        <div className="flex items-center justify-between mb-2">
+                                            <span className="text-sm font-semibold">Total Funding Overview</span>
+                                            <span className="text-sm font-bold text-violet-700">
+                                                ${new Intl.NumberFormat('en-NZ').format(totalUsed)} / ${new Intl.NumberFormat('en-NZ').format(totalBudget)} NZD
+                                            </span>
+                                        </div>
+                                        <div className="h-4 w-full overflow-hidden rounded-full bg-violet-200">
+                                            <div className={`h-full rounded-full transition-all ${overallPct > 90 ? 'bg-red-500' : overallPct > 70 ? 'bg-amber-500' : 'bg-violet-600'}`} style={{ width: `${Math.min(overallPct, 100)}%` }} />
+                                        </div>
+                                        <div className="mt-1 flex justify-between text-[10px] text-muted-foreground">
+                                            <span>Remaining: ${new Intl.NumberFormat('en-NZ').format(totalBudget - totalUsed)}</span>
+                                            <span>{overallPct}% utilised</span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Header */}
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">Agreements ({agreements.length})</span>
+                                <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700" asChild>
+                                    <Link href={`/operations/service-agreements/create?client_id=${client.id}`}>New Agreement</Link>
+                                </Button>
+                            </div>
+
+                            {/* Agreement Cards */}
                             {agreements.length === 0 ? (
-                                <Card>
+                                <Card className="border-dashed">
                                     <CardContent className="flex flex-col items-center justify-center py-12">
-                                        <p className="mb-1 font-medium">No Service Agreements</p>
-                                        <p className="mb-4 text-sm text-muted-foreground">Create a service agreement for {client.first_name}.</p>
-                                        <Button size="sm" asChild>
-                                            <Link href={`/operations/service-agreements/create?client_id=${client.id}`}>New Agreement</Link>
-                                        </Button>
+                                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
+                                            <DollarSign className="h-7 w-7 text-violet-400" />
+                                        </div>
+                                        <p className="font-medium">No Service Agreements</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">Create a funding agreement for {client.first_name}.</p>
                                     </CardContent>
                                 </Card>
                             ) : (
-                                agreements.map((ag: any) => {
-                                    const budgetPct = ag.total_budget > 0 ? Math.round(((ag.budget_used ?? 0) / ag.total_budget) * 100) : 0;
-                                    const budgetColor = budgetPct > 90 ? 'bg-red-500' : budgetPct > 70 ? 'bg-amber-500' : 'bg-emerald-500';
-                                    return (
-                                        <Card key={ag.id} className={`border-l-4 ${ag.status === 'active' ? 'border-l-emerald-500' : 'border-l-slate-300'}`}>
-                                            <CardContent className="p-4">
-                                                <div className="flex items-center justify-between">
-                                                    <div>
-                                                        <h3 className="font-medium text-sm">{ag.title}</h3>
-                                                        <div className="flex items-center gap-2 mt-1">
-                                                            <span className={`inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${ag.status === 'active' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>{ag.status}</span>
-                                                            {ag.funding_body && <span className="text-xs text-muted-foreground">{ag.funding_body}</span>}
-                                                            {ag.starts_at && <span className="text-xs text-muted-foreground">{new Date(ag.starts_at).toLocaleDateString('en-NZ')} — {ag.ends_at ? new Date(ag.ends_at).toLocaleDateString('en-NZ') : 'Ongoing'}</span>}
+                                <div className="space-y-3">
+                                    {agreements.map((ag: any) => {
+                                        const budgetPct = ag.total_budget > 0 ? Math.round(((ag.budget_used ?? 0) / ag.total_budget) * 100) : 0;
+                                        const budgetColor = budgetPct > 90 ? 'bg-red-500' : budgetPct > 70 ? 'bg-amber-500' : 'bg-emerald-500';
+                                        const isExpiring = ag.ends_at && new Date(ag.ends_at).getTime() - Date.now() < 30 * 86400000 && new Date(ag.ends_at) > new Date();
+                                        const isExpired = ag.ends_at && new Date(ag.ends_at) < new Date();
+                                        return (
+                                            <Card key={ag.id} className={`overflow-hidden border-l-4 transition-all hover:shadow-sm ${ag.status === 'active' ? 'border-l-emerald-500' : 'border-l-slate-300'}`}>
+                                                <CardContent className="p-4">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="flex items-start gap-3">
+                                                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${ag.status === 'active' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                                                                <DollarSign className="h-5 w-5" />
+                                                            </div>
+                                                            <div>
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <span className="text-sm font-semibold">{ag.title}</span>
+                                                                    <Badge className={`border-0 text-[9px] capitalize ${ag.status === 'active' ? 'bg-emerald-100 text-emerald-700' : ag.status === 'draft' ? 'bg-slate-100 text-slate-600' : 'bg-amber-100 text-amber-700'}`}>{ag.status}</Badge>
+                                                                    {ag.funding_body && <Badge variant="outline" className="text-[9px]">{ag.funding_body}</Badge>}
+                                                                    {isExpiring && <Badge className="border-0 bg-amber-100 text-amber-700 text-[9px] animate-pulse">Expiring Soon</Badge>}
+                                                                    {isExpired && <Badge className="border-0 bg-red-100 text-red-700 text-[9px]">Expired</Badge>}
+                                                                </div>
+                                                                <div className="mt-0.5 flex gap-3 text-xs text-muted-foreground">
+                                                                    {ag.reference_number && <span>Ref: {ag.reference_number}</span>}
+                                                                    {ag.starts_at && <span>{new Date(ag.starts_at).toLocaleDateString('en-NZ')} — {ag.ends_at ? new Date(ag.ends_at).toLocaleDateString('en-NZ') : 'Ongoing'}</span>}
+                                                                    {ag.hourly_rate && <span>${ag.hourly_rate}/hr</span>}
+                                                                </div>
+                                                            </div>
                                                         </div>
+                                                        <Button variant="outline" size="sm" className="shrink-0 text-xs" asChild>
+                                                            <Link href={`/operations/service-agreements/${ag.id}`}>View</Link>
+                                                        </Button>
                                                     </div>
-                                                    <Button variant="outline" size="sm" asChild>
-                                                        <Link href={`/operations/service-agreements/${ag.id}`}>View</Link>
-                                                    </Button>
-                                                </div>
-                                                {ag.total_budget > 0 && (
-                                                    <div className="mt-3">
-                                                        <div className="flex items-center justify-between text-xs mb-1">
-                                                            <span className="text-muted-foreground">Budget</span>
-                                                            <span className="font-medium">${new Intl.NumberFormat('en-NZ').format(ag.budget_used ?? 0)} / ${new Intl.NumberFormat('en-NZ').format(ag.total_budget)}</span>
+                                                    {ag.total_budget > 0 && (
+                                                        <div className="mt-3">
+                                                            <div className="flex items-center justify-between text-xs mb-1">
+                                                                <span className="text-muted-foreground">Budget Utilisation</span>
+                                                                <span className="font-semibold">${new Intl.NumberFormat('en-NZ').format(ag.budget_used ?? 0)} / ${new Intl.NumberFormat('en-NZ').format(ag.total_budget)} ({budgetPct}%)</span>
+                                                            </div>
+                                                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                                                <div className={`h-full rounded-full ${budgetColor} transition-all`} style={{ width: `${Math.min(budgetPct, 100)}%` }} />
+                                                            </div>
                                                         </div>
-                                                        <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-                                                            <div className={`h-full rounded-full ${budgetColor} transition-all`} style={{ width: `${Math.min(budgetPct, 100)}%` }} />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                    );
-                                })
+                                                    )}
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
+                                </div>
                             )}
                         </div>
                     );
