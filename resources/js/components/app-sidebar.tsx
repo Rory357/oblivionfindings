@@ -270,7 +270,6 @@ function buildOperationsSubPanelGroups({ can, role, labels }: { can?: any; role?
     if (can?.shifts?.viewAny || role === 'support_worker') scheduling.push({ title: 'Job Board', href: '/operations/job-board', icon: ClipboardList });
     if (can?.rostering?.viewAny) scheduling.push({ title: 'Rostering', href: '/operations/rostering', icon: CalendarDays });
     if (can?.rostering?.viewAny) scheduling.push({ title: 'Availability', href: '/operations/availability', icon: Clock });
-    if (can?.rostering?.viewAny) scheduling.push({ title: 'Qualifications', href: '/operations/qualifications', icon: ShieldCheck });
     if (scheduling.length > 0) groups.push({ label: 'Scheduling', items: scheduling });
 
     // Time & Billing
@@ -283,7 +282,6 @@ function buildOperationsSubPanelGroups({ can, role, labels }: { can?: any; role?
     if (can?.quotes?.viewAny) timeBilling.push({ title: 'Quotes', href: '/operations/quotes', icon: FileText });
     if (can?.billing?.viewAny) timeBilling.push({ title: 'Recurring Charges', href: '/operations/recurring-charges', icon: Receipt });
     if (can?.mileage?.viewAny || can?.mileage?.viewOwn) timeBilling.push({ title: 'Mileage', href: '/operations/mileage', icon: Route });
-    if (can?.payroll?.export) timeBilling.push({ title: 'Payroll Export', href: '/operations/payroll-export', icon: DollarSign });
     if (timeBilling.length > 0) groups.push({ label: 'Time & Billing', items: timeBilling });
 
     // Communications
@@ -291,7 +289,6 @@ function buildOperationsSubPanelGroups({ can, role, labels }: { can?: any; role?
     if (can?.messages?.viewAny || can?.shifts?.viewAny) comms.push({ title: 'Messages', href: '/operations/messages', icon: MessageSquareText });
     if (can?.handovers?.viewAny || can?.shifts?.viewAny) comms.push({ title: 'Handovers', href: '/operations/handovers', icon: GitBranch });
     if (can?.shifts?.viewAny) comms.push({ title: 'Shift Notes', href: '/operations/shift-notes', icon: BookOpen });
-    comms.push({ title: 'Notifications', href: '/operations/notifications', icon: Bell });
     if (comms.length > 0) groups.push({ label: 'Communications', items: comms });
 
     // Tools
@@ -301,7 +298,6 @@ function buildOperationsSubPanelGroups({ can, role, labels }: { can?: any; role?
     if (can?.evv?.viewAny) tools.push({ title: 'EVV', href: '/operations/evv', icon: MapPin });
     if (can?.evv?.viewAny) tools.push({ title: 'Geofences', href: '/operations/geofences', icon: MapPin });
     if (can?.clients?.update) tools.push({ title: 'Family Portal', href: '/operations/family-portal', icon: Users });
-    tools.push({ title: 'Calendar Sync', href: '/operations/calendar-sync', icon: CalendarDays });
     if (tools.length > 0) groups.push({ label: 'Tools', items: tools });
 
     // Reports
