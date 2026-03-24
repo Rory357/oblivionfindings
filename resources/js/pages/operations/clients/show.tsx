@@ -1270,189 +1270,247 @@ export default function ClientShow({
                     const activePlan = summary.active_plan;
                     const recentNotes = summary.recent_notes ?? [];
                     const reviewDue = summary.review_due ?? false;
+                    const goals = activePlan?.goals ?? [];
+                    const goalsCompleted = goals.filter((g: any) => g.status === 'completed').length;
+                    const goalsInProgress = goals.filter((g: any) => g.status === 'in_progress').length;
+                    const goalsPct = goals.length > 0 ? Math.round((goalsCompleted / goals.length) * 100) : 0;
+                    const avgProgress = goals.length > 0 ? Math.round(goals.reduce((s: number, g: any) => s + (g.progress_percentage ?? 0), 0) / goals.length) : 0;
+
+                    // Build sparkline data from goal progress values (simulates progress over time)
+                    const sparklineData = goals.length > 0
+                        ? goals.map((g: any) => g.progress_percentage ?? 0).sort((a: number, b: number) => a - b)
+                        : [0, 0, 0];
+
+                    const content = activePlan?.content ? (typeof activePlan.content === 'string' ? JSON.parse(activePlan.content || '{}') : activePlan.content) : {};
+                    const aboutMe = content.about_me ?? {};
+                    const hasAboutMe = Object.values(aboutMe).some((v: any) => v && String(v).trim());
+                    const reviewDays = activePlan?.next_review_at ? Math.ceil((new Date(activePlan.next_review_at).getTime() - Date.now()) / 86400000) : null;
 
                     return (
                         <div className="space-y-4">
                             {/* Review Due Alert */}
                             {reviewDue && activePlan && (
-                                <div className="flex items-center gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
-                                    <svg className="h-5 w-5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.072 16.5c-.77.833.192 2.5 1.732 2.5z" /></svg>
-                                    <span>Care plan review is due. Please review and update the plan.</span>
-                                    <Button size="sm" variant="outline" className="ml-auto border-amber-300 text-amber-700 hover:bg-amber-100" asChild>
+                                <div className="flex items-center gap-3 rounded-xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                        <ShieldAlert className="h-5 w-5" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-semibold text-amber-800">Care Plan Review Overdue</p>
+                                        <p className="text-xs text-amber-700">This plan is due for review. Please update goals and strategies.</p>
+                                    </div>
+                                    <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" asChild>
                                         <Link href={`/operations/care-plans/${activePlan.id}`}>Start Review</Link>
                                     </Button>
                                 </div>
                             )}
 
-                            {/* Active Plan Summary */}
                             {activePlan ? (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center justify-between text-base">
-                                            <div className="flex items-center gap-2">
-                                                <span>{activePlan.title}</span>
-                                                <span className="inline-flex items-center rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700">Active</span>
-                                                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">{(activePlan.plan_type ?? '').replace(/_/g, ' ')}</span>
-                                            </div>
-                                            <div className="flex gap-2">
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={`/operations/care-plans/${activePlan.id}`}>View Full Plan</Link>
-                                                </Button>
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={`/operations/care-plans?client_id=${client.id}`}>All Plans ({summary.total_plans ?? 0})</Link>
-                                                </Button>
-                                            </div>
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {/* Goals Progress */}
-                                        <div className="mb-4">
-                                            <div className="mb-2 flex items-center justify-between text-sm">
-                                                <span className="font-medium">Goals Progress</span>
-                                                <span className="text-muted-foreground">{activePlan.goals_completed ?? 0} / {activePlan.goals_count ?? 0} completed</span>
-                                            </div>
-                                            <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
-                                                <div
-                                                    className="h-full rounded-full bg-emerald-500 transition-all"
-                                                    style={{ width: `${activePlan.goals_count > 0 ? Math.round(((activePlan.goals_completed ?? 0) / activePlan.goals_count) * 100) : 0}%` }}
-                                                />
-                                            </div>
+                                <>
+                                    {/* Quick Stats */}
+                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                        <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                            <div className="text-2xl font-bold text-violet-700">{goalsPct}%</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-violet-500">Overall Progress</div>
                                         </div>
+                                        <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
+                                            <div className="text-2xl font-bold text-emerald-700">{goalsCompleted}/{goals.length}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-emerald-500">Goals Completed</div>
+                                        </div>
+                                        <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-indigo-50 p-3 text-center">
+                                            <div className="text-2xl font-bold text-blue-700">{goalsInProgress}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-blue-500">In Progress</div>
+                                        </div>
+                                        <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                            <div className={`text-2xl font-bold ${reviewDays !== null && reviewDays < 0 ? 'text-red-600' : 'text-violet-700'}`}>
+                                                {reviewDays !== null ? (reviewDays < 0 ? `${Math.abs(reviewDays)}d` : `${reviewDays}d`) : '—'}
+                                            </div>
+                                            <div className="text-[10px] uppercase tracking-wider text-violet-500">{reviewDays !== null && reviewDays < 0 ? 'Overdue' : 'Until Review'}</div>
+                                        </div>
+                                    </div>
 
-                                        {/* Individual Goals */}
-                                        {(activePlan.goals ?? []).length > 0 && (
-                                            <div className="space-y-2">
-                                                {(activePlan.goals ?? []).slice(0, 5).map((goal: any) => (
-                                                    <div key={goal.id} className="flex items-center gap-3 rounded border p-2 text-sm">
-                                                        <div className={`h-2 w-2 shrink-0 rounded-full ${goal.status === 'completed' ? 'bg-emerald-500' : goal.status === 'in_progress' ? 'bg-blue-500' : 'bg-slate-300'}`} />
-                                                        <span className="flex-1 truncate">{goal.title}</span>
-                                                        <span className={`text-xs font-medium ${goal.priority === 'critical' ? 'text-red-600' : goal.priority === 'high' ? 'text-amber-600' : 'text-slate-500'}`}>{goal.priority}</span>
-                                                        <div className="w-16">
-                                                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
-                                                                <div className={`h-full rounded-full ${goal.status === 'completed' ? 'bg-emerald-500' : 'bg-indigo-500'}`} style={{ width: `${goal.progress_percentage ?? 0}%` }} />
+                                    {/* Main Grid */}
+                                    <div className="grid gap-4 lg:grid-cols-3">
+                                        {/* Left: Goals + Progress Chart */}
+                                        <div className="space-y-4 lg:col-span-2">
+                                            {/* Progress Stream Card */}
+                                            <Card className="overflow-hidden">
+                                                <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-5 py-3">
+                                                    <div className="flex items-center justify-between">
+                                                        <div>
+                                                            <h3 className="text-sm font-semibold text-white">{activePlan.title}</h3>
+                                                            <p className="text-xs text-violet-200">{(activePlan.plan_type ?? '').replace(/_/g, ' ')} · Version {activePlan.version ?? 1}</p>
+                                                        </div>
+                                                        <Button size="sm" variant="outline" className="border-white/30 text-white hover:bg-white/20" asChild>
+                                                            <Link href={`/operations/care-plans/${activePlan.id}`}>View Plan</Link>
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                                <CardContent className="p-5">
+                                                    {/* Progress Area Chart (SVG stream graph) */}
+                                                    <div className="mb-4">
+                                                        <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Goal Progress Distribution</p>
+                                                        <div className="relative h-[100px] w-full overflow-hidden rounded-xl bg-slate-50">
+                                                            <svg viewBox="0 0 400 100" className="h-full w-full" preserveAspectRatio="none">
+                                                                <defs>
+                                                                    <linearGradient id="streamGrad" x1="0" y1="0" x2="0" y2="1">
+                                                                        <stop offset="0%" stopColor="#7c3aed" stopOpacity="0.4" />
+                                                                        <stop offset="100%" stopColor="#7c3aed" stopOpacity="0.05" />
+                                                                    </linearGradient>
+                                                                </defs>
+                                                                {/* Area fill */}
+                                                                <path d={(() => {
+                                                                    const pts = goals.length > 0 ? goals.map((g: any, i: number) => {
+                                                                        const x = goals.length > 1 ? (i / (goals.length - 1)) * 400 : 200;
+                                                                        const y = 100 - (g.progress_percentage ?? 0);
+                                                                        return `${x},${y}`;
+                                                                    }) : ['0,100', '400,100'];
+                                                                    return `M0,100 L${pts.join(' L')} L400,100 Z`;
+                                                                })()} fill="url(#streamGrad)" />
+                                                                {/* Line */}
+                                                                <polyline
+                                                                    points={goals.length > 0 ? goals.map((g: any, i: number) => {
+                                                                        const x = goals.length > 1 ? (i / (goals.length - 1)) * 400 : 200;
+                                                                        const y = 100 - (g.progress_percentage ?? 0);
+                                                                        return `${x},${y}`;
+                                                                    }).join(' ') : '0,100 400,100'}
+                                                                    fill="none" stroke="#7c3aed" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+                                                                />
+                                                                {/* Dots */}
+                                                                {goals.map((g: any, i: number) => {
+                                                                    const x = goals.length > 1 ? (i / (goals.length - 1)) * 400 : 200;
+                                                                    const y = 100 - (g.progress_percentage ?? 0);
+                                                                    return <circle key={g.id} cx={x} cy={y} r="4" fill={g.status === 'completed' ? '#10b981' : '#7c3aed'} stroke="white" strokeWidth="2" />;
+                                                                })}
+                                                            </svg>
+                                                            {/* Labels */}
+                                                            <div className="absolute bottom-1 left-0 right-0 flex justify-between px-2">
+                                                                {goals.slice(0, 5).map((g: any) => (
+                                                                    <span key={g.id} className="text-[8px] text-muted-foreground truncate max-w-[70px]">{g.title.split(' ').slice(0, 2).join(' ')}</span>
+                                                                ))}
                                                             </div>
                                                         </div>
-                                                        <span className="w-8 text-right text-xs text-muted-foreground">{goal.progress_percentage ?? 0}%</span>
                                                     </div>
-                                                ))}
-                                            </div>
-                                        )}
 
-                                        {/* Dates */}
-                                        {(activePlan.starts_at || activePlan.next_review_at) && (
-                                            <div className="mt-3 flex gap-4 text-xs text-muted-foreground">
-                                                {activePlan.starts_at && <span>Started: {new Date(activePlan.starts_at).toLocaleDateString('en-NZ')}</span>}
-                                                {activePlan.next_review_at && (
-                                                    <span className={reviewDue ? 'font-medium text-amber-600' : ''}>
-                                                        Next Review: {new Date(activePlan.next_review_at).toLocaleDateString('en-NZ')}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
+                                                    {/* Goal bars */}
+                                                    <div className="space-y-2">
+                                                        {goals.slice(0, 6).map((goal: any) => (
+                                                            <div key={goal.id} className="flex items-center gap-3">
+                                                                <div className={`h-2.5 w-2.5 shrink-0 rounded-full ${goal.status === 'completed' ? 'bg-emerald-500' : goal.status === 'in_progress' ? 'bg-violet-500' : 'bg-slate-300'}`} />
+                                                                <span className="flex-1 truncate text-xs">{goal.title}</span>
+                                                                <div className="w-24">
+                                                                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                                                        <div className={`h-full rounded-full transition-all ${goal.status === 'completed' ? 'bg-emerald-500' : 'bg-violet-500'}`} style={{ width: `${goal.progress_percentage ?? 0}%` }} />
+                                                                    </div>
+                                                                </div>
+                                                                <span className="w-8 text-right text-[10px] font-semibold tabular-nums">{goal.progress_percentage ?? 0}%</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* About Me */}
+                                            {hasAboutMe && (
+                                                <Card className="overflow-hidden border-violet-200">
+                                                    <div className="bg-gradient-to-r from-rose-400 to-pink-500 px-5 py-2.5">
+                                                        <h3 className="text-sm font-semibold text-white">About {client.first_name}</h3>
+                                                    </div>
+                                                    <CardContent className="space-y-3 p-4">
+                                                        {aboutMe.dreams && (
+                                                            <div className="rounded-lg bg-violet-50 p-3">
+                                                                <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500">Dreams & Aspirations</p>
+                                                                <p className="mt-1 text-sm">{aboutMe.dreams}</p>
+                                                            </div>
+                                                        )}
+                                                        <div className="grid gap-3 sm:grid-cols-2">
+                                                            {aboutMe.likes && (
+                                                                <div className="rounded-lg bg-emerald-50 p-3">
+                                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600">Things I Like</p>
+                                                                    <p className="mt-1 text-sm">{aboutMe.likes}</p>
+                                                                </div>
+                                                            )}
+                                                            {aboutMe.dislikes && (
+                                                                <div className="rounded-lg bg-red-50 p-3">
+                                                                    <p className="text-[10px] font-bold uppercase tracking-wider text-red-500">Things I Don{"'"}t Like</p>
+                                                                    <p className="mt-1 text-sm">{aboutMe.dislikes}</p>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        {aboutMe.how_to_support && (
+                                                            <div className="rounded-lg border border-violet-200 bg-white p-3">
+                                                                <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500">How to Support Me</p>
+                                                                <p className="mt-1 text-sm">{aboutMe.how_to_support}</p>
+                                                            </div>
+                                                        )}
+                                                    </CardContent>
+                                                </Card>
+                                            )}
+                                        </div>
+
+                                        {/* Right: Notes + Plan Info */}
+                                        <div className="space-y-4">
+                                            {/* Plan Info */}
+                                            <Card>
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="text-sm font-semibold">Plan Details</CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="space-y-2 text-xs">
+                                                    <div className="flex justify-between"><span className="text-muted-foreground">Status</span><Badge className="border-0 bg-emerald-100 text-emerald-700 text-[10px]">Active</Badge></div>
+                                                    <div className="flex justify-between"><span className="text-muted-foreground">Type</span><span className="capitalize">{(activePlan.plan_type ?? '').replace(/_/g, ' ')}</span></div>
+                                                    {activePlan.starts_at && <div className="flex justify-between"><span className="text-muted-foreground">Started</span><span>{new Date(activePlan.starts_at).toLocaleDateString('en-NZ')}</span></div>}
+                                                    {activePlan.next_review_at && <div className="flex justify-between"><span className="text-muted-foreground">Next Review</span><span className={reviewDue ? 'font-semibold text-red-600' : ''}>{new Date(activePlan.next_review_at).toLocaleDateString('en-NZ')}</span></div>}
+                                                    <div className="flex justify-between"><span className="text-muted-foreground">Total Plans</span><span>{summary.total_plans ?? 0}</span></div>
+                                                    <div className="pt-2">
+                                                        <Button variant="outline" size="sm" className="w-full text-xs" asChild>
+                                                            <Link href={`/operations/care-plans?client_id=${client.id}`}>View All Plans</Link>
+                                                        </Button>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+
+                                            {/* Recent Notes */}
+                                            <Card>
+                                                <CardHeader className="pb-2">
+                                                    <CardTitle className="flex items-center justify-between text-sm font-semibold">
+                                                        <span>Recent Notes</span>
+                                                        <Button variant="ghost" size="sm" className="h-6 text-[10px] text-violet-600" asChild>
+                                                            <Link href={`/operations/progress-notes?client_id=${client.id}`}>View All</Link>
+                                                        </Button>
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    {recentNotes.length === 0 ? (
+                                                        <p className="py-4 text-center text-xs text-muted-foreground">No notes yet.</p>
+                                                    ) : (
+                                                        <div className="space-y-2">
+                                                            {recentNotes.slice(0, 4).map((note: any) => (
+                                                                <div key={note.id} className={`rounded-lg border p-2.5 text-xs ${note.is_flagged ? 'border-l-4 border-l-red-400' : ''}`}>
+                                                                    <div className="flex items-center justify-between">
+                                                                        <span className="font-medium">{note.author?.name ?? 'Unknown'}</span>
+                                                                        <span className="text-[10px] text-muted-foreground">{new Date(note.created_at).toLocaleDateString('en-NZ')}</span>
+                                                                    </div>
+                                                                    {note.goal && <span className="mt-0.5 inline-block rounded bg-violet-50 px-1 py-0.5 text-[9px] text-violet-600">{note.goal.title}</span>}
+                                                                    <p className="mt-0.5 text-muted-foreground line-clamp-2">{note.content}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    )}
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+                                    </div>
+                                </>
                             ) : (
-                                <Card>
-                                    <CardContent className="flex flex-col items-center justify-center py-12">
-                                        <svg className="mb-3 h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                                        <p className="mb-1 font-medium">No Active Care Plan</p>
-                                        <p className="mb-4 text-sm text-muted-foreground">Create a care plan to start tracking goals and progress for {client.first_name}.</p>
-                                        <Button size="sm" asChild>
+                                <Card className="border-dashed">
+                                    <CardContent className="flex flex-col items-center justify-center py-16">
+                                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
+                                            <Heart className="h-8 w-8 text-violet-400" />
+                                        </div>
+                                        <p className="font-medium">No Active Care Plan</p>
+                                        <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground">Create a care plan to start tracking goals and progress for {client.first_name}.</p>
+                                        <Button size="sm" className="mt-4 bg-violet-600 hover:bg-violet-700" asChild>
                                             <Link href={`/operations/care-plans/create?client_id=${client.id}`}>Create Care Plan</Link>
                                         </Button>
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {/* About Me — from care plan content */}
-                            {activePlan && (() => {
-                                const content = typeof activePlan.content === 'string' ? JSON.parse(activePlan.content || '{}') : (activePlan.content ?? {});
-                                const aboutMe = content.about_me ?? {};
-                                const hasAboutMe = Object.values(aboutMe).some((v: any) => v && String(v).trim());
-                                if (!hasAboutMe) return null;
-                                return (
-                                    <Card className="border-rose-200 bg-rose-50/30">
-                                        <CardHeader>
-                                            <CardTitle className="text-base">About {client.first_name}</CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="space-y-3">
-                                            {aboutMe.dreams && (
-                                                <div>
-                                                    <p className="text-xs font-semibold text-rose-600">Dreams & Aspirations</p>
-                                                    <p className="mt-0.5 text-sm text-slate-700">{aboutMe.dreams}</p>
-                                                </div>
-                                            )}
-                                            <div className="grid gap-3 sm:grid-cols-2">
-                                                {aboutMe.important_to_me && (
-                                                    <div>
-                                                        <p className="text-xs font-semibold text-rose-600">What{"'"}s Important TO Me</p>
-                                                        <p className="mt-0.5 text-sm text-slate-700">{aboutMe.important_to_me}</p>
-                                                    </div>
-                                                )}
-                                                {aboutMe.important_for_me && (
-                                                    <div>
-                                                        <p className="text-xs font-semibold text-rose-600">What{"'"}s Important FOR Me</p>
-                                                        <p className="mt-0.5 text-sm text-slate-700">{aboutMe.important_for_me}</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {aboutMe.ideal_day && (
-                                                <div>
-                                                    <p className="text-xs font-semibold text-rose-600">My Ideal Day</p>
-                                                    <p className="mt-0.5 text-sm text-slate-700">{aboutMe.ideal_day}</p>
-                                                </div>
-                                            )}
-                                            <div className="grid gap-3 sm:grid-cols-2">
-                                                {aboutMe.likes && (
-                                                    <div className="rounded-md bg-emerald-50 p-2">
-                                                        <p className="text-xs font-semibold text-emerald-700">Things I Like</p>
-                                                        <p className="mt-0.5 text-sm text-emerald-800">{aboutMe.likes}</p>
-                                                    </div>
-                                                )}
-                                                {aboutMe.dislikes && (
-                                                    <div className="rounded-md bg-red-50 p-2">
-                                                        <p className="text-xs font-semibold text-red-700">Things I Don{"'"}t Like</p>
-                                                        <p className="mt-0.5 text-sm text-red-800">{aboutMe.dislikes}</p>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {aboutMe.how_to_support && (
-                                                <div>
-                                                    <p className="text-xs font-semibold text-rose-600">How to Support Me Best</p>
-                                                    <p className="mt-0.5 text-sm text-slate-700">{aboutMe.how_to_support}</p>
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })()}
-
-                            {/* Recent Progress Notes */}
-                            {recentNotes.length > 0 && (
-                                <Card>
-                                    <CardHeader>
-                                        <CardTitle className="flex items-center justify-between text-base">
-                                            <span>Recent Progress Notes</span>
-                                            <Button variant="outline" size="sm" asChild>
-                                                <Link href={`/operations/progress-notes?client_id=${client.id}`}>View All</Link>
-                                            </Button>
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-3">
-                                            {recentNotes.map((note: any) => (
-                                                <div key={note.id} className={`rounded-lg border p-3 text-sm ${note.is_flagged ? 'border-l-4 border-l-red-400' : ''}`}>
-                                                    <div className="mb-1 flex items-center justify-between">
-                                                        <span className="font-medium">{note.author?.name ?? 'Unknown'}</span>
-                                                        <span className="text-xs text-muted-foreground">{new Date(note.created_at).toLocaleDateString('en-NZ')}</span>
-                                                    </div>
-                                                    {note.goal && (
-                                                        <span className="mb-1 inline-block rounded bg-indigo-50 px-1.5 py-0.5 text-xs text-indigo-600">Goal: {note.goal.title}</span>
-                                                    )}
-                                                    <p className="text-muted-foreground">{(note.content ?? '').slice(0, 200)}{(note.content ?? '').length > 200 ? '...' : ''}</p>
-                                                </div>
-                                            ))}
-                                        </div>
                                     </CardContent>
                                 </Card>
                             )}
