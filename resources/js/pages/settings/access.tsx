@@ -2,6 +2,13 @@ import HeadingSmall from '@/components/heading-small';
 import InputError from '@/components/input-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+    Card,
+    CardContent,
+    CardDescription,
+    CardHeader,
+    CardTitle,
+} from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -35,7 +42,7 @@ import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
-import { Users, UserPlus, UserMinus } from 'lucide-react';
+import { Users, UserPlus, UserMinus, Shield, Key, Landmark } from 'lucide-react';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Settings', href: '/settings/profile' },
@@ -146,15 +153,13 @@ function BoardMembersSection({
     const availableUsers = users.filter(u => !boardMemberUserIds.has(u.id));
 
     return (
-        <div className="space-y-4">
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-blue-500" />
-                    <div>
-                        <h3 className="text-sm font-semibold">Board Members</h3>
-                        <p className="text-xs text-muted-foreground">
-                            Manage governance board appointments
-                        </p>
+        <Card>
+            <CardHeader className="flex-row items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <Landmark className="h-5 w-5 text-amber-500" />
+                    <div className="flex flex-col gap-1.5">
+                        <CardTitle>Board &amp; Governance</CardTitle>
+                        <CardDescription>Manage board member appointments</CardDescription>
                     </div>
                 </div>
                 <Dialog open={isOpen} onOpenChange={setIsOpen}>
@@ -237,8 +242,9 @@ function BoardMembersSection({
                         </form>
                     </DialogContent>
                 </Dialog>
-            </div>
+            </CardHeader>
 
+            <CardContent>
             {boardMembers.length > 0 ? (
                 <Table>
                     <TableHeader>
@@ -293,7 +299,8 @@ function BoardMembersSection({
                     No board members appointed yet.
                 </div>
             )}
-        </div>
+            </CardContent>
+        </Card>
     );
 }
 
@@ -417,58 +424,122 @@ export default function AccessControlPage(props: Props) {
                         description="Assign roles and set per-user permission overrides. Overrides take precedence over role permissions."
                     />
 
-                    <div className="grid gap-6 lg:grid-cols-[220px_1fr]">
+                    <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
                         {/* User list */}
-                        <div className="space-y-3">
-                            <Input
-                                placeholder="Search users…"
-                                value={query}
-                                onChange={(e) => setQuery(e.target.value)}
-                            />
-
-                            <div className="max-h-[520px] overflow-auto rounded-md border">
-                                {filteredUsers.map((u) => (
-                                    <button
-                                        key={u.id}
-                                        type="button"
-                                        onClick={() => selectUser(u.id)}
-                                        className={`w-full border-b p-3 text-left last:border-b-0 hover:bg-muted ${
-                                            selectedId === u.id
-                                                ? 'bg-muted'
-                                                : ''
-                                        }`}
-                                    >
-                                        <div className="flex items-center justify-between gap-2">
-                                            <div className="text-sm font-medium">
-                                                {u.name}
-                                            </div>
-                                            {!u.approved_at && (
-                                                <Badge variant="secondary">
-                                                    Pending
-                                                </Badge>
-                                            )}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {u.email}
-                                        </div>
-                                    </button>
-                                ))}
-
-                                {filteredUsers.length === 0 && (
-                                    <div className="p-3 text-sm text-muted-foreground">
-                                        No users found.
+                        <Card className="h-fit">
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                        <Users className="h-5 w-5 text-violet-500" />
+                                        <CardTitle className="text-base">Team Members</CardTitle>
                                     </div>
-                                )}
-                            </div>
-                        </div>
+                                    <Badge variant="secondary" className="tabular-nums">
+                                        {props.users.length}
+                                    </Badge>
+                                </div>
+                                <CardDescription>Select a user to manage their access</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <Input
+                                    placeholder="Search users…"
+                                    value={query}
+                                    onChange={(e) => setQuery(e.target.value)}
+                                />
+
+                                <div className="max-h-[520px] overflow-auto rounded-md border">
+                                    {filteredUsers.map((u) => {
+                                        const initials = u.name
+                                            .split(' ')
+                                            .map((w) => w[0])
+                                            .join('')
+                                            .slice(0, 2)
+                                            .toUpperCase();
+                                        const isSelected = selectedId === u.id;
+                                        return (
+                                            <button
+                                                key={u.id}
+                                                type="button"
+                                                onClick={() => selectUser(u.id)}
+                                                className={`w-full border-b p-3 text-left last:border-b-0 transition-colors hover:bg-muted ${
+                                                    isSelected
+                                                        ? 'border-l-2 border-l-violet-500 bg-muted'
+                                                        : 'border-l-2 border-l-transparent'
+                                                }`}
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-violet-100 text-xs font-semibold text-violet-700 dark:bg-violet-900 dark:text-violet-300">
+                                                        {initials}
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center justify-between gap-2">
+                                                            <div className="truncate text-sm font-medium">
+                                                                {u.name}
+                                                            </div>
+                                                            {!u.approved_at && (
+                                                                <Badge variant="secondary" className="shrink-0 text-[10px]">
+                                                                    Pending
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="truncate text-xs text-muted-foreground">
+                                                            {u.email}
+                                                        </div>
+                                                        {u.roles.length > 0 && (
+                                                            <Badge variant="outline" className="mt-1 text-[10px]">
+                                                                {u.roles.map((r) => r.label).join(', ')}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+
+                                    {filteredUsers.length === 0 && (
+                                        <div className="p-3 text-sm text-muted-foreground">
+                                            No users found.
+                                        </div>
+                                    )}
+                                </div>
+                            </CardContent>
+                        </Card>
 
                         {/* Editor */}
-                        <div className="space-y-6">
+                        <Card>
                             {!selected ? (
-                                <div className="rounded-md border p-4 text-sm text-muted-foreground">
+                                <CardContent className="py-8 text-center text-sm text-muted-foreground">
                                     Select a user to edit their access.
-                                </div>
+                                </CardContent>
                             ) : (
+                                <>
+                                <CardHeader>
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <CardTitle className="text-base">{selected.name}</CardTitle>
+                                            <CardDescription>Manage roles and permission overrides</CardDescription>
+                                            <div className="mt-1 text-xs text-muted-foreground">
+                                                {selected.email}
+                                            </div>
+                                        </div>
+
+                                        {selectedIsPending ? (
+                                            <Badge variant="secondary">
+                                                Pending approval
+                                            </Badge>
+                                        ) : (
+                                            <Badge>Active</Badge>
+                                        )}
+                                    </div>
+
+                                    {selectedIsPending && (
+                                        <div className="mt-2 rounded-md border bg-muted/30 p-3 text-sm">
+                                            This user cannot log in yet.
+                                            Assign roles, then approve.
+                                        </div>
+                                    )}
+                                </CardHeader>
+
+                                <CardContent>
                                 <form
                                     onSubmit={(e) => {
                                         e.preventDefault();
@@ -478,36 +549,9 @@ export default function AccessControlPage(props: Props) {
                                     }}
                                     className="space-y-6"
                                 >
-                                    <div className="rounded-md border p-4">
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div>
-                                                <div className="text-sm font-semibold">
-                                                    {selected.name}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">
-                                                    {selected.email}
-                                                </div>
-                                            </div>
-
-                                            {selectedIsPending ? (
-                                                <Badge variant="secondary">
-                                                    Pending approval
-                                                </Badge>
-                                            ) : (
-                                                <Badge>Active</Badge>
-                                            )}
-                                        </div>
-
-                                        {selectedIsPending && (
-                                            <div className="mt-3 rounded-md border bg-muted/30 p-3 text-sm">
-                                                This user cannot log in yet.
-                                                Assign roles, then approve.
-                                            </div>
-                                        )}
-                                    </div>
-
                                     <div className="space-y-3">
-                                        <div className="text-sm font-semibold">
+                                        <div className="flex items-center gap-2 text-sm font-semibold">
+                                            <Shield className="h-4 w-4 text-blue-500" />
                                             Roles
                                         </div>
                                         <InputError
@@ -566,7 +610,8 @@ export default function AccessControlPage(props: Props) {
                                     <Separator />
 
                                     <div className="space-y-3">
-                                        <div className="text-sm font-semibold">
+                                        <div className="flex items-center gap-2 text-sm font-semibold">
+                                            <Key className="h-4 w-4 text-amber-500" />
                                             Permission overrides
                                         </div>
                                         <div className="text-xs text-muted-foreground">
@@ -734,13 +779,22 @@ export default function AccessControlPage(props: Props) {
                                                                                             </SelectTrigger>
                                                                                             <SelectContent>
                                                                                                 <SelectItem value="inherit">
-                                                                                                    Inherit
+                                                                                                    <span className="flex items-center gap-2">
+                                                                                                        <span className="inline-block h-2 w-2 rounded-full bg-gray-400" />
+                                                                                                        Inherit
+                                                                                                    </span>
                                                                                                 </SelectItem>
                                                                                                 <SelectItem value="allow">
-                                                                                                    Allow
+                                                                                                    <span className="flex items-center gap-2">
+                                                                                                        <span className="inline-block h-2 w-2 rounded-full bg-green-500" />
+                                                                                                        Allow
+                                                                                                    </span>
                                                                                                 </SelectItem>
                                                                                                 <SelectItem value="deny">
-                                                                                                    Deny
+                                                                                                    <span className="flex items-center gap-2">
+                                                                                                        <span className="inline-block h-2 w-2 rounded-full bg-red-500" />
+                                                                                                        Deny
+                                                                                                    </span>
                                                                                                 </SelectItem>
                                                                                             </SelectContent>
                                                                                         </Select>
@@ -808,8 +862,10 @@ export default function AccessControlPage(props: Props) {
                                         </Button>
                                     </div>
                                 </form>
+                                </CardContent>
+                                </>
                             )}
-                        </div>
+                        </Card>
                     </div>
 
                     <Separator />
