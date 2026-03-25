@@ -18,17 +18,26 @@ import {
     CheckCircle2,
     Clock,
     DollarSign,
+    ExternalLink,
     FileText,
     History,
+    Landmark,
+    Link2,
+    Mail,
     Milestone,
     Pause,
+    PenLine,
     Pencil,
+    Phone,
     Play,
     Plus,
+    Receipt,
     RefreshCw,
     Send,
     ShieldCheck,
+    Timer,
     Trash2,
+    UserCheck,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -106,6 +115,25 @@ type Props = {
         suspended_at: string | null;
         suspended_reason: string | null;
         resumed_at: string | null;
+        // NZ fields
+        funding_type: string | null;
+        service_level: string | null;
+        allocated_hours_per_week: number | null;
+        total_hours: number | null;
+        hours_used: number | null;
+        hours_remaining: number | null;
+        hours_utilisation_percent: number | null;
+        gst_inclusive: boolean;
+        whaikaha_reference: string | null;
+        support_needs_level: string | null;
+        nasc_assessor_name: string | null;
+        nasc_support_package_ref: string | null;
+        client_signatory: string | null;
+        provider_signatory: string | null;
+        funder_contact_name: string | null;
+        funder_contact_email: string | null;
+        funder_contact_phone: string | null;
+        client_id: number;
     };
     budget_summary?: {
         total_budget: number;
@@ -114,6 +142,41 @@ type Props = {
         budget_remaining: number;
         utilisation_percent: number;
     };
+    funding_claims_summary?: {
+        draft: number;
+        submitted: number;
+        approved: number;
+        total_claimed: number;
+    };
+};
+
+const FUNDING_TYPE_LABELS: Record<string, string> = {
+    if: 'Individualised Funding (IF)',
+    eif: 'Enhanced IF (EIF)',
+    flexible_disability: 'Flexible Disability Support',
+    residential: 'Residential Support',
+    community_participation: 'Community Participation',
+    respite: 'Respite',
+    day_services: 'Day Services',
+    vocational: 'Vocational',
+    other: 'Other',
+};
+
+const SERVICE_LEVEL_LABELS: Record<string, string> = {
+    level_1: 'Level 1',
+    level_2: 'Level 2',
+    level_3: 'Level 3',
+    level_4: 'Level 4',
+    community: 'Community',
+    flexible: 'Flexible',
+};
+
+const SUPPORT_NEEDS_LABELS: Record<string, string> = {
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    very_high: 'Very High',
+    complex: 'Complex',
 };
 
 /* ---------- helpers ---------- */
@@ -672,6 +735,39 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                 </div>
                             ))}
                         </div>
+                        {/* NASC Details */}
+                        {(ag.nasc_assessor_name || ag.nasc_support_package_ref || ag.support_needs_level) && (
+                            <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                                {ag.nasc_assessor_name && (
+                                    <div className="flex items-center gap-3 rounded-lg border border-teal-200 bg-teal-50/50 p-3">
+                                        <UserCheck className="h-4 w-4 text-teal-500" />
+                                        <div>
+                                            <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">NASC Assessor</div>
+                                            <div className="text-sm font-medium">{ag.nasc_assessor_name}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {ag.nasc_support_package_ref && (
+                                    <div className="flex items-center gap-3 rounded-lg border border-teal-200 bg-teal-50/50 p-3">
+                                        <FileText className="h-4 w-4 text-teal-500" />
+                                        <div>
+                                            <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Package Ref</div>
+                                            <div className="text-sm font-medium">{ag.nasc_support_package_ref}</div>
+                                        </div>
+                                    </div>
+                                )}
+                                {ag.support_needs_level && (
+                                    <div className="flex items-center gap-3 rounded-lg border border-teal-200 bg-teal-50/50 p-3">
+                                        <ShieldCheck className="h-4 w-4 text-teal-500" />
+                                        <div>
+                                            <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Support Needs</div>
+                                            <div className="text-sm font-medium">{SUPPORT_NEEDS_LABELS[ag.support_needs_level] ?? ag.support_needs_level}</div>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
                         {/* Terminated/Suspended info */}
                         {ag.terminated_at && (
                             <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3">
@@ -698,6 +794,96 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                         )}
                     </CardContent>
                 </Card>
+
+                {/* Funding Details */}
+                {(ag.funding_type || ag.service_level || ag.whaikaha_reference || (ag.total_hours != null && Number(ag.total_hours) > 0)) && (
+                    <Card className="mt-4">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                <Landmark className="h-4 w-4 text-indigo-500" />
+                                Funding Details
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                {/* Left: details */}
+                                <div className="space-y-3 sm:col-span-2">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        {ag.funding_type && (
+                                            <span className="inline-flex items-center rounded-full border border-indigo-200 bg-indigo-50 px-2.5 py-0.5 text-xs font-medium text-indigo-700">
+                                                {FUNDING_TYPE_LABELS[ag.funding_type] ?? ag.funding_type}
+                                            </span>
+                                        )}
+                                        {ag.service_level && (
+                                            <span className="inline-flex items-center rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-xs font-medium text-violet-700">
+                                                {SERVICE_LEVEL_LABELS[ag.service_level] ?? ag.service_level}
+                                            </span>
+                                        )}
+                                        <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium ${ag.gst_inclusive ? 'border-emerald-200 bg-emerald-50 text-emerald-700' : 'border-slate-200 bg-slate-50 text-slate-600'}`}>
+                                            {ag.gst_inclusive ? 'GST Inclusive' : 'GST Exclusive'}
+                                        </span>
+                                    </div>
+                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                                        {ag.allocated_hours_per_week != null && Number(ag.allocated_hours_per_week) > 0 && (
+                                            <div className="rounded-lg border bg-muted/30 p-3">
+                                                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Hours / Week</div>
+                                                <div className="text-lg font-semibold tabular-nums">{ag.allocated_hours_per_week}</div>
+                                            </div>
+                                        )}
+                                        {ag.total_hours != null && Number(ag.total_hours) > 0 && (
+                                            <div className="rounded-lg border bg-muted/30 p-3">
+                                                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Total Hours</div>
+                                                <div className="text-lg font-semibold tabular-nums">{ag.total_hours}</div>
+                                            </div>
+                                        )}
+                                        {ag.hours_remaining != null && (
+                                            <div className="rounded-lg border bg-muted/30 p-3">
+                                                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Hours Remaining</div>
+                                                <div className="text-lg font-semibold tabular-nums text-emerald-600">{ag.hours_remaining}</div>
+                                            </div>
+                                        )}
+                                        {ag.whaikaha_reference && (
+                                            <div className="rounded-lg border bg-muted/30 p-3">
+                                                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Whaikaha Ref</div>
+                                                <div className="text-sm font-medium">{ag.whaikaha_reference}</div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                                {/* Right: hours donut */}
+                                {ag.total_hours != null && Number(ag.total_hours) > 0 && (
+                                    <div className="flex flex-col items-center justify-center">
+                                        {(() => {
+                                            const hoursUsed = ag.hours_used ?? 0;
+                                            const hoursTotal = Number(ag.total_hours);
+                                            const hoursRemaining = Math.max(hoursTotal - hoursUsed, 0);
+                                            const hoursPct = ag.hours_utilisation_percent ?? (hoursTotal > 0 ? Math.round((hoursUsed / hoursTotal) * 100) : 0);
+                                            return (
+                                                <>
+                                                    <DonutChart
+                                                        segments={[
+                                                            {
+                                                                label: 'Used',
+                                                                value: hoursUsed,
+                                                                color: hoursPct > 90 ? OPS_COLORS.danger : hoursPct > 70 ? OPS_COLORS.warning : OPS_COLORS.primary,
+                                                            },
+                                                            { label: 'Remaining', value: hoursRemaining, color: '#e2e8f0' },
+                                                        ]}
+                                                        centerValue={`${hoursPct}%`}
+                                                        centerLabel="HOURS"
+                                                        size={110}
+                                                        strokeWidth={14}
+                                                    />
+                                                    <p className="mt-1.5 text-[10px] text-muted-foreground">{hoursUsed} / {hoursTotal} hrs</p>
+                                                </>
+                                            );
+                                        })()}
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Budget + Line Items */}
                 <div className="mt-4 grid gap-4 lg:grid-cols-3">
@@ -927,6 +1113,112 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                 ))}
                             </div>
                         )}
+                    </CardContent>
+                </Card>
+
+                {/* Signatories */}
+                {(ag.client_signatory || ag.provider_signatory || ag.funder_contact_name) && (
+                    <Card className="mt-4">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                <PenLine className="h-4 w-4 text-violet-500" />
+                                Signatories & Contacts
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-3 sm:grid-cols-3">
+                                {ag.client_signatory && (
+                                    <div className="rounded-lg border bg-muted/30 p-3">
+                                        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Client Signatory</div>
+                                        <div className="text-sm font-medium">{ag.client_signatory}</div>
+                                    </div>
+                                )}
+                                {ag.provider_signatory && (
+                                    <div className="rounded-lg border bg-muted/30 p-3">
+                                        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Provider Signatory</div>
+                                        <div className="text-sm font-medium">{ag.provider_signatory}</div>
+                                    </div>
+                                )}
+                                {ag.funder_contact_name && (
+                                    <div className="rounded-lg border bg-muted/30 p-3">
+                                        <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Funder Contact</div>
+                                        <div className="text-sm font-medium">{ag.funder_contact_name}</div>
+                                        {ag.funder_contact_email && (
+                                            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                                <Mail className="h-3 w-3" /> {ag.funder_contact_email}
+                                            </div>
+                                        )}
+                                        {ag.funder_contact_phone && (
+                                            <div className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                                                <Phone className="h-3 w-3" /> {ag.funder_contact_phone}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Related Records */}
+                <Card className="mt-4">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                            <Link2 className="h-4 w-4 text-violet-500" />
+                            Related Records
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            {/* Funding Claims */}
+                            <div className="rounded-lg border p-4">
+                                <div className="flex items-center gap-2">
+                                    <Receipt className="h-4 w-4 text-indigo-500" />
+                                    <h4 className="text-sm font-semibold">Funding Claims</h4>
+                                </div>
+                                <p className="mt-2 text-2xl font-bold tabular-nums">{ag.funding_claims_count ?? 0}</p>
+                                <p className="text-[10px] text-muted-foreground">total claims</p>
+                                <div className="mt-3 flex flex-wrap gap-2">
+                                    <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+                                        <Link href={`/operations/funding/claims?agreement_id=${ag.id}`}>
+                                            <ExternalLink className="mr-1 h-3 w-3" /> View Claims
+                                        </Link>
+                                    </Button>
+                                    <Button asChild size="sm" className="h-7 bg-indigo-600 text-xs hover:bg-indigo-700">
+                                        <Link href={`/operations/funding/claims/create?agreement_id=${ag.id}`}>
+                                            <Plus className="mr-1 h-3 w-3" /> Create Claim
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </div>
+
+                            {/* Linked Shifts */}
+                            <div className="rounded-lg border border-dashed p-4">
+                                <div className="flex items-center gap-2">
+                                    <Timer className="h-4 w-4 text-slate-400" />
+                                    <h4 className="text-sm font-semibold text-muted-foreground">Linked Shifts</h4>
+                                </div>
+                                <p className="mt-2 text-xs text-muted-foreground">
+                                    Shift integration coming soon &mdash; shifts will automatically track budget usage.
+                                </p>
+                            </div>
+
+                            {/* Invoices */}
+                            <div className="rounded-lg border p-4">
+                                <div className="flex items-center gap-2">
+                                    <DollarSign className="h-4 w-4 text-emerald-500" />
+                                    <h4 className="text-sm font-semibold">Invoices</h4>
+                                </div>
+                                <p className="mt-2 text-xs text-muted-foreground">View related invoices for this client.</p>
+                                <div className="mt-3">
+                                    <Button asChild size="sm" variant="outline" className="h-7 text-xs">
+                                        <Link href={`/operations/invoices?client_id=${ag.client_id ?? ag.client?.id}`}>
+                                            <ExternalLink className="mr-1 h-3 w-3" /> View Invoices
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </div>
+                        </div>
                     </CardContent>
                 </Card>
 

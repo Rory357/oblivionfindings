@@ -124,6 +124,23 @@ class ServiceAgreementController extends Controller
             'terms' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'status' => ['nullable', 'string', 'in:draft,active,expired,cancelled'],
+            // NZ Funding Details
+            'funding_type' => ['nullable', 'string', 'max:100'],
+            'service_level' => ['nullable', 'string', 'max:100'],
+            'allocated_hours_per_week' => ['nullable', 'numeric', 'min:0'],
+            'total_hours' => ['nullable', 'numeric', 'min:0'],
+            'gst_inclusive' => ['nullable', 'boolean'],
+            'whaikaha_reference' => ['nullable', 'string', 'max:255'],
+            'support_needs_level' => ['nullable', 'string', 'max:100'],
+            // NASC Details
+            'nasc_assessor_name' => ['nullable', 'string', 'max:255'],
+            'nasc_support_package_ref' => ['nullable', 'string', 'max:255'],
+            // Signatories & Contacts
+            'client_signatory' => ['nullable', 'string', 'max:255'],
+            'provider_signatory' => ['nullable', 'string', 'max:255'],
+            'funder_contact_name' => ['nullable', 'string', 'max:255'],
+            'funder_contact_email' => ['nullable', 'email', 'max:255'],
+            'funder_contact_phone' => ['nullable', 'string', 'max:50'],
         ]);
 
         $agreement = ServiceAgreement::create([
@@ -150,6 +167,23 @@ class ServiceAgreementController extends Controller
             'notes' => $data['notes'] ?? null,
             'status' => $data['status'] ?? 'draft',
             'created_by' => $auth->id,
+            // NZ Funding Details
+            'funding_type' => $data['funding_type'] ?? null,
+            'service_level' => $data['service_level'] ?? null,
+            'allocated_hours_per_week' => $data['allocated_hours_per_week'] ?? null,
+            'total_hours' => $data['total_hours'] ?? null,
+            'gst_inclusive' => $data['gst_inclusive'] ?? true,
+            'whaikaha_reference' => $data['whaikaha_reference'] ?? null,
+            'support_needs_level' => $data['support_needs_level'] ?? null,
+            // NASC Details
+            'nasc_assessor_name' => $data['nasc_assessor_name'] ?? null,
+            'nasc_support_package_ref' => $data['nasc_support_package_ref'] ?? null,
+            // Signatories & Contacts
+            'client_signatory' => $data['client_signatory'] ?? null,
+            'provider_signatory' => $data['provider_signatory'] ?? null,
+            'funder_contact_name' => $data['funder_contact_name'] ?? null,
+            'funder_contact_email' => $data['funder_contact_email'] ?? null,
+            'funder_contact_phone' => $data['funder_contact_phone'] ?? null,
         ]);
 
         return redirect()->route('operations.service_agreements.show', $agreement)
@@ -183,6 +217,24 @@ class ServiceAgreementController extends Controller
         $allocatedFromItems = $agreement->lineItems->sum('budget_allocated');
         $effectiveUsed = $budgetFromItems > 0 ? $budgetFromItems : (float) $agreement->budget_used;
 
+        // Hours utilisation
+        $totalHours = (float) ($agreement->total_hours ?? 0);
+        $hoursUsed = (float) ($agreement->hours_used ?? 0);
+        $hoursRemaining = $totalHours > 0 ? round($totalHours - $hoursUsed, 1) : null;
+        $hoursUtilisationPercent = $totalHours > 0 ? round(($hoursUsed / $totalHours) * 100, 1) : null;
+
+        $agreement->hours_remaining = $hoursRemaining;
+        $agreement->hours_utilisation_percent = $hoursUtilisationPercent;
+
+        // Funding claims summary by status
+        $claimsByStatus = $agreement->fundingClaims->groupBy('status');
+        $fundingClaimsSummary = [
+            'draft' => ($claimsByStatus->get('draft') ?? collect())->count(),
+            'submitted' => ($claimsByStatus->get('submitted') ?? collect())->count(),
+            'approved' => ($claimsByStatus->get('approved') ?? collect())->count(),
+            'total_claimed' => round((float) $agreement->fundingClaims->sum('amount'), 2),
+        ];
+
         return inertia('operations/service-agreements/Show', [
             'agreement' => $agreement,
             'budget_summary' => [
@@ -194,6 +246,7 @@ class ServiceAgreementController extends Controller
                     ? round(($effectiveUsed / (float) $agreement->total_budget) * 100, 1)
                     : 0,
             ],
+            'funding_claims_summary' => $fundingClaimsSummary,
         ]);
     }
 
@@ -248,6 +301,23 @@ class ServiceAgreementController extends Controller
             'terms' => ['nullable', 'string'],
             'notes' => ['nullable', 'string'],
             'status' => ['nullable', 'string', 'in:draft,active,expired,cancelled'],
+            // NZ Funding Details
+            'funding_type' => ['nullable', 'string', 'max:100'],
+            'service_level' => ['nullable', 'string', 'max:100'],
+            'allocated_hours_per_week' => ['nullable', 'numeric', 'min:0'],
+            'total_hours' => ['nullable', 'numeric', 'min:0'],
+            'gst_inclusive' => ['nullable', 'boolean'],
+            'whaikaha_reference' => ['nullable', 'string', 'max:255'],
+            'support_needs_level' => ['nullable', 'string', 'max:100'],
+            // NASC Details
+            'nasc_assessor_name' => ['nullable', 'string', 'max:255'],
+            'nasc_support_package_ref' => ['nullable', 'string', 'max:255'],
+            // Signatories & Contacts
+            'client_signatory' => ['nullable', 'string', 'max:255'],
+            'provider_signatory' => ['nullable', 'string', 'max:255'],
+            'funder_contact_name' => ['nullable', 'string', 'max:255'],
+            'funder_contact_email' => ['nullable', 'email', 'max:255'],
+            'funder_contact_phone' => ['nullable', 'string', 'max:50'],
         ]);
 
         $agreement->update($data);

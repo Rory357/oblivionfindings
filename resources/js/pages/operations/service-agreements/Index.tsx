@@ -26,6 +26,7 @@ type Agreement = {
     status: string;
     agreement_type: string;
     funding_body: string | null;
+    funding_type: string | null;
     starts_at: string | null;
     ends_at: string | null;
     total_budget: number;
@@ -34,6 +35,18 @@ type Agreement = {
     budget_utilisation_percent: number;
     client: { id: number; first_name: string; last_name: string } | null;
     line_items_count: number;
+};
+
+const FUNDING_TYPE_LABELS: Record<string, string> = {
+    if: 'IF',
+    eif: 'EIF',
+    flexible_disability: 'Flexible',
+    residential: 'Residential',
+    community_participation: 'Community',
+    respite: 'Respite',
+    day_services: 'Day Services',
+    vocational: 'Vocational',
+    other: 'Other',
 };
 
 type ClientOption = { id: number; first_name: string; last_name: string };
@@ -209,6 +222,11 @@ export default function ServiceAgreementsIndex({
                                         </Link>
                                         <Badge variant={STATUS_VARIANTS[ag.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">{ag.status?.replace(/_/g, ' ')}</Badge>
                                         <Badge variant="outline" className="h-4 px-1.5 text-[9px]">{TYPE_LABELS[ag.agreement_type] ?? ag.agreement_type}</Badge>
+                                        {ag.funding_type && (
+                                            <Badge variant="outline" className="h-4 border-indigo-200 bg-indigo-50 px-1.5 text-[9px] text-indigo-700">
+                                                {FUNDING_TYPE_LABELS[ag.funding_type] ?? ag.funding_type}
+                                            </Badge>
+                                        )}
                                         {ag.reference_number && <span className="text-[10px] text-muted-foreground">#{ag.reference_number}</span>}
                                     </div>
                                     <div className="mt-1 flex items-center gap-3 text-xs text-muted-foreground">

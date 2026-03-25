@@ -2,6 +2,7 @@ import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,7 +21,11 @@ import {
     ClipboardList,
     DollarSign,
     FileText,
+    Landmark,
+    Mail,
+    PenLine,
     Upload,
+    UserCheck,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
@@ -61,6 +66,35 @@ const AGREEMENT_TYPES: Record<string, string> = {
     other: 'Other',
 };
 
+const FUNDING_TYPES: Record<string, string> = {
+    if: 'Individualised Funding (IF)',
+    eif: 'Enhanced IF (EIF)',
+    flexible_disability: 'Flexible Disability Support',
+    residential: 'Residential Support',
+    community_participation: 'Community Participation',
+    respite: 'Respite',
+    day_services: 'Day Services',
+    vocational: 'Vocational',
+    other: 'Other',
+};
+
+const SERVICE_LEVELS: Record<string, string> = {
+    level_1: 'Level 1',
+    level_2: 'Level 2',
+    level_3: 'Level 3',
+    level_4: 'Level 4',
+    community: 'Community',
+    flexible: 'Flexible',
+};
+
+const SUPPORT_NEEDS_LEVELS: Record<string, string> = {
+    low: 'Low',
+    medium: 'Medium',
+    high: 'High',
+    very_high: 'Very High',
+    complex: 'Complex',
+};
+
 /* ---------- Component ---------- */
 
 export default function ServiceAgreementCreate({ clients }: Props) {
@@ -91,6 +125,23 @@ export default function ServiceAgreementCreate({ clients }: Props) {
         daily_rate: '',
         terms: '',
         notes: '',
+        // NZ Funding Details
+        funding_type: '',
+        service_level: '',
+        allocated_hours_per_week: '',
+        total_hours: '',
+        gst_inclusive: true,
+        whaikaha_reference: '',
+        support_needs_level: '',
+        // NASC Details
+        nasc_assessor_name: '',
+        nasc_support_package_ref: '',
+        // Signatories & Contacts
+        client_signatory: '',
+        provider_signatory: '',
+        funder_contact_name: '',
+        funder_contact_email: '',
+        funder_contact_phone: '',
     });
 
     const [docFiles, setDocFiles] = useState<File[]>([]);
@@ -301,7 +352,140 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         </CardContent>
                     </Card>
 
-                    {/* Section 5: Terms & Notes */}
+                    {/* Section 5: NZ Funding Details */}
+                    <Card>
+                        <CardContent className="p-5">
+                            <SectionHeader
+                                icon={Landmark}
+                                iconBg="bg-indigo-100 text-indigo-600"
+                                title="NZ Funding Details"
+                                description="Whaikaha / DSS funding type and service level details."
+                            />
+                            <div className="space-y-4">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="space-y-1.5">
+                                        <Label>Funding Type</Label>
+                                        <Select value={data.funding_type} onValueChange={(v) => setData('funding_type', v)}>
+                                            <SelectTrigger><SelectValue placeholder="Select funding type" /></SelectTrigger>
+                                            <SelectContent>
+                                                {Object.entries(FUNDING_TYPES).map(([value, label]) => (
+                                                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Service Level</Label>
+                                        <Select value={data.service_level} onValueChange={(v) => setData('service_level', v)}>
+                                            <SelectTrigger><SelectValue placeholder="Select service level" /></SelectTrigger>
+                                            <SelectContent>
+                                                {Object.entries(SERVICE_LEVELS).map(([value, label]) => (
+                                                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-3">
+                                    <div className="space-y-1.5">
+                                        <Label>Allocated Hours / Week</Label>
+                                        <Input type="number" step="0.5" min="0" value={data.allocated_hours_per_week} onChange={(e) => setData('allocated_hours_per_week', e.target.value)} placeholder="0" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Total Hours (Agreement Period)</Label>
+                                        <Input type="number" step="0.5" min="0" value={data.total_hours} onChange={(e) => setData('total_hours', e.target.value)} placeholder="0" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Support Needs Level</Label>
+                                        <Select value={data.support_needs_level} onValueChange={(v) => setData('support_needs_level', v)}>
+                                            <SelectTrigger><SelectValue placeholder="Select level" /></SelectTrigger>
+                                            <SelectContent>
+                                                {Object.entries(SUPPORT_NEEDS_LEVELS).map(([value, label]) => (
+                                                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="space-y-1.5">
+                                        <Label>Whaikaha Reference</Label>
+                                        <Input value={data.whaikaha_reference} onChange={(e) => setData('whaikaha_reference', e.target.value)} placeholder="e.g. WHK-2026-0001" />
+                                    </div>
+                                    <div className="flex items-center gap-3 pt-6">
+                                        <Checkbox
+                                            id="gst_inclusive"
+                                            checked={data.gst_inclusive}
+                                            onCheckedChange={(v) => setData('gst_inclusive', v === true)}
+                                        />
+                                        <Label htmlFor="gst_inclusive" className="cursor-pointer">GST Inclusive (15%)</Label>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Section 6: NASC Details */}
+                    <Card>
+                        <CardContent className="p-5">
+                            <SectionHeader
+                                icon={UserCheck}
+                                iconBg="bg-teal-100 text-teal-600"
+                                title="NASC Details"
+                                description="Needs Assessment and Service Coordination information."
+                            />
+                            <div className="grid gap-4 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <Label>NASC Assessor Name</Label>
+                                    <Input value={data.nasc_assessor_name} onChange={(e) => setData('nasc_assessor_name', e.target.value)} placeholder="e.g. Jane Smith" />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label>NASC Support Package Ref</Label>
+                                    <Input value={data.nasc_support_package_ref} onChange={(e) => setData('nasc_support_package_ref', e.target.value)} placeholder="e.g. SP-2026-0001" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Section 7: Signatories & Contacts */}
+                    <Card>
+                        <CardContent className="p-5">
+                            <SectionHeader
+                                icon={PenLine}
+                                iconBg="bg-violet-100 text-violet-600"
+                                title="Signatories & Contacts"
+                                description="Agreement signatories and funder contact details."
+                            />
+                            <div className="space-y-4">
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="space-y-1.5">
+                                        <Label>Client Signatory</Label>
+                                        <Input value={data.client_signatory} onChange={(e) => setData('client_signatory', e.target.value)} placeholder="Person signing for the client (e.g. welfare guardian)" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Provider Signatory</Label>
+                                        <Input value={data.provider_signatory} onChange={(e) => setData('provider_signatory', e.target.value)} placeholder="Person signing for your organisation" />
+                                    </div>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-3">
+                                    <div className="space-y-1.5">
+                                        <Label>Funder Contact Name</Label>
+                                        <Input value={data.funder_contact_name} onChange={(e) => setData('funder_contact_name', e.target.value)} placeholder="e.g. John Doe" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="flex items-center gap-1.5"><Mail className="h-3.5 w-3.5 text-muted-foreground" />Funder Contact Email</Label>
+                                        <Input type="email" value={data.funder_contact_email} onChange={(e) => setData('funder_contact_email', e.target.value)} placeholder="funder@example.co.nz" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Funder Contact Phone</Label>
+                                        <Input type="tel" value={data.funder_contact_phone} onChange={(e) => setData('funder_contact_phone', e.target.value)} placeholder="e.g. 04 123 4567" />
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Section 8: Terms & Notes */}
                     <Card>
                         <CardContent className="p-5">
                             <SectionHeader
@@ -323,7 +507,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         </CardContent>
                     </Card>
 
-                    {/* Section 6: Document Upload */}
+                    {/* Section 9: Document Upload */}
                     <Card>
                         <CardContent className="p-5">
                             <SectionHeader
