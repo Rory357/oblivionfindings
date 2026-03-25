@@ -2,7 +2,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
 import {
     Activity,
@@ -69,9 +71,15 @@ export default function Modules() {
         setBetaFeatures((prev) => prev.map((f) => (f.id === id ? { ...f, enabled: !f.enabled } : f)));
     }
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Settings', href: '/settings' },
+        { title: 'Modules & Features' },
+    ];
+
     return (
-        <SettingsLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Modules & Features" />
+            <SettingsLayout>
 
             <div className="space-y-6">
                 {/* Active Modules */}
@@ -154,6 +162,7 @@ export default function Modules() {
                     <Button className="bg-violet-600 hover:bg-violet-700">Save Changes</Button>
                 </div>
             </div>
-        </SettingsLayout>
+            </SettingsLayout>
+        </AppLayout>
     );
 }

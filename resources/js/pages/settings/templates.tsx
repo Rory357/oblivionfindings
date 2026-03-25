@@ -12,7 +12,9 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
 import { Mail, MessageSquare, Pencil } from 'lucide-react';
 import { useState } from 'react';
@@ -96,9 +98,15 @@ export default function Templates() {
         setTimeout(() => setTestSent(false), 3000);
     }
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Settings', href: '/settings' },
+        { title: 'Templates' },
+    ];
+
     return (
-        <SettingsLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Email & SMS Templates" />
+            <SettingsLayout>
 
             <div className="space-y-6">
                 {/* Email Templates */}
@@ -263,6 +271,7 @@ export default function Templates() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </SettingsLayout>
+            </SettingsLayout>
+        </AppLayout>
     );
 }

@@ -3,7 +3,9 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
+import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 
 type Props = {
@@ -25,9 +27,15 @@ export default function NotificationPreferences({
 
     const keys = Object.values(groups).flat();
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Settings', href: '/settings' },
+        { title: 'Notifications' },
+    ];
+
     return (
-        <SettingsLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Notification preferences" />
+            <SettingsLayout>
             <div className="space-y-6">
                 <div className="flex items-start justify-between gap-4">
                     <HeadingSmall
@@ -116,6 +124,7 @@ export default function NotificationPreferences({
                     </Button>
                 </div>
             </div>
-        </SettingsLayout>
+            </SettingsLayout>
+        </AppLayout>
     );
 }

@@ -20,7 +20,9 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
 import { Activity, Check, Copy, Key, Plus, Trash2, Webhook } from 'lucide-react';
 import { useState } from 'react';
@@ -187,9 +189,15 @@ export default function Api() {
         setWebhookEvents((prev) => (prev.includes(event) ? prev.filter((e) => e !== event) : [...prev, event]));
     }
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Settings', href: '/settings' },
+        { title: 'API & Webhooks' },
+    ];
+
     return (
-        <SettingsLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="API & Webhooks" />
+            <SettingsLayout>
 
             <div className="space-y-6">
                 {/* API Keys */}
@@ -472,6 +480,7 @@ export default function Api() {
                     )}
                 </DialogContent>
             </Dialog>
-        </SettingsLayout>
+            </SettingsLayout>
+        </AppLayout>
     );
 }

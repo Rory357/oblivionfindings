@@ -19,7 +19,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
 import { Archive, Download, Lock, Shield } from 'lucide-react';
 import { useState } from 'react';
@@ -74,9 +76,15 @@ export default function Data() {
         setSelectedModules([]);
     }
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Settings', href: '/settings' },
+        { title: 'Data & Privacy' },
+    ];
+
     return (
-        <SettingsLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Data & Privacy" />
+            <SettingsLayout>
 
             <div className="space-y-6">
                 {/* Data Export */}
@@ -290,6 +298,7 @@ export default function Data() {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </SettingsLayout>
+            </SettingsLayout>
+        </AppLayout>
     );
 }
