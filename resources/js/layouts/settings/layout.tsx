@@ -80,6 +80,13 @@ const navSections: NavSection[] = [
         ],
     },
     {
+        label: 'Security',
+        permission: 'settings.manageAccess',
+        items: [
+            { icon: Shield, title: 'Security Settings', href: '/settings/security' },
+        ],
+    },
+    {
         label: 'Notifications',
         items: [
             { icon: Bell, title: 'My Notifications', href: '/settings/notifications' },

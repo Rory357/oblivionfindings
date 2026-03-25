@@ -92,7 +92,7 @@ class UsersController extends Controller
         // Get all roles for filter dropdown
         $roles = Role::orderByDesc('level')->get(['id', 'name', 'label', 'level', 'type']);
 
-        return Inertia::render('system/users/Index', [
+        return Inertia::render('settings/users/index', [
             'users' => $users,
             'filters' => [
                 'search' => $search,

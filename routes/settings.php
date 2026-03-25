@@ -160,8 +160,123 @@ Route::middleware('auth')->group(function () {
         Route::post('/settings/users/{target}/suspend', [\App\Http\Controllers\System\UsersController::class, 'suspend'])->name('settings.users.suspend');
     });
 
+    // Security Settings
+    Route::middleware('permission:settings.access.manage')->group(function () {
+        Route::get('/settings/security', function () {
+            $keys = [
+                'security.password_min_length',
+                'security.password_require_uppercase',
+                'security.password_require_numbers',
+                'security.password_require_symbols',
+                'security.password_expiry_days',
+                'security.session_timeout_minutes',
+                'security.max_login_attempts',
+                'security.lockout_duration_minutes',
+                'security.force_2fa',
+            ];
+            $settings = \App\Models\AppSetting::whereIn('key', $keys)
+                ->pluck('value', 'key')
+                ->mapWithKeys(fn ($value, $key) => [str_replace('security.', '', $key) => $value]);
+
+            $totalUsers = \App\Models\User::count();
+            $twoFaEnabled = \App\Models\User::whereNotNull('two_factor_confirmed_at')->count();
+
+            return inertia('settings/security', [
+                'settings' => $settings,
+                'twoFaStats' => [
+                    'enabled' => $twoFaEnabled,
+                    'total' => $totalUsers,
+                ],
+            ]);
+        })->name('settings.security');
+
+        Route::put('/settings/security', function (\Illuminate\Http\Request $request) {
+            $fields = [
+                'password_min_length', 'password_require_uppercase', 'password_require_numbers',
+                'password_require_symbols', 'password_expiry_days', 'session_timeout_minutes',
+                'max_login_attempts', 'lockout_duration_minutes', 'force_2fa',
+            ];
+            collect($request->only($fields))->each(fn ($value, $key) =>
+                \App\Models\AppSetting::updateOrCreate(
+                    ['key' => "security.{$key}"],
+                    ['value' => $value]
+                )
+            );
+
+            return back()->with('success', 'Security settings updated.');
+        })->name('settings.security.update');
+    });
+
     // Audit Logs
     Route::get('/settings/audit-logs', function (\Illuminate\Http\Request $request) {
-        return inertia('audit/index', []);
+        $search = $request->query('search', '');
+        $userFilter = $request->query('user', 'all');
+        $moduleFilter = $request->query('module', 'all');
+        $actionFilter = $request->query('action', 'all');
+        $dateFrom = $request->query('date_from');
+        $dateTo = $request->query('date_to');
+
+        $query = \App\Models\AuditLog::query()
+            ->with('user:id,name,email')
+            ->latest();
+
+        if ($search) {
+            $query->where('action', 'like', "%{$search}%");
+        }
+        if ($userFilter !== 'all' && is_numeric($userFilter)) {
+            $query->where('user_id', (int) $userFilter);
+        }
+        if ($moduleFilter !== 'all') {
+            $query->where('auditable_type', 'like', "%{$moduleFilter}%");
+        }
+        if ($actionFilter !== 'all') {
+            $query->where('action', $actionFilter);
+        }
+        if ($dateFrom) {
+            $query->whereDate('created_at', '>=', $dateFrom);
+        }
+        if ($dateTo) {
+            $query->whereDate('created_at', '<=', $dateTo);
+        }
+
+        $events = $query->paginate(30)->through(fn ($log) => [
+            'id' => $log->id,
+            'description' => $log->action,
+            'event' => strtolower(explode('.', $log->action)[0] ?? $log->action),
+            'module' => $log->auditable_type ? strtolower(class_basename($log->auditable_type)) : null,
+            'subject_type' => $log->auditable_type ? class_basename($log->auditable_type) : null,
+            'subject_id' => $log->auditable_id,
+            'properties' => $log->meta ?? [],
+            'causer' => $log->user ? [
+                'id' => $log->user->id,
+                'name' => $log->user->name,
+                'email' => $log->user->email,
+            ] : null,
+            'created_at' => $log->created_at?->toISOString(),
+        ]);
+
+        $users = \App\Models\User::orderBy('name')->get(['id', 'name']);
+
+        $today = now()->startOfDay();
+        $weekStart = now()->startOfWeek();
+        $monthStart = now()->startOfMonth();
+
+        return inertia('settings/audit-logs', [
+            'events' => $events,
+            'users' => $users,
+            'filters' => [
+                'search' => $search,
+                'user' => $userFilter,
+                'module' => $moduleFilter,
+                'action' => $actionFilter,
+                'date_from' => $dateFrom,
+                'date_to' => $dateTo,
+            ],
+            'stats' => [
+                'today' => \App\Models\AuditLog::where('created_at', '>=', $today)->count(),
+                'this_week' => \App\Models\AuditLog::where('created_at', '>=', $weekStart)->count(),
+                'this_month' => \App\Models\AuditLog::where('created_at', '>=', $monthStart)->count(),
+            ],
+        ]);
     })->middleware('permission:audit.viewAny')->name('settings.audit');
 });
