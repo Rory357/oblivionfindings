@@ -1950,7 +1950,7 @@ class SettingsControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->post('/settings/service-contexts', [
                 'name' => 'Emergency Respite',
-                'type' => 'respite',
+                'type' => 'emergency_respite',
                 'is_active' => true,
             ])
             ->assertRedirect()
@@ -1958,7 +1958,7 @@ class SettingsControllerTest extends TestCase
 
         $this->assertDatabaseHas('service_contexts', [
             'name' => 'Emergency Respite',
-            'type' => 'respite',
+            'type' => 'emergency_respite',
         ]);
     }
 

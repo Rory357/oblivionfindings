@@ -18,6 +18,8 @@ return [
             'code' => $t->value,
             'label' => $t->label(),
             'description' => $t->description(),
+            'category' => $t->category(),
+            'colour' => $t->colour(),
         ])
         ->values()
         ->all(),

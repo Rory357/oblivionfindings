@@ -61,7 +61,7 @@ class SystemCatalogSeeder extends Seeder
         );
 
         ServiceContext::firstOrCreate(
-            ['type' => ServiceType::Respite->value, 'site_id' => $siteB->id],
+            ['type' => ServiceType::PlannedRespite->value, 'site_id' => $siteB->id],
             [
                 'name' => 'Respite (Harbour)',
                 'description' => 'Short stay / respite care',
