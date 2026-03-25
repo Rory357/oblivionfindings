@@ -93,4 +93,14 @@ Route::middleware(['auth'])->group(function () {
             ->middleware('permission:controlRoom.alerts.manage')
             ->name('control-room.integration-alerts.create-incident');
     });
+
+    // Placeholder routes for future Control Room features
+    $placeholders = ['map', 'shifts', 'alerts', 'escalations', 'incidents', 'broadcast', 'messaging', 'stats'];
+    foreach ($placeholders as $feature) {
+        Route::get("/control-room/{$feature}", function () use ($feature) {
+            return inertia('control-room/Placeholder', [
+                'feature' => ucfirst(str_replace('-', ' ', $feature)),
+            ]);
+        })->name("control-room.{$feature}");
+    }
 });

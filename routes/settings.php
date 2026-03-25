@@ -147,4 +147,21 @@ Route::middleware('auth')->group(function () {
         Route::put('/hardware/{hardware}/room', [UnifiSettingsController::class, 'assignHardwareRoom']);
         Route::put('/defaults', [UnifiSettingsController::class, 'updateDefaults']);
     });
+
+    // User Management (moved from System)
+    Route::middleware('permission:settings.access.manage')->group(function () {
+        Route::get('/settings/users', [\App\Http\Controllers\System\UsersController::class, 'index'])->name('settings.users.index');
+        Route::get('/settings/users/create', [\App\Http\Controllers\System\UsersController::class, 'create'])->name('settings.users.create');
+        Route::post('/settings/users', [\App\Http\Controllers\System\UsersController::class, 'store'])->name('settings.users.store');
+        Route::get('/settings/users/{target}', [\App\Http\Controllers\System\UsersController::class, 'show'])->name('settings.users.show');
+        Route::put('/settings/users/{target}', [\App\Http\Controllers\System\UsersController::class, 'update'])->name('settings.users.update');
+        Route::delete('/settings/users/{target}', [\App\Http\Controllers\System\UsersController::class, 'destroy'])->name('settings.users.destroy');
+        Route::post('/settings/users/{target}/approve', [\App\Http\Controllers\System\UsersController::class, 'approve'])->name('settings.users.approve');
+        Route::post('/settings/users/{target}/suspend', [\App\Http\Controllers\System\UsersController::class, 'suspend'])->name('settings.users.suspend');
+    });
+
+    // Audit Logs
+    Route::get('/settings/audit-logs', function (\Illuminate\Http\Request $request) {
+        return inertia('audit/index', []);
+    })->middleware('permission:audit.viewAny')->name('settings.audit');
 });

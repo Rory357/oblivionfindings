@@ -14,14 +14,18 @@ const dashboard = () => '/dashboard';
 import { Link, usePage } from '@inertiajs/react';
 import {
     Activity,
+    AlertCircle,
     AlertOctagon,
     AlertTriangle,
     ArrowLeftRight,
+    ArrowUpCircle,
+    BarChart3,
     Bell,
     BookOpen,
     Briefcase,
     Building2,
     CalendarDays,
+    Car,
     CheckCircle2,
     ChevronRight,
     ClipboardCheck,
@@ -34,9 +38,12 @@ import {
     Home,
     Key,
     Landmark,
+    LayoutDashboard,
     LayoutGrid,
     Map,
     MapPin,
+    Megaphone,
+    MessageSquare,
     MessageSquareText,
     Package,
     PieChart,
@@ -199,11 +206,11 @@ function buildIconNavItems({
         items.push({ id: 'governance', icon: Landmark, label: 'Governance', subPanel: true, dividerAfter: true });
     }
 
-    // System
-    const hasSystem = can?.reports?.viewAny || can?.audit?.viewAny || can?.settings?.manageAccess;
-    if (hasSystem) {
-        items.push({ id: 'system', icon: FileText, label: 'System', subPanel: true });
-    }
+    // Reporting
+    items.push({ id: 'reporting', icon: PieChart, label: 'Reporting', subPanel: true });
+
+    // Control Room
+    items.push({ id: 'control-room', icon: Radio, label: 'Control Room', subPanel: true });
 
     return items;
 }
@@ -249,6 +256,8 @@ function buildOperationsSubPanelGroups({ can, role, labels }: { can?: any; role?
     const overview: NavItem[] = [
         { title: 'Dashboard', href: '/operations', icon: LayoutGrid },
         { title: 'Activity Feed', href: '/operations/activity', icon: Activity },
+        { title: 'Timeline', href: '/operations/timeline', icon: Clock },
+        { title: 'Summaries', href: '/operations/summaries', icon: FileText },
     ];
     groups.push({ label: 'Overview', items: overview });
 
@@ -483,6 +492,92 @@ function buildSystemSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.settings?.manageAccess) items.push({ title: 'Settings', href: '/settings', icon: Settings });
     if (can?.settings?.rbacManage) items.push({ title: 'Roles & Permissions', href: '/settings/roles', icon: Shield });
     return [{ label: 'System', items }];
+}
+
+function buildReportingSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    const groups: SubPanelGroup[] = [];
+
+    groups.push({
+        label: 'Overview',
+        items: [
+            { title: 'Reports Dashboard', href: '/reports', icon: BarChart3 },
+        ],
+    });
+
+    groups.push({
+        label: 'Operations',
+        items: [
+            { title: 'Operations Reports', href: '/operations/reports', icon: ClipboardList },
+            { title: 'Shift Reports', href: '/reports/shifts', icon: Clock },
+        ],
+    });
+
+    groups.push({
+        label: 'Sites & Facilities',
+        items: [
+            { title: 'Site Reports', href: '/sites/reports', icon: Building2 },
+        ],
+    });
+
+    groups.push({
+        label: 'HR & People',
+        items: [
+            { title: 'HR Reports', href: '/hr/reports', icon: Users },
+            { title: 'Report Builder', href: '/hr/reports/builder', icon: Wrench },
+        ],
+    });
+
+    groups.push({
+        label: 'Fleet & Assets',
+        items: [
+            { title: 'Fleet Reports', href: '/fleet-assets/reports', icon: Car },
+        ],
+    });
+
+    groups.push({
+        label: 'Governance',
+        items: [
+            { title: 'Board Reports', href: '/governance/reports/board-monthly', icon: FileText },
+            { title: 'Compliance', href: '/governance/reports/compliance-status', icon: ShieldCheck },
+        ],
+    });
+
+    return groups.filter(g => g.items.length > 0);
+}
+
+function buildControlRoomSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    return [
+        {
+            label: 'Live Monitoring',
+            items: [
+                { title: 'Dashboard', href: '/control-room', icon: LayoutDashboard },
+                { title: 'Live Map', href: '/control-room/map', icon: Map },
+                { title: 'Active Shifts', href: '/control-room/shifts', icon: Clock },
+            ],
+        },
+        {
+            label: 'Alerts & Escalations',
+            items: [
+                { title: 'Active Alerts', href: '/control-room/alerts', icon: AlertTriangle },
+                { title: 'Escalation Queue', href: '/control-room/escalations', icon: ArrowUpCircle },
+                { title: 'Incident Tracker', href: '/control-room/incidents', icon: AlertCircle },
+            ],
+        },
+        {
+            label: 'Communications',
+            items: [
+                { title: 'Broadcast', href: '/control-room/broadcast', icon: Megaphone },
+                { title: 'Staff Messaging', href: '/control-room/messaging', icon: MessageSquare },
+            ],
+        },
+        {
+            label: 'Analytics',
+            items: [
+                { title: 'Real-time Stats', href: '/control-room/stats', icon: Activity },
+                { title: 'Reports', href: '/control-room/reports', icon: FileText },
+            ],
+        },
+    ];
 }
 
 function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
@@ -750,7 +845,8 @@ export function AppSidebar() {
         'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
         hr: buildHrSubPanelGroups({ can }),
         governance: buildGovernanceSubPanelGroups({ can }),
-        system: buildSystemSubPanelGroups({ can }),
+        reporting: buildReportingSubPanelGroups({ can }),
+        'control-room': buildControlRoomSubPanelGroups({ can }),
     }), [can, role]);
 
     const toggleSubPanel = useCallback((id: string) => {
@@ -934,7 +1030,8 @@ export function AppSidebarMobile({
         'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
         hr: buildHrSubPanelGroups({ can }),
         governance: buildGovernanceSubPanelGroups({ can }),
-        system: buildSystemSubPanelGroups({ can }),
+        reporting: buildReportingSubPanelGroups({ can }),
+        'control-room': buildControlRoomSubPanelGroups({ can }),
     }), [can, role]);
 
     const [expandedId, setExpandedId] = useState<string | null>(null);
