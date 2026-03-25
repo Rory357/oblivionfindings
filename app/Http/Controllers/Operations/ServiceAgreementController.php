@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Operations;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ServiceAgreement;
+use App\Models\ServiceAgreementLineItem;
+use App\Models\ServiceAgreementRate;
 use App\Models\ServiceAgreementStatusChange;
 use Illuminate\Http\Request;
 
@@ -16,22 +18,50 @@ class ServiceAgreementController extends Controller
         abort_unless($auth && $auth->canDo('service_agreements.viewAny'), 403);
 
         $data = $request->validate([
+            'q' => ['nullable', 'string', 'max:255'],
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-            'status' => ['nullable', 'string', 'in:draft,active,expired,cancelled'],
+            'status' => ['nullable', 'string', 'in:draft,pending_approval,active,under_review,renewed,expired,terminated,suspended'],
             'agreement_type' => ['nullable', 'string'],
-            'expiring_soon' => ['nullable', 'boolean'],
+            'funding_type' => ['nullable', 'string'],
         ]);
 
-        $agreements = ServiceAgreement::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+        $baseQuery = ServiceAgreement::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
+
+        // Compute stats from the org-scoped base (before user filters)
+        $stats = [
+            'total' => (clone $baseQuery)->count(),
+            'active' => (clone $baseQuery)->where('status', 'active')->count(),
+            'pending_approval' => (clone $baseQuery)->where('status', 'pending_approval')->count(),
+            'expiring_soon' => (clone $baseQuery)->where('status', 'active')
+                ->where('ends_at', '<=', now()->addDays(30))
+                ->where('ends_at', '>=', now())
+                ->count(),
+            'total_budget' => (float) (clone $baseQuery)->sum('total_budget'),
+            'total_used' => (float) ServiceAgreementLineItem::query()
+                ->whereIn('service_agreement_id', (clone $baseQuery)->select('id'))
+                ->sum('budget_used'),
+            'draft_count' => (clone $baseQuery)->where('status', 'draft')->count(),
+        ];
+
+        $agreements = (clone $baseQuery)
             ->with(['client:id,first_name,last_name', 'creator:id,name'])
             ->withCount(['lineItems', 'fundingClaims'])
+            ->when(!empty($data['q']), function ($q) use ($data) {
+                $search = $data['q'];
+                $q->where(function ($sub) use ($search) {
+                    $sub->where('title', 'like', "%{$search}%")
+                        ->orWhere('reference_number', 'like', "%{$search}%")
+                        ->orWhere('funding_body', 'like', "%{$search}%")
+                        ->orWhere('funding_reference', 'like', "%{$search}%");
+                });
+            })
             ->when(!empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
             ->when(!empty($data['status']), fn ($q) => $q->where('status', $data['status']))
             ->when(!empty($data['agreement_type']), fn ($q) => $q->where('agreement_type', $data['agreement_type']))
-            ->when(!empty($data['expiring_soon']), fn ($q) => $q->expiringSoon())
+            ->when(!empty($data['funding_type']), fn ($q) => $q->where('funding_type', $data['funding_type']))
             ->orderByDesc('updated_at')
-            ->paginate(20)
+            ->paginate(15)
             ->withQueryString();
 
         // Append the budget_utilisation_percent accessor to each item
@@ -48,7 +78,8 @@ class ServiceAgreementController extends Controller
         return inertia('operations/service-agreements/Index', [
             'agreements' => $agreements,
             'clients' => $clients,
-            'filters' => $request->only(['client_id', 'status', 'agreement_type', 'expiring_soon']),
+            'stats' => $stats,
+            'filters' => $request->only(['q', 'client_id', 'status', 'agreement_type', 'funding_type']),
         ]);
     }
 
@@ -136,6 +167,7 @@ class ServiceAgreementController extends Controller
                 'client:id,first_name,last_name',
                 'creator:id,name',
                 'lineItems',
+                'rates',
                 'fundingClaims' => fn ($q) => $q->orderByDesc('created_at'),
                 'fundingClaims.submitter:id,name',
                 'statusChanges' => fn ($q) => $q->orderByDesc('created_at'),
@@ -229,7 +261,9 @@ class ServiceAgreementController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
 
-        $agreement = ServiceAgreement::findOrFail($serviceAgreement);
+        $agreement = ServiceAgreement::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($serviceAgreement);
 
         $data = $request->validate([
             'status' => ['required', 'in:draft,pending_approval,active,under_review,renewed,expired,terminated,suspended'],
@@ -378,5 +412,144 @@ class ServiceAgreementController extends Controller
 
         return redirect()->route('operations.service_agreements.index')
             ->with('success', 'Service agreement deleted.');
+    }
+
+    // -------------------------------------------------------------------------
+    // Line Item CRUD
+    // -------------------------------------------------------------------------
+
+    public function storeLineItem(Request $request, $serviceAgreement)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
+
+        $agreement = ServiceAgreement::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($serviceAgreement);
+
+        $data = $request->validate([
+            'description' => ['required', 'string', 'max:255'],
+            'unit_price' => ['required', 'numeric', 'min:0'],
+            'unit' => ['required', 'string', 'in:hour,night,day,km,trip,flat'],
+            'quantity' => ['nullable', 'numeric', 'min:0'],
+            'budget_allocated' => ['nullable', 'numeric', 'min:0'],
+            'ndis_line_item_code' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $agreement->lineItems()->create([
+            'organization_id' => $auth->organization_id,
+            'description' => $data['description'],
+            'unit_price' => $data['unit_price'],
+            'unit' => $data['unit'],
+            'quantity' => $data['quantity'] ?? null,
+            'budget_allocated' => $data['budget_allocated'] ?? ($data['unit_price'] * ($data['quantity'] ?? 0)),
+            'ndis_line_item_code' => $data['ndis_line_item_code'] ?? null,
+            'category' => $data['category'] ?? null,
+        ]);
+
+        return redirect()->back()->with('success', 'Line item added.');
+    }
+
+    public function updateLineItem(Request $request, $serviceAgreement, $lineItem)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
+
+        $agreement = ServiceAgreement::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($serviceAgreement);
+
+        $item = ServiceAgreementLineItem::where('service_agreement_id', $agreement->id)
+            ->findOrFail($lineItem);
+
+        $data = $request->validate([
+            'description' => ['required', 'string', 'max:255'],
+            'unit_price' => ['required', 'numeric', 'min:0'],
+            'unit' => ['required', 'string', 'in:hour,night,day,km,trip,flat'],
+            'quantity' => ['nullable', 'numeric', 'min:0'],
+            'budget_allocated' => ['nullable', 'numeric', 'min:0'],
+            'ndis_line_item_code' => ['nullable', 'string', 'max:100'],
+            'category' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $item->update([
+            'description' => $data['description'],
+            'unit_price' => $data['unit_price'],
+            'unit' => $data['unit'],
+            'quantity' => $data['quantity'] ?? null,
+            'budget_allocated' => $data['budget_allocated'] ?? ($data['unit_price'] * ($data['quantity'] ?? 0)),
+            'ndis_line_item_code' => $data['ndis_line_item_code'] ?? null,
+            'category' => $data['category'] ?? null,
+        ]);
+
+        return redirect()->back()->with('success', 'Line item updated.');
+    }
+
+    public function destroyLineItem(Request $request, $serviceAgreement, $lineItem)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
+
+        $agreement = ServiceAgreement::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($serviceAgreement);
+
+        $item = ServiceAgreementLineItem::where('service_agreement_id', $agreement->id)
+            ->findOrFail($lineItem);
+
+        $item->delete();
+
+        return redirect()->back()->with('success', 'Line item deleted.');
+    }
+
+    // -------------------------------------------------------------------------
+    // Rate CRUD
+    // -------------------------------------------------------------------------
+
+    public function storeRate(Request $request, $serviceAgreement)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
+
+        $agreement = ServiceAgreement::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($serviceAgreement);
+
+        $data = $request->validate([
+            'rate_type' => ['required', 'string', 'in:weekday,evening,weekend,public_holiday,sleepover,active_night,overtime,travel,mileage'],
+            'rate' => ['required', 'numeric', 'min:0'],
+            'unit' => ['required', 'string', 'in:hour,night,km,trip,flat'],
+            'effective_from' => ['nullable', 'date'],
+            'effective_to' => ['nullable', 'date', 'after_or_equal:effective_from'],
+        ]);
+
+        $agreement->rates()->create([
+            'organization_id' => $auth->organization_id,
+            'rate_type' => $data['rate_type'],
+            'rate' => $data['rate'],
+            'unit' => $data['unit'],
+            'effective_from' => $data['effective_from'] ?? null,
+            'effective_to' => $data['effective_to'] ?? null,
+        ]);
+
+        return redirect()->back()->with('success', 'Rate added.');
+    }
+
+    public function destroyRate(Request $request, $serviceAgreement, $rate)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
+
+        $agreement = ServiceAgreement::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($serviceAgreement);
+
+        $rateModel = ServiceAgreementRate::where('service_agreement_id', $agreement->id)
+            ->findOrFail($rate);
+
+        $rateModel->delete();
+
+        return redirect()->back()->with('success', 'Rate deleted.');
     }
 }

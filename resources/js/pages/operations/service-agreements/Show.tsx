@@ -5,7 +5,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -22,9 +24,11 @@ import {
     Pause,
     Pencil,
     Play,
+    Plus,
     RefreshCw,
     Send,
     ShieldCheck,
+    Trash2,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -42,6 +46,16 @@ type LineItem = {
     budget_used: number;
     category: string | null;
     ndis_line_item_code: string | null;
+};
+
+type Rate = {
+    id: number;
+    rate_type: string;
+    rate: number;
+    unit: string;
+    effective_from: string | null;
+    effective_to: string | null;
+    notes: string | null;
 };
 
 type StatusChange = {
@@ -78,6 +92,7 @@ type Props = {
         client: { id: number; first_name: string; last_name: string } | null;
         creator: { id: number; name: string } | null;
         line_items: LineItem[];
+        rates: Rate[];
         funding_claims_count: number;
         status_changes: StatusChange[];
         nasc_assessment_date: string | null;
@@ -315,6 +330,233 @@ function TransitionDialog({
     );
 }
 
+/* ---------- Line Item Dialog ---------- */
+
+const UNIT_OPTIONS = ['hour', 'night', 'day', 'km', 'trip', 'flat'] as const;
+
+function LineItemDialog({
+    open,
+    onOpenChange,
+    agreementId,
+    lineItem,
+}: {
+    open: boolean;
+    onOpenChange: (v: boolean) => void;
+    agreementId: number;
+    lineItem: LineItem | null;
+}) {
+    const isEdit = lineItem !== null;
+    const form = useForm({
+        description: lineItem?.description ?? '',
+        unit_price: lineItem?.unit_price?.toString() ?? '',
+        unit: lineItem?.unit ?? 'hour',
+        quantity: lineItem?.quantity?.toString() ?? '',
+        budget_allocated: lineItem?.budget_allocated?.toString() ?? '',
+        category: lineItem?.category ?? '',
+        ndis_line_item_code: lineItem?.ndis_line_item_code ?? '',
+    });
+
+    // Reset form when lineItem changes
+    const [prevItem, setPrevItem] = useState<LineItem | null>(null);
+    if (lineItem !== prevItem) {
+        setPrevItem(lineItem);
+        form.setData({
+            description: lineItem?.description ?? '',
+            unit_price: lineItem?.unit_price?.toString() ?? '',
+            unit: lineItem?.unit ?? 'hour',
+            quantity: lineItem?.quantity?.toString() ?? '',
+            budget_allocated: lineItem?.budget_allocated?.toString() ?? '',
+            category: lineItem?.category ?? '',
+            ndis_line_item_code: lineItem?.ndis_line_item_code ?? '',
+        });
+    }
+
+    // Auto-calculate budget_allocated
+    const unitPrice = parseFloat(form.data.unit_price) || 0;
+    const quantity = parseFloat(form.data.quantity) || 0;
+    const autoAllocated = (unitPrice * quantity).toFixed(2);
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        const payload = {
+            ...form.data,
+            budget_allocated: form.data.budget_allocated || autoAllocated,
+        };
+
+        if (isEdit) {
+            router.put(`/operations/service-agreements/${agreementId}/line-items/${lineItem.id}`, payload, {
+                preserveScroll: true,
+                onSuccess: () => { form.reset(); onOpenChange(false); },
+            });
+        } else {
+            router.post(`/operations/service-agreements/${agreementId}/line-items`, payload, {
+                preserveScroll: true,
+                onSuccess: () => { form.reset(); onOpenChange(false); },
+            });
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>{isEdit ? 'Edit Line Item' : 'Add Line Item'}</DialogTitle>
+                    <DialogDescription>{isEdit ? 'Update the line item details.' : 'Add a new line item to this agreement.'}</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <Label htmlFor="li-description">Description *</Label>
+                        <Input id="li-description" value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} placeholder="Service description" />
+                        {form.errors.description && <p className="mt-1 text-xs text-red-500">{form.errors.description}</p>}
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="li-unit-price">Unit Price *</Label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                                <Input id="li-unit-price" className="pl-7" type="number" step="0.01" min="0" value={form.data.unit_price} onChange={(e) => form.setData('unit_price', e.target.value)} />
+                            </div>
+                            {form.errors.unit_price && <p className="mt-1 text-xs text-red-500">{form.errors.unit_price}</p>}
+                        </div>
+                        <div>
+                            <Label htmlFor="li-unit">Unit *</Label>
+                            <Select value={form.data.unit} onValueChange={(v) => form.setData('unit', v)}>
+                                <SelectTrigger id="li-unit"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {UNIT_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="li-quantity">Quantity</Label>
+                            <Input id="li-quantity" type="number" step="0.01" min="0" value={form.data.quantity} onChange={(e) => form.setData('quantity', e.target.value)} />
+                        </div>
+                        <div>
+                            <Label htmlFor="li-budget">Budget Allocated</Label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                                <Input id="li-budget" className="pl-7" type="number" step="0.01" min="0" value={form.data.budget_allocated || autoAllocated} onChange={(e) => form.setData('budget_allocated', e.target.value)} placeholder={autoAllocated} />
+                            </div>
+                            {unitPrice > 0 && quantity > 0 && <p className="mt-1 text-[10px] text-muted-foreground">Auto: ${autoAllocated}</p>}
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="li-category">Category</Label>
+                            <Input id="li-category" value={form.data.category} onChange={(e) => form.setData('category', e.target.value)} placeholder="e.g. Core Support" />
+                        </div>
+                        <div>
+                            <Label htmlFor="li-ndis">NDIS Line Item Code</Label>
+                            <Input id="li-ndis" value={form.data.ndis_line_item_code} onChange={(e) => form.setData('ndis_line_item_code', e.target.value)} placeholder="Optional" />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="submit" disabled={form.processing}>{form.processing ? 'Saving...' : isEdit ? 'Update' : 'Add'}</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/* ---------- Rate Dialog ---------- */
+
+const RATE_TYPE_OPTIONS = [
+    { value: 'weekday', label: 'Weekday' },
+    { value: 'evening', label: 'Evening' },
+    { value: 'weekend', label: 'Weekend' },
+    { value: 'public_holiday', label: 'Public Holiday' },
+    { value: 'sleepover', label: 'Sleepover' },
+    { value: 'active_night', label: 'Active Night' },
+    { value: 'overtime', label: 'Overtime' },
+    { value: 'travel', label: 'Travel' },
+    { value: 'mileage', label: 'Mileage' },
+] as const;
+
+function RateDialog({
+    open,
+    onOpenChange,
+    agreementId,
+}: {
+    open: boolean;
+    onOpenChange: (v: boolean) => void;
+    agreementId: number;
+}) {
+    const form = useForm({
+        rate_type: 'weekday',
+        rate: '',
+        unit: 'hour',
+        effective_from: '',
+        effective_to: '',
+    });
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        router.post(`/operations/service-agreements/${agreementId}/rates`, form.data, {
+            preserveScroll: true,
+            onSuccess: () => { form.reset(); onOpenChange(false); },
+        });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Add Rate</DialogTitle>
+                    <DialogDescription>Define a rate for this service agreement.</DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <Label htmlFor="rate-type">Rate Type *</Label>
+                        <Select value={form.data.rate_type} onValueChange={(v) => form.setData('rate_type', v)}>
+                            <SelectTrigger id="rate-type"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                {RATE_TYPE_OPTIONS.map((rt) => <SelectItem key={rt.value} value={rt.value}>{rt.label}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="rate-amount">Rate *</Label>
+                            <div className="relative">
+                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                                <Input id="rate-amount" className="pl-7" type="number" step="0.01" min="0" value={form.data.rate} onChange={(e) => form.setData('rate', e.target.value)} />
+                            </div>
+                            {form.errors.rate && <p className="mt-1 text-xs text-red-500">{form.errors.rate}</p>}
+                        </div>
+                        <div>
+                            <Label htmlFor="rate-unit">Unit *</Label>
+                            <Select value={form.data.unit} onValueChange={(v) => form.setData('unit', v)}>
+                                <SelectTrigger id="rate-unit"><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    {UNIT_OPTIONS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <Label htmlFor="rate-from">Effective From</Label>
+                            <Input id="rate-from" type="date" value={form.data.effective_from} onChange={(e) => form.setData('effective_from', e.target.value)} />
+                        </div>
+                        <div>
+                            <Label htmlFor="rate-to">Effective To</Label>
+                            <Input id="rate-to" type="date" value={form.data.effective_to} onChange={(e) => form.setData('effective_to', e.target.value)} />
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="submit" disabled={form.processing}>{form.processing ? 'Saving...' : 'Add Rate'}</Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 /* ---------- Main Component ---------- */
 
 export default function ServiceAgreementShow({ agreement: ag, budget_summary }: Props) {
@@ -325,6 +567,17 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
     const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
     const transitions = getTransitions(ag.status);
     const rejectForm = useForm({ reason: '' });
+
+    // Line Item CRUD state
+    const [lineItemDialogOpen, setLineItemDialogOpen] = useState(false);
+    const [editingLineItem, setEditingLineItem] = useState<LineItem | null>(null);
+    const [deleteLineItemDialogOpen, setDeleteLineItemDialogOpen] = useState(false);
+    const [deletingLineItemId, setDeletingLineItemId] = useState<number | null>(null);
+
+    // Rate CRUD state
+    const [rateDialogOpen, setRateDialogOpen] = useState(false);
+    const [deleteRateDialogOpen, setDeleteRateDialogOpen] = useState(false);
+    const [deletingRateId, setDeletingRateId] = useState<number | null>(null);
 
     function openTransition(t: TransitionDef) {
         setActiveTransition(t);
@@ -522,10 +775,15 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                     {/* Line Items */}
                     <Card className="lg:col-span-2">
                         <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <FileText className="h-4 w-4 text-violet-500" />
-                                Line Items ({ag.line_items?.length ?? 0})
-                            </CardTitle>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                    <FileText className="h-4 w-4 text-violet-500" />
+                                    Line Items ({ag.line_items?.length ?? 0})
+                                </CardTitle>
+                                <Button size="sm" variant="outline" onClick={() => { setEditingLineItem(null); setLineItemDialogOpen(true); }}>
+                                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Line Item
+                                </Button>
+                            </div>
                         </CardHeader>
                         <CardContent>
                             {!ag.line_items || ag.line_items.length === 0 ? (
@@ -542,12 +800,24 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                                         <div className="text-sm font-medium">{item.description}</div>
                                                         <div className="text-[11px] text-muted-foreground">
                                                             {formatCurrency(item.unit_price)}/{item.unit}
+                                                            {item.quantity != null && <span className="ml-1">x {item.quantity}</span>}
+                                                            {item.category && <span className="ml-2 text-blue-500">{item.category}</span>}
                                                             {item.ndis_line_item_code && <span className="ml-2 text-violet-500">#{item.ndis_line_item_code}</span>}
                                                         </div>
                                                     </div>
-                                                    <div className="text-right">
-                                                        <div className={`text-sm font-semibold tabular-nums ${itemPct > 90 ? 'text-red-600' : itemPct > 70 ? 'text-amber-600' : 'text-slate-900'}`}>{itemPct}%</div>
-                                                        <div className="text-[10px] text-muted-foreground">{formatCurrency(item.budget_used)} / {formatCurrency(item.budget_allocated)}</div>
+                                                    <div className="flex items-start gap-2">
+                                                        <div className="text-right">
+                                                            <div className={`text-sm font-semibold tabular-nums ${itemPct > 90 ? 'text-red-600' : itemPct > 70 ? 'text-amber-600' : 'text-slate-900'}`}>{itemPct}%</div>
+                                                            <div className="text-[10px] text-muted-foreground">{formatCurrency(item.budget_used)} / {formatCurrency(item.budget_allocated)}</div>
+                                                        </div>
+                                                        <div className="flex gap-1">
+                                                            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => { setEditingLineItem(item); setLineItemDialogOpen(true); }}>
+                                                                <Pencil className="h-3 w-3" />
+                                                            </Button>
+                                                            <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => { setDeletingLineItemId(item.id); setDeleteLineItemDialogOpen(true); }}>
+                                                                <Trash2 className="h-3 w-3" />
+                                                            </Button>
+                                                        </div>
                                                     </div>
                                                 </div>
                                                 <div className="h-1.5 w-full rounded-full bg-slate-100">
@@ -561,6 +831,57 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Rates Section */}
+                <Card className="mt-4">
+                    <CardHeader className="pb-2">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                <DollarSign className="h-4 w-4 text-emerald-500" />
+                                Rate Structure ({ag.rates?.length ?? 0})
+                            </CardTitle>
+                            <Button size="sm" variant="outline" onClick={() => setRateDialogOpen(true)}>
+                                <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Rate
+                            </Button>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        {!ag.rates || ag.rates.length === 0 ? (
+                            <p className="py-4 text-center text-xs text-muted-foreground">No rates defined yet.</p>
+                        ) : (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b text-left text-xs text-muted-foreground">
+                                            <th className="pb-2 pr-4 font-medium">Type</th>
+                                            <th className="pb-2 pr-4 font-medium">Rate</th>
+                                            <th className="pb-2 pr-4 font-medium">Unit</th>
+                                            <th className="pb-2 pr-4 font-medium">Effective From</th>
+                                            <th className="pb-2 pr-4 font-medium">Effective To</th>
+                                            <th className="pb-2 font-medium"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {ag.rates.map((rate) => (
+                                            <tr key={rate.id} className="border-b last:border-0">
+                                                <td className="py-2 pr-4 capitalize">{rate.rate_type.replace(/_/g, ' ')}</td>
+                                                <td className="py-2 pr-4 tabular-nums">{formatCurrency(rate.rate)}</td>
+                                                <td className="py-2 pr-4">{rate.unit}</td>
+                                                <td className="py-2 pr-4">{formatDate(rate.effective_from)}</td>
+                                                <td className="py-2 pr-4">{formatDate(rate.effective_to)}</td>
+                                                <td className="py-2">
+                                                    <Button size="icon" variant="ghost" className="h-7 w-7 text-red-500 hover:text-red-700" onClick={() => { setDeletingRateId(rate.id); setDeleteRateDialogOpen(true); }}>
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
                 {/* Audit Trail */}
                 <Card className="mt-4">
@@ -637,6 +958,71 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
 
                 {/* Transition Dialog */}
                 <TransitionDialog open={dialogOpen} onOpenChange={setDialogOpen} transition={activeTransition} agreementId={ag.id} />
+
+                {/* Line Item Dialog */}
+                <LineItemDialog
+                    open={lineItemDialogOpen}
+                    onOpenChange={(v) => { setLineItemDialogOpen(v); if (!v) setEditingLineItem(null); }}
+                    agreementId={ag.id}
+                    lineItem={editingLineItem}
+                />
+
+                {/* Delete Line Item Confirmation */}
+                <Dialog open={deleteLineItemDialogOpen} onOpenChange={setDeleteLineItemDialogOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Delete Line Item</DialogTitle>
+                            <DialogDescription>Are you sure you want to delete this line item? This action cannot be undone.</DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setDeleteLineItemDialogOpen(false)}>Cancel</Button>
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                onClick={() => {
+                                    if (deletingLineItemId) {
+                                        router.delete(`/operations/service-agreements/${ag.id}/line-items/${deletingLineItemId}`, {
+                                            preserveScroll: true,
+                                            onSuccess: () => { setDeleteLineItemDialogOpen(false); setDeletingLineItemId(null); },
+                                        });
+                                    }
+                                }}
+                            >
+                                Delete
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Rate Dialog */}
+                <RateDialog open={rateDialogOpen} onOpenChange={setRateDialogOpen} agreementId={ag.id} />
+
+                {/* Delete Rate Confirmation */}
+                <Dialog open={deleteRateDialogOpen} onOpenChange={setDeleteRateDialogOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Delete Rate</DialogTitle>
+                            <DialogDescription>Are you sure you want to delete this rate? This action cannot be undone.</DialogDescription>
+                        </DialogHeader>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setDeleteRateDialogOpen(false)}>Cancel</Button>
+                            <Button
+                                type="button"
+                                variant="destructive"
+                                onClick={() => {
+                                    if (deletingRateId) {
+                                        router.delete(`/operations/service-agreements/${ag.id}/rates/${deletingRateId}`, {
+                                            preserveScroll: true,
+                                            onSuccess: () => { setDeleteRateDialogOpen(false); setDeletingRateId(null); },
+                                        });
+                                    }
+                                }}
+                            >
+                                Delete
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
 
                 {/* Reject Dialog */}
                 <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>

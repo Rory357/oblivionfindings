@@ -15,6 +15,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { AlertTriangle, CalendarDays, DollarSign, Eye, FileText, Pencil, Plus, Search } from 'lucide-react';
+import { useCallback, useEffect, useRef } from 'react';
 
 const ANY = '__ANY__';
 
@@ -35,6 +36,8 @@ type Agreement = {
     line_items_count: number;
 };
 
+type ClientOption = { id: number; first_name: string; last_name: string };
+
 type Props = {
     agreements: {
         data: Agreement[];
@@ -43,23 +46,45 @@ type Props = {
         last_page: number;
         total: number;
     };
-    filters: { q?: string; status?: string; agreement_type?: string };
-    stats: { total: number; active: number; expiring_soon: number; total_budget: number; total_used: number };
+    filters: { q?: string; status?: string; agreement_type?: string; client_id?: string; funding_type?: string };
+    stats: { total: number; active: number; pending_approval: number; expiring_soon: number; total_budget: number; total_used: number; draft_count: number };
+    clients: ClientOption[];
 };
 
 const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
     active: 'default',
     draft: 'outline',
+    pending_approval: 'secondary',
+    under_review: 'secondary',
+    renewed: 'default',
     expired: 'secondary',
     terminated: 'destructive',
+    suspended: 'destructive',
 };
 
 const TYPE_LABELS: Record<string, string> = {
     ndis: 'NDIS',
+    msd: 'MSD',
+    dss: 'DSS',
+    acc: 'ACC',
+    dhb: 'Health NZ',
+    oranga_tamariki: 'Oranga Tamariki',
     private: 'Private',
-    block: 'Block',
-    spot: 'Spot',
+    whaikaha: 'Whaikaha',
+    charitable: 'Charitable',
+    other: 'Other',
 };
+
+const FUNDING_TYPE_OPTIONS = [
+    'IF',
+    'EIF',
+    'Flexible',
+    'Residential',
+    'Community Participation',
+    'Respite',
+    'Day Services',
+    'Vocational',
+];
 
 function formatDate(d: string | null): string {
     if (!d) return '-';
@@ -70,10 +95,31 @@ function formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(n);
 }
 
-export default function ServiceAgreementsIndex({ agreements = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
-    const updateFilters = (key: string, value: string | null) => {
+export default function ServiceAgreementsIndex({
+    agreements = { data: [], links: [], current_page: 1, last_page: 1, total: 0 },
+    filters = {} as any,
+    stats = {} as any,
+    clients = [],
+}: Props) {
+    const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const updateFilters = useCallback((key: string, value: string | null) => {
         router.get('/operations/service-agreements', { ...filters, [key]: value }, { preserveState: true, replace: true });
-    };
+    }, [filters]);
+
+    const handleSearchChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+        const value = e.target.value || null;
+        if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+        searchTimerRef.current = setTimeout(() => {
+            updateFilters('q', value);
+        }, 300);
+    }, [updateFilters]);
+
+    useEffect(() => {
+        return () => {
+            if (searchTimerRef.current) clearTimeout(searchTimerRef.current);
+        };
+    }, []);
 
     return (
         <AppLayout>
@@ -85,31 +131,53 @@ export default function ServiceAgreementsIndex({ agreements = { data: [], links:
                     <OpsStatCard label="Active Agreements" value={stats?.active ?? 0} icon={FileText} color="indigo" />
                     <OpsStatCard label="Total Budget" value={formatCurrency(stats?.total_budget ?? 0)} icon={DollarSign} color="emerald" />
                     <OpsStatCard label="Budget Used" value={formatCurrency(stats?.total_used ?? 0)} icon={DollarSign} color="blue" />
-                    <OpsStatCard label="Expiring Soon" value={stats?.expiring_soon ?? 0} icon={AlertTriangle} color={stats?.expiring_soon > 0 ? 'amber' : 'slate'} />
+                    <OpsStatCard label="Expiring Soon" value={stats?.expiring_soon ?? 0} icon={AlertTriangle} color={(stats?.expiring_soon ?? 0) > 0 ? 'amber' : 'slate'} />
                 </div>
 
                 {/* Filters */}
                 <div className="mt-4 flex flex-wrap items-center gap-2">
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input placeholder="Search agreements..." className="h-9 pl-8 text-sm" defaultValue={filters?.q ?? ''} onChange={(e) => updateFilters('q', e.target.value || null)} />
+                        <Input placeholder="Search agreements..." className="h-9 pl-8 text-sm" defaultValue={filters?.q ?? ''} onChange={handleSearchChange} />
                     </div>
                     <Select value={filters?.status ?? ANY} onValueChange={(v) => updateFilters('status', v === ANY ? null : v)}>
-                        <SelectTrigger className="h-9 w-[130px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
+                        <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="Status" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value={ANY}>All Status</SelectItem>
-                            <SelectItem value="active">Active</SelectItem>
                             <SelectItem value="draft">Draft</SelectItem>
+                            <SelectItem value="pending_approval">Pending Approval</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="under_review">Under Review</SelectItem>
+                            <SelectItem value="renewed">Renewed</SelectItem>
                             <SelectItem value="expired">Expired</SelectItem>
                             <SelectItem value="terminated">Terminated</SelectItem>
+                            <SelectItem value="suspended">Suspended</SelectItem>
                         </SelectContent>
                     </Select>
                     <Select value={filters?.agreement_type ?? ANY} onValueChange={(v) => updateFilters('agreement_type', v === ANY ? null : v)}>
-                        <SelectTrigger className="h-9 w-[120px] text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
+                        <SelectTrigger className="h-9 w-[140px] text-xs"><SelectValue placeholder="Type" /></SelectTrigger>
                         <SelectContent>
                             <SelectItem value={ANY}>All Types</SelectItem>
                             {Object.entries(TYPE_LABELS).map(([k, v]) => (
                                 <SelectItem key={k} value={k}>{v}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select value={filters?.client_id ?? ANY} onValueChange={(v) => updateFilters('client_id', v === ANY ? null : v)}>
+                        <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="Client" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ANY}>All Clients</SelectItem>
+                            {(clients ?? []).map((c) => (
+                                <SelectItem key={c.id} value={String(c.id)}>{c.first_name} {c.last_name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select value={filters?.funding_type ?? ANY} onValueChange={(v) => updateFilters('funding_type', v === ANY ? null : v)}>
+                        <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="Funding Type" /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ANY}>All Funding</SelectItem>
+                            {FUNDING_TYPE_OPTIONS.map((ft) => (
+                                <SelectItem key={ft} value={ft}>{ft}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>
@@ -139,7 +207,7 @@ export default function ServiceAgreementsIndex({ agreements = { data: [], links:
                                         <Link href={`/operations/service-agreements/${ag.id}`} className="text-sm font-semibold hover:underline">
                                             {ag.title}
                                         </Link>
-                                        <Badge variant={STATUS_VARIANTS[ag.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">{ag.status}</Badge>
+                                        <Badge variant={STATUS_VARIANTS[ag.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">{ag.status?.replace(/_/g, ' ')}</Badge>
                                         <Badge variant="outline" className="h-4 px-1.5 text-[9px]">{TYPE_LABELS[ag.agreement_type] ?? ag.agreement_type}</Badge>
                                         {ag.reference_number && <span className="text-[10px] text-muted-foreground">#{ag.reference_number}</span>}
                                     </div>
@@ -147,7 +215,7 @@ export default function ServiceAgreementsIndex({ agreements = { data: [], links:
                                         {ag.client && <span>{ag.client.first_name} {ag.client.last_name}</span>}
                                         {ag.funding_body && <span>{ag.funding_body}</span>}
                                         {ag.starts_at && <span className="flex items-center gap-1"><CalendarDays className="h-3 w-3" />{formatDate(ag.starts_at)} - {formatDate(ag.ends_at)}</span>}
-                                        <span>{ag.line_items_count} line items</span>
+                                        <span>{ag.line_items_count ?? 0} line items</span>
                                     </div>
                                     {/* Budget bar */}
                                     <div className="mt-2 flex items-center gap-3">
@@ -155,13 +223,13 @@ export default function ServiceAgreementsIndex({ agreements = { data: [], links:
                                             <div
                                                 className="h-1.5 rounded-full transition-all"
                                                 style={{
-                                                    width: `${Math.min(100, ag.budget_utilisation_percent)}%`,
-                                                    backgroundColor: ag.budget_utilisation_percent > 90 ? OPS_COLORS.danger : ag.budget_utilisation_percent > 70 ? OPS_COLORS.warning : OPS_COLORS.success,
+                                                    width: `${Math.min(100, ag.budget_utilisation_percent ?? 0)}%`,
+                                                    backgroundColor: (ag.budget_utilisation_percent ?? 0) > 90 ? OPS_COLORS.danger : (ag.budget_utilisation_percent ?? 0) > 70 ? OPS_COLORS.warning : OPS_COLORS.success,
                                                 }}
                                             />
                                         </div>
                                         <span className="text-[10px] font-medium tabular-nums">
-                                            {formatCurrency(ag.budget_used)} / {formatCurrency(ag.total_budget)} ({ag.budget_utilisation_percent}%)
+                                            {formatCurrency(ag.budget_used ?? 0)} / {formatCurrency(ag.total_budget ?? 0)} ({ag.budget_utilisation_percent ?? 0}%)
                                         </span>
                                     </div>
                                 </div>

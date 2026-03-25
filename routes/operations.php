@@ -353,6 +353,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->middleware('permission:service_agreements.delete')
         ->name('operations.service_agreements.destroy');
 
+    Route::middleware('permission:service_agreements.update')->group(function () {
+        Route::post('/service-agreements/{serviceAgreement}/line-items', [ServiceAgreementController::class, 'storeLineItem']);
+        Route::put('/service-agreements/{serviceAgreement}/line-items/{lineItem}', [ServiceAgreementController::class, 'updateLineItem']);
+        Route::delete('/service-agreements/{serviceAgreement}/line-items/{lineItem}', [ServiceAgreementController::class, 'destroyLineItem']);
+        Route::post('/service-agreements/{serviceAgreement}/rates', [ServiceAgreementController::class, 'storeRate']);
+        Route::delete('/service-agreements/{serviceAgreement}/rates/{rate}', [ServiceAgreementController::class, 'destroyRate']);
+    });
+
     // -------------------------------------------------------------------------
     // Progress Notes (NEW)
     // -------------------------------------------------------------------------
