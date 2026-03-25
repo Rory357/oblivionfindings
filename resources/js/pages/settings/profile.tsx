@@ -167,25 +167,27 @@ export default function Profile({
             <Head title="Profile settings" />
 
             <SettingsLayout>
-                {/* ── Hero Profile Card ── */}
-                <Card className="overflow-hidden border-0 shadow-sm">
-                    <div className="bg-gradient-to-br from-violet-50 via-violet-50/60 to-white px-6 pb-6 pt-8 dark:from-violet-950/30 dark:via-violet-950/10 dark:to-transparent">
-                        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-start">
-                            {/* Avatar with hover overlay */}
+                {/* ── Modern Profile Header ── */}
+                <div className="relative overflow-hidden rounded-xl border bg-white dark:bg-gray-950">
+                    {/* Accent bar */}
+                    <div className="h-1.5 w-full bg-gradient-to-r from-violet-600 via-indigo-500 to-purple-600" />
+
+                    <div className="px-6 py-6">
+                        <div className="flex items-center gap-5">
+                            {/* Avatar */}
                             <div className="group relative shrink-0">
-                                <Avatar className="h-[120px] w-[120px] ring-4 ring-white shadow-lg dark:ring-gray-800">
+                                <Avatar className="h-16 w-16 border-2 border-violet-100 shadow-md dark:border-violet-900">
                                     <AvatarImage src={avatarSrc} alt={auth.user.name} />
-                                    <AvatarFallback className="bg-violet-100 text-2xl font-semibold text-violet-700 dark:bg-violet-900 dark:text-violet-300">
+                                    <AvatarFallback className="bg-violet-600 text-lg font-semibold text-white">
                                         {getInitials(auth.user.name)}
                                     </AvatarFallback>
                                 </Avatar>
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="absolute inset-0 flex cursor-pointer flex-col items-center justify-center rounded-full bg-black/50 opacity-0 transition-opacity group-hover:opacity-100"
+                                    className="absolute inset-0 flex cursor-pointer items-center justify-center rounded-full bg-black/40 opacity-0 transition-opacity group-hover:opacity-100"
                                 >
-                                    <Camera className="mb-1 h-5 w-5 text-white" />
-                                    <span className="text-xs font-medium text-white">Change photo</span>
+                                    <Camera className="h-4 w-4 text-white" />
                                 </button>
                                 <input
                                     ref={fileInputRef}
@@ -196,53 +198,45 @@ export default function Profile({
                                 />
                             </div>
 
-                            {/* Name, email, role, member since */}
-                            <div className="flex flex-1 flex-col items-center gap-2 sm:items-start">
-                                <h1 className="text-2xl font-bold tracking-tight text-gray-900 dark:text-gray-100">
-                                    {auth.user.name}
-                                </h1>
-                                <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
-                                    <Mail className="h-3.5 w-3.5" />
-                                    {auth.user.email}
-                                </p>
-
-                                <div className="mt-1 flex flex-wrap items-center gap-2">
+                            {/* Info */}
+                            <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-3">
+                                    <h1 className="text-xl font-semibold tracking-tight text-gray-900 dark:text-gray-100 truncate">
+                                        {auth.user.name}
+                                    </h1>
                                     {roles.length > 0
                                         ? roles.map((role: string) => (
-                                              <Badge
-                                                  key={role}
-                                                  className="bg-violet-100 text-violet-700 hover:bg-violet-100 dark:bg-violet-900/50 dark:text-violet-300"
-                                              >
+                                              <Badge key={role} variant="secondary" className="bg-violet-100 text-violet-700 text-xs dark:bg-violet-900/50 dark:text-violet-300">
                                                   {role}
                                               </Badge>
                                           ))
                                         : (
-                                              <Badge className="bg-violet-100 text-violet-700 hover:bg-violet-100 dark:bg-violet-900/50 dark:text-violet-300">
+                                              <Badge variant="secondary" className="bg-violet-100 text-violet-700 text-xs dark:bg-violet-900/50 dark:text-violet-300">
                                                   Team Member
                                               </Badge>
                                           )}
-                                    {memberSince && (
-                                        <span className="text-xs text-muted-foreground">
-                                            Member since {memberSince}
-                                        </span>
-                                    )}
                                 </div>
+                                <p className="mt-0.5 text-sm text-muted-foreground">{auth.user.email}</p>
+                                {memberSince && (
+                                    <p className="mt-1 text-xs text-muted-foreground/70">Member since {memberSince}</p>
+                                )}
+                            </div>
 
-                                {/* Photo action buttons */}
-                                <div className="mt-3 flex items-center gap-2">
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        className="gap-1.5"
-                                        disabled={photoForm.processing}
-                                        onClick={() => fileInputRef.current?.click()}
-                                        onDragOver={(e) => e.preventDefault()}
-                                        onDrop={handleDrop}
-                                    >
-                                        <Upload className="h-3.5 w-3.5" />
-                                        Upload photo
-                                    </Button>
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 shrink-0">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="gap-1.5"
+                                    disabled={photoForm.processing}
+                                    onClick={() => fileInputRef.current?.click()}
+                                    onDragOver={(e) => e.preventDefault()}
+                                    onDrop={handleDrop}
+                                >
+                                    <Upload className="h-3.5 w-3.5" />
+                                    Upload photo
+                                </Button>
                                     {hasPhoto && (
                                         <Button
                                             type="button"
@@ -260,12 +254,11 @@ export default function Profile({
                                             Remove photo
                                         </Button>
                                     )}
-                                </div>
-                                <InputError className="mt-1" message={(photoForm.errors as any).photo} />
                             </div>
                         </div>
+                        <InputError className="mt-2" message={(photoForm.errors as any).photo} />
                     </div>
-                </Card>
+                </div>
 
                 {/* ── Two-Column Layout ── */}
                 <div className="grid gap-6 lg:grid-cols-[1fr_0.67fr]">
