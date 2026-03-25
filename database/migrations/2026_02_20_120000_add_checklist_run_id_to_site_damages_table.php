@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        if (Schema::hasColumn('site_damages', 'checklist_run_id')) return;
         Schema::table('site_damages', function (Blueprint $table) {
             $table->foreignId('checklist_run_id')
                 ->nullable()
