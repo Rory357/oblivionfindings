@@ -336,8 +336,7 @@ function TransitionDialog({
     const [processing, setProcessing] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
+    function doTransition() {
         if (!transition) return;
         setProcessing(true);
         router.post(`/operations/service-agreements/${agreementId}/transition`, {
@@ -352,7 +351,7 @@ function TransitionDialog({
                 setErrors({});
                 onOpenChange(false);
             },
-            onError: (errs) => setErrors(errs),
+            onError: (errs: any) => setErrors(errs),
             onFinish: () => setProcessing(false),
         });
     }
@@ -368,7 +367,7 @@ function TransitionDialog({
                         Transition this agreement to <strong>{transition.toStatus.replace(/_/g, ' ')}</strong>. Provide a reason or notes for the audit trail.
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={submit} className="space-y-4">
+                <div className="space-y-4">
                     <div>
                         <Label htmlFor="reason">Reason</Label>
                         <Textarea
@@ -395,11 +394,11 @@ function TransitionDialog({
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={processing} variant={transition.variant === 'destructive' ? 'destructive' : 'default'}>
+                        <Button type="button" disabled={processing} variant={transition.variant === 'destructive' ? 'destructive' : 'default'} onClick={doTransition}>
                             {processing ? 'Processing...' : transition.label}
                         </Button>
                     </DialogFooter>
-                </form>
+                </div>
             </DialogContent>
         </Dialog>
     );
