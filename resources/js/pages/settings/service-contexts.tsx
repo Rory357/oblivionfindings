@@ -761,9 +761,10 @@ function ContextCard({
                                 <Pencil className="h-3.5 w-3.5" />
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="max-w-lg">
+                        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>Edit service context</DialogTitle>
+                                <p className="text-sm text-muted-foreground">Update service details, funding, and staffing information.</p>
                             </DialogHeader>
 
                             <form
@@ -773,106 +774,158 @@ function ContextCard({
                                         onSuccess: () => setEditing(null),
                                     });
                                 }}
-                                className="space-y-4"
+                                className="space-y-6"
                             >
+                                {/* Section 1: Basic Details */}
+                                <div className="space-y-1">
+                                    <h4 className="text-sm font-semibold text-violet-700">Basic Details</h4>
+                                    <div className="h-px bg-violet-100" />
+                                </div>
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div className="space-y-2">
                                         <Label>Type</Label>
-                                        <Select
-                                            value={editForm.data.type}
-                                            onValueChange={(v) => editForm.setData('type', v)}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select type" />
-                                            </SelectTrigger>
+                                        <Select value={editForm.data.type} onValueChange={(v) => editForm.setData('type', v)}>
+                                            <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
                                             <SelectContent>
                                                 {CATEGORY_ORDER.map((cat) => {
                                                     const catTypes = typesByCategory[cat];
                                                     if (!catTypes?.length) return null;
                                                     return (
                                                         <SelectGroup key={cat}>
-                                                            <SelectLabel className={`text-xs font-semibold ${CATEGORY_COLOURS[cat]?.text ?? ''}`}>
-                                                                {cat}
-                                                            </SelectLabel>
-                                                            {catTypes.map((t) => (
-                                                                <SelectItem key={t.code} value={t.code}>
-                                                                    {t.label}
-                                                                </SelectItem>
-                                                            ))}
+                                                            <SelectLabel className={`text-xs font-semibold ${CATEGORY_COLOURS[cat]?.text ?? ''}`}>{cat}</SelectLabel>
+                                                            {catTypes.map((t) => (<SelectItem key={t.code} value={t.code}>{t.label}</SelectItem>))}
                                                         </SelectGroup>
                                                     );
                                                 })}
                                             </SelectContent>
                                         </Select>
-                                        {editForm.errors.type && (
-                                            <div className="text-xs text-red-400">{editForm.errors.type}</div>
-                                        )}
                                     </div>
-
                                     <div className="space-y-2">
                                         <Label>Name</Label>
-                                        <Input
-                                            value={editForm.data.name}
-                                            onChange={(e) => editForm.setData('name', e.target.value)}
-                                        />
-                                        {editForm.errors.name && (
-                                            <div className="text-xs text-red-400">{editForm.errors.name}</div>
-                                        )}
+                                        <Input value={editForm.data.name} onChange={(e) => editForm.setData('name', e.target.value)} />
                                     </div>
                                 </div>
-
                                 <div className="space-y-2">
-                                    <Label>Site (optional)</Label>
-                                    <select
-                                        className="mt-1 w-full rounded-md border bg-transparent p-2 text-sm"
-                                        value={editForm.data.site_id ?? ''}
-                                        onChange={(e) =>
-                                            editForm.setData(
-                                                'site_id',
-                                                e.target.value === '' ? '' : Number(e.target.value),
-                                            )
-                                        }
-                                    >
-                                        <option value="">--</option>
-                                        {sites.map((s) => (
-                                            <option key={s.id} value={s.id}>
-                                                {s.name}
-                                                {s.is_active === false ? ' (inactive)' : ''}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {editForm.errors.site_id && (
-                                        <div className="text-xs text-red-400">{editForm.errors.site_id}</div>
-                                    )}
+                                    <Label>Description</Label>
+                                    <Textarea value={editForm.data.description} onChange={(e) => editForm.setData('description', e.target.value)} rows={2} />
                                 </div>
-
-                                <div className="space-y-2">
-                                    <Label>Description (optional)</Label>
-                                    <Textarea
-                                        value={editForm.data.description}
-                                        onChange={(e) => editForm.setData('description', e.target.value)}
-                                        rows={3}
-                                    />
-                                    {editForm.errors.description && (
-                                        <div className="text-xs text-red-400">{editForm.errors.description}</div>
-                                    )}
-                                </div>
-
                                 <div className="flex items-center gap-2">
-                                    <Checkbox
-                                        checked={!!editForm.data.is_active}
-                                        onCheckedChange={(v) => editForm.setData('is_active', !!v)}
-                                    />
+                                    <Checkbox checked={!!editForm.data.is_active} onCheckedChange={(v) => editForm.setData('is_active', !!v)} />
                                     <span className="text-sm">Active</span>
                                 </div>
 
+                                {/* Section 2: Service Details */}
+                                <div className="space-y-1 pt-2">
+                                    <h4 className="text-sm font-semibold text-blue-700">Service Details</h4>
+                                    <div className="h-px bg-blue-100" />
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label>Site</Label>
+                                        <select className="w-full rounded-md border bg-transparent p-2 text-sm" value={editForm.data.site_id ?? ''} onChange={(e) => editForm.setData('site_id', e.target.value === '' ? '' : Number(e.target.value))}>
+                                            <option value="">-- None --</option>
+                                            {sites.map((s) => (<option key={s.id} value={s.id}>{s.name}{s.is_active === false ? ' (inactive)' : ''}</option>))}
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Operating Model</Label>
+                                        <select className="w-full rounded-md border bg-transparent p-2 text-sm" value={(editForm.data as any).operating_model ?? ''} onChange={(e) => (editForm as any).setData('operating_model', e.target.value)}>
+                                            <option value="">-- Select --</option>
+                                            <option value="24_7_residential">24/7 Residential</option>
+                                            <option value="day_programme">Day Programme (Business Hours)</option>
+                                            <option value="after_hours">After Hours</option>
+                                            <option value="on_call">On-Call</option>
+                                            <option value="flexible">Flexible</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Max Capacity</Label>
+                                        <Input type="number" min={0} value={(editForm.data as any).max_capacity ?? ''} onChange={(e) => (editForm as any).setData('max_capacity', e.target.value)} placeholder="e.g. 6" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Staff Ratio</Label>
+                                        <Input value={(editForm.data as any).staff_ratio ?? ''} onChange={(e) => (editForm as any).setData('staff_ratio', e.target.value)} placeholder="e.g. 1:3" />
+                                    </div>
+                                </div>
+
+                                {/* Section 3: Funding & Compliance */}
+                                <div className="space-y-1 pt-2">
+                                    <h4 className="text-sm font-semibold text-emerald-700">Funding & Compliance</h4>
+                                    <div className="h-px bg-emerald-100" />
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="space-y-2">
+                                        <Label>Funding Body</Label>
+                                        <select className="w-full rounded-md border bg-transparent p-2 text-sm" value={(editForm.data as any).funding_body ?? ''} onChange={(e) => (editForm as any).setData('funding_body', e.target.value)}>
+                                            <option value="">-- Select --</option>
+                                            <option value="whaikaha">Whaikaha</option>
+                                            <option value="msd">MSD</option>
+                                            <option value="acc">ACC</option>
+                                            <option value="health_nz">Health NZ</option>
+                                            <option value="oranga_tamariki">Oranga Tamariki</option>
+                                            <option value="private">Private</option>
+                                            <option value="self_funded">Self-funded</option>
+                                            <option value="other">Other</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Funding Type</Label>
+                                        <select className="w-full rounded-md border bg-transparent p-2 text-sm" value={(editForm.data as any).funding_type ?? ''} onChange={(e) => (editForm as any).setData('funding_type', e.target.value)}>
+                                            <option value="">-- Select --</option>
+                                            <option value="if">Individualised Funding (IF)</option>
+                                            <option value="eif">Enhanced IF (EIF)</option>
+                                            <option value="flexible">Flexible</option>
+                                            <option value="contract">Contract</option>
+                                            <option value="fee_for_service">Fee for Service</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Whaikaha Reference</Label>
+                                        <Input value={(editForm.data as any).whaikaha_reference ?? ''} onChange={(e) => (editForm as any).setData('whaikaha_reference', e.target.value)} placeholder="e.g. WHK-2026-001" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Contract Reference</Label>
+                                        <Input value={(editForm.data as any).contract_reference ?? ''} onChange={(e) => (editForm as any).setData('contract_reference', e.target.value)} placeholder="e.g. CON-2026-001" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Audit Status</Label>
+                                        <select className="w-full rounded-md border bg-transparent p-2 text-sm" value={(editForm.data as any).audit_status ?? ''} onChange={(e) => (editForm as any).setData('audit_status', e.target.value)}>
+                                            <option value="">-- Select --</option>
+                                            <option value="current">Current</option>
+                                            <option value="due">Due</option>
+                                            <option value="overdue">Overdue</option>
+                                            <option value="exempt">Exempt</option>
+                                        </select>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Next Audit Date</Label>
+                                        <Input type="date" value={(editForm.data as any).next_audit_date ?? ''} onChange={(e) => (editForm as any).setData('next_audit_date', e.target.value)} />
+                                    </div>
+                                </div>
+
+                                {/* Section 4: Contact */}
+                                <div className="space-y-1 pt-2">
+                                    <h4 className="text-sm font-semibold text-amber-700">Service Coordinator</h4>
+                                    <div className="h-px bg-amber-100" />
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-3">
+                                    <div className="space-y-2">
+                                        <Label>Name</Label>
+                                        <Input value={(editForm.data as any).coordinator_name ?? ''} onChange={(e) => (editForm as any).setData('coordinator_name', e.target.value)} placeholder="Full name" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Email</Label>
+                                        <Input type="email" value={(editForm.data as any).coordinator_email ?? ''} onChange={(e) => (editForm as any).setData('coordinator_email', e.target.value)} placeholder="email@example.com" />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Phone</Label>
+                                        <Input value={(editForm.data as any).coordinator_phone ?? ''} onChange={(e) => (editForm as any).setData('coordinator_phone', e.target.value)} placeholder="021 XXX XXXX" />
+                                    </div>
+                                </div>
+
                                 <DialogFooter>
-                                    <Button type="button" variant="outline" onClick={() => setEditing(null)}>
-                                        Cancel
-                                    </Button>
-                                    <Button type="submit" disabled={editForm.processing}>
-                                        Save
-                                    </Button>
+                                    <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
+                                    <Button type="submit" disabled={editForm.processing}>Save</Button>
                                 </DialogFooter>
                             </form>
                         </DialogContent>
