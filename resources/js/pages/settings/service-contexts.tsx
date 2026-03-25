@@ -21,6 +21,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -774,13 +775,16 @@ function ContextCard({
                                         onSuccess: () => setEditing(null),
                                     });
                                 }}
-                                className="space-y-6"
                             >
-                                {/* Section 1: Basic Details */}
-                                <div className="space-y-1">
-                                    <h4 className="text-sm font-semibold text-violet-700">Basic Details</h4>
-                                    <div className="h-px bg-violet-100" />
-                                </div>
+                              <Tabs defaultValue="details" className="w-full">
+                                <TabsList className="mb-4 grid w-full grid-cols-4">
+                                    <TabsTrigger value="details">Details</TabsTrigger>
+                                    <TabsTrigger value="service">Service</TabsTrigger>
+                                    <TabsTrigger value="funding">Funding</TabsTrigger>
+                                    <TabsTrigger value="contact">Contact</TabsTrigger>
+                                </TabsList>
+
+                                <TabsContent value="details" className="space-y-4">
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div className="space-y-2">
                                         <Label>Type</Label>
@@ -814,11 +818,9 @@ function ContextCard({
                                     <span className="text-sm">Active</span>
                                 </div>
 
-                                {/* Section 2: Service Details */}
-                                <div className="space-y-1 pt-2">
-                                    <h4 className="text-sm font-semibold text-blue-700">Service Details</h4>
-                                    <div className="h-px bg-blue-100" />
-                                </div>
+                                </TabsContent>
+
+                                <TabsContent value="service" className="space-y-4">
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div className="space-y-2">
                                         <Label>Site</Label>
@@ -848,11 +850,9 @@ function ContextCard({
                                     </div>
                                 </div>
 
-                                {/* Section 3: Funding & Compliance */}
-                                <div className="space-y-1 pt-2">
-                                    <h4 className="text-sm font-semibold text-emerald-700">Funding & Compliance</h4>
-                                    <div className="h-px bg-emerald-100" />
-                                </div>
+                                </TabsContent>
+
+                                <TabsContent value="funding" className="space-y-4">
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div className="space-y-2">
                                         <Label>Funding Body</Label>
@@ -903,11 +903,9 @@ function ContextCard({
                                     </div>
                                 </div>
 
-                                {/* Section 4: Contact */}
-                                <div className="space-y-1 pt-2">
-                                    <h4 className="text-sm font-semibold text-amber-700">Service Coordinator</h4>
-                                    <div className="h-px bg-amber-100" />
-                                </div>
+                                </TabsContent>
+
+                                <TabsContent value="contact" className="space-y-4">
                                 <div className="grid gap-4 sm:grid-cols-3">
                                     <div className="space-y-2">
                                         <Label>Name</Label>
@@ -923,7 +921,10 @@ function ContextCard({
                                     </div>
                                 </div>
 
-                                <DialogFooter>
+                                </TabsContent>
+                              </Tabs>
+
+                                <DialogFooter className="mt-4">
                                     <Button type="button" variant="outline" onClick={() => setEditing(null)}>Cancel</Button>
                                     <Button type="submit" disabled={editForm.processing}>Save</Button>
                                 </DialogFooter>
