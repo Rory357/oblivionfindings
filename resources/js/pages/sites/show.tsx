@@ -38,6 +38,7 @@ import {
     Award,
     Star,
     MessageSquare,
+    Layers,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -397,6 +398,13 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             Staff Requirements
                             {staffRequirements.length > 0 && (
                                 <Badge variant="outline" className="ml-1 text-xs px-1.5 py-0">{staffRequirements.length}</Badge>
+                            )}
+                        </TabsTrigger>
+                        <TabsTrigger value="service-contexts" className="flex items-center gap-1">
+                            <Layers className="w-4 h-4" />
+                            Services
+                            {(site.service_contexts ?? []).length > 0 && (
+                                <Badge variant="outline" className="ml-1 text-xs px-1.5 py-0">{(site.service_contexts ?? []).length}</Badge>
                             )}
                         </TabsTrigger>
                     </TabsList>
@@ -798,6 +806,56 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                     {/* Staff Requirements Tab */}
                     <TabsContent value="staff-requirements">
                         <StaffRequirementsTab site={site} requirements={staffRequirements} can_edit={can_edit} />
+                    </TabsContent>
+
+                    {/* Service Contexts Tab */}
+                    <TabsContent value="service-contexts">
+                        <Card>
+                            <CardHeader>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <Layers className="h-5 w-5 text-violet-600" />
+                                            Service Contexts
+                                        </CardTitle>
+                                        <p className="text-sm text-muted-foreground mt-1">Services delivered from this site</p>
+                                    </div>
+                                    <Link href="/settings/service-contexts">
+                                        <Button variant="outline" size="sm">Manage in Settings</Button>
+                                    </Link>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                {(site.service_contexts ?? []).length === 0 ? (
+                                    <div className="text-center py-8 text-muted-foreground">
+                                        <Layers className="h-10 w-10 mx-auto mb-2 opacity-30" />
+                                        <p className="font-medium">No service contexts linked</p>
+                                        <p className="text-sm mt-1">Link service contexts to this site in Settings → Service Contexts</p>
+                                    </div>
+                                ) : (
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        {(site.service_contexts ?? []).map((ctx: any) => (
+                                            <div key={ctx.id} className="rounded-lg border border-l-4 border-l-violet-500 p-4 space-y-2">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-medium">{ctx.name}</span>
+                                                    {ctx.is_active ? (
+                                                        <Badge className="bg-emerald-100 text-emerald-700 text-xs">Active</Badge>
+                                                    ) : (
+                                                        <Badge variant="outline" className="text-xs">Inactive</Badge>
+                                                    )}
+                                                </div>
+                                                {ctx.type && (
+                                                    <Badge variant="secondary" className="text-xs">{ctx.type.replace(/_/g, ' ')}</Badge>
+                                                )}
+                                                {ctx.description && (
+                                                    <p className="text-sm text-muted-foreground line-clamp-2">{ctx.description}</p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
                     </TabsContent>
                 </Tabs>
             </PageShell>

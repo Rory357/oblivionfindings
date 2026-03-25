@@ -97,6 +97,7 @@ class SiteController extends Controller
             'contacts',
             'documents.uploadedBy:id,name,email',
             'primaryContact:id,name',
+            'serviceContexts',
             'houseRooms' => fn($q) => $q->active()->orderBy('sort_order'),
             'hoResources' => fn($q) => $q->active()->orderBy('name'),
             'facilityZones' => fn($q) => $q->active()->orderBy('name'),

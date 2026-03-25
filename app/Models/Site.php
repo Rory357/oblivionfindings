@@ -185,6 +185,11 @@ class Site extends Model
         return $this->hasMany(SiteFeedback::class);
     }
 
+    public function serviceContexts(): HasMany
+    {
+        return $this->hasMany(\App\Models\ServiceContext::class);
+    }
+
     // Accessors
     public function getAddressAttribute(): string
     {
