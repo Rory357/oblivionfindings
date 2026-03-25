@@ -133,7 +133,7 @@ export default function ClientShow({
     respite,
     can,
 }: Props) {
-    const { auth } = usePage().props as any;
+    const { auth, labels } = usePage().props as any;
     const respiteCan = auth?.can?.respite ?? {};
     const name = `${client.first_name} ${client.last_name}`.trim();
     const getInitials = useInitials();
@@ -198,7 +198,7 @@ export default function ClientShow({
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Clients', href: '/clients' },
+                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
                 { title: name, href: `/clients/${client.id}` },
             ]}
         >
@@ -686,7 +686,7 @@ export default function ClientShow({
                                         </div>
                                         <div className="text-xs text-slate-500">
                                             Next and recent rostered shifts for
-                                            this client.
+                                            this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}.
                                         </div>
                                     </div>
                                     {can.create_shift ? (
@@ -1616,12 +1616,12 @@ export default function ClientShow({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">
-                                Portal access (Client / Next of Kin)
+                                Portal access ({labels?.['client.singular'] ?? 'Client'} / Next of Kin)
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             <div className="text-sm text-slate-600">
-                                Portal users can view this client’s medical,
+                                Portal users can view this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}{"'s"} medical,
                                 documents, and timeline, and can query the RAG
                                 assistant.
                             </div>
@@ -1675,8 +1675,8 @@ export default function ClientShow({
                         </CardHeader>
                         <CardContent className="space-y-2">
                             <div className="text-sm text-slate-600">
-                                Assign support workers to this client. This
-                                controls which staff can see the client.
+                                Assign support workers to this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}. This
+                                controls which staff can see the {(labels?.['client.singular'] ?? 'Client').toLowerCase()}.
                             </div>
                             <div className="pt-2">
                                 <Link

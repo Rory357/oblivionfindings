@@ -468,17 +468,17 @@ export default function CalendarIndex(props: Props) {
                                 </div>
 
                                 <div className="grid gap-1">
-                                    <Label>Client</Label>
+                                    <Label>{labels?.['client.singular'] ?? 'Client'}</Label>
                                     <Select
                                         value={clientId}
                                         onValueChange={(v) => setClientId(v)}
                                     >
                                         <SelectTrigger className="w-[220px]">
-                                            <SelectValue placeholder="All clients" />
+                                            <SelectValue placeholder={`All ${(labels?.['client.plural'] ?? 'Clients').toLowerCase()}`} />
                                         </SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="all">
-                                                All clients
+                                                {`All ${(labels?.['client.plural'] ?? 'Clients').toLowerCase()}`}
                                             </SelectItem>
                                             {clientOptions.map((c) => (
                                                 <SelectItem
@@ -682,7 +682,7 @@ export default function CalendarIndex(props: Props) {
                         {(canManageAny || modalMode === 'create') && (
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="grid gap-1">
-                                    <Label>Client</Label>
+                                    <Label>{labels?.['client.singular'] ?? 'Client'}</Label>
                                     <select
                                         className="w-full rounded-md border bg-background p-2 text-sm"
                                         value={String(form.client_id)}

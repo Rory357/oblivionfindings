@@ -82,6 +82,11 @@ class Shift extends Model
         return $this->hasMany(ClientIncident::class);
     }
 
+    public function clientNotes()
+    {
+        return $this->hasMany(\App\Models\ClientNote::class, 'shift_id');
+    }
+
     public function isEnded(): bool
     {
         $end = $this->actual_ends_at ?? $this->ends_at;

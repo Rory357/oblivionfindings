@@ -11,7 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { DollarSign, Loader2, Save } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { formatCurrency } from '@/lib/fleet-utils';
@@ -21,15 +21,17 @@ type Props = {
     ird_rate?: number;
 };
 
-const PURPOSE_OPTIONS = [
-    { value: 'client_visit', label: 'Client Visit' },
-    { value: 'meeting', label: 'Meeting' },
-    { value: 'training', label: 'Training' },
-    { value: 'admin', label: 'Admin' },
-    { value: 'other', label: 'Other' },
-];
-
 export default function MileageCreate({ clients, ird_rate }: Props) {
+    const { labels } = usePage().props as any;
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
+
+    const PURPOSE_OPTIONS = [
+        { value: 'client_visit', label: `${clientSingular} Visit` },
+        { value: 'meeting', label: 'Meeting' },
+        { value: 'training', label: 'Training' },
+        { value: 'admin', label: 'Admin' },
+        { value: 'other', label: 'Other' },
+    ];
     const safeClients = clients ?? [];
     const rate = ird_rate ?? 0.95;
 

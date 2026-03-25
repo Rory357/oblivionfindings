@@ -13,6 +13,7 @@ import { type NavItem } from '@/types';
 const dashboard = () => '/dashboard';
 import { Link, usePage } from '@inertiajs/react';
 import {
+    Activity,
     AlertOctagon,
     AlertTriangle,
     ArrowLeftRight,
@@ -170,6 +171,12 @@ function buildIconNavItems({
         items.push({ id: 'operations', icon: Users, label: 'Operations', subPanel: true });
     }
 
+    // eMAR (Electronic Medication Administration)
+    const hasEmar = can?.medications?.view || can?.medications?.administer?.record;
+    if (hasEmar) {
+        items.push({ id: 'emar', icon: Pill, label: 'eMAR', subPanel: true });
+    }
+
     // Compliance & Safety
     const hasSafety = can?.incidents?.viewAny || can?.incidents?.viewAssigned || can?.compliance?.view || can?.hazards?.view;
     if (hasSafety) {
@@ -217,26 +224,123 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.siteHardware?.view) items.push({ title: 'Site Hardware', href: '/site-hardware', icon: Settings });
     if (can?.unifi?.manage) items.push({ title: 'UniFi', href: '/unifi', icon: Settings });
     if (can?.assets?.geofences?.manage || can?.fleet?.viewAny) items.push({ title: 'Geofences', href: '/fleet-assets/geofences', icon: MapPin });
-    return [{ label: 'Sites & Locations', items }];
+
+    const groups: SubPanelGroup[] = [{ label: 'Sites & Locations', items }];
+
+    // Respite (moved from Operations — site-based stays)
+    if (can?.respite?.viewAny) {
+        const respiteItems: NavItem[] = [
+            { title: 'Referrals', href: '/respite', icon: Users },
+            { title: 'Booking Requests', href: '/respite/requests', icon: CalendarDays },
+            { title: 'Approved Bookings', href: '/respite/bookings', icon: ClipboardCheck },
+            { title: 'Calendar', href: '/respite/calendar', icon: CalendarDays },
+            { title: 'Stays', href: '/respite/stays', icon: Home },
+        ];
+        groups.push({ label: 'Respite', items: respiteItems });
+    }
+
+    return groups;
 }
 
-function buildOperationsSubPanelGroups({ can, role }: { can?: any; role?: string | null }): SubPanelGroup[] {
-    const core: NavItem[] = [];
-    if (can?.clients?.viewAny || role === 'support_worker') core.push({ title: 'Clients', href: '/clients', icon: Users });
-    if (can?.shifts?.viewAny || role === 'support_worker') core.push({ title: 'Shifts', href: '/shifts', icon: CalendarDays });
-    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned || role === 'support_worker') core.push({ title: 'Timesheets', href: '/timesheets', icon: Clock });
-    if (can?.rostering?.viewAny) core.push({ title: 'Rostering', href: '/rostering', icon: CalendarDays });
-    if (can?.respite?.viewAny) core.push({ title: 'Respite', href: '/respite', icon: CalendarDays });
-    if (can?.medications?.view) core.push({ title: 'Medications', href: '/medications', icon: Shield });
-    if (can?.medications?.breakGlass) core.push({ title: 'Emergency Access', href: '/emergency-access', icon: ShieldAlert });
-    if (can?.consents?.viewAny) core.push({ title: 'Consents', href: '/consents', icon: ClipboardCheck });
+function buildOperationsSubPanelGroups({ can, role, labels }: { can?: any; role?: string | null; labels?: any }): SubPanelGroup[] {
+    const groups: SubPanelGroup[] = [];
 
-    const resources: NavItem[] = [];
-    if (can?.staff?.viewAny) resources.push({ title: 'Staff', href: '/staff', icon: Users });
-    if (can?.credentials?.view) resources.push({ title: 'Credentials', href: '/credentials', icon: Shield });
+    // Overview
+    const overview: NavItem[] = [
+        { title: 'Dashboard', href: '/operations', icon: LayoutGrid },
+        { title: 'Activity Feed', href: '/operations/activity', icon: Activity },
+    ];
+    groups.push({ label: 'Overview', items: overview });
 
-    const groups: SubPanelGroup[] = [{ label: 'Operations', items: core }];
-    if (resources.length > 0) groups.push({ label: 'Resources', items: resources });
+    // Client Management
+    const clientLabel = labels?.['client.singular'] ?? 'Client';
+    const clientLabelPlural = labels?.['client.plural'] ?? 'Clients';
+    const clientMgmt: NavItem[] = [];
+    if (can?.clients?.viewAny || role === 'support_worker') clientMgmt.push({ title: clientLabelPlural, href: '/operations/clients', icon: Users });
+    if (can?.clients?.viewAny) clientMgmt.push({ title: 'Onboarding Pipeline', href: '/operations/onboarding', icon: UserCheck });
+    if (can?.care_plans?.viewAny || can?.clients?.viewAny) clientMgmt.push({ title: 'Care Plans', href: '/operations/care-plans', icon: ClipboardCheck });
+    if (can?.service_agreements?.viewAny || can?.clients?.viewAny) clientMgmt.push({ title: 'Service Agreements', href: '/operations/service-agreements', icon: FileText });
+    if (can?.progress_notes?.viewAny || can?.clients?.viewAny || role === 'support_worker') clientMgmt.push({ title: 'Progress Notes', href: '/operations/progress-notes', icon: MessageSquareText });
+    if (can?.clients?.viewAny) clientMgmt.push({ title: `${clientLabel} Funds`, href: '/operations/client-funds', icon: DollarSign });
+    if (clientMgmt.length > 0) groups.push({ label: `${clientLabel} Management`, items: clientMgmt });
+
+    // Scheduling
+    const scheduling: NavItem[] = [];
+    if (can?.shifts?.viewAny || role === 'support_worker') scheduling.push({ title: 'Shifts', href: '/operations/shifts', icon: CalendarDays });
+    if (can?.shifts?.viewAny || role === 'support_worker') scheduling.push({ title: 'Job Board', href: '/operations/job-board', icon: ClipboardList });
+    if (can?.rostering?.viewAny) scheduling.push({ title: 'Rostering', href: '/operations/rostering', icon: CalendarDays });
+    if (can?.rostering?.viewAny) scheduling.push({ title: 'Availability', href: '/operations/availability', icon: Clock });
+    if (scheduling.length > 0) groups.push({ label: 'Scheduling', items: scheduling });
+
+    // Time & Billing
+    const timeBilling: NavItem[] = [];
+    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned || role === 'support_worker') timeBilling.push({ title: 'Timesheets', href: '/operations/timesheets', icon: Clock });
+    if (can?.billing?.viewAny) timeBilling.push({ title: 'Billing', href: '/operations/billing', icon: DollarSign });
+    if (can?.invoices?.viewAny) timeBilling.push({ title: 'Invoices', href: '/operations/invoices', icon: Receipt });
+    if (can?.funding?.viewAny) timeBilling.push({ title: 'Funding', href: '/operations/funding', icon: PieChart });
+    if (can?.billing?.viewAny) timeBilling.push({ title: 'Price Books', href: '/operations/price-books', icon: BookOpen });
+    if (can?.quotes?.viewAny) timeBilling.push({ title: 'Quotes', href: '/operations/quotes', icon: FileText });
+    if (can?.billing?.viewAny) timeBilling.push({ title: 'Recurring Charges', href: '/operations/recurring-charges', icon: Receipt });
+    if (can?.mileage?.viewAny || can?.mileage?.viewOwn) timeBilling.push({ title: 'Mileage', href: '/operations/mileage', icon: Route });
+    if (timeBilling.length > 0) groups.push({ label: 'Time & Billing', items: timeBilling });
+
+    // Communications
+    const comms: NavItem[] = [];
+    if (can?.messages?.viewAny || can?.shifts?.viewAny) comms.push({ title: 'Messages', href: '/operations/messages', icon: MessageSquareText });
+    if (can?.handovers?.viewAny || can?.shifts?.viewAny) comms.push({ title: 'Handovers', href: '/operations/handovers', icon: GitBranch });
+    if (can?.shifts?.viewAny) comms.push({ title: 'Shift Notes', href: '/operations/shift-notes', icon: BookOpen });
+    if (comms.length > 0) groups.push({ label: 'Communications', items: comms });
+
+    // Tools
+    const tools: NavItem[] = [];
+    if (can?.custom_forms?.viewAny) tools.push({ title: 'Custom Forms', href: '/operations/forms', icon: ClipboardCheck });
+    if (can?.care_note_templates?.viewAny) tools.push({ title: 'Note Templates', href: '/operations/note-templates', icon: FileText });
+    if (can?.evv?.viewAny) tools.push({ title: 'EVV', href: '/operations/evv', icon: MapPin });
+    if (can?.evv?.viewAny) tools.push({ title: 'Geofences', href: '/operations/geofences', icon: MapPin });
+    if (can?.clients?.update) tools.push({ title: 'Family Portal', href: '/operations/family-portal', icon: Users });
+    if (tools.length > 0) groups.push({ label: 'Tools', items: tools });
+
+    // Reports
+    if (can?.operations?.reports?.view || can?.reports?.viewAny) {
+        groups.push({ label: 'Reports', items: [
+            { title: 'Reports & Analytics', href: '/operations/reports', icon: PieChart },
+        ]});
+    }
+
+    return groups;
+}
+
+function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    const groups: SubPanelGroup[] = [];
+
+    // Overview
+    groups.push({ label: 'Overview', items: [
+        { title: 'Dashboard', href: '/emar', icon: LayoutGrid },
+        { title: 'Daily Overview', href: '/emar/daily', icon: Activity },
+    ]});
+
+    // Administration
+    const admin: NavItem[] = [];
+    if (can?.medications?.view) admin.push({ title: 'MAR Charts', href: '/emar/mar', icon: ClipboardCheck });
+    if (can?.medications?.view) admin.push({ title: 'PRN Records', href: '/emar/prn', icon: BookOpen });
+    if (can?.medications?.view) admin.push({ title: 'Controlled Drugs', href: '/emar/controlled', icon: Shield });
+    if (can?.medications?.breakGlass) admin.push({ title: 'Emergency Access', href: '/emar/emergency-access', icon: ShieldAlert });
+    if (admin.length > 0) groups.push({ label: 'Administration', items: admin });
+
+    // Management
+    const mgmt: NavItem[] = [];
+    if (can?.medications?.view) mgmt.push({ title: 'Medications', href: '/emar/medications', icon: Pill });
+    if (can?.medications?.view) mgmt.push({ title: 'Stock Management', href: '/emar/stock', icon: Package });
+    if (can?.medications?.view) mgmt.push({ title: 'Prescriptions', href: '/emar/prescriptions', icon: FileText });
+    if (mgmt.length > 0) groups.push({ label: 'Management', items: mgmt });
+
+    // Compliance
+    const compliance: NavItem[] = [];
+    if (can?.medications?.audit?.view) compliance.push({ title: 'Audit Trail', href: '/emar/audit', icon: Shield });
+    if (can?.reports?.viewAny) compliance.push({ title: 'Reports', href: '/emar/reports', icon: PieChart });
+    if (can?.medications?.view) compliance.push({ title: 'Competency', href: '/emar/competency', icon: ClipboardCheck });
+    if (compliance.length > 0) groups.push({ label: 'Compliance', items: compliance });
+
     return groups;
 }
 
@@ -626,7 +730,7 @@ function SubPanel({
 
 export function AppSidebar() {
     const page = usePage<PageProps & Record<string, any>>();
-    const { auth, branding, name: appName } = page.props;
+    const { auth, branding, name: appName, labels } = page.props;
     const role = auth.user?.role ?? null;
     const can = auth?.can;
     const currentUrl = page.url;
@@ -640,7 +744,8 @@ export function AppSidebar() {
 
     const subPanelMap = useMemo(() => ({
         sites: buildSitesSubPanelGroups({ can }),
-        operations: buildOperationsSubPanelGroups({ can, role }),
+        operations: buildOperationsSubPanelGroups({ can, role, labels: labels as any }),
+        emar: buildEmarSubPanelGroups({ can }),
         safety: buildSafetySubPanelGroups({ can }),
         'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
         hr: buildHrSubPanelGroups({ can }),
@@ -814,7 +919,7 @@ export function AppSidebarMobile({
     onClose: () => void;
 }) {
     const page = usePage<PageProps & Record<string, any>>();
-    const { auth } = page.props;
+    const { auth, labels } = page.props as any;
     const role = auth.user?.role ?? null;
     const can = auth?.can;
     const currentUrl = page.url;
@@ -823,7 +928,8 @@ export function AppSidebarMobile({
 
     const mobileSubPanelMap = useMemo(() => ({
         sites: buildSitesSubPanelGroups({ can }),
-        operations: buildOperationsSubPanelGroups({ can, role }),
+        operations: buildOperationsSubPanelGroups({ can, role, labels: labels as any }),
+        emar: buildEmarSubPanelGroups({ can }),
         safety: buildSafetySubPanelGroups({ can }),
         'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
         hr: buildHrSubPanelGroups({ can }),

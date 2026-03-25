@@ -1,0 +1,1919 @@
+import PageHeader from '@/components/page-header';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { Textarea } from '@/components/ui/textarea';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
+import AppLayout from '@/layouts/app-layout';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import {
+    Activity,
+    AlertTriangle,
+    ClipboardList,
+    FileHeart,
+    Heart,
+    Package,
+    Phone,
+    Pill,
+    Plus,
+    Shield,
+    Stethoscope,
+    Syringe,
+    Thermometer,
+    User,
+} from 'lucide-react';
+import { useState } from 'react';
+
+type Props = {
+    client: { id: number; first_name: string; last_name: string };
+    can_edit: boolean;
+    can_record: boolean;
+    can_stock: boolean;
+    profile: any | null;
+    medications: Array<any>;
+    conditions: Array<any>;
+    emergency_contacts: Array<any>;
+    administrations: Array<any>;
+    can_controlled_view: boolean;
+    can_controlled_record: boolean;
+    can_controlled_witness: boolean;
+    witnesses: Array<any>;
+    controlled_entries: Array<any>;
+    controlled_discrepancies: Array<any>;
+    med_charts?: Array<any>;
+    has_open_controlled_discrepancy?: boolean;
+};
+
+export default function ClientMedical({
+    client,
+    can_edit,
+    can_record,
+    can_stock,
+    profile,
+    medications,
+    conditions,
+    emergency_contacts,
+    administrations,
+    can_controlled_view,
+    can_controlled_record,
+    can_controlled_witness,
+    witnesses,
+    controlled_entries,
+    controlled_discrepancies,
+    med_charts = [],
+    has_open_controlled_discrepancy = false,
+}: Props) {
+    const { labels } = usePage().props as any;
+    const name = `${client.first_name} ${client.last_name}`.trim();
+    const [confirmAdminOpen, setConfirmAdminOpen] = useState(false);
+
+    // When navigating from the client profile "Manage" buttons, we pass a section.
+    // This keeps the medical workflow focused instead of showing every create form at once.
+    const sectionParam =
+        typeof window !== 'undefined'
+            ? new URLSearchParams(window.location.search).get('section')
+            : null;
+    const [focusSection, setFocusSection] = useState<string>(sectionParam ?? 'all');
+
+    const profileForm = useForm({
+        medical_history: profile?.medical_history || '',
+        disabilities: profile?.disabilities || '',
+        allergies: profile?.allergies || '',
+        notes: profile?.notes || '',
+        gp_name: profile?.gp_name || '',
+        gp_practice: profile?.gp_practice || '',
+        gp_phone: profile?.gp_phone || '',
+        hospital_preference: profile?.hospital_preference || '',
+        blood_type: profile?.blood_type || '',
+    });
+
+    const medForm = useForm({
+        name: '',
+        dosage: '',
+        frequency: '',
+        dose_times: '' as any,
+        is_prn: false,
+        controlled_drug: false,
+        prn_reason: '',
+        max_per_day: '',
+        route: '',
+        form: '',
+        prescriber: '',
+        pharmacy: '',
+        state: 'active',
+        ceased_at: '',
+        ceased_reason: '',
+        start_date: '',
+        end_date: '',
+        instructions: '',
+        active: true,
+    });
+
+    const administrationForm = useForm({
+        medication_id: medications?.[0]?.id ?? '',
+        status: 'given',
+        reason: '',
+        dose_given: '',
+        administered_at: new Date().toISOString().slice(0, 16),
+        scheduled_for: '',
+        shift_id: '',
+        witnessed_by: '',
+        notes: '',
+    });
+
+    const selectedMedication = medications.find(
+        (m) => `${m.id}` === `${administrationForm.data.medication_id}`,
+    );
+    const administrationNeedsReason =
+        administrationForm.data.status !== 'given' || !!selectedMedication?.is_prn;
+
+    const stockForm = useForm({
+        medication_id: medications?.[0]?.id ?? '',
+        on_hand: '',
+        unit: '',
+        reorder_level: '',
+        last_counted_at: '',
+        notes: '',
+        reason: '',
+        witnessed_by: '',
+    });
+
+    const [closeDiscOpen, setCloseDiscOpen] = useState(false);
+    const [selectedDiscId, setSelectedDiscId] = useState<number | null>(null);
+    const closeDiscForm = useForm({
+        resolution_notes: '',
+    });
+
+    const selectedStockMedication = medications.find(
+        (m) => `${m.id}` === `${stockForm.data.medication_id}`,
+    );
+    const conditionForm = useForm({
+        label: '',
+        severity: '',
+        notes: '',
+    });
+
+    const contactForm = useForm({
+        name: '',
+        relationship: '',
+        phone: '',
+        email: '',
+        notes: '',
+    });
+
+    const submitAdministration = () => {
+        administrationForm.post(
+            `/operations/clients/${client.id}/medical/medications/${administrationForm.data.medication_id}/administrations`,
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    administrationForm.reset('dose_given', 'scheduled_for', 'notes', 'reason');
+                    administrationForm.reset('witnessed_by');
+                    setConfirmAdminOpen(false);
+                },
+            },
+        );
+    };
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: labels?.['client.plural'] ?? 'Clients', href: '/clients' },
+                { title: name, href: `/operations/clients/${client.id}` },
+                { title: 'Medical', href: `/operations/clients/${client.id}/medical` },
+            ]}
+        >
+            <Head title={`Medical - ${name}`} />
+
+            <div className="space-y-6">
+                <PageHeader
+                    title="Medical Profile"
+                    description={`Medical information and health records for ${name}.`}
+                    backHref={`/operations/clients/${client.id}`}
+                    actions={
+                        <Button variant="outline" onClick={() => (window.location.href = `/operations/clients/${client.id}/mar`)}>
+                            <ClipboardList className="mr-2 h-4 w-4" />
+                            Open Daily MAR
+                        </Button>
+                    }
+                />
+
+                {has_open_controlled_discrepancy && (
+                    <div className="flex items-center gap-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
+                        <AlertTriangle className="h-6 w-6 shrink-0 text-amber-600" />
+                        <div>
+                            <p className="text-sm font-bold text-amber-800">Open Controlled Drug Discrepancy</p>
+                            <p className="text-sm text-amber-700">
+                                There is an open controlled-drug discrepancy for this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}. Review and resolve before further controlled stock edits (unless override is granted).
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {/* Allergy alert banner */}
+                {profile?.allergies && (
+                    <div className="flex items-center gap-3 rounded-xl border-2 border-red-300 bg-red-50 p-4">
+                        <AlertTriangle className="h-6 w-6 shrink-0 text-red-600" />
+                        <div>
+                            <p className="text-sm font-bold text-red-800">Allergies</p>
+                            <p className="text-sm text-red-700">{profile.allergies}</p>
+                        </div>
+                    </div>
+                )}
+
+                {med_charts.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2.5 text-base">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                                    <ClipboardList className="h-4 w-4" />
+                                </div>
+                                Medication Chart (Source of Truth)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {med_charts.map((d: any) => (
+                                <div key={d.id} className="flex items-center justify-between rounded-lg border p-3">
+                                    <div>
+                                        <div className="text-sm font-medium">{d.title}</div>
+                                        <div className="text-xs text-muted-foreground">
+                                            {d.version ? `v${d.version} \u2022 ` : ''}
+                                            {d.effective_date ? `Effective: ${new Date(d.effective_date).toLocaleDateString()}` : ''}
+                                        </div>
+                                    </div>
+                                    <Button variant="outline" size="sm" onClick={() => (window.location.href = `/operations/clients/${client.id}/documents/${d.id}/download`)}>
+                                        Download
+                                    </Button>
+                                </div>
+                            ))}
+                            <div className="text-xs text-muted-foreground">To upload/update charts, use the Documents tab (category: Medication chart).</div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Section navigation pills */}
+                <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white/50 p-2 shadow-sm">
+                    {[
+                        { key: 'all', label: 'Overview', icon: Activity },
+                        { key: 'profile', label: 'Medical Profile', icon: FileHeart },
+                        { key: 'medications', label: 'Medications', icon: Pill },
+                        { key: 'conditions', label: 'Conditions', icon: Thermometer },
+                        { key: 'emergency_contacts', label: 'Emergency Contacts', icon: Phone },
+                    ].map(s => (
+                        <Button key={s.key} size="sm"
+                            variant={focusSection === s.key ? 'default' : 'ghost'}
+                            className={`gap-1.5 text-xs ${focusSection === s.key ? 'bg-violet-600 hover:bg-violet-700' : ''}`}
+                            onClick={() => setFocusSection(s.key)}>
+                            <s.icon className="h-3.5 w-3.5" />
+                            {s.label}
+                        </Button>
+                    ))}
+                </div>
+
+                <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2">
+                    {/* Medical Profile Card */}
+                    <Card className={cn(focusSection !== 'all' && focusSection !== 'profile' && 'hidden')}>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2.5 text-base">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                                    <FileHeart className="h-4 w-4" />
+                                </div>
+                                Medical Profile
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {/* GP Information highlight card */}
+                            {(profile?.gp_name || profile?.gp_practice || profile?.gp_phone) && (
+                                <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                                    <div className="flex items-center gap-2 mb-2">
+                                        <Stethoscope className="h-4 w-4 text-emerald-600" />
+                                        <span className="text-sm font-semibold text-emerald-800">GP / Primary Care</span>
+                                    </div>
+                                    <div className="grid gap-2 sm:grid-cols-3 text-sm">
+                                        {profile.gp_name && <div><span className="text-xs text-muted-foreground">Doctor</span><p className="font-medium">{profile.gp_name}</p></div>}
+                                        {profile.gp_practice && <div><span className="text-xs text-muted-foreground">Practice</span><p className="font-medium">{profile.gp_practice}</p></div>}
+                                        {profile.gp_phone && <div><span className="text-xs text-muted-foreground">Phone</span><p className="font-medium">{profile.gp_phone}</p></div>}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div>
+                                <Label>Medical history</Label>
+                                <Textarea
+                                    value={profileForm.data.medical_history}
+                                    onChange={(e) =>
+                                        profileForm.setData(
+                                            'medical_history',
+                                            e.target.value,
+                                        )
+                                    }
+                                    disabled={!can_edit}
+                                />
+                            </div>
+                            <div>
+                                <Label>Disabilities</Label>
+                                <Textarea
+                                    value={profileForm.data.disabilities}
+                                    onChange={(e) =>
+                                        profileForm.setData(
+                                            'disabilities',
+                                            e.target.value,
+                                        )
+                                    }
+                                    disabled={!can_edit}
+                                />
+                            </div>
+                            <div>
+                                <Label>Allergies</Label>
+                                <Textarea
+                                    value={profileForm.data.allergies}
+                                    onChange={(e) =>
+                                        profileForm.setData(
+                                            'allergies',
+                                            e.target.value,
+                                        )
+                                    }
+                                    disabled={!can_edit}
+                                />
+                            </div>
+                            <div>
+                                <Label>Notes</Label>
+                                <Textarea
+                                    value={profileForm.data.notes}
+                                    onChange={(e) =>
+                                        profileForm.setData('notes', e.target.value)
+                                    }
+                                    disabled={!can_edit}
+                                />
+                            </div>
+
+                            <Separator />
+
+                            {/* GP / Hospital / Blood Type fields */}
+                            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                <div>
+                                    <Label>GP name</Label>
+                                    <Input
+                                        value={profileForm.data.gp_name}
+                                        onChange={(e) => profileForm.setData('gp_name', e.target.value)}
+                                        disabled={!can_edit}
+                                        placeholder="Dr. Smith"
+                                    />
+                                </div>
+                                <div>
+                                    <Label>GP practice</Label>
+                                    <Input
+                                        value={profileForm.data.gp_practice}
+                                        onChange={(e) => profileForm.setData('gp_practice', e.target.value)}
+                                        disabled={!can_edit}
+                                        placeholder="Riverside Medical Centre"
+                                    />
+                                </div>
+                                <div>
+                                    <Label>GP phone</Label>
+                                    <Input
+                                        value={profileForm.data.gp_phone}
+                                        onChange={(e) => profileForm.setData('gp_phone', e.target.value)}
+                                        disabled={!can_edit}
+                                        placeholder="0123 456 7890"
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Hospital preference</Label>
+                                    <Input
+                                        value={profileForm.data.hospital_preference}
+                                        onChange={(e) => profileForm.setData('hospital_preference', e.target.value)}
+                                        disabled={!can_edit}
+                                        placeholder="e.g. Royal Infirmary"
+                                    />
+                                </div>
+                                <div>
+                                    <Label>Blood type</Label>
+                                    <Select
+                                        value={profileForm.data.blood_type}
+                                        onValueChange={(v) => profileForm.setData('blood_type', v)}
+                                        disabled={!can_edit}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select blood type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-', 'Unknown'].map(bt => (
+                                                <SelectItem key={bt} value={bt}>{bt}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {can_edit && (
+                                <Button
+                                    className="bg-violet-600 hover:bg-violet-700"
+                                    onClick={() =>
+                                        profileForm.put(
+                                            `/operations/clients/${client.id}/medical/profile`,
+                                            {
+                                                preserveScroll: true,
+                                            },
+                                        )
+                                    }
+                                    disabled={profileForm.processing}
+                                >
+                                    Save profile
+                                </Button>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Medications Card */}
+                    <Card className={cn(focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2.5 text-base">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                                    <Pill className="h-4 w-4" />
+                                </div>
+                                Medications
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {can_edit && (
+                                <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/30 p-4">
+                                    <div className="flex items-center gap-2 text-sm font-medium text-violet-800">
+                                        <Plus className="h-4 w-4" />
+                                        Add medication
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        <div>
+                                            <Label>Name</Label>
+                                            <Input
+                                                value={medForm.data.name}
+                                                onChange={(e) =>
+                                                    medForm.setData(
+                                                        'name',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Dosage</Label>
+                                            <Input
+                                                value={medForm.data.dosage}
+                                                onChange={(e) =>
+                                                    medForm.setData(
+                                                        'dosage',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Frequency</Label>
+                                            <Input
+                                                value={medForm.data.frequency}
+                                                onChange={(e) =>
+                                                    medForm.setData(
+                                                        'frequency',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2 pt-6">
+                                            <Checkbox
+                                                checked={!!medForm.data.is_prn}
+                                                onCheckedChange={(v) =>
+                                                    medForm.setData('is_prn', !!v)
+                                                }
+                                            />
+                                            <Label className="!mt-0">PRN (as needed)</Label>
+                                        </div>
+                                        <div className="flex items-center gap-2 pt-6">
+                                            <Checkbox
+                                                checked={!!medForm.data.controlled_drug}
+                                                onCheckedChange={(v) =>
+                                                    medForm.setData(
+                                                        'controlled_drug',
+                                                        !!v,
+                                                    )
+                                                }
+                                            />
+                                            <Label className="!mt-0">
+                                                Controlled drug (double-sign required)
+                                            </Label>
+                                        </div>
+                                        {medForm.data.is_prn && (
+                                            <>
+                                                <div>
+                                                    <Label>PRN reason</Label>
+                                                    <Input
+                                                        value={medForm.data.prn_reason}
+                                                        onChange={(e) =>
+                                                            medForm.setData(
+                                                                'prn_reason',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>Max per day</Label>
+                                                    <Input
+                                                        value={medForm.data.max_per_day}
+                                                        onChange={(e) =>
+                                                            medForm.setData(
+                                                                'max_per_day',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+                                        <div>
+                                            <Label>Route</Label>
+                                            <Input
+                                                value={medForm.data.route}
+                                                onChange={(e) =>
+                                                    medForm.setData(
+                                                        'route',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Prescriber</Label>
+                                            <Input
+                                                value={medForm.data.prescriber}
+                                                onChange={(e) =>
+                                                    medForm.setData(
+                                                        'prescriber',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Pharmacy</Label>
+                                            <Input
+                                                value={medForm.data.pharmacy}
+                                                onChange={(e) =>
+                                                    medForm.setData(
+                                                        'pharmacy',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Form (tablet/liquid/patch)</Label>
+                                            <Input
+                                                value={medForm.data.form}
+                                                onChange={(e) =>
+                                                    medForm.setData(
+                                                        'form',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Dose times (HH:MM, comma separated)</Label>
+                                            <Input
+                                                value={medForm.data.dose_times as any}
+                                                onChange={(e) =>
+                                                    medForm.setData(
+                                                        'dose_times',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="e.g. 08:00, 12:00, 18:00"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>State</Label>
+                                            <Select
+                                                value={medForm.data.state}
+                                                onValueChange={(v) =>
+                                                    medForm.setData('state', v)
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select state" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="active">Active</SelectItem>
+                                                    <SelectItem value="paused">Paused</SelectItem>
+                                                    <SelectItem value="ceased">Ceased</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        {medForm.data.state === 'ceased' && (
+                                            <>
+                                                <div>
+                                                    <Label>Ceased date</Label>
+                                                    <Input
+                                                        type="date"
+                                                        value={medForm.data.ceased_at}
+                                                        onChange={(e) =>
+                                                            medForm.setData(
+                                                                'ceased_at',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>Ceased reason</Label>
+                                                    <Input
+                                                        value={medForm.data.ceased_reason}
+                                                        onChange={(e) =>
+                                                            medForm.setData(
+                                                                'ceased_reason',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                    />
+                                                </div>
+                                            </>
+                                        )}
+                                        <div>
+                                            <Label>Start date</Label>
+                                            <Input
+                                                type="date"
+                                                value={medForm.data.start_date}
+                                                onChange={(e) =>
+                                                    medForm.setData(
+                                                        'start_date',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>End date</Label>
+                                            <Input
+                                                type="date"
+                                                value={medForm.data.end_date}
+                                                onChange={(e) =>
+                                                    medForm.setData(
+                                                        'end_date',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <Label>Instructions</Label>
+                                            <Textarea
+                                                value={medForm.data.instructions}
+                                                onChange={(e) =>
+                                                    medForm.setData(
+                                                        'instructions',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-2 pt-6">
+                                            <Checkbox
+                                                checked={!!medForm.data.active}
+                                                onCheckedChange={(v) =>
+                                                    medForm.setData('active', !!v)
+                                                }
+                                            />
+                                            <Label className="!mt-0">Active</Label>
+                                        </div>
+                                    </div>
+                                    <div className="mt-3">
+                                        <Button
+                                            className="bg-violet-600 hover:bg-violet-700"
+                                            onClick={() => {
+                                                // Inertia's useForm().transform() does not always support chaining in all versions.
+                                                // Normalize dose_times without relying on chained calls.
+                                                const dt =
+                                                    typeof (medForm.data as any).dose_times === 'string'
+                                                        ? (medForm.data as any).dose_times
+                                                              .split(',')
+                                                              .map((s: string) => s.trim())
+                                                              .filter(Boolean)
+                                                        : (medForm.data as any).dose_times;
+                                                medForm.setData('dose_times', dt as any);
+                                                medForm.post(`/operations/clients/${client.id}/medical/medications`, {
+                                                    preserveScroll: true,
+                                                    onSuccess: () => medForm.reset(),
+                                                });
+                                            }}
+                                            disabled={
+                                                medForm.processing ||
+                                                !medForm.data.name.trim()
+                                            }
+                                        >
+                                            <Plus className="mr-1 h-4 w-4" />
+                                            Add
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            <Separator />
+
+                            {/* Medication list */}
+                            <div className="space-y-2">
+                                {medications.map((m) => {
+                                    const isActive = m.state === 'active' || m.active;
+                                    const isOverdue = m.end_date && new Date(m.end_date) < new Date();
+                                    return (
+                                        <div
+                                            key={m.id}
+                                            className={cn(
+                                                'rounded-lg border p-4 transition-colors',
+                                                isActive
+                                                    ? 'border-l-4 border-l-violet-400 bg-white'
+                                                    : 'border-l-4 border-l-slate-200 bg-slate-50/50',
+                                            )}
+                                        >
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="flex items-center gap-2">
+                                                    <Pill className="h-4 w-4 text-violet-500" />
+                                                    <span className="text-sm font-semibold">{m.name}</span>
+                                                    {m.controlled_drug && (
+                                                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                                            Controlled
+                                                        </span>
+                                                    )}
+                                                    {m.is_prn && (
+                                                        <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[10px] font-medium text-blue-700">
+                                                            PRN
+                                                        </span>
+                                                    )}
+                                                    {!isActive && (
+                                                        <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                                                            {m.state || 'Inactive'}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {can_edit && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                        onClick={() =>
+                                                            medForm.delete(
+                                                                `/operations/clients/${client.id}/medical/medications/${m.id}`,
+                                                                {
+                                                                    preserveScroll: true,
+                                                                },
+                                                            )
+                                                        }
+                                                    >
+                                                        Remove
+                                                    </Button>
+                                                )}
+                                            </div>
+                                            <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                                {m.dosage && <span>Dosage: <span className="font-medium text-foreground">{m.dosage}</span></span>}
+                                                {m.frequency && <span>Frequency: <span className="font-medium text-foreground">{m.frequency}</span></span>}
+                                                {m.route && <span>Route: <span className="font-medium text-foreground">{m.route}</span></span>}
+                                            </div>
+                                            {m.instructions && (
+                                                <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                                                    {m.instructions}
+                                                </div>
+                                            )}
+                                            {isOverdue && (
+                                                <div className="mt-2 flex items-center gap-1 text-xs text-red-600">
+                                                    <AlertTriangle className="h-3 w-3" />
+                                                    Review overdue (end date: {new Date(m.end_date).toLocaleDateString()})
+                                                </div>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                                {!medications.length && (
+                                    <div className="py-6 text-center text-sm text-muted-foreground">
+                                        No medications listed.
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Conditions Card */}
+                    <Card className={cn(focusSection !== 'all' && focusSection !== 'conditions' && 'hidden')}>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2.5 text-base">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                    <Thermometer className="h-4 w-4" />
+                                </div>
+                                Conditions
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {can_edit && (
+                                <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50/30 p-4">
+                                    <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                                        <Plus className="h-4 w-4" />
+                                        Add condition
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        <div>
+                                            <Label>Label</Label>
+                                            <Input
+                                                value={conditionForm.data.label}
+                                                onChange={(e) =>
+                                                    conditionForm.setData(
+                                                        'label',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Severity</Label>
+                                            <Input
+                                                value={conditionForm.data.severity}
+                                                onChange={(e) =>
+                                                    conditionForm.setData(
+                                                        'severity',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                placeholder="mild / moderate / severe"
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <Label>Notes</Label>
+                                            <Textarea
+                                                value={conditionForm.data.notes}
+                                                onChange={(e) =>
+                                                    conditionForm.setData(
+                                                        'notes',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="mt-3">
+                                        <Button
+                                            className="bg-amber-600 hover:bg-amber-700"
+                                            onClick={() =>
+                                                conditionForm.post(
+                                                    `/operations/clients/${client.id}/medical/conditions`,
+                                                    {
+                                                        preserveScroll: true,
+                                                        onSuccess: () =>
+                                                            conditionForm.reset(),
+                                                    },
+                                                )
+                                            }
+                                            disabled={
+                                                conditionForm.processing ||
+                                                !conditionForm.data.label.trim()
+                                            }
+                                        >
+                                            <Plus className="mr-1 h-4 w-4" />
+                                            Add
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            <Separator />
+
+                            <div className="space-y-2">
+                                {conditions.map((c) => (
+                                    <div
+                                        key={c.id}
+                                        className="rounded-lg border border-l-4 border-l-amber-300 p-4"
+                                    >
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <Thermometer className="h-4 w-4 text-amber-500" />
+                                                <span className="text-sm font-semibold">{c.label}</span>
+                                                {c.severity && (
+                                                    <span className={cn(
+                                                        'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                                                        c.severity === 'severe' ? 'bg-red-100 text-red-700' :
+                                                        c.severity === 'moderate' ? 'bg-amber-100 text-amber-700' :
+                                                        'bg-green-100 text-green-700',
+                                                    )}>
+                                                        {c.severity}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            {can_edit && (
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                    onClick={() =>
+                                                        conditionForm.delete(
+                                                            `/operations/clients/${client.id}/medical/conditions/${c.id}`,
+                                                            {
+                                                                preserveScroll: true,
+                                                            },
+                                                        )
+                                                    }
+                                                >
+                                                    Remove
+                                                </Button>
+                                            )}
+                                        </div>
+                                        {c.notes && (
+                                            <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                                                {c.notes}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                {!conditions.length && (
+                                    <div className="py-6 text-center text-sm text-muted-foreground">
+                                        No conditions listed.
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Emergency Contacts Card */}
+                    <Card className={cn(focusSection !== 'all' && focusSection !== 'emergency_contacts' && 'hidden')}>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2.5 text-base">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                                    <Phone className="h-4 w-4" />
+                                </div>
+                                Emergency Contacts
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {can_edit && (
+                                <div className="rounded-xl border border-dashed border-blue-200 bg-blue-50/30 p-4">
+                                    <div className="flex items-center gap-2 text-sm font-medium text-blue-800">
+                                        <Plus className="h-4 w-4" />
+                                        Add emergency contact
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        <div>
+                                            <Label>Name</Label>
+                                            <Input
+                                                value={contactForm.data.name}
+                                                onChange={(e) =>
+                                                    contactForm.setData(
+                                                        'name',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Relationship</Label>
+                                            <Input
+                                                value={
+                                                    contactForm.data.relationship
+                                                }
+                                                onChange={(e) =>
+                                                    contactForm.setData(
+                                                        'relationship',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Phone</Label>
+                                            <Input
+                                                value={contactForm.data.phone}
+                                                onChange={(e) =>
+                                                    contactForm.setData(
+                                                        'phone',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Email</Label>
+                                            <Input
+                                                value={contactForm.data.email}
+                                                onChange={(e) =>
+                                                    contactForm.setData(
+                                                        'email',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <Label>Notes</Label>
+                                            <Textarea
+                                                value={contactForm.data.notes}
+                                                onChange={(e) =>
+                                                    contactForm.setData(
+                                                        'notes',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="mt-3">
+                                        <Button
+                                            className="bg-blue-600 hover:bg-blue-700"
+                                            onClick={() =>
+                                                contactForm.post(
+                                                    `/operations/clients/${client.id}/medical/emergency-contacts`,
+                                                    {
+                                                        preserveScroll: true,
+                                                        onSuccess: () =>
+                                                            contactForm.reset(),
+                                                    },
+                                                )
+                                            }
+                                            disabled={
+                                                contactForm.processing ||
+                                                !contactForm.data.name.trim()
+                                            }
+                                        >
+                                            <Plus className="mr-1 h-4 w-4" />
+                                            Add
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            <Separator />
+
+                            <div className="space-y-2">
+                                {emergency_contacts.map((ec, idx) => {
+                                    const initials = ec.name
+                                        ? ec.name.split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
+                                        : '??';
+                                    return (
+                                        <div
+                                            key={ec.id}
+                                            className="rounded-lg border p-4"
+                                        >
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                                                    {initials}
+                                                </div>
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="text-sm font-semibold">{ec.name}</span>
+                                                        {ec.relationship && (
+                                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-600">
+                                                                {ec.relationship}
+                                                            </span>
+                                                        )}
+                                                        {ec.authorised_for_health_info && (
+                                                            <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-medium text-green-700">
+                                                                <Shield className="mr-0.5 inline h-3 w-3" />
+                                                                Health info authorised
+                                                            </span>
+                                                        )}
+                                                        {ec.contact_order && (
+                                                            <span className="rounded-full bg-violet-100 px-2 py-0.5 text-[10px] font-medium text-violet-700">
+                                                                #{ec.contact_order}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-1 flex flex-wrap gap-x-4 text-xs text-muted-foreground">
+                                                        {ec.phone && (
+                                                            <span className="flex items-center gap-1">
+                                                                <Phone className="h-3 w-3" />
+                                                                {ec.phone}
+                                                            </span>
+                                                        )}
+                                                        {ec.email && (
+                                                            <span>{ec.email}</span>
+                                                        )}
+                                                    </div>
+                                                    {ec.notes && (
+                                                        <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                                                            {ec.notes}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                {can_edit && (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="shrink-0 text-red-600 hover:bg-red-50 hover:text-red-700"
+                                                        onClick={() =>
+                                                            contactForm.delete(
+                                                                `/operations/clients/${client.id}/medical/emergency-contacts/${ec.id}`,
+                                                                {
+                                                                    preserveScroll: true,
+                                                                },
+                                                            )
+                                                        }
+                                                    >
+                                                        Remove
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                                {!emergency_contacts.length && (
+                                    <div className="py-6 text-center text-sm text-muted-foreground">
+                                        No emergency contacts listed.
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* MAR + Stock */}
+                <div className={cn('grid gap-4 md:grid-cols-2', focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2.5 text-base">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                                    <Syringe className="h-4 w-4" />
+                                </div>
+                                Medication Administration (MAR)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {can_record && medications.length > 0 && (
+                                <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/30 p-4">
+                                    <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                                        <Plus className="h-4 w-4" />
+                                        Record administration
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        <div className="md:col-span-2">
+                                            <Label>Medication</Label>
+                                            <Select
+                                                value={`${administrationForm.data.medication_id}`}
+                                                onValueChange={(v) =>
+                                                    administrationForm.setData(
+                                                        'medication_id',
+                                                        v,
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select medication" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {medications.map((m) => (
+                                                        <SelectItem
+                                                            key={m.id}
+                                                            value={`${m.id}`}
+                                                        >
+                                                            {m.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div>
+                                            <Label>Status</Label>
+                                            <Select
+                                                value={administrationForm.data.status}
+                                                onValueChange={(v) =>
+                                                    administrationForm.setData(
+                                                        'status',
+                                                        v,
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="given">
+                                                        Given
+                                                    </SelectItem>
+                                                    <SelectItem value="refused">
+                                                        Refused
+                                                    </SelectItem>
+                                                    <SelectItem value="missed">
+                                                        Missed
+                                                    </SelectItem>
+                                                    <SelectItem value="withheld">
+                                                        Withheld
+                                                    </SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        {administrationNeedsReason && (
+                                            <div className="md:col-span-2">
+                                                <Label>
+                                                    {selectedMedication?.is_prn
+                                                        ? 'Indication (required for PRN)'
+                                                        : 'Reason (required)'}
+                                                </Label>
+                                                <Input
+                                                    value={administrationForm.data.reason}
+                                                    onChange={(e) =>
+                                                        administrationForm.setData(
+                                                            'reason',
+                                                            e.target.value,
+                                                        )
+                                                    }
+                                                    placeholder={
+                                                        selectedMedication?.is_prn
+                                                            ? 'e.g. headache, anxiety, pain'
+                                                            : 'e.g. client refused, clinical hold, unavailable'
+                                                    }
+                                                />
+                                                {administrationForm.errors.reason && (
+                                                    <div className="mt-1 text-xs text-red-600">
+                                                        {administrationForm.errors.reason}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {selectedMedication?.controlled_drug &&
+                                            administrationForm.data.status === 'given' && (
+                                                <div className="md:col-span-2">
+                                                    <Label>Witness (required)</Label>
+                                                    <Select
+                                                        value={`${administrationForm.data.witnessed_by}`}
+                                                        onValueChange={(v) =>
+                                                            administrationForm.setData(
+                                                                'witnessed_by',
+                                                                v,
+                                                            )
+                                                        }
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select witness" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {witnesses.map((w: any) => (
+                                                                <SelectItem
+                                                                    key={w.id}
+                                                                    value={`${w.id}`}
+                                                                >
+                                                                    {w.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {administrationForm.errors.witnessed_by && (
+                                                        <div className="mt-1 text-xs text-red-600">
+                                                            {administrationForm.errors.witnessed_by}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
+                                        <div>
+                                            <Label>Dose given</Label>
+                                            <Input
+                                                value={administrationForm.data.dose_given}
+                                                onChange={(e) =>
+                                                    administrationForm.setData(
+                                                        'dose_given',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <Label>Administered at</Label>
+                                            <Input
+                                                type="datetime-local"
+                                                value={administrationForm.data.administered_at}
+                                                onChange={(e) =>
+                                                    administrationForm.setData(
+                                                        'administered_at',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+
+                                        <div>
+                                            <Label>Scheduled for (optional)</Label>
+                                            <Input
+                                                type="datetime-local"
+                                                value={administrationForm.data.scheduled_for}
+                                                onChange={(e) =>
+                                                    administrationForm.setData(
+                                                        'scheduled_for',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+
+                                        <div className="md:col-span-2">
+                                            <Label>Notes</Label>
+                                            <Textarea
+                                                value={administrationForm.data.notes}
+                                                onChange={(e) =>
+                                                    administrationForm.setData(
+                                                        'notes',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="mt-3">
+                                        <Button
+                                            className="bg-emerald-600 hover:bg-emerald-700"
+                                            onClick={() => {
+                                                administrationForm.clearErrors();
+                                                if (!administrationForm.data.medication_id) return;
+                                                if (
+                                                    administrationNeedsReason &&
+                                                    !administrationForm.data.reason
+                                                ) {
+                                                    administrationForm.setError(
+                                                        'reason',
+                                                        'A reason/indication is required.',
+                                                    );
+                                                    return;
+                                                }
+                                                if (
+                                                    selectedMedication?.controlled_drug &&
+                                                    administrationForm.data.status === 'given' &&
+                                                    !administrationForm.data.witnessed_by
+                                                ) {
+                                                    administrationForm.setError(
+                                                        'witnessed_by',
+                                                        'A witness is required for controlled drug administration.',
+                                                    );
+                                                    return;
+                                                }
+                                                setConfirmAdminOpen(true);
+                                            }}
+                                            disabled={
+                                                administrationForm.processing ||
+                                                !administrationForm.data
+                                                    .medication_id
+                                            }
+                                        >
+                                            Save
+                                        </Button>
+
+                                        <Dialog
+                                            open={confirmAdminOpen}
+                                            onOpenChange={setConfirmAdminOpen}
+                                        >
+                                            <DialogContent>
+                                                <DialogHeader>
+                                                    <DialogTitle>
+                                                        Confirm medication administration
+                                                    </DialogTitle>
+                                                </DialogHeader>
+
+                                                <div className="space-y-2 text-sm">
+                                                    <div>
+                                                        <span className="font-medium">
+                                                            Medication:
+                                                        </span>{' '}
+                                                        {selectedMedication?.name || 'Medication'}
+                                                    </div>
+                                                    <div>
+                                                        <span className="font-medium">
+                                                            Outcome:
+                                                        </span>{' '}
+                                                        {administrationForm.data.status}
+                                                    </div>
+                                                    {administrationForm.data.reason && (
+                                                        <div>
+                                                            <span className="font-medium">
+                                                                Reason:
+                                                            </span>{' '}
+                                                            {administrationForm.data.reason}
+                                                        </div>
+                                                    )}
+                                                    <div>
+                                                        <span className="font-medium">
+                                                            Administered at:
+                                                        </span>{' '}
+                                                        {administrationForm.data.administered_at}
+                                                    </div>
+                                                </div>
+
+                                                <DialogFooter>
+                                                    <Button
+                                                        variant="outline"
+                                                        onClick={() =>
+                                                            setConfirmAdminOpen(false)
+                                                        }
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                    <Button
+                                                        className="bg-violet-600 hover:bg-violet-700"
+                                                        onClick={submitAdministration}
+                                                        disabled={administrationForm.processing}
+                                                    >
+                                                        Confirm
+                                                    </Button>
+                                                </DialogFooter>
+                                            </DialogContent>
+                                        </Dialog>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                {administrations.map((a) => (
+                                    <div
+                                        key={a.id}
+                                        className={cn(
+                                            'rounded-lg border p-3',
+                                            a.status === 'given' ? 'border-l-4 border-l-emerald-400' : 'border-l-4 border-l-amber-400',
+                                        )}
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="text-sm font-medium">
+                                                {a.medication?.name || 'Medication'}
+                                            </div>
+                                            <span className={cn(
+                                                'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                                                a.status === 'given' ? 'bg-emerald-100 text-emerald-700' :
+                                                a.status === 'refused' ? 'bg-red-100 text-red-700' :
+                                                a.status === 'missed' ? 'bg-amber-100 text-amber-700' :
+                                                'bg-slate-100 text-slate-700',
+                                            )}>
+                                                {a.status}
+                                            </span>
+                                        </div>
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            {a.administered_at
+                                                ? `Administered: ${new Date(a.administered_at).toLocaleString()}`
+                                                : ''}
+                                            {a.administeredBy?.name
+                                                ? ` \u2022 By: ${a.administeredBy.name}`
+                                                : ''}
+                                            {a.dose_given
+                                                ? ` \u2022 Dose: ${a.dose_given}`
+                                                : ''}
+                                            {a.late_minutes && a.late_minutes > 0
+                                                ? ` \u2022 Late: ${a.late_minutes} min`
+                                                : ''}
+                                            {a.serviceContext?.name
+                                                ? ` \u2022 Context: ${a.serviceContext.name}`
+                                                : ''}
+                                        </div>
+                                        {a.reason && a.status !== 'given' && (
+                                            <div className="mt-2 text-xs text-muted-foreground">
+                                                Reason: {a.reason}
+                                            </div>
+                                        )}
+                                        {a.notes && (
+                                            <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                                                {a.notes}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                {!administrations.length && (
+                                    <div className="py-6 text-center text-sm text-muted-foreground">
+                                        No administrations recorded yet.
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2.5 text-base">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 text-indigo-600">
+                                    <Package className="h-4 w-4" />
+                                </div>
+                                Stock
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            {can_stock && medications.length > 0 && (
+                                <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/30 p-4">
+                                    <div className="flex items-center gap-2 text-sm font-medium text-indigo-800">
+                                        <Plus className="h-4 w-4" />
+                                        Update stock
+                                    </div>
+                                    <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        <div className="md:col-span-2">
+                                            <Label>Medication</Label>
+                                            <Select
+                                                value={`${stockForm.data.medication_id}`}
+                                                onValueChange={(v) =>
+                                                    stockForm.setData(
+                                                        'medication_id',
+                                                        v,
+                                                    )
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select medication" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {medications.map((m) => (
+                                                        <SelectItem
+                                                            key={m.id}
+                                                            value={`${m.id}`}
+                                                        >
+                                                            {m.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        {selectedStockMedication?.controlled_drug && (
+                                            <>
+                                                <div className="md:col-span-2">
+                                                    <Label>Reason (required for controlled drug stock)</Label>
+                                                    <Input
+                                                        value={stockForm.data.reason}
+                                                        onChange={(e) =>
+                                                            stockForm.setData(
+                                                                'reason',
+                                                                e.target.value,
+                                                            )
+                                                        }
+                                                        placeholder="e.g. stock count, discrepancy investigation"
+                                                    />
+                                                    {stockForm.errors.reason && (
+                                                        <div className="mt-1 text-xs text-red-600">
+                                                            {stockForm.errors.reason}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                                <div className="md:col-span-2">
+                                                    <Label>Witness (required)</Label>
+                                                    <Select
+                                                        value={`${stockForm.data.witnessed_by}`}
+                                                        onValueChange={(v) =>
+                                                            stockForm.setData(
+                                                                'witnessed_by',
+                                                                v,
+                                                            )
+                                                        }
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select witness" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {witnesses.map((w: any) => (
+                                                                <SelectItem
+                                                                    key={w.id}
+                                                                    value={`${w.id}`}
+                                                                >
+                                                                    {w.name}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {stockForm.errors.witnessed_by && (
+                                                        <div className="mt-1 text-xs text-red-600">
+                                                            {stockForm.errors.witnessed_by}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </>
+                                        )}
+                                        <div>
+                                            <Label>On hand</Label>
+                                            <Input
+                                                value={stockForm.data.on_hand}
+                                                onChange={(e) =>
+                                                    stockForm.setData(
+                                                        'on_hand',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Unit</Label>
+                                            <Input
+                                                value={stockForm.data.unit}
+                                                onChange={(e) =>
+                                                    stockForm.setData(
+                                                        'unit',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Reorder level</Label>
+                                            <Input
+                                                value={stockForm.data.reorder_level}
+                                                onChange={(e) =>
+                                                    stockForm.setData(
+                                                        'reorder_level',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Last counted (optional)</Label>
+                                            <Input
+                                                type="date"
+                                                value={stockForm.data.last_counted_at}
+                                                onChange={(e) =>
+                                                    stockForm.setData(
+                                                        'last_counted_at',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                        <div className="md:col-span-2">
+                                            <Label>Notes</Label>
+                                            <Textarea
+                                                value={stockForm.data.notes}
+                                                onChange={(e) =>
+                                                    stockForm.setData(
+                                                        'notes',
+                                                        e.target.value,
+                                                    )
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="mt-3">
+                                        <Button
+                                            className="bg-indigo-600 hover:bg-indigo-700"
+                                            onClick={() => {
+                                                stockForm.clearErrors();
+                                                if (!stockForm.data.medication_id) return;
+                                                if (selectedStockMedication?.controlled_drug) {
+                                                    if (!stockForm.data.reason) {
+                                                        stockForm.setError('reason', 'Reason is required for controlled drug stock updates.');
+                                                        return;
+                                                    }
+                                                    if (!stockForm.data.witnessed_by) {
+                                                        stockForm.setError('witnessed_by', 'Witness is required for controlled drug stock updates.');
+                                                        return;
+                                                    }
+                                                }
+                                                stockForm.put(
+                                                    `/operations/clients/${client.id}/medical/medications/${stockForm.data.medication_id}/stock`,
+                                                    { preserveScroll: true },
+                                                );
+                                            }}
+                                            disabled={
+                                                stockForm.processing ||
+                                                !stockForm.data.medication_id
+                                            }
+                                        >
+                                            Save
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-2">
+                                {medications.map((m) => (
+                                    <div
+                                        key={m.id}
+                                        className="rounded-lg border p-3"
+                                    >
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2">
+                                                <Package className="h-4 w-4 text-indigo-500" />
+                                                <span className="text-sm font-medium">{m.name}</span>
+                                            </div>
+                                            <div className="text-xs font-medium text-foreground">
+                                                {m.stock?.on_hand !== null &&
+                                                m.stock?.on_hand !== undefined
+                                                    ? `${m.stock.on_hand}${m.stock.unit ? ` ${m.stock.unit}` : ''}`
+                                                    : '\u2014'}
+                                            </div>
+                                        </div>
+                                        {m.stock?.reorder_level !== null &&
+                                            m.stock?.reorder_level !== undefined && (
+                                                <div className="mt-1 text-xs text-muted-foreground">
+                                                    Reorder at: {m.stock.reorder_level}
+                                                </div>
+                                            )}
+                                        {m.stock?.notes && (
+                                            <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                                                {m.stock.notes}
+                                            </div>
+                                        )}
+                                    </div>
+                                ))}
+                                {!medications.length && (
+                                    <div className="py-6 text-center text-sm text-muted-foreground">
+                                        No medications listed.
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Controlled Drug Register */}
+                {can_controlled_view && (
+                    <Card className={cn(focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2.5 text-base">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
+                                    <Shield className="h-4 w-4" />
+                                </div>
+                                Controlled Drug Register
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {controlled_entries.map((e: any) => (
+                                <div key={e.id} className="rounded-lg border border-l-4 border-l-rose-300 p-3">
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="text-sm font-medium">
+                                            {e.medication?.name || 'Medication'}
+                                        </div>
+                                        <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[10px] font-medium text-rose-700">
+                                            {e.entry_type}
+                                            {e.recorded_at
+                                                ? ` \u2022 ${new Date(e.recorded_at).toLocaleString()}`
+                                                : ''}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                        {e.recordedBy?.name ? `By: ${e.recordedBy.name}` : ''}
+                                        {e.witnessedBy?.name ? ` \u2022 Witness: ${e.witnessedBy.name}` : ''}
+                                        {e.serviceContext?.name ? ` \u2022 Context: ${e.serviceContext.name}` : ''}
+                                    </div>
+                                    {(e.on_hand_before !== null || e.on_hand_after !== null) && (
+                                        <div className="mt-1 text-xs text-muted-foreground">
+                                            Stock: {e.on_hand_before ?? '\u2014'} \u2192 {e.on_hand_after ?? '\u2014'}
+                                            {e.unit ? ` ${e.unit}` : ''}
+                                        </div>
+                                    )}
+                                    {e.reason && (
+                                        <div className="mt-2 text-xs text-muted-foreground">
+                                            Reason: {e.reason}
+                                        </div>
+                                    )}
+                                    {e.notes && (
+                                        <div className="mt-2 text-xs whitespace-pre-wrap text-muted-foreground">
+                                            {e.notes}
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+                            {!controlled_entries.length && (
+                                <div className="py-6 text-center text-sm text-muted-foreground">
+                                    No controlled drug entries recorded yet.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Controlled Drug Discrepancies */}
+                {can_controlled_view && (
+                    <Card className={cn(focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2.5 text-base">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                    <AlertTriangle className="h-4 w-4" />
+                                </div>
+                                Controlled Drug Discrepancies
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {controlled_discrepancies.map((d: any) => (
+                                <div key={d.id} className={cn(
+                                    'rounded-lg border p-3',
+                                    d.status === 'open' ? 'border-l-4 border-l-amber-400 bg-amber-50/30' : 'border-l-4 border-l-slate-200',
+                                )}>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <div className="text-sm font-medium">
+                                            {d.medication?.name || 'Medication'}
+                                        </div>
+                                        <span className={cn(
+                                            'rounded-full px-2 py-0.5 text-[10px] font-medium',
+                                            d.status === 'open' ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-600',
+                                        )}>
+                                            {d.status}
+                                            {d.reported_at
+                                                ? ` \u2022 ${new Date(d.reported_at).toLocaleString()}`
+                                                : ''}
+                                        </span>
+                                    </div>
+                                    <div className="mt-1 text-xs text-muted-foreground">
+                                        {d.reportedBy?.name ? `Reported by: ${d.reportedBy.name}` : ''}
+                                        {d.witnessedBy?.name ? ` \u2022 Witness: ${d.witnessedBy.name}` : ''}
+                                        {d.serviceContext?.name ? ` \u2022 Context: ${d.serviceContext.name}` : ''}
+                                    </div>
+                                    <div className="mt-2 text-xs text-muted-foreground">
+                                        Stock: {d.on_hand_before ?? '\u2014'} \u2192 {d.on_hand_after ?? '\u2014'}
+                                        {d.difference !== null && d.difference !== undefined
+                                            ? ` \u2022 Difference: ${d.difference}`
+                                            : ''}
+                                    </div>
+                                    {d.reason && (
+                                        <div className="mt-2 text-xs text-muted-foreground">
+                                            Reason: {d.reason}
+                                        </div>
+                                    )}
+                                    {d.status === 'closed' && (d.resolution_notes || d.resolvedBy?.name) && (
+                                        <div className="mt-2 text-xs text-muted-foreground">
+                                            Closed{d.resolvedBy?.name ? ` by ${d.resolvedBy.name}` : ''}
+                                            {d.resolution_notes ? ` \u2022 ${d.resolution_notes}` : ''}
+                                        </div>
+                                    )}
+
+                                    {d.status === 'open' && can_controlled_record && (
+                                        <div className="mt-3 flex justify-end">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => {
+                                                    setSelectedDiscId(d.id);
+                                                    closeDiscForm.reset('resolution_notes');
+                                                    setCloseDiscOpen(true);
+                                                }}
+                                            >
+                                                Close discrepancy
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            ))}
+
+                            {!controlled_discrepancies.length && (
+                                <div className="py-6 text-center text-sm text-muted-foreground">
+                                    No controlled drug discrepancies.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
+
+            <Dialog open={closeDiscOpen} onOpenChange={setCloseDiscOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Close discrepancy</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                        <Label>Resolution notes (optional)</Label>
+                        <Textarea
+                            value={closeDiscForm.data.resolution_notes}
+                            onChange={(e) => closeDiscForm.setData('resolution_notes', e.target.value)}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setCloseDiscOpen(false)}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            className="bg-violet-600 hover:bg-violet-700"
+                            onClick={() => {
+                                if (!selectedDiscId) return;
+                                closeDiscForm.post(
+                                    `/operations/clients/${client.id}/medical/controlled-discrepancies/${selectedDiscId}/close`,
+                                    {
+                                        preserveScroll: true,
+                                        onSuccess: () => {
+                                            setCloseDiscOpen(false);
+                                            setSelectedDiscId(null);
+                                        },
+                                    },
+                                );
+                            }}
+                            disabled={closeDiscForm.processing}
+                        >
+                            Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </AppLayout>
+    );
+}

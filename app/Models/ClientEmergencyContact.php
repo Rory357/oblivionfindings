@@ -17,6 +17,14 @@ class ClientEmergencyContact extends Model
         'phone',
         'email',
         'notes',
+        'contact_order',
+        'preferred_method',
+        'availability',
+        'authorised_health_info',
+    ];
+
+    protected $casts = [
+        'authorised_health_info' => 'boolean',
     ];
 
     public function client(): BelongsTo

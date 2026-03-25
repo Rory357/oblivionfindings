@@ -176,7 +176,7 @@ class DailyMarController extends Controller
             ->values()
             ->map(fn (User $u) => $u->only(['id', 'name', 'email']));
 
-        return inertia('clients/mar', [
+        return inertia('operations/clients/mar', [
             'client' => [
                 'id' => $client->id,
                 'first_name' => $client->first_name,

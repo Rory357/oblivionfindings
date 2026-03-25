@@ -81,7 +81,7 @@ class ClientController extends Controller
             ];
         })->values();
 
-        return inertia('clients/index', [
+        return inertia('operations/clients/index', [
             'clients' => $clients,
         ]);
     }
@@ -144,6 +144,7 @@ class ClientController extends Controller
             'supportPlan',
             'assessments',
             'onboardingOverrides',
+            'onboardingWorkflow.steps',
         ]);
 
         // For modal / async detail views, return JSON.
@@ -208,7 +209,7 @@ class ClientController extends Controller
             ->with(['actor:id,name'])
             ->get();
 
-        return inertia('clients/show', [
+        return inertia('operations/clients/show', [
             'client' => [
                 'id' => $client->id,
                 'nhi_number' => $client->nhi_number,
@@ -298,7 +299,75 @@ class ClientController extends Controller
                     'staff' => $lastShift->staff ? ['id' => $lastShift->staff->id, 'name' => $lastShift->staff->name, 'email' => $lastShift->staff->email] : null,
                 ] : null,
             ],
-            'onboarding' => $this->buildOnboardingChecklist($client),
+            'onboarding' => [
+                'checklist' => $this->buildOnboardingChecklist($client),
+                'workflow' => $client->onboardingWorkflow ? [
+                    'id' => $client->onboardingWorkflow->id,
+                    'status' => $client->onboardingWorkflow->status,
+                    'started_at' => $client->onboardingWorkflow->started_at?->toISOString(),
+                    'completed_at' => $client->onboardingWorkflow->completed_at?->toISOString(),
+                    'assigned_to' => $client->onboardingWorkflow->assignee ? [
+                        'id' => $client->onboardingWorkflow->assignee->id,
+                        'name' => $client->onboardingWorkflow->assignee->name,
+                    ] : null,
+                    'notes' => $client->onboardingWorkflow->notes,
+                    'steps' => $client->onboardingWorkflow->steps->sortBy('step_order')->map(fn($s) => [
+                        'id' => $s->id,
+                        'step_name' => $s->step_name,
+                        'step_order' => $s->step_order,
+                        'is_required' => $s->is_required,
+                        'status' => $s->status,
+                        'completed_at' => $s->completed_at?->toISOString(),
+                        'completed_by' => $s->completer ? ['id' => $s->completer->id, 'name' => $s->completer->name] : null,
+                        'notes' => $s->notes,
+                        'due_date' => $s->due_date?->toDateString(),
+                    ])->values()->toArray(),
+                ] : null,
+            ],
+            // Progress notes for client (last 20)
+            'client_progress_notes' => \App\Models\ProgressNote::where('client_id', $client->id)
+                ->with(['author:id,name', 'goal:id,title'])
+                ->orderByDesc('created_at')
+                ->limit(20)
+                ->get(),
+
+            // Service agreements
+            'client_agreements' => \App\Models\ServiceAgreement::where('client_id', $client->id)
+                ->orderByDesc('created_at')
+                ->get(),
+
+            // Active risks
+            'client_risks' => \App\Models\ClientRisk::where('client_id', $client->id)
+                ->where('active', true)
+                ->orderByDesc('severity')
+                ->limit(10)
+                ->get(),
+
+            // Recent incidents (last 5)
+            'client_incidents' => \App\Models\ClientIncident::where('client_id', $client->id)
+                ->with(['reporter:id,name'])
+                ->orderByDesc('occurred_at')
+                ->limit(5)
+                ->get(),
+
+            'care_plans_summary' => [
+                'active_plan' => \App\Models\CarePlan::where('client_id', $client->id)
+                    ->where('status', 'active')
+                    ->withCount(['goals', 'goals as goals_completed' => fn($q) => $q->where('status', 'completed')])
+                    ->with('goals:id,care_plan_id,title,status,progress_percentage,priority')
+                    ->first(),
+                'total_plans' => \App\Models\CarePlan::where('client_id', $client->id)->count(),
+                'review_due' => \App\Models\CarePlan::where('client_id', $client->id)
+                    ->where('status', 'active')
+                    ->where(function ($q) {
+                        $q->whereNull('next_review_at')->orWhere('next_review_at', '<=', now());
+                    })->exists(),
+                'recent_notes' => \App\Models\ProgressNote::where('client_id', $client->id)
+                    ->with(['author:id,name', 'goal:id,title'])
+                    ->orderByDesc('created_at')
+                    ->limit(5)
+                    ->get(),
+            ],
             'respite' => [
                 'bookings' => RespiteBooking::query()
                     ->where('client_id', $client->id)
@@ -326,6 +395,28 @@ class ClientController extends Controller
                         'status' => $r->status,
                     ])->values(),
             ],
+            'consents' => \App\Models\ClientConsent::where('client_id', $client->id)
+                ->with('consentType:id,name,category')
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(fn($c) => [
+                    'id' => $c->id,
+                    'consent_type' => $c->consentType?->name ?? 'Unknown',
+                    'consent_type_category' => $c->consentType?->category,
+                    'status' => $c->status,
+                    'given_at' => $c->given_at?->toISOString(),
+                    'given_method' => $c->given_method,
+                    'expires_at' => $c->expires_at?->toISOString(),
+                    'is_expired' => $c->isExpired(),
+                    'is_expiring_soon' => $c->isExpiringSoon(),
+                    'withdrawn_at' => $c->withdrawn_at?->toISOString(),
+                    'withdrawal_reason' => $c->withdrawal_reason,
+                    'conditions' => $c->conditions,
+                    'special_conditions' => $c->special_conditions,
+                    'capacity_assessed' => $c->capacity_assessed,
+                    'capacity_outcome' => $c->capacity_outcome,
+                    'best_interests_decision' => $c->best_interests_decision,
+                ]),
             'can' => [
                 'edit' => $request->user()?->canDo('clients.update') ?? false,
                 'assign_workers' => $request->user()?->canDo('clients.assignments.update') ?? false,
@@ -333,6 +424,7 @@ class ClientController extends Controller
                 'pin_handover' => $request->user()?->canDo('timeline.pin') ?? false,
                 'manage_onboarding' => $request->user()?->canDo('clients.onboarding.manage') ?? false,
                 'create_shift' => $request->user()?->canDo('shifts.create') ?? false,
+                'manage_onboarding_workflow' => $request->user()?->canDo('onboarding.edit') ?? false,
             ],
         ]);
     }
@@ -418,7 +510,7 @@ class ClientController extends Controller
     // {
     //     $this->authorize('view', $client);
 
-    //     return inertia('clients/show', [
+    //     return inertia('operations/clients/show', [
     //         'client' => $client->load('supportWorkers'),
     //     ]);
     // }
@@ -437,7 +529,7 @@ class ClientController extends Controller
             ->orderBy('name')
             ->get(['id', 'type', 'name']);
 
-        return inertia('clients/create', [
+        return inertia('operations/clients/create', [
             'sites' => $sites,
             'serviceContexts' => $serviceContexts,
             'defaultServiceContextId' => ServiceContext::defaultId(),
@@ -460,8 +552,17 @@ class ClientController extends Controller
                 'create_client_portal_user',
             ])->all();
 
-            $client = DB::transaction(function () use ($clientFields, $data) {
+            // Default to onboarding status for new clients
+            if (!isset($clientFields['status']) || $clientFields['status'] === 'active') {
+                $clientFields['status'] = 'onboarding';
+            }
+
+            $auth = $request->user();
+
+            $client = DB::transaction(function () use ($clientFields, $data, $auth) {
                 $client = Client::create($clientFields);
+
+                \App\Models\ClientOnboardingWorkflow::createForClient($client, $auth->id);
 
                 if (!empty($data['create_client_portal_user'])) {
                     $clientEmail = trim((string) ($data['email'] ?? $client->email ?? ''));
@@ -549,7 +650,7 @@ class ClientController extends Controller
         }
         $serviceContexts = $serviceContextsQuery->get(['id', 'type', 'name', 'is_active']);
 
-        return inertia('clients/edit', [
+        return inertia('operations/clients/edit', [
             'client' => $client->only([
                 'id','site_id','service_context_id','nhi_number','first_name','last_name','preferred_name','date_of_birth','gender','status',
                 'phone','email','address_line_1','address_line_2','suburb','city','postcode',
@@ -582,6 +683,25 @@ class ClientController extends Controller
                 ->withInput()
                 ->with('error', 'Failed to update client: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Quick-update a single field on a client (e.g. risk_level, safeguarding_flag).
+     */
+    public function quickUpdate(Request $request, Client $client)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('clients.update'), 403);
+
+        $data = $request->validate([
+            'risk_level' => ['nullable', 'in:low,medium,high,critical'],
+            'safeguarding_flag' => ['nullable', 'boolean'],
+            'key_worker_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        $client->update(array_filter($data, fn ($v) => $v !== null));
+
+        return redirect()->back()->with('success', 'Updated.');
     }
 
 

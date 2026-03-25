@@ -21,7 +21,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { Tabs } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
 import { Fragment, useMemo, useState } from 'react';
 
@@ -139,6 +139,9 @@ function isActionableConflictShift(shift: ShiftLite) {
 }
 
 export default function RosteringIndex(props: Props) {
+    const { labels } = usePage().props as any;
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
+    const clientPlural = labels?.['client.plural'] ?? 'Clients';
     const timeOffForm = useForm({
         user_id: props.filters.staff_id ? String(props.filters.staff_id) : 'self',
         starts_at: `${props.weekStart}T09:00`,
@@ -498,7 +501,7 @@ export default function RosteringIndex(props: Props) {
                                 Staff overlaps: {props.stats.staff_overlaps}
                             </Badge>
                             <Badge variant={props.stats.client_overlaps > 0 ? 'destructive' : 'outline'}>
-                                Client overlaps: {props.stats.client_overlaps}
+                                {clientSingular} overlaps: {props.stats.client_overlaps}
                             </Badge>
                             <Badge variant={props.stats.time_off_conflicts > 0 ? 'destructive' : 'outline'}>
                                 Time-off conflicts: {props.stats.time_off_conflicts}
@@ -535,10 +538,10 @@ export default function RosteringIndex(props: Props) {
                                         onValueChange={(v) => updateFilter({ client_id: v === 'all' ? null : Number(v) })}
                                     >
                                         <SelectTrigger>
-                                            <SelectValue placeholder="All clients" />
+                                            <SelectValue placeholder={`All ${clientPlural.toLowerCase()}`} />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="all">All clients</SelectItem>
+                                            <SelectItem value="all">{`All ${clientPlural.toLowerCase()}`}</SelectItem>
                                             {props.clients.map((c) => (
                                                 <SelectItem key={c.id} value={String(c.id)}>
                                                     {c.first_name} {c.last_name}
@@ -594,7 +597,7 @@ export default function RosteringIndex(props: Props) {
                                                                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                                                     <div>
                                                                         <div className="text-sm font-medium">
-                                                                            {sh.client ?? 'Client'} · {new Date(sh.starts_at).toLocaleDateString()} {fmtTime(sh.starts_at)}–{fmtTime(sh.ends_at)}
+                                                                            {sh.client ?? clientSingular} · {new Date(sh.starts_at).toLocaleDateString()} {fmtTime(sh.starts_at)}–{fmtTime(sh.ends_at)}
                                                                         </div>
                                                                         <div className="mt-1 text-xs text-muted-foreground">
                                                                             {sh.location ? `${sh.location} · ` : ''}Status: {sh.status}
@@ -690,7 +693,7 @@ export default function RosteringIndex(props: Props) {
                                                                     <div>
                                                                         <div className="text-sm font-medium">Time-off conflict · {shift.staff ?? 'Staff'}</div>
                                                                         <div className="mt-1 text-xs text-muted-foreground">
-                                                                            {shift.client ?? 'Client'} · {new Date(shift.starts_at).toLocaleDateString()} {fmtTime(shift.starts_at)}–{fmtTime(shift.ends_at)}
+                                                                            {shift.client ?? clientSingular} · {new Date(shift.starts_at).toLocaleDateString()} {fmtTime(shift.starts_at)}–{fmtTime(shift.ends_at)}
                                                                         </div>
                                                                         <div className="mt-1 text-xs text-muted-foreground">{label}</div>
                                                                     </div>
@@ -722,10 +725,10 @@ export default function RosteringIndex(props: Props) {
                                                                     <div>
                                                                         <div className="text-sm font-medium">Staff overlap · {a.staff ?? 'Staff'}</div>
                                                                         <div className="mt-1 text-xs text-muted-foreground">
-                                                                            A: {new Date(a.starts_at).toLocaleDateString()} {fmtTime(a.starts_at)}–{fmtTime(a.ends_at)} · {a.client ?? 'Client'}
+                                                                            A: {new Date(a.starts_at).toLocaleDateString()} {fmtTime(a.starts_at)}–{fmtTime(a.ends_at)} · {a.client ?? clientSingular}
                                                                         </div>
                                                                         <div className="mt-1 text-xs text-muted-foreground">
-                                                                            B: {new Date(b.starts_at).toLocaleDateString()} {fmtTime(b.starts_at)}–{fmtTime(b.ends_at)} · {b.client ?? 'Client'}
+                                                                            B: {new Date(b.starts_at).toLocaleDateString()} {fmtTime(b.starts_at)}–{fmtTime(b.ends_at)} · {b.client ?? clientSingular}
                                                                         </div>
                                                                     </div>
                                                                     <div className="flex flex-wrap items-center gap-2">
@@ -765,7 +768,7 @@ export default function RosteringIndex(props: Props) {
                                                             <div key={`co-${a.id}-${b.id}`} className="rounded-md border p-3">
                                                                 <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
                                                                     <div>
-                                                                        <div className="text-sm font-medium">Client overlap · {a.client ?? 'Client'}</div>
+                                                                        <div className="text-sm font-medium">{clientSingular} overlap · {a.client ?? clientSingular}</div>
                                                                         <div className="mt-1 text-xs text-muted-foreground">
                                                                             A: {new Date(a.starts_at).toLocaleDateString()} {fmtTime(a.starts_at)}–{fmtTime(a.ends_at)} · {a.staff ?? 'Staff'}
                                                                         </div>
@@ -829,7 +832,7 @@ export default function RosteringIndex(props: Props) {
                                                                             <Badge variant="outline" className="text-[10px]">TS: {sh.timesheet_status}</Badge>
                                                                         ) : null}
                                                                     </div>
-                                                                    <div className="mt-1 text-xs text-slate-700">{sh.client ?? 'Client'} · {sh.staff ?? 'Staff'}</div>
+                                                                    <div className="mt-1 text-xs text-slate-700">{sh.client ?? clientSingular} · {sh.staff ?? 'Staff'}</div>
                                                                 </div>
                                                             </Link>
                                                         ))}
@@ -869,7 +872,7 @@ export default function RosteringIndex(props: Props) {
                                                                             {sh.incidents_count} incident{sh.incidents_count === 1 ? '' : 's'}
                                                                         </Badge>
                                                                     </div>
-                                                                    <div className="mt-1 text-xs text-slate-700">{sh.client ?? 'Client'} · {sh.staff ?? 'Staff'}</div>
+                                                                    <div className="mt-1 text-xs text-slate-700">{sh.client ?? clientSingular} · {sh.staff ?? 'Staff'}</div>
                                                                 </div>
                                                             </Link>
                                                         ))}
@@ -1013,7 +1016,7 @@ export default function RosteringIndex(props: Props) {
                                                                                                         {sh.status}
                                                                                                     </Badge>
                                                                                                 </div>
-                                                                                                <div className="mt-1 text-xs text-slate-700">{sh.client ?? 'Client'}</div>
+                                                                                                <div className="mt-1 text-xs text-slate-700">{sh.client ?? clientSingular}</div>
 
                                                                                                 <div className="mt-1 flex flex-wrap gap-1">
                                                                                                     {sh.incidents_count > 0 && (
@@ -1123,7 +1126,7 @@ export default function RosteringIndex(props: Props) {
                                                         <div key={sh.id} className="rounded-md border p-3">
                                                             <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                                                                 <div>
-                                                                    <div className="text-sm font-medium">{sh.client ?? 'Client'} · {new Date(sh.starts_at).toLocaleDateString()} {fmtTime(sh.starts_at)}–{fmtTime(sh.ends_at)}</div>
+                                                                    <div className="text-sm font-medium">{sh.client ?? clientSingular} · {new Date(sh.starts_at).toLocaleDateString()} {fmtTime(sh.starts_at)}–{fmtTime(sh.ends_at)}</div>
                                                                     <div className="mt-1 text-xs text-muted-foreground">Status: {sh.status}{sh.location ? ` · ${sh.location}` : ''}</div>
                                                                 </div>
                                                                 {props.canManageAny ? (
@@ -1447,7 +1450,7 @@ export default function RosteringIndex(props: Props) {
                                     <div className="mt-1 text-xs text-muted-foreground">
                                         {new Date(resolveModal.a.starts_at).toLocaleDateString()} {fmtTime(resolveModal.a.starts_at)}–{fmtTime(resolveModal.a.ends_at)}
                                     </div>
-                                    <div className="mt-1 text-xs">{resolveModal.a.client ?? 'Client'} · {resolveModal.a.staff ?? 'Unassigned'} </div>
+                                    <div className="mt-1 text-xs">{resolveModal.a.client ?? clientSingular} · {resolveModal.a.staff ?? 'Unassigned'} </div>
                                     <div className="mt-2">
                                         <Link href={`/shifts/${resolveModal.a.id}`}>
                                             <Button size="sm" variant="outline">Open A</Button>
@@ -1463,7 +1466,7 @@ export default function RosteringIndex(props: Props) {
                                     <div className="mt-1 text-xs text-muted-foreground">
                                         {new Date(resolveModal.b.starts_at).toLocaleDateString()} {fmtTime(resolveModal.b.starts_at)}–{fmtTime(resolveModal.b.ends_at)}
                                     </div>
-                                    <div className="mt-1 text-xs">{resolveModal.b.client ?? 'Client'} · {resolveModal.b.staff ?? 'Unassigned'} </div>
+                                    <div className="mt-1 text-xs">{resolveModal.b.client ?? clientSingular} · {resolveModal.b.staff ?? 'Unassigned'} </div>
                                     <div className="mt-2">
                                         <Link href={`/shifts/${resolveModal.b.id}`}>
                                             <Button size="sm" variant="outline">Open B</Button>

@@ -37,11 +37,32 @@ class Client extends Model
         'profile_photo_path',
         'transport_needs',
         'transport_notes',
+        'ethnicity',
+        'languages',
+        'preferred_pronouns',
+        'religion',
+        'interests_hobbies',
+        'strengths_abilities',
+        'life_story',
+        'education_level',
+        'employment_status',
+        'mobility_needs',
+        'sensory_needs',
+        'cognitive_needs',
+        'dietary_requirements',
+        'sleep_preferences',
+        'service_start_date',
+        'key_worker_id',
+        'risk_level',
+        'safeguarding_flag',
     ];
 
     protected $casts = [
         'date_of_birth' => 'date',
         'transport_needs' => 'array',
+        'languages' => 'array',
+        'service_start_date' => 'date',
+        'safeguarding_flag' => 'boolean',
     ];
 
     protected $appends = ['profile_photo_url', 'avatar', 'full_name'];
@@ -79,6 +100,11 @@ class Client extends Model
     public function serviceContext()
     {
         return $this->belongsTo(ServiceContext::class);
+    }
+
+    public function keyWorker()
+    {
+        return $this->belongsTo(\App\Models\User::class, 'key_worker_id');
     }
 
     public function supportWorkers()
@@ -228,5 +254,15 @@ class Client extends Model
     public function setNhiNumberAttribute($value): void
     {
         $this->attributes['nhi_number'] = $value ? strtoupper($value) : null;
+    }
+
+    public function onboardingWorkflow()
+    {
+        return $this->hasOne(\App\Models\ClientOnboardingWorkflow::class, 'client_id')->latest();
+    }
+
+    public function onboardingWorkflows()
+    {
+        return $this->hasMany(\App\Models\ClientOnboardingWorkflow::class, 'client_id');
     }
 }

@@ -22,7 +22,7 @@ class StoreClientRequest extends FormRequest
             'date_of_birth' => ['nullable', 'date'],
             'preferred_name' => ['nullable', 'string', 'max:255'],
             'gender' => ['nullable', 'string', 'max:50'],
-            'status'     => ['required', 'in:active,inactive'],
+            'status'     => ['required', 'in:active,inactive,onboarding'],
             'phone' => ['nullable', 'string', 'max:50'],
             'email' => ['nullable', 'email', 'max:255', 'required_if:create_client_portal_user,true'],
             'address_line_1' => ['nullable', 'string', 'max:255'],

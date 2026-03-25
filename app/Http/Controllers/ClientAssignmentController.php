@@ -19,7 +19,7 @@ class ClientAssignmentController extends Controller
 
         $assignedIds = $client->supportWorkers()->pluck('users.id')->values();
 
-        return inertia('clients/assignments', [
+        return inertia('operations/clients/assignments', [
             'client' => $client->only(['id', 'first_name', 'last_name', 'status']),
             'workers' => $workers,
             'assignedIds' => $assignedIds,

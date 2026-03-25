@@ -1,0 +1,167 @@
+import PageHeader from '@/components/page-header';
+import PageShell from '@/components/page-shell';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import AppLayout from '@/layouts/app-layout';
+import { Head, router } from '@inertiajs/react';
+import { AlertTriangle, Bell, BellOff, CalendarDays, CheckCircle2, Info, Mail, MessageSquare } from 'lucide-react';
+
+const ANY = '__ANY__';
+
+type Notification = {
+    id: number;
+    title: string;
+    body: string;
+    type: string;
+    is_read: boolean;
+    created_at: string;
+};
+
+type Props = {
+    notifications: {
+        data: Notification[];
+        links: any[];
+        current_page: number;
+        last_page: number;
+        total: number;
+    };
+    filters: {
+        type?: string;
+    };
+};
+
+const TYPE_CONFIG: Record<string, { icon: typeof Bell; color: string }> = {
+    info: { icon: Info, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+    alert: { icon: AlertTriangle, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+    success: { icon: CheckCircle2, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+    message: { icon: MessageSquare, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },
+    reminder: { icon: CalendarDays, color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+    email: { icon: Mail, color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300' },
+};
+
+function formatDate(d: string | null): string {
+    if (!d) return '-';
+    return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+export default function NotificationsIndex({ notifications = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any }: Props) {
+    const updateFilters = (key: string, value: string | null) => {
+        router.get('/operations/notifications', { ...filters, [key]: value }, { preserveState: true, replace: true });
+    };
+
+    const markRead = (id: number) => {
+        router.post(`/operations/notifications/${id}/read`, {}, { preserveState: true });
+    };
+
+    const markAllRead = () => {
+        router.post('/operations/notifications/read-all', {}, { preserveState: true });
+    };
+
+    return (
+        <AppLayout>
+            <Head title="Notifications" />
+            <PageHeader
+                title="Notifications"
+                description="View and manage your notifications."
+                backHref="/operations"
+            />
+            <PageShell>
+                {/* Filters + Actions */}
+                <div className="flex flex-wrap items-center gap-2">
+                    <Select value={filters?.type ?? ANY} onValueChange={(v) => updateFilters('type', v === ANY ? null : v)}>
+                        <SelectTrigger className="h-9 w-[140px] text-xs">
+                            <SelectValue placeholder="Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value={ANY}>All Types</SelectItem>
+                            <SelectItem value="info">Info</SelectItem>
+                            <SelectItem value="alert">Alert</SelectItem>
+                            <SelectItem value="success">Success</SelectItem>
+                            <SelectItem value="message">Message</SelectItem>
+                            <SelectItem value="reminder">Reminder</SelectItem>
+                            <SelectItem value="email">Email</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <div className="flex-1" />
+                    <Button size="sm" variant="outline" onClick={markAllRead}>
+                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                        Mark All Read
+                    </Button>
+                </div>
+
+                {/* List */}
+                <div className="mt-4 space-y-2">
+                    {(notifications?.data ?? []).length === 0 && (
+                        <Card>
+                            <CardContent className="flex flex-col items-center justify-center py-16">
+                                <BellOff className="mb-4 h-12 w-12 text-muted-foreground/30" />
+                                <h2 className="text-lg font-semibold text-muted-foreground">No Notifications</h2>
+                                <p className="mt-1 text-sm text-muted-foreground/80">You're all caught up!</p>
+                            </CardContent>
+                        </Card>
+                    )}
+                    {(notifications?.data ?? []).map((notif) => {
+                        const typeConf = TYPE_CONFIG[notif.type] ?? TYPE_CONFIG.info;
+                        const Icon = typeConf.icon;
+                        return (
+                            <Card key={notif.id} className={`transition-all hover:border-border hover:shadow-sm ${!notif.is_read ? 'border-l-2 border-l-indigo-500 bg-indigo-50/30 dark:bg-indigo-950/10' : ''}`}>
+                                <CardContent className="flex items-center gap-4 p-4">
+                                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${typeConf.color}`}>
+                                        <Icon className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className={`text-sm ${!notif.is_read ? 'font-semibold' : 'font-medium'}`}>
+                                                {notif.title}
+                                            </span>
+                                            <Badge variant="outline" className="h-4 px-1.5 text-[9px] capitalize">
+                                                {notif.type}
+                                            </Badge>
+                                            {!notif.is_read && (
+                                                <span className="h-2 w-2 rounded-full bg-indigo-500" />
+                                            )}
+                                        </div>
+                                        <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{notif.body}</p>
+                                        <span className="mt-0.5 text-[10px] text-muted-foreground/60">{formatDate(notif.created_at)}</span>
+                                    </div>
+                                    <div className="flex shrink-0 gap-1">
+                                        {!notif.is_read && (
+                                            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => markRead(notif.id)}>
+                                                <CheckCircle2 className="mr-1 h-3 w-3" /> Mark Read
+                                            </Button>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
+                </div>
+
+                {/* Pagination */}
+                {(notifications?.last_page ?? 1) > 1 && (
+                    <div className="mt-4 flex items-center justify-center gap-1">
+                        {(notifications?.links ?? []).map((link: any, i: number) => (
+                            <Button
+                                key={i}
+                                size="sm"
+                                variant={link.active ? 'default' : 'outline'}
+                                className="h-7 min-w-[28px] px-2 text-xs"
+                                disabled={!link.url}
+                                onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
+                                dangerouslySetInnerHTML={{ __html: link.label }}
+                            />
+                        ))}
+                    </div>
+                )}
+            </PageShell>
+        </AppLayout>
+    );
+}

@@ -84,6 +84,19 @@ class ClientMedicalProfile extends Model
         'disabilities',
         'allergies',
         'notes',
+        'gp_name',
+        'gp_practice',
+        'gp_phone',
+        'hospital_preference',
+        'blood_type',
+        'organ_donor',
+        'immunisation_notes',
+        'mental_health_history',
+        'surgical_history',
+    ];
+
+    protected $casts = [
+        'organ_donor' => 'boolean',
     ];
 
     protected $casts = [

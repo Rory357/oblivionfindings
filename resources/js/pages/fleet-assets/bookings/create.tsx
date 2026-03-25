@@ -16,7 +16,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { formatDate } from '@/lib/fleet-utils';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { AlertTriangle, Calendar, Info, Loader2, Save } from 'lucide-react';
 import { useCallback, useEffect, useRef } from 'react';
 
@@ -156,6 +156,8 @@ function AvailabilityCalendar({ bookings, selectedStart, selectedEnd }: {
 }
 
 export default function BookingCreate({ vehicles, sites, conflicts, selected_vehicle_status, vehicle_bookings, clients }: Props) {
+    const { labels } = usePage().props as any;
+    const clientSingular = labels?.['client.singular'] ?? 'Client';
     const safeVehicles = vehicles ?? [];
     const safeSites = sites ?? [];
     const safeConflicts = conflicts ?? [];
@@ -185,16 +187,16 @@ export default function BookingCreate({ vehicles, sites, conflicts, selected_veh
     if (selectedClient?.transport_needs && selectedVehicle) {
         const needs = selectedClient.transport_needs;
         if (needs.wheelchair_ramp && !selectedVehicle.has_wheelchair_ramp) {
-            compatibilityWarnings.push('Client requires wheelchair ramp, but this vehicle does not have one.');
+            compatibilityWarnings.push(`${clientSingular} requires wheelchair ramp, but this vehicle does not have one.`);
         }
         if (needs.hoist && !selectedVehicle.has_hoist) {
-            compatibilityWarnings.push('Client requires a hoist, but this vehicle does not have one.');
+            compatibilityWarnings.push(`${clientSingular} requires a hoist, but this vehicle does not have one.`);
         }
         if (needs.child_seat && !selectedVehicle.has_child_seat_anchors) {
-            compatibilityWarnings.push('Client requires child seat anchors, but this vehicle does not have them.');
+            compatibilityWarnings.push(`${clientSingular} requires child seat anchors, but this vehicle does not have them.`);
         }
         if (needs.medical_storage && !selectedVehicle.has_medical_storage) {
-            compatibilityWarnings.push('Client requires medical storage, but this vehicle does not have it.');
+            compatibilityWarnings.push(`${clientSingular} requires medical storage, but this vehicle does not have it.`);
         }
     }
 
@@ -320,10 +322,10 @@ export default function BookingCreate({ vehicles, sites, conflicts, selected_veh
                             {/* Client Selector */}
                             {safeClients.length > 0 && (
                                 <div className="sm:col-span-2">
-                                    <label className="text-sm font-medium">Client (optional)</label>
+                                    <label className="text-sm font-medium">{clientSingular} (optional)</label>
                                     <Select value={form.data.client_id} onValueChange={(v) => form.setData('client_id', v)}>
                                         <SelectTrigger>
-                                            <SelectValue placeholder="Select client for accessibility matching" />
+                                            <SelectValue placeholder={`Select ${clientSingular.toLowerCase()} for accessibility matching`} />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {safeClients.map((c) => (

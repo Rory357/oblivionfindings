@@ -23,7 +23,7 @@ class TimesheetController extends Controller
             ->paginate(25)
             ->withQueryString();
 
-        return inertia('timesheets/approvals', [
+        return inertia('operations/timesheets/approvals', [
             'timesheets' => $pending,
             'filters' => $request->only(['from', 'to', 'client_id', 'staff_id']),
         ]);
@@ -180,7 +180,7 @@ class TimesheetController extends Controller
         $clients = $canApprove ? Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']) : [];
         $staff = $canApprove ? \App\Models\User::staff()->orderBy('name')->get(['id', 'name', 'email']) : [];
 
-        return inertia('timesheets/index', [
+        return inertia('operations/timesheets/index', [
             'timesheets' => $timesheets,
             'filters' => [
                 'status' => $status,
@@ -216,7 +216,7 @@ class TimesheetController extends Controller
 
         $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
 
-        return inertia('timesheets/create', [
+        return inertia('operations/timesheets/create', [
             'clients' => $clients,
             'shift' => $shift,
         ]);
@@ -294,7 +294,7 @@ class TimesheetController extends Controller
         $timesheet->load(['client:id,first_name,last_name', 'staff:id,name,email', 'shift:id,starts_at,ends_at']);
         $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
 
-        return inertia('timesheets/edit', [
+        return inertia('operations/timesheets/edit', [
             'timesheet' => $timesheet,
             'clients' => $clients,
             'canApprove' => $auth->canDo('timesheets.approve') || $auth->canDo('timesheets.manageAny'),

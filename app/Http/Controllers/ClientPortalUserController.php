@@ -17,7 +17,7 @@ class ClientPortalUserController extends Controller
 
         $client->load(['portalUsers:id,name,email']);
 
-        return inertia('clients/portal-users', [
+        return inertia('operations/clients/portal-users', [
             'client' => $client->only(['id', 'first_name', 'last_name']),
             'portal_users' => $client->portalUsers->map(fn($u) => [
                 'id' => $u->id,
