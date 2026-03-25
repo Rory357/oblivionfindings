@@ -49,8 +49,6 @@ const navSections: NavSection[] = [
         label: 'General',
         items: [
             { icon: User, title: 'Profile', href: edit() },
-            { icon: Lock, title: 'Password', href: editPassword() },
-            { icon: ShieldCheck, title: 'Two-Factor Auth', href: show() },
             { icon: Palette, title: 'Appearance', href: editAppearance() },
         ],
     },
