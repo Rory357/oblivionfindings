@@ -8,10 +8,14 @@ import {
     AlertTriangle,
     Bell,
     BellRing,
+    Boxes,
     Building2,
+    Database,
     FileText,
+    Key,
     Languages,
     Lock,
+    Mail,
     Menu,
     Paintbrush,
     Palette,
@@ -80,18 +84,12 @@ const navSections: NavSection[] = [
         ],
     },
     {
-        label: 'Security',
-        permission: 'settings.manageAccess',
-        items: [
-            { icon: Shield, title: 'Security Settings', href: '/settings/security' },
-        ],
-    },
-    {
         label: 'Notifications',
         items: [
             { icon: Bell, title: 'My Notifications', href: '/settings/notifications' },
             { icon: BellRing, title: 'Role Defaults', href: '/settings/notifications/roles', permission: 'settings.manageAccess' },
             { icon: AlertTriangle, title: 'Escalation Rules', href: '/settings/notifications/escalations', permission: 'settings.manageAccess' },
+            { icon: Mail, title: 'Templates', href: '/settings/templates', permission: 'settings.manageAccess' },
         ],
     },
     {
@@ -100,13 +98,22 @@ const navSections: NavSection[] = [
         items: [
             { icon: Plug, title: 'Integration Hub', href: '/settings/integrations' },
             { icon: Wifi, title: 'UniFi', href: '/settings/integrations/unifi' },
+            { icon: Key, title: 'API & Webhooks', href: '/settings/api' },
         ],
     },
     {
-        label: 'Audit',
+        label: 'Data & Compliance',
         permission: 'settings.manageAccess',
         items: [
+            { icon: Database, title: 'Data & Privacy', href: '/settings/data' },
             { icon: FileText, title: 'Audit Logs', href: '/settings/audit-logs' },
+        ],
+    },
+    {
+        label: 'System',
+        permission: 'settings.manageAccess',
+        items: [
+            { icon: Boxes, title: 'Modules & Features', href: '/settings/modules' },
         ],
     },
 ];
