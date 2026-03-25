@@ -6,8 +6,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Calendar, CheckCircle2, Clock, Mail, Shield, ShieldAlert, User, XCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle2, Clock, Mail, Plus, Shield, ShieldAlert, User, X, XCircle } from 'lucide-react';
+import { useState } from 'react';
 
+type Role = { id: number; name: string; label?: string };
 type Props = {
     user: {
         id: number;
@@ -17,16 +19,20 @@ type Props = {
         is_active: boolean;
         approved_at?: string;
         created_at?: string;
-        roles?: Array<{ id: number; name: string; label?: string }>;
+        roles?: Role[];
         user_type?: string;
         staff_profile?: any;
     };
+    allRoles?: Role[];
 };
 
-export default function UserShow({ user }: Props) {
+export default function UserShow({ user, allRoles = [] }: Props) {
     const u = user ?? {} as any;
-    const roles = u.roles ?? [];
+    const roles: Role[] = u.roles ?? [];
     const initials = (u.name ?? '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
+    const [showAddRole, setShowAddRole] = useState(false);
+    const assignedIds = new Set(roles.map((r: Role) => r.id));
+    const availableRoles = allRoles.filter((r) => !assignedIds.has(r.id));
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Settings', href: '/settings' },
@@ -140,28 +146,66 @@ export default function UserShow({ user }: Props) {
                             {/* Roles */}
                             <Card>
                                 <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Shield className="h-5 w-5 text-violet-600" /> Roles & Permissions
-                                    </CardTitle>
-                                    <CardDescription>Manage this user's access in Access Control</CardDescription>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <CardTitle className="flex items-center gap-2">
+                                                <Shield className="h-5 w-5 text-violet-600" /> Roles
+                                            </CardTitle>
+                                            <CardDescription>Assign or remove roles for this user</CardDescription>
+                                        </div>
+                                        {availableRoles.length > 0 && (
+                                            <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowAddRole(!showAddRole)}>
+                                                <Plus className="h-3.5 w-3.5" /> Add
+                                            </Button>
+                                        )}
+                                    </div>
                                 </CardHeader>
-                                <CardContent>
-                                    {roles.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground">No roles assigned</p>
-                                    ) : (
-                                        <div className="flex flex-wrap gap-2">
-                                            {roles.map((role: any) => (
-                                                <Badge key={role.id} className="bg-violet-100 text-violet-700 text-xs">
-                                                    {role.label || role.name}
-                                                </Badge>
+                                <CardContent className="space-y-3">
+                                    {/* Add role dropdown */}
+                                    {showAddRole && availableRoles.length > 0 && (
+                                        <div className="flex flex-wrap gap-1.5 rounded-lg border border-dashed border-violet-300 bg-violet-50/50 p-3">
+                                            <span className="text-xs text-muted-foreground w-full mb-1">Click to assign:</span>
+                                            {availableRoles.map((role) => (
+                                                <button
+                                                    key={role.id}
+                                                    onClick={() => {
+                                                        const newIds = [...Array.from(assignedIds), role.id];
+                                                        router.put(`/settings/users/${u.id}/roles`, { role_ids: newIds }, { preserveScroll: true });
+                                                        setShowAddRole(false);
+                                                    }}
+                                                    className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors"
+                                                >
+                                                    <Plus className="h-3 w-3" /> {role.label || role.name}
+                                                </button>
                                             ))}
                                         </div>
                                     )}
-                                    <div className="mt-4">
-                                        <Link href="/settings/access">
-                                            <Button variant="outline" size="sm">Manage in Access Control</Button>
-                                        </Link>
-                                    </div>
+
+                                    {/* Current roles */}
+                                    {roles.length === 0 ? (
+                                        <p className="text-sm text-muted-foreground">No roles assigned</p>
+                                    ) : (
+                                        <div className="space-y-2">
+                                            {roles.map((role: Role) => (
+                                                <div key={role.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <Shield className="h-3.5 w-3.5 text-violet-600" />
+                                                        <span className="text-sm font-medium">{role.label || role.name}</span>
+                                                    </div>
+                                                    <button
+                                                        onClick={() => {
+                                                            const newIds = Array.from(assignedIds).filter(id => id !== role.id);
+                                                            router.put(`/settings/users/${u.id}/roles`, { role_ids: newIds }, { preserveScroll: true });
+                                                        }}
+                                                        className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors"
+                                                        title="Remove role"
+                                                    >
+                                                        <X className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
 

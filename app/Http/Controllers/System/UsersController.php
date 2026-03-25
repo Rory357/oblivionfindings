@@ -249,6 +249,8 @@ class UsersController extends Controller
 
         $target->load(['roles.permissions', 'staffProfile']);
 
+        $allRoles = \App\Models\Role::query()->orderBy('label')->get(['id', 'name', 'label']);
+
         return Inertia::render('settings/users/show', [
             'user' => [
                 'id' => $target->id,
@@ -262,6 +264,7 @@ class UsersController extends Controller
                 'user_type' => $this->getUserType($target),
                 'staff_profile' => $target->staffProfile,
             ],
+            'allRoles' => $allRoles,
         ]);
     }
 

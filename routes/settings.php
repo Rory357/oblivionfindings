@@ -50,6 +50,12 @@ Route::middleware('auth')->group(function () {
     Route::post('settings/users/{target}/approve', [\App\Http\Controllers\System\UsersController::class, 'approve'])
         ->middleware('permission:settings.access.manage')
         ->name('settings.users.approve');
+    Route::put('settings/users/{target}/roles', function (\Illuminate\Http\Request $request, \App\Models\User $target) {
+        abort_unless($request->user()?->canDo('settings.access.manage'), 403);
+        $data = $request->validate(['role_ids' => 'array', 'role_ids.*' => 'integer|exists:roles,id']);
+        $target->roles()->sync($data['role_ids'] ?? []);
+        return back()->with('success', 'Roles updated.');
+    })->middleware('permission:settings.access.manage')->name('settings.users.roles.sync');
     Route::post('settings/users/{target}/suspend', [\App\Http\Controllers\System\UsersController::class, 'suspend'])
         ->middleware('permission:settings.access.manage')
         ->name('settings.users.suspend');
