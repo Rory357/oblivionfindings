@@ -81,6 +81,12 @@ class ServiceAgreementController extends Controller
             'funding_reference' => ['nullable', 'string', 'max:255'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
+            'nasc_assessment_date' => ['nullable', 'date'],
+            'funding_approved_date' => ['nullable', 'date'],
+            'signed_date' => ['nullable', 'date'],
+            'first_service_date' => ['nullable', 'date'],
+            'review_due_date' => ['nullable', 'date'],
+            'renewal_date' => ['nullable', 'date'],
             'total_budget' => ['nullable', 'numeric', 'min:0'],
             'hourly_rate' => ['nullable', 'numeric', 'min:0'],
             'daily_rate' => ['nullable', 'numeric', 'min:0'],
@@ -99,6 +105,12 @@ class ServiceAgreementController extends Controller
             'funding_reference' => $data['funding_reference'] ?? null,
             'starts_at' => $data['starts_at'] ?? null,
             'ends_at' => $data['ends_at'] ?? null,
+            'nasc_assessment_date' => $data['nasc_assessment_date'] ?? null,
+            'funding_approved_date' => $data['funding_approved_date'] ?? null,
+            'signed_date' => $data['signed_date'] ?? null,
+            'first_service_date' => $data['first_service_date'] ?? null,
+            'review_due_date' => $data['review_due_date'] ?? null,
+            'renewal_date' => $data['renewal_date'] ?? null,
             'total_budget' => $data['total_budget'] ?? 0,
             'budget_used' => 0,
             'hourly_rate' => $data['hourly_rate'] ?? null,
@@ -192,6 +204,12 @@ class ServiceAgreementController extends Controller
             'funding_reference' => ['nullable', 'string', 'max:255'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
+            'nasc_assessment_date' => ['nullable', 'date'],
+            'funding_approved_date' => ['nullable', 'date'],
+            'signed_date' => ['nullable', 'date'],
+            'first_service_date' => ['nullable', 'date'],
+            'review_due_date' => ['nullable', 'date'],
+            'renewal_date' => ['nullable', 'date'],
             'total_budget' => ['nullable', 'numeric', 'min:0'],
             'hourly_rate' => ['nullable', 'numeric', 'min:0'],
             'daily_rate' => ['nullable', 'numeric', 'min:0'],
@@ -248,6 +266,103 @@ class ServiceAgreementController extends Controller
         $agreement->update($updates);
 
         return redirect()->back()->with('success', "Agreement status changed to {$data['status']}.");
+    }
+
+    public function submitForApproval(Request $request, $serviceAgreement)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
+
+        $agreement = ServiceAgreement::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($serviceAgreement);
+
+        abort_unless($agreement->status === 'draft', 422, 'Only draft agreements can be submitted for approval.');
+
+        $fromStatus = $agreement->status;
+
+        ServiceAgreementStatusChange::create([
+            'service_agreement_id' => $agreement->id,
+            'from_status' => $fromStatus,
+            'to_status' => 'pending_approval',
+            'changed_by' => $auth->id,
+            'reason' => 'Submitted for approval',
+            'notes' => null,
+        ]);
+
+        $agreement->update([
+            'status' => 'pending_approval',
+            'submitted_for_approval_at' => now(),
+            'submitted_for_approval_by' => $auth->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Agreement submitted for approval.');
+    }
+
+    public function approve(Request $request, $serviceAgreement)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
+
+        $agreement = ServiceAgreement::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($serviceAgreement);
+
+        abort_unless($agreement->status === 'pending_approval', 422, 'Only agreements pending approval can be approved.');
+
+        $fromStatus = $agreement->status;
+
+        ServiceAgreementStatusChange::create([
+            'service_agreement_id' => $agreement->id,
+            'from_status' => $fromStatus,
+            'to_status' => 'active',
+            'changed_by' => $auth->id,
+            'reason' => 'Approved',
+            'notes' => $request->input('notes'),
+        ]);
+
+        $agreement->update([
+            'status' => 'active',
+            'approved_at' => now(),
+            'approved_by' => $auth->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Agreement approved and now active.');
+    }
+
+    public function reject(Request $request, $serviceAgreement)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('service_agreements.update'), 403);
+
+        $agreement = ServiceAgreement::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($serviceAgreement);
+
+        abort_unless($agreement->status === 'pending_approval', 422, 'Only agreements pending approval can be rejected.');
+
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $fromStatus = $agreement->status;
+
+        ServiceAgreementStatusChange::create([
+            'service_agreement_id' => $agreement->id,
+            'from_status' => $fromStatus,
+            'to_status' => 'draft',
+            'changed_by' => $auth->id,
+            'reason' => $data['reason'] ?? 'Returned to draft',
+            'notes' => null,
+        ]);
+
+        $agreement->update([
+            'status' => 'draft',
+            'submitted_for_approval_at' => null,
+            'submitted_for_approval_by' => null,
+        ]);
+
+        return redirect()->back()->with('success', 'Agreement returned to draft.');
     }
 
     public function destroy(Request $request, $agreement)

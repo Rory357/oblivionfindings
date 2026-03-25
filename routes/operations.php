@@ -344,6 +344,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::get('/service-agreements/{agreement}/edit', [ServiceAgreementController::class, 'edit'])->name('operations.service_agreements.edit');
         Route::put('/service-agreements/{agreement}', [ServiceAgreementController::class, 'update'])->name('operations.service_agreements.update');
         Route::post('/service-agreements/{serviceAgreement}/transition', [ServiceAgreementController::class, 'transition'])->name('operations.service_agreements.transition');
+        Route::post('/service-agreements/{serviceAgreement}/submit-for-approval', [ServiceAgreementController::class, 'submitForApproval'])->name('operations.service_agreements.submit_for_approval');
+        Route::post('/service-agreements/{serviceAgreement}/approve', [ServiceAgreementController::class, 'approve'])->name('operations.service_agreements.approve');
+        Route::post('/service-agreements/{serviceAgreement}/reject', [ServiceAgreementController::class, 'reject'])->name('operations.service_agreements.reject');
     });
 
     Route::delete('/service-agreements/{agreement}', [ServiceAgreementController::class, 'destroy'])

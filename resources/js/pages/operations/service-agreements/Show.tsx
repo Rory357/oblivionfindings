@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
@@ -322,7 +322,9 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
     const utilPct = bs.utilisation_percent;
     const [dialogOpen, setDialogOpen] = useState(false);
     const [activeTransition, setActiveTransition] = useState<TransitionDef | null>(null);
+    const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
     const transitions = getTransitions(ag.status);
+    const rejectForm = useForm({ reason: '' });
 
     function openTransition(t: TransitionDef) {
         setActiveTransition(t);
@@ -355,12 +357,33 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                         </span>
                     )}
                     <div className="ml-auto flex gap-2">
-                        {transitions.map((t) => (
-                            <Button key={t.toStatus} size="sm" variant={t.variant} onClick={() => openTransition(t)}>
-                                {t.icon}
-                                {t.label}
-                            </Button>
-                        ))}
+                        {ag.status === 'pending_approval' ? (
+                            <>
+                                <Button
+                                    size="sm"
+                                    className="bg-emerald-600 hover:bg-emerald-700"
+                                    onClick={() => router.post(`/operations/service-agreements/${ag.id}/approve`)}
+                                >
+                                    <ShieldCheck className="mr-1.5 h-3.5 w-3.5" />
+                                    Approve
+                                </Button>
+                                <Button
+                                    size="sm"
+                                    variant="destructive"
+                                    onClick={() => setRejectDialogOpen(true)}
+                                >
+                                    <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                                    Reject
+                                </Button>
+                            </>
+                        ) : (
+                            transitions.map((t) => (
+                                <Button key={t.toStatus} size="sm" variant={t.variant} onClick={() => openTransition(t)}>
+                                    {t.icon}
+                                    {t.label}
+                                </Button>
+                            ))
+                        )}
                         <Button asChild size="sm" variant="outline">
                             <Link href={`/operations/service-agreements/${ag.id}/edit`}>
                                 <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
@@ -614,6 +637,50 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
 
                 {/* Transition Dialog */}
                 <TransitionDialog open={dialogOpen} onOpenChange={setDialogOpen} transition={activeTransition} agreementId={ag.id} />
+
+                {/* Reject Dialog */}
+                <Dialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Reject Agreement</DialogTitle>
+                            <DialogDescription>
+                                Return this agreement to <strong>draft</strong> status. Provide a reason so the author can make changes.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                rejectForm.post(`/operations/service-agreements/${ag.id}/reject`, {
+                                    preserveScroll: true,
+                                    onSuccess: () => {
+                                        rejectForm.reset();
+                                        setRejectDialogOpen(false);
+                                    },
+                                });
+                            }}
+                            className="space-y-4"
+                        >
+                            <div>
+                                <Label htmlFor="reject-reason">Reason for Rejection</Label>
+                                <Textarea
+                                    id="reject-reason"
+                                    value={rejectForm.data.reason}
+                                    onChange={(e) => rejectForm.setData('reason', e.target.value)}
+                                    placeholder="Why is this agreement being returned?"
+                                    rows={3}
+                                />
+                            </div>
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setRejectDialogOpen(false)}>
+                                    Cancel
+                                </Button>
+                                <Button type="submit" variant="destructive" disabled={rejectForm.processing}>
+                                    {rejectForm.processing ? 'Rejecting...' : 'Reject & Return to Draft'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             </PageShell>
         </AppLayout>
     );

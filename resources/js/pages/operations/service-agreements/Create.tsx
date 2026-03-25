@@ -25,6 +25,8 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 
+/* ---------- SectionHeader ---------- */
+
 function SectionHeader({ icon: Icon, iconBg, title, description }: { icon: LucideIcon; iconBg: string; title: string; description: string }) {
     return (
         <div className="mb-4 flex items-center gap-2.5">
@@ -39,9 +41,27 @@ function SectionHeader({ icon: Icon, iconBg, title, description }: { icon: Lucid
     );
 }
 
+/* ---------- Types ---------- */
+
 type Props = {
     clients: Array<{ id: number; first_name: string; last_name: string }>;
 };
+
+/* ---------- Agreement Types ---------- */
+
+const AGREEMENT_TYPES: Record<string, string> = {
+    ndis: 'NDIS',
+    msd: 'MSD — Ministry of Social Development',
+    dss: 'DSS — Disability Support Services',
+    acc: 'ACC — Accident Compensation',
+    dhb: 'Health NZ / Te Whatu Ora',
+    oranga_tamariki: 'Oranga Tamariki',
+    private: 'Private / Self-Funded',
+    charitable: 'Charitable Trust / NGO',
+    other: 'Other',
+};
+
+/* ---------- Component ---------- */
 
 export default function ServiceAgreementCreate({ clients }: Props) {
     const { labels } = usePage().props as any;
@@ -60,6 +80,12 @@ export default function ServiceAgreementCreate({ clients }: Props) {
         status: 'draft',
         starts_at: '',
         ends_at: '',
+        nasc_assessment_date: '',
+        funding_approved_date: '',
+        signed_date: '',
+        first_service_date: '',
+        review_due_date: '',
+        renewal_date: '',
         total_budget: '',
         hourly_rate: '',
         daily_rate: '',
@@ -67,15 +93,32 @@ export default function ServiceAgreementCreate({ clients }: Props) {
         notes: '',
     });
 
-    const [docFile, setDocFile] = useState<File | null>(null);
+    const [docFiles, setDocFiles] = useState<File[]>([]);
+    const [dragOver, setDragOver] = useState(false);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         const payload: any = { ...data };
-        if (docFile) payload.document = docFile;
+        if (docFiles.length > 0) payload.documents = docFiles;
         post('/operations/service-agreements', {
-            forceFormData: !!docFile,
+            forceFormData: docFiles.length > 0,
         });
+    };
+
+    const handleFileDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setDragOver(false);
+        const files = Array.from(e.dataTransfer.files);
+        setDocFiles((prev) => [...prev, ...files]);
+    };
+
+    const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(e.target.files ?? []);
+        setDocFiles((prev) => [...prev, ...files]);
+    };
+
+    const removeFile = (index: number) => {
+        setDocFiles((prev) => prev.filter((_, i) => i !== index));
     };
 
     return (
@@ -116,14 +159,9 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                                         <Select value={data.agreement_type} onValueChange={(v) => setData('agreement_type', v)}>
                                             <SelectTrigger><SelectValue /></SelectTrigger>
                                             <SelectContent>
-                                                <SelectItem value="msd">MSD — Ministry of Social Development</SelectItem>
-                                                <SelectItem value="dss">DSS — Disability Support Services</SelectItem>
-                                                <SelectItem value="acc">ACC — Accident Compensation</SelectItem>
-                                                <SelectItem value="dhb">Health NZ / Te Whatu Ora</SelectItem>
-                                                <SelectItem value="oranga_tamariki">Oranga Tamariki</SelectItem>
-                                                <SelectItem value="private">Private / Self-Funded</SelectItem>
-                                                <SelectItem value="charitable">Charitable Trust / NGO</SelectItem>
-                                                <SelectItem value="other">Other</SelectItem>
+                                                {Object.entries(AGREEMENT_TYPES).map(([value, label]) => (
+                                                    <SelectItem key={value} value={value}>{label}</SelectItem>
+                                                ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
@@ -165,14 +203,14 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         </CardContent>
                     </Card>
 
-                    {/* Section 3: Period & Budget */}
+                    {/* Section 3: Dates & Milestones */}
                     <Card>
                         <CardContent className="p-5">
                             <SectionHeader
-                                icon={DollarSign}
-                                iconBg="bg-amber-100 text-amber-600"
-                                title="Period & Budget"
-                                description="Agreement dates and allocated funding in NZD."
+                                icon={CalendarClock}
+                                iconBg="bg-indigo-100 text-indigo-600"
+                                title="Dates & Milestones"
+                                description="Key dates throughout the agreement lifecycle."
                             />
                             <div className="space-y-4">
                                 <div className="grid gap-4 sm:grid-cols-3">
@@ -191,40 +229,79 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                                             <SelectContent>
                                                 <SelectItem value="draft">Draft</SelectItem>
                                                 <SelectItem value="active">Active</SelectItem>
-                                                <SelectItem value="expired">Expired</SelectItem>
                                             </SelectContent>
                                         </Select>
                                     </div>
                                 </div>
                                 <div className="grid gap-4 sm:grid-cols-3">
                                     <div className="space-y-1.5">
-                                        <Label>Total Budget (NZD)</Label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">$</span>
-                                            <Input type="number" step="0.01" className="pl-7" value={data.total_budget} onChange={(e) => setData('total_budget', e.target.value)} placeholder="0.00" />
-                                        </div>
-                                        {errors.total_budget && <p className="text-xs text-destructive">{errors.total_budget}</p>}
+                                        <Label>NASC Assessment Date</Label>
+                                        <Input type="date" value={data.nasc_assessment_date} onChange={(e) => setData('nasc_assessment_date', e.target.value)} />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <Label>Hourly Rate (NZD)</Label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">$</span>
-                                            <Input type="number" step="0.01" className="pl-7" value={data.hourly_rate} onChange={(e) => setData('hourly_rate', e.target.value)} placeholder="0.00" />
-                                        </div>
+                                        <Label>Funding Approved Date</Label>
+                                        <Input type="date" value={data.funding_approved_date} onChange={(e) => setData('funding_approved_date', e.target.value)} />
                                     </div>
                                     <div className="space-y-1.5">
-                                        <Label>Daily Rate (NZD)</Label>
-                                        <div className="relative">
-                                            <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">$</span>
-                                            <Input type="number" step="0.01" className="pl-7" value={data.daily_rate} onChange={(e) => setData('daily_rate', e.target.value)} placeholder="0.00" />
-                                        </div>
+                                        <Label>Signed Date</Label>
+                                        <Input type="date" value={data.signed_date} onChange={(e) => setData('signed_date', e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-3">
+                                    <div className="space-y-1.5">
+                                        <Label>First Service Date</Label>
+                                        <Input type="date" value={data.first_service_date} onChange={(e) => setData('first_service_date', e.target.value)} />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Review Due Date</Label>
+                                        <Input type="date" value={data.review_due_date} onChange={(e) => setData('review_due_date', e.target.value)} />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Renewal Date</Label>
+                                        <Input type="date" value={data.renewal_date} onChange={(e) => setData('renewal_date', e.target.value)} />
                                     </div>
                                 </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Section 4: Terms & Notes */}
+                    {/* Section 4: Budget & Rates */}
+                    <Card>
+                        <CardContent className="p-5">
+                            <SectionHeader
+                                icon={DollarSign}
+                                iconBg="bg-amber-100 text-amber-600"
+                                title="Budget & Rates"
+                                description="Allocated funding and service rates in NZD."
+                            />
+                            <div className="grid gap-4 sm:grid-cols-3">
+                                <div className="space-y-1.5">
+                                    <Label>Total Budget (NZD)</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">$</span>
+                                        <Input type="number" step="0.01" className="pl-7" value={data.total_budget} onChange={(e) => setData('total_budget', e.target.value)} placeholder="0.00" />
+                                    </div>
+                                    {errors.total_budget && <p className="text-xs text-destructive">{errors.total_budget}</p>}
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label>Hourly Rate (NZD)</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">$</span>
+                                        <Input type="number" step="0.01" className="pl-7" value={data.hourly_rate} onChange={(e) => setData('hourly_rate', e.target.value)} placeholder="0.00" />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label>Daily Rate (NZD)</Label>
+                                    <div className="relative">
+                                        <span className="absolute left-3 top-2.5 text-sm text-muted-foreground">$</span>
+                                        <Input type="number" step="0.01" className="pl-7" value={data.daily_rate} onChange={(e) => setData('daily_rate', e.target.value)} placeholder="0.00" />
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Section 5: Terms & Notes */}
                     <Card>
                         <CardContent className="p-5">
                             <SectionHeader
@@ -246,21 +323,64 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         </CardContent>
                     </Card>
 
-                    {/* Section 5: Document Upload */}
+                    {/* Section 6: Document Upload */}
                     <Card>
                         <CardContent className="p-5">
                             <SectionHeader
                                 icon={Upload}
                                 iconBg="bg-cyan-100 text-cyan-600"
-                                title="Agreement Document"
-                                description="Upload the signed agreement or contract document."
+                                title="Documents"
+                                description="Upload signed agreement, addendums, or supporting documents."
                             />
-                            <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-violet-300 bg-violet-50/50 p-8 transition-colors hover:bg-violet-50">
+                            <div
+                                className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed p-8 transition-colors ${
+                                    dragOver
+                                        ? 'border-violet-500 bg-violet-100/50'
+                                        : 'border-violet-300 bg-violet-50/50 hover:bg-violet-50'
+                                }`}
+                                onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                                onDragLeave={() => setDragOver(false)}
+                                onDrop={handleFileDrop}
+                                onClick={() => document.getElementById('doc-upload-create')?.click()}
+                            >
                                 <Upload className="mb-2 h-8 w-8 text-violet-400" />
-                                <p className="text-sm font-medium text-violet-700">{docFile ? docFile.name : 'Click to upload agreement document'}</p>
+                                <p className="text-sm font-medium text-violet-700">
+                                    {dragOver ? 'Drop files here' : 'Click or drag files to upload'}
+                                </p>
                                 <p className="mt-1 text-xs text-violet-500">PDF, Word document, or scanned image</p>
-                                <input type="file" className="hidden" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" onChange={(e) => setDocFile(e.target.files?.[0] ?? null)} />
-                            </label>
+                                <input
+                                    id="doc-upload-create"
+                                    type="file"
+                                    className="hidden"
+                                    multiple
+                                    accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                                    onChange={handleFileSelect}
+                                />
+                            </div>
+                            {docFiles.length > 0 && (
+                                <div className="mt-3 space-y-2">
+                                    {docFiles.map((file, index) => (
+                                        <div key={index} className="flex items-center justify-between rounded-lg border bg-muted/30 px-3 py-2">
+                                            <div className="flex items-center gap-2">
+                                                <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                                                <span className="text-sm">{file.name}</span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    ({(file.size / 1024).toFixed(1)} KB)
+                                                </span>
+                                            </div>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-6 px-2 text-xs text-red-500 hover:text-red-700"
+                                                onClick={(e) => { e.stopPropagation(); removeFile(index); }}
+                                            >
+                                                Remove
+                                            </Button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
@@ -271,7 +391,9 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                         </p>
                         <div className="flex gap-2">
                             <Button type="button" variant="outline" onClick={() => router.get(initialClientId ? `/operations/clients/${initialClientId}` : '/operations/service-agreements')}>Cancel</Button>
-                            <Button type="submit" disabled={processing} className="bg-violet-600 hover:bg-violet-700">Create Agreement</Button>
+                            <Button type="submit" disabled={processing} className="bg-violet-600 hover:bg-violet-700">
+                                {processing ? 'Creating...' : 'Create Agreement'}
+                            </Button>
                         </div>
                     </div>
                 </form>
