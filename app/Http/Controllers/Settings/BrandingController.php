@@ -35,7 +35,25 @@ class BrandingController extends Controller
         $themeLight = AppSetting::query()->where('key', 'theme.light')->value('value') ?? [];
         $themeDark = AppSetting::query()->where('key', 'theme.dark')->value('value') ?? [];
         $brandingName = AppSetting::query()->where('key', 'branding.name')->value('value');
+        $brandingTagline = AppSetting::query()->where('key', 'branding.tagline')->value('value');
+        $brandingReportSubtitle = AppSetting::query()->where('key', 'branding.report_subtitle')->value('value');
         $logoPath = AppSetting::query()->where('key', 'branding.logo_path')->value('value');
+        $faviconPath = AppSetting::query()->where('key', 'branding.favicon_path')->value('value');
+
+        // Email & Report branding
+        $emailHeaderColour = AppSetting::query()->where('key', 'branding.email_header_colour')->value('value');
+        $emailFooterText = AppSetting::query()->where('key', 'branding.email_footer_text')->value('value');
+        $reportLogoPosition = AppSetting::query()->where('key', 'branding.report_logo_position')->value('value');
+        $reportFont = AppSetting::query()->where('key', 'branding.report_font')->value('value');
+        $reportIncludeCompanyDetails = AppSetting::query()->where('key', 'branding.report_include_company_details')->value('value');
+
+        // Terminology data
+        $terminologyDefaults = config('labels', []);
+        $terminologyOverrides = AppSetting::query()
+            ->where('key', 'like', 'labels.%')
+            ->get(['key', 'value'])
+            ->mapWithKeys(fn($row) => [str_replace('labels.', '', $row->key) => $row->value])
+            ->toArray();
 
         return inertia('settings/branding', [
             'allowedVars' => $this->allowedVars,
@@ -45,7 +63,19 @@ class BrandingController extends Controller
             ],
             'branding' => [
                 'name' => is_string($brandingName) ? $brandingName : null,
+                'tagline' => is_string($brandingTagline) ? $brandingTagline : null,
+                'report_subtitle' => is_string($brandingReportSubtitle) ? $brandingReportSubtitle : null,
                 'logoUrl' => $logoPath ? Storage::disk('public')->url($logoPath) : null,
+                'faviconUrl' => $faviconPath ? Storage::disk('public')->url($faviconPath) : null,
+                'email_header_colour' => is_string($emailHeaderColour) ? $emailHeaderColour : null,
+                'email_footer_text' => is_string($emailFooterText) ? $emailFooterText : null,
+                'report_logo_position' => is_string($reportLogoPosition) ? $reportLogoPosition : 'left',
+                'report_font' => is_string($reportFont) ? $reportFont : 'default',
+                'report_include_company_details' => $reportIncludeCompanyDetails === '1' || $reportIncludeCompanyDetails === true,
+            ],
+            'terminology' => [
+                'defaults' => $terminologyDefaults,
+                'overrides' => $terminologyOverrides,
             ],
         ]);
     }
@@ -58,6 +88,13 @@ class BrandingController extends Controller
         $data = $request->validate([
             'branding' => ['nullable', 'array'],
             'branding.name' => ['nullable', 'string', 'max:80'],
+            'branding.tagline' => ['nullable', 'string', 'max:120'],
+            'branding.report_subtitle' => ['nullable', 'string', 'max:120'],
+            'branding.email_header_colour' => ['nullable', 'string', 'max:20'],
+            'branding.email_footer_text' => ['nullable', 'string', 'max:500'],
+            'branding.report_logo_position' => ['nullable', 'string', 'in:left,centre,right'],
+            'branding.report_font' => ['nullable', 'string', 'in:default,serif,sans-serif'],
+            'branding.report_include_company_details' => ['nullable', 'boolean'],
 
             'theme' => ['nullable', 'array'],
             'theme.light' => ['nullable', 'array'],
@@ -65,14 +102,29 @@ class BrandingController extends Controller
 
             'logo' => ['nullable', 'file', 'image', 'max:2048'],
             'remove_logo' => ['nullable', 'boolean'],
+            'favicon' => ['nullable', 'file', 'image', 'max:512'],
+            'remove_favicon' => ['nullable', 'boolean'],
         ]);
 
-        // Save branding name
-        $name = trim((string) data_get($data, 'branding.name', ''));
-        if ($name === '') {
-            AppSetting::query()->where('key', 'branding.name')->delete();
-        } else {
-            AppSetting::updateOrCreate(['key' => 'branding.name'], ['value' => $name]);
+        // Save branding text fields
+        $textFields = ['name', 'tagline', 'report_subtitle', 'email_header_colour', 'email_footer_text', 'report_logo_position', 'report_font'];
+        foreach ($textFields as $field) {
+            $value = trim((string) data_get($data, "branding.{$field}", ''));
+            $dbKey = "branding.{$field}";
+            if ($value === '') {
+                AppSetting::query()->where('key', $dbKey)->delete();
+            } else {
+                AppSetting::updateOrCreate(['key' => $dbKey], ['value' => $value]);
+            }
+        }
+
+        // Save boolean field
+        $includeDetails = data_get($data, 'branding.report_include_company_details');
+        if ($includeDetails !== null) {
+            AppSetting::updateOrCreate(
+                ['key' => 'branding.report_include_company_details'],
+                ['value' => $includeDetails ? '1' : '0']
+            );
         }
 
         // Save theme tokens (light/dark)
@@ -128,8 +180,24 @@ class BrandingController extends Controller
             }
 
             $path = $request->file('logo')->store('branding', 'public');
-            // Store the disk path (render with Storage::disk('public')->url())
             AppSetting::updateOrCreate(['key' => 'branding.logo_path'], ['value' => $path]);
+        }
+
+        // Favicon upload / removal
+        $removeFavicon = (bool) ($data['remove_favicon'] ?? false);
+        $existingFaviconPath = AppSetting::query()->where('key', 'branding.favicon_path')->value('value');
+
+        if ($removeFavicon && $existingFaviconPath) {
+            Storage::disk('public')->delete($existingFaviconPath);
+            AppSetting::query()->where('key', 'branding.favicon_path')->delete();
+        }
+
+        if ($request->hasFile('favicon')) {
+            if ($existingFaviconPath) {
+                Storage::disk('public')->delete($existingFaviconPath);
+            }
+            $path = $request->file('favicon')->store('branding', 'public');
+            AppSetting::updateOrCreate(['key' => 'branding.favicon_path'], ['value' => $path]);
         }
 
         return redirect()->back()->with('success', 'Branding updated.');

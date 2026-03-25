@@ -13,7 +13,6 @@ import {
     Database,
     FileText,
     Key,
-    Languages,
     Lock,
     Mail,
     Menu,
@@ -62,7 +61,6 @@ const navSections: NavSection[] = [
     {
         label: 'Organisation',
         items: [
-            { icon: Languages, title: 'Terminology', href: '/settings/terminology', permission: 'settings.manageTerminology' },
             { icon: Building2, title: 'Service Contexts', href: '/settings/service-contexts', permission: 'settings.manageServiceContexts' },
         ],
     },
