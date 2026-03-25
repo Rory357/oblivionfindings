@@ -37,6 +37,11 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
 
+    // User Management
+    Route::get('settings/users', [\App\Http\Controllers\System\UsersController::class, 'index'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.index');
+
     // Admin access controls (roles & per-user overrides)
     Route::get('settings/access', [AccessController::class, 'index'])
         ->middleware('permission:settings.access.manage')
