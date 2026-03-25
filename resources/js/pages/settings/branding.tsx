@@ -332,7 +332,7 @@ export default function BrandingPage(props: Props) {
                                                 name: e.target.value,
                                             })
                                         }
-                                        placeholder="e.g. CodeBlue 365"
+                                        placeholder="e.g. My Organisation"
                                     />
                                 </div>
                                 <div className="space-y-2">
