@@ -297,6 +297,17 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('sites.zones.destroy')
         ->middleware('permission:sites.update');
 
+    // Staff Requirements
+    Route::post('/sites/{site}/staff-requirements', [SiteComplianceController::class, 'storeStaffRequirement'])->name('sites.staff_requirements.store');
+    Route::put('/sites/{site}/staff-requirements/{requirement}', [SiteComplianceController::class, 'updateStaffRequirement'])->name('sites.staff_requirements.update');
+    Route::delete('/sites/{site}/staff-requirements/{requirement}', [SiteComplianceController::class, 'destroyStaffRequirement'])->name('sites.staff_requirements.destroy');
+
+    // Feedback
+    Route::get('/sites/{site}/feedback', [SiteComplianceController::class, 'feedback'])->name('sites.feedback');
+    Route::post('/sites/{site}/feedback', [SiteComplianceController::class, 'storeFeedback'])->name('sites.feedback.store');
+    Route::post('/sites/{site}/feedback/{feedback}/respond', [SiteComplianceController::class, 'respondFeedback'])->name('sites.feedback.respond');
+    Route::put('/sites/{site}/feedback/{feedback}/status', [SiteComplianceController::class, 'updateFeedbackStatus'])->name('sites.feedback.update_status');
+
     // Compliance
     Route::get('/sites/{site}/compliance', [SiteComplianceController::class, 'dashboard'])->name('sites.compliance.dashboard');
     Route::post('/sites/{site}/certifications', [SiteComplianceController::class, 'storeCertification'])->name('sites.certifications.store');

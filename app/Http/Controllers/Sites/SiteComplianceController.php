@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteCertification;
 use App\Models\SiteComplianceCheck;
+use App\Models\SiteFeedback;
+use App\Models\SiteStaffRequirement;
 use Illuminate\Http\Request;
 
 class SiteComplianceController extends Controller
@@ -212,5 +214,174 @@ class SiteComplianceController extends Controller
         $check->update($validated);
 
         return redirect()->back()->with('success', 'Compliance check updated successfully.');
+    }
+
+    // Staff Requirements
+    public function storeStaffRequirement(Request $request, Site $site)
+    {
+        $this->authorize('update', $site);
+
+        $validated = $request->validate([
+            'requirement_name' => 'required|string|max:255',
+            'category' => 'required|string|in:mandatory,recommended,specialist',
+            'description' => 'nullable|string',
+            'certification_required' => 'boolean',
+            'expiry_period_months' => 'nullable|integer|min:1',
+        ]);
+
+        SiteStaffRequirement::create([
+            ...$validated,
+            'site_id' => $site->id,
+            'organization_id' => $request->user()?->organization_id,
+        ]);
+
+        return redirect()->back()->with('success', 'Staff requirement added successfully.');
+    }
+
+    public function updateStaffRequirement(Request $request, Site $site, SiteStaffRequirement $requirement)
+    {
+        $this->authorize('update', $site);
+
+        abort_if($requirement->site_id !== $site->id, 404);
+
+        $validated = $request->validate([
+            'requirement_name' => 'sometimes|required|string|max:255',
+            'category' => 'sometimes|required|string|in:mandatory,recommended,specialist',
+            'description' => 'nullable|string',
+            'certification_required' => 'boolean',
+            'expiry_period_months' => 'nullable|integer|min:1',
+            'is_active' => 'boolean',
+        ]);
+
+        $requirement->update($validated);
+
+        return redirect()->back()->with('success', 'Staff requirement updated successfully.');
+    }
+
+    public function destroyStaffRequirement(Request $request, Site $site, SiteStaffRequirement $requirement)
+    {
+        $this->authorize('update', $site);
+
+        abort_if($requirement->site_id !== $site->id, 404);
+
+        $requirement->delete();
+
+        return redirect()->back()->with('success', 'Staff requirement removed successfully.');
+    }
+
+    // Feedback
+    public function feedback(Request $request, Site $site)
+    {
+        $this->authorize('view', $site);
+
+        $orgId = $request->user()?->organization_id;
+
+        $query = SiteFeedback::where('site_id', $site->id)
+            ->when($orgId, fn($q) => $q->where('organization_id', $orgId));
+
+        // Filters
+        if ($request->filled('type')) {
+            $query->where('feedback_type', $request->input('type'));
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->input('status'));
+        }
+        if ($request->filled('rating')) {
+            $query->where('rating', $request->input('rating'));
+        }
+        if ($request->filled('from')) {
+            $query->whereDate('created_at', '>=', $request->input('from'));
+        }
+        if ($request->filled('to')) {
+            $query->whereDate('created_at', '<=', $request->input('to'));
+        }
+
+        $allFeedback = SiteFeedback::where('site_id', $site->id)
+            ->when($orgId, fn($q) => $q->where('organization_id', $orgId));
+
+        $totalCount = (clone $allFeedback)->count();
+        $avgRating = (clone $allFeedback)->whereNotNull('rating')->avg('rating');
+        $openCount = (clone $allFeedback)->whereIn('status', ['new', 'acknowledged', 'in_progress'])->count();
+        $respondedCount = (clone $allFeedback)->whereNotNull('response')->count();
+        $responseRate = $totalCount > 0 ? round(($respondedCount / $totalCount) * 100) : 0;
+
+        $feedback = $query->with(['respondedBy:id,name'])
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        return inertia('sites/feedback/Index', [
+            'site' => [
+                'id' => $site->id,
+                'name' => $site->name,
+            ],
+            'feedback' => $feedback,
+            'stats' => [
+                'total' => $totalCount,
+                'average_rating' => $avgRating ? round($avgRating, 1) : null,
+                'open' => $openCount,
+                'response_rate' => $responseRate,
+            ],
+            'filters' => $request->only(['type', 'status', 'rating', 'from', 'to']),
+        ]);
+    }
+
+    public function storeFeedback(Request $request, Site $site)
+    {
+        $this->authorize('view', $site);
+
+        $validated = $request->validate([
+            'feedback_type' => 'required|string|in:whanau,client,staff,external,complaint,compliment',
+            'submitted_by_name' => 'nullable|string|max:255',
+            'submitted_by_relationship' => 'nullable|string|in:whanau,parent,sibling,advocate,staff,other',
+            'content' => 'required|string',
+            'rating' => 'nullable|integer|min:1|max:5',
+            'category' => 'nullable|string|in:care_quality,communication,environment,staff,food,activities,safety,other',
+            'is_anonymous' => 'boolean',
+        ]);
+
+        SiteFeedback::create([
+            ...$validated,
+            'site_id' => $site->id,
+            'organization_id' => $request->user()?->organization_id,
+            'status' => 'new',
+        ]);
+
+        return redirect()->back()->with('success', 'Feedback submitted successfully.');
+    }
+
+    public function respondFeedback(Request $request, Site $site, SiteFeedback $feedback)
+    {
+        $this->authorize('update', $site);
+
+        abort_if($feedback->site_id !== $site->id, 404);
+
+        $validated = $request->validate([
+            'response' => 'required|string',
+        ]);
+
+        $feedback->update([
+            'response' => $validated['response'],
+            'responded_by' => $request->user()?->id,
+            'responded_at' => now(),
+            'status' => $feedback->status === 'new' ? 'acknowledged' : $feedback->status,
+        ]);
+
+        return redirect()->back()->with('success', 'Response recorded successfully.');
+    }
+
+    public function updateFeedbackStatus(Request $request, Site $site, SiteFeedback $feedback)
+    {
+        $this->authorize('update', $site);
+
+        abort_if($feedback->site_id !== $site->id, 404);
+
+        $validated = $request->validate([
+            'status' => 'required|string|in:new,acknowledged,in_progress,resolved,closed',
+        ]);
+
+        $feedback->update($validated);
+
+        return redirect()->back()->with('success', 'Feedback status updated successfully.');
     }
 }

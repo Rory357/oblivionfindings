@@ -32,7 +32,16 @@ import {
     Settings,
     PlayCircle,
     Circle,
+    GraduationCap,
+    Plus,
+    Shield,
+    Award,
+    Star,
+    MessageSquare,
 } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 
 type Site = {
     id: number;
@@ -117,6 +126,15 @@ type VendorLite = {
     is_preferred: boolean;
 };
 
+type StaffRequirement = {
+    id: number;
+    requirement_name: string;
+    category: 'mandatory' | 'recommended' | 'specialist';
+    description?: string | null;
+    certification_required: boolean;
+    expiry_period_months?: number | null;
+};
+
 type Props = {
     site: Site;
     clients: ClientLite[];
@@ -126,6 +144,7 @@ type Props = {
     checklist: ChecklistItem[];
     typeSpecificData: TypeSpecificData;
     vendors?: VendorLite[];
+    staffRequirements?: StaffRequirement[];
     credentialCount?: number;
     hardwareCount?: number;
     integrationStatus?: Array<{ provider: string; status: string }>;
@@ -153,7 +172,7 @@ function bytes(n?: number | null): string {
     return `${mb.toFixed(1)} MB`;
 }
 
-export default function SiteShow({ site, clients, assets, contacts, documents, checklist, typeSpecificData, vendors = [], credentialCount = 0, hardwareCount = 0, integrationStatus = [], can_edit, can: assetCan }: Props) {
+export default function SiteShow({ site, clients, assets, contacts, documents, checklist, typeSpecificData, vendors = [], staffRequirements = [], credentialCount = 0, hardwareCount = 0, integrationStatus = [], can_edit, can: assetCan }: Props) {
     const TypeIcon = typeIcons[site.type];
     const percent = Math.round((checklist.filter((c) => c.done).length / Math.max(1, checklist.length)) * 100);
     const page = usePage<any>();
@@ -372,6 +391,13 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             {site.type === 'head_office' && <DoorOpen className="w-4 h-4" />}
                             {site.type === 'facility' && <LayoutGrid className="w-4 h-4" />}
                             {site.type === 'house' ? 'Rooms' : site.type === 'head_office' ? 'Resources' : 'Zones'}
+                        </TabsTrigger>
+                        <TabsTrigger value="staff-requirements" className="flex items-center gap-1">
+                            <GraduationCap className="w-4 h-4" />
+                            Staff Requirements
+                            {staffRequirements.length > 0 && (
+                                <Badge variant="outline" className="ml-1 text-xs px-1.5 py-0">{staffRequirements.length}</Badge>
+                            )}
                         </TabsTrigger>
                     </TabsList>
 
@@ -768,6 +794,11 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                     <TabsContent value="type-specific">
                         <TypeSpecificTab site={site} data={typeSpecificData} />
                     </TabsContent>
+
+                    {/* Staff Requirements Tab */}
+                    <TabsContent value="staff-requirements">
+                        <StaffRequirementsTab site={site} requirements={staffRequirements} can_edit={can_edit} />
+                    </TabsContent>
                 </Tabs>
             </PageShell>
         </AppLayout>
@@ -1136,5 +1167,201 @@ function TypeSpecificTab({ site, data }: { site: Site; data: TypeSpecificData })
                 )}
             </CardContent>
         </Card>
+    );
+}
+
+const PRESET_REQUIREMENTS = [
+    { requirement_name: 'First Aid Certificate', category: 'mandatory' as const, description: 'Current first aid certificate (NZQA Level 2 or equivalent)', certification_required: true, expiry_period_months: 24 },
+    { requirement_name: 'Medication Competency', category: 'mandatory' as const, description: 'Competency assessment for medication administration', certification_required: true, expiry_period_months: 12 },
+    { requirement_name: 'Manual Handling', category: 'mandatory' as const, description: 'Safe manual handling and transfer techniques training', certification_required: true, expiry_period_months: 24 },
+    { requirement_name: 'Positive Behaviour Support', category: 'specialist' as const, description: 'PBS training for managing challenging behaviours', certification_required: true, expiry_period_months: 12 },
+    { requirement_name: 'Cultural Safety', category: 'mandatory' as const, description: 'Cultural competency training including Te Tiriti o Waitangi awareness', certification_required: true, expiry_period_months: 36 },
+    { requirement_name: 'Restricted Practices', category: 'specialist' as const, description: 'Training in use and minimisation of restricted practices', certification_required: true, expiry_period_months: 12 },
+];
+
+const categoryConfig = {
+    mandatory: { label: 'Mandatory', color: 'border-red-500/30 text-red-300 bg-red-500/10', icon: Shield },
+    recommended: { label: 'Recommended', color: 'border-amber-500/30 text-amber-300 bg-amber-500/10', icon: Star },
+    specialist: { label: 'Specialist', color: 'border-indigo-500/30 text-indigo-300 bg-indigo-500/10', icon: Award },
+};
+
+function StaffRequirementsTab({ site, requirements, can_edit }: { site: Site; requirements: StaffRequirement[]; can_edit: boolean }) {
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const form = useForm({
+        requirement_name: '',
+        category: 'mandatory',
+        description: '',
+        certification_required: false,
+        expiry_period_months: '' as string | number,
+    });
+
+    const grouped = useMemo(() => {
+        const groups: Record<string, StaffRequirement[]> = { mandatory: [], recommended: [], specialist: [] };
+        requirements.forEach((r) => {
+            if (groups[r.category]) groups[r.category].push(r);
+        });
+        return groups;
+    }, [requirements]);
+
+    function applyPreset(preset: typeof PRESET_REQUIREMENTS[0]) {
+        form.setData({
+            requirement_name: preset.requirement_name,
+            category: preset.category,
+            description: preset.description,
+            certification_required: preset.certification_required,
+            expiry_period_months: preset.expiry_period_months,
+        });
+    }
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        form.post(`/sites/${site.id}/staff-requirements`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                form.reset();
+                setDialogOpen(false);
+            },
+        });
+    }
+
+    function deleteRequirement(id: number) {
+        if (!confirm('Remove this requirement?')) return;
+        form.delete(`/sites/${site.id}/staff-requirements/${id}`, { preserveScroll: true });
+    }
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Staff Competency Requirements</h3>
+                {can_edit && (
+                    <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+                        <DialogTrigger asChild>
+                            <Button size="sm">
+                                <Plus className="w-4 h-4 mr-1" />
+                                Add Requirement
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent className="max-w-lg">
+                            <DialogHeader>
+                                <DialogTitle>Add Staff Requirement</DialogTitle>
+                            </DialogHeader>
+
+                            {/* Preset buttons */}
+                            <div className="space-y-2">
+                                <Label className="text-xs text-slate-400">Quick-add common NZ requirements:</Label>
+                                <div className="flex flex-wrap gap-1">
+                                    {PRESET_REQUIREMENTS.filter(
+                                        (p) => !requirements.some((r) => r.requirement_name === p.requirement_name)
+                                    ).map((p) => (
+                                        <Button key={p.requirement_name} variant="outline" size="sm" className="text-xs" onClick={() => applyPreset(p)}>
+                                            {p.requirement_name}
+                                        </Button>
+                                    ))}
+                                </div>
+                            </div>
+
+                            <form onSubmit={submit} className="space-y-3 mt-2">
+                                <div>
+                                    <Label>Requirement Name</Label>
+                                    <Input value={form.data.requirement_name} onChange={(e) => form.setData('requirement_name', e.target.value)} required />
+                                </div>
+                                <div>
+                                    <Label>Category</Label>
+                                    <Select value={form.data.category} onValueChange={(v) => form.setData('category', v)}>
+                                        <SelectTrigger><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="mandatory">Mandatory</SelectItem>
+                                            <SelectItem value="recommended">Recommended</SelectItem>
+                                            <SelectItem value="specialist">Specialist</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label>Description</Label>
+                                    <Textarea value={form.data.description} onChange={(e) => form.setData('description', e.target.value)} rows={2} />
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <Switch checked={form.data.certification_required} onCheckedChange={(v) => form.setData('certification_required', v)} />
+                                    <Label>Certification Required</Label>
+                                </div>
+                                <div>
+                                    <Label>Expiry Period (months)</Label>
+                                    <Input
+                                        type="number"
+                                        min={1}
+                                        value={form.data.expiry_period_months}
+                                        onChange={(e) => form.setData('expiry_period_months', e.target.value ? parseInt(e.target.value) : '')}
+                                        placeholder="e.g. 12, 24"
+                                    />
+                                </div>
+                                <Button type="submit" disabled={form.processing} className="w-full">
+                                    {form.processing ? 'Adding...' : 'Add Requirement'}
+                                </Button>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                )}
+            </div>
+
+            {requirements.length === 0 ? (
+                <Card>
+                    <CardContent className="py-8 text-center">
+                        <GraduationCap className="w-12 h-12 mx-auto mb-3 text-slate-500 opacity-50" />
+                        <p className="text-slate-400">No staff requirements configured for this site</p>
+                        <p className="text-sm text-slate-500 mt-1">Add mandatory, recommended, and specialist competency requirements</p>
+                    </CardContent>
+                </Card>
+            ) : (
+                (['mandatory', 'recommended', 'specialist'] as const).map((cat) => {
+                    const items = grouped[cat];
+                    if (items.length === 0) return null;
+                    const config = categoryConfig[cat];
+                    const CatIcon = config.icon;
+                    return (
+                        <Card key={cat}>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <CatIcon className="w-4 h-4" />
+                                    {config.label} Requirements
+                                    <Badge variant="outline" className={config.color}>{items.length}</Badge>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-2">
+                                    {items.map((req) => (
+                                        <div key={req.id} className="rounded-lg border p-3 flex items-start justify-between gap-3">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="font-medium text-sm">{req.requirement_name}</span>
+                                                    {req.certification_required && (
+                                                        <Badge variant="outline" className="text-xs border-emerald-500/30 text-emerald-300 bg-emerald-500/10">
+                                                            <Award className="w-3 h-3 mr-1" />
+                                                            Certification
+                                                        </Badge>
+                                                    )}
+                                                    {req.expiry_period_months && (
+                                                        <Badge variant="outline" className="text-xs border-slate-500/30 text-slate-400">
+                                                            Renew every {req.expiry_period_months}mo
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                {req.description && (
+                                                    <p className="text-sm text-slate-400 mt-1">{req.description}</p>
+                                                )}
+                                            </div>
+                                            {can_edit && (
+                                                <Button variant="ghost" size="sm" className="text-slate-500 hover:text-red-400 shrink-0" onClick={() => deleteRequirement(req.id)}>
+                                                    Remove
+                                                </Button>
+                                            )}
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    );
+                })
+            )}
+        </div>
     );
 }

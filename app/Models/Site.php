@@ -175,6 +175,16 @@ class Site extends Model
         return $this->hasMany(SiteComplianceCheck::class);
     }
 
+    public function staffRequirements(): HasMany
+    {
+        return $this->hasMany(SiteStaffRequirement::class);
+    }
+
+    public function feedback(): HasMany
+    {
+        return $this->hasMany(SiteFeedback::class);
+    }
+
     // Accessors
     public function getAddressAttribute(): string
     {
