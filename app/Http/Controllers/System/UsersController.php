@@ -249,7 +249,7 @@ class UsersController extends Controller
 
         $target->load(['roles.permissions', 'staffProfile']);
 
-        return Inertia::render('system/users/Show', [
+        return Inertia::render('settings/users/show', [
             'user' => [
                 'id' => $target->id,
                 'name' => $target->name,

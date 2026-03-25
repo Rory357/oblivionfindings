@@ -41,6 +41,18 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/users', [\App\Http\Controllers\System\UsersController::class, 'index'])
         ->middleware('permission:settings.access.manage')
         ->name('settings.users.index');
+    Route::get('settings/users/{target}', [\App\Http\Controllers\System\UsersController::class, 'show'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.show');
+    Route::put('settings/users/{target}', [\App\Http\Controllers\System\UsersController::class, 'update'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.update');
+    Route::post('settings/users/{target}/approve', [\App\Http\Controllers\System\UsersController::class, 'approve'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.approve');
+    Route::post('settings/users/{target}/suspend', [\App\Http\Controllers\System\UsersController::class, 'suspend'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.suspend');
 
     // Admin access controls (roles & per-user overrides)
     Route::get('settings/access', [AccessController::class, 'index'])
