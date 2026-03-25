@@ -331,16 +331,29 @@ function TransitionDialog({
     transition: TransitionDef | null;
     agreementId: number;
 }) {
-    const form = useForm({ status: transition?.toStatus ?? '', reason: '', notes: '' });
+    const [reason, setReason] = useState('');
+    const [notes, setNotes] = useState('');
+    const [processing, setProcessing] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
-        form.post(`/operations/service-agreements/${agreementId}/transition`, {
+        if (!transition) return;
+        setProcessing(true);
+        router.post(`/operations/service-agreements/${agreementId}/transition`, {
+            status: transition.toStatus,
+            reason,
+            notes,
+        }, {
             preserveScroll: true,
             onSuccess: () => {
-                form.reset();
+                setReason('');
+                setNotes('');
+                setErrors({});
                 onOpenChange(false);
             },
+            onError: (errs) => setErrors(errs),
+            onFinish: () => setProcessing(false),
         });
     }
 
@@ -356,35 +369,34 @@ function TransitionDialog({
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-4">
-                    <input type="hidden" name="status" value={transition.toStatus} />
                     <div>
                         <Label htmlFor="reason">Reason</Label>
                         <Textarea
                             id="reason"
-                            value={form.data.reason}
-                            onChange={(e) => form.setData('reason', e.target.value)}
+                            value={reason}
+                            onChange={(e) => setReason(e.target.value)}
                             placeholder="Why is this transition being made?"
                             rows={2}
                         />
-                        {form.errors.reason && <p className="mt-1 text-xs text-red-500">{form.errors.reason}</p>}
+                        {errors.reason && <p className="mt-1 text-xs text-red-500">{errors.reason}</p>}
                     </div>
                     <div>
                         <Label htmlFor="notes">Notes</Label>
                         <Textarea
                             id="notes"
-                            value={form.data.notes}
-                            onChange={(e) => form.setData('notes', e.target.value)}
+                            value={notes}
+                            onChange={(e) => setNotes(e.target.value)}
                             placeholder="Any additional notes..."
                             rows={2}
                         />
-                        {form.errors.notes && <p className="mt-1 text-xs text-red-500">{form.errors.notes}</p>}
+                        {errors.notes && <p className="mt-1 text-xs text-red-500">{errors.notes}</p>}
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                             Cancel
                         </Button>
-                        <Button type="submit" disabled={form.processing} variant={transition.variant === 'destructive' ? 'destructive' : 'default'}>
-                            {form.processing ? 'Processing...' : transition.label}
+                        <Button type="submit" disabled={processing} variant={transition.variant === 'destructive' ? 'destructive' : 'default'}>
+                            {processing ? 'Processing...' : transition.label}
                         </Button>
                     </DialogFooter>
                 </form>
