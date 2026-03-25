@@ -6,7 +6,7 @@ import { edit as editAppearance } from '@/routes/appearance';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { Appearance, useAppearance } from '@/hooks/use-appearance';
+import { type Appearance as AppearanceType, useAppearance } from '@/hooks/use-appearance';
 import { cn } from '@/lib/utils';
 import { Monitor, Moon, Sun } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -19,7 +19,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 interface ThemeOption {
-    value: Appearance;
+    value: AppearanceType;
     label: string;
     icon: typeof Sun;
     // Mini preview colors: [sidebar, content, accent]
