@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Sites\{
     SiteCalendarController,
+    SiteComplianceController,
     SiteHazardController,
     SiteChecklistController,
     SiteChecklistTemplateController,
@@ -17,9 +18,6 @@ use App\Http\Controllers\Sites\{
     SiteResourceController,
     SiteZoneController
 };
-use App\Http\Controllers\Sites\SiteDamageController;
-use App\Http\Controllers\Sites\HouseLedgerController;
-use App\Http\Controllers\Sites\HouseChecklistController;
 
 /*
 |--------------------------------------------------------------------------
@@ -37,15 +35,6 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('sites.calendar.global')
         ->middleware('permission:calendar.view');
 
-    // Global inspections & maintenance
-    Route::get('/sites/inspections', [SiteInspectionController::class, 'globalIndex'])
-        ->name('sites.inspections.global')
-        ->middleware('permission:checklists.view');
-
-    // Global vendors & credentials register
-    Route::get('/sites/vendors-credentials', [SiteVendorController::class, 'globalIndex'])
-        ->name('sites.vendors-credentials.global');
-
     // Site-scoped routes
     Route::prefix('sites/{site}')->middleware('permission:sites.viewAny')->group(function () {
         
@@ -59,10 +48,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('permission:calendar.create');
         Route::put('/calendar/events/{event}', [SiteCalendarController::class, 'update'])
             ->name('sites.calendar.update')
-            ->middleware('permission:calendar.manage');
+            ->middleware('permission:calendar.create');
         Route::delete('/calendar/events/{event}', [SiteCalendarController::class, 'destroy'])
             ->name('sites.calendar.destroy')
-            ->middleware('permission:calendar.manage');
+            ->middleware('permission:calendar.create');
         
         // Hazards
         Route::get('/hazards', [SiteHazardController::class, 'index'])
@@ -123,8 +112,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('sites.credentials.destroy')
             ->middleware('permission:credentials.manage');
         Route::get('/credentials/{credential}/audit', [SiteCredentialController::class, 'auditLog'])
-            ->name('sites.credentials.audit')
-            ->middleware('permission:credentials.view');
+            ->name('sites.credentials.audit');
 
         // Inspections
         Route::get('/inspections', [SiteInspectionController::class, 'index'])
@@ -202,71 +190,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/onboarding/complete', [SiteOnboardingController::class, 'complete'])
             ->name('sites.onboarding.complete')
             ->middleware('permission:sites.update');
-        Route::post('/onboarding/documents', [SiteOnboardingController::class, 'uploadDocument'])
-            ->name('sites.onboarding.uploadDocument')
-            ->middleware('permission:sites.update');
-        Route::delete('/onboarding/documents/{document}', [SiteOnboardingController::class, 'deleteDocument'])
-            ->name('sites.onboarding.deleteDocument')
-            ->middleware('permission:sites.update');
-
-        // Site Documents (general — reuses onboarding controller methods)
-        Route::post('/documents', [SiteOnboardingController::class, 'uploadDocument'])
-            ->name('sites.documents.upload')
-            ->middleware('permission:sites.update');
-        Route::delete('/documents/{document}', [SiteOnboardingController::class, 'deleteDocument'])
-            ->name('sites.documents.delete')
-            ->middleware('permission:sites.update');
-
-        // Damages
-        Route::get('/damages', [SiteDamageController::class, 'index'])
-            ->name('sites.damages.index')
-            ->middleware('permission:sites.damages.view');
-        Route::post('/damages', [SiteDamageController::class, 'store'])
-            ->name('sites.damages.store')
-            ->middleware('permission:sites.damages.create');
-        Route::put('/damages/{damage}', [SiteDamageController::class, 'update'])
-            ->name('sites.damages.update')
-            ->middleware('permission:sites.damages.manage');
-        Route::delete('/damages/{damage}', [SiteDamageController::class, 'destroy'])
-            ->name('sites.damages.destroy')
-            ->middleware('permission:sites.damages.manage');
-
-        // House Ledger
-        Route::get('/ledger', [HouseLedgerController::class, 'index'])
-            ->name('sites.ledger.index')
-            ->middleware('permission:sites.ledger.view');
-        Route::post('/ledger', [HouseLedgerController::class, 'store'])
-            ->name('sites.ledger.store')
-            ->middleware('permission:sites.ledger.create');
-        Route::post('/ledger/reconcile', [HouseLedgerController::class, 'reconcile'])
-            ->name('sites.ledger.reconcile')
-            ->middleware('permission:sites.ledger.manage');
-        Route::get('/ledger/entries/{entry}/attachment', [HouseLedgerController::class, 'downloadAttachment'])
-            ->name('sites.ledger.attachment')
-            ->middleware('permission:sites.ledger.view');
-
-        // House Checklists
-        Route::get('/house-checklists', [HouseChecklistController::class, 'index'])
-            ->name('sites.house-checklists.index')
-            ->middleware('permission:checklists.view');
-        Route::post('/house-checklists/templates', [HouseChecklistController::class, 'storeTemplate'])
-            ->name('sites.house-checklists.store-template')
-            ->middleware('permission:checklists.manage_templates');
-        Route::post('/house-checklists/{template}/start', [HouseChecklistController::class, 'startRun'])
-            ->name('sites.house-checklists.start-run')
-            ->middleware('permission:checklists.run');
-        Route::post('/house-checklists/runs/{run}/complete', [HouseChecklistController::class, 'completeRun'])
-            ->name('sites.house-checklists.complete-run')
-            ->middleware('permission:checklists.run');
     });
 
     // Hazard routes (not site-scoped)
     Route::get('/hazards/{hazard}', [SiteHazardController::class, 'show'])
-        ->name('sites.hazards.show')
-        ->middleware('permission:hazards.view');
+        ->name('sites.hazards.show');
     Route::put('/hazards/{hazard}', [SiteHazardController::class, 'update'])
         ->name('sites.hazards.update')
-        ->middleware('permission:hazards.manage');
+        ->middleware('permission:hazards.create');
     Route::post('/hazards/{hazard}/assign', [SiteHazardController::class, 'assign'])
         ->name('sites.hazards.assign')
         ->middleware('permission:hazards.assign');
@@ -276,8 +207,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Checklist run routes
     Route::get('/checklists/runs/{run}', [SiteChecklistController::class, 'showRun'])
-        ->name('sites.checklists.showRun')
-        ->middleware('permission:checklists.view');
+        ->name('sites.checklists.showRun');
     Route::post('/checklists/runs/{run}/start', [SiteChecklistController::class, 'startRun'])
         ->name('sites.checklists.startRun')
         ->middleware('permission:checklists.run');
@@ -366,6 +296,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/sites/{site}/zones/{zone}', [SiteZoneController::class, 'destroy'])
         ->name('sites.zones.destroy')
         ->middleware('permission:sites.update');
+
+    // Compliance
+    Route::get('/sites/{site}/compliance', [SiteComplianceController::class, 'dashboard'])->name('sites.compliance.dashboard');
+    Route::post('/sites/{site}/certifications', [SiteComplianceController::class, 'storeCertification'])->name('sites.certifications.store');
+    Route::put('/sites/{site}/certifications/{certification}', [SiteComplianceController::class, 'updateCertification'])->name('sites.certifications.update');
+    Route::delete('/sites/{site}/certifications/{certification}', [SiteComplianceController::class, 'destroyCertification'])->name('sites.certifications.destroy');
+    Route::post('/sites/{site}/compliance-checks', [SiteComplianceController::class, 'storeCheck'])->name('sites.compliance_checks.store');
+    Route::patch('/sites/{site}/compliance-checks/{check}/complete', [SiteComplianceController::class, 'completeCheck'])->name('sites.compliance_checks.complete');
+    Route::put('/sites/{site}/compliance-checks/{check}', [SiteComplianceController::class, 'updateCheck'])->name('sites.compliance_checks.update');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {

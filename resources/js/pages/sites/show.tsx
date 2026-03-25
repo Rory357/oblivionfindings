@@ -21,6 +21,7 @@ import {
     CheckCircle2,
     Calendar,
     ClipboardCheck,
+    Shield,
     ShieldAlert,
     Truck,
     Package,
@@ -380,6 +381,12 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                         <TabsTrigger value="hazards" className="flex items-center gap-1">
                             <ShieldAlert className="w-4 h-4" />
                             Hazards
+                        </TabsTrigger>
+                        <TabsTrigger value="compliance" className="flex items-center gap-1" asChild>
+                            <Link href={`/sites/${site.id}/compliance`}>
+                                <Shield className="w-4 h-4" />
+                                Compliance
+                            </Link>
                         </TabsTrigger>
                         {canSeeVendorsCredentials && (
                             <TabsTrigger value="vendors-credentials" className="flex items-center gap-1">
