@@ -18,12 +18,27 @@ return new class extends Migration
             $table->foreignId('fleet_signal_id')->nullable()->constrained('fleet_signals')->nullOnDelete();
             $table->dateTime('triggered_at');
             $table->dateTime('acknowledged_at')->nullable();
+            $table->foreignId('acknowledged_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->dateTime('resolved_at')->nullable();
+            $table->foreignId('resolved_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('closed_at')->nullable();
+            $table->foreignId('closed_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('escalated_at')->nullable();
+            $table->foreignId('escalated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->unsignedTinyInteger('escalation_level')->default(0);
+            $table->foreignId('assigned_to_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->timestamp('assigned_at')->nullable();
+            $table->foreignId('assigned_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->json('context')->nullable();
+            $table->text('notes')->nullable();
             $table->timestamps();
 
             $table->index(['status', 'severity']);
             $table->index(['source', 'triggered_at']);
+            $table->index('assigned_to_user_id');
+            $table->index('escalation_level');
+            $table->index(['status', 'assigned_to_user_id']);
         });
     }
 

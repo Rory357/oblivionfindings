@@ -2,6 +2,7 @@
 
 namespace App\Http\Requests;
 
+use App\Models\Client;
 use Illuminate\Foundation\Http\FormRequest;
 
 class StoreClientRequest extends FormRequest
@@ -31,6 +32,9 @@ class StoreClientRequest extends FormRequest
             'postcode' => ['nullable', 'string', 'max:20'],
             'funding_type' => ['nullable', 'string', 'max:100'],
             'funding_notes' => ['nullable', 'string', 'max:2000'],
+
+            // NHI Number (3 letters + 4 digits, e.g., ZAC5961)
+            'nhi_number' => Client::nhiValidationRules(),
 
             // Optional portal account for the client themselves.
             'create_client_portal_user' => ['nullable', 'boolean'],

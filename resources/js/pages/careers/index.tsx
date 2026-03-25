@@ -1,154 +1,133 @@
-import MarketingLayout from '@/layouts/marketing-layout';
-import { Link, router } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
+﻿import { Head, Link, router } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { MapPin, Briefcase, Clock, DollarSign } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
-type Posting = {
+interface Job {
     id: number;
     title: string;
-    department: string | null;
-    location: string | null;
+    slug: string;
+    position_role: string | null;
     employment_type: string;
-    salary_range: string | null;
+    summary: string | null;
+    site: { id: number; name: string } | null;
     published_at: string | null;
-    closes_at: string | null;
-};
+    closing_at: string | null;
+}
 
-type Props = {
-    postings: Posting[];
-    departments: string[];
-    locations: string[];
-    filters: { department: string | null; location: string | null };
-};
-
-const typeLabels: Record<string, string> = {
-    full_time: 'Full Time',
-    part_time: 'Part Time',
-    casual: 'Casual',
-    fixed_term: 'Fixed Term',
-};
-
-export default function CareersIndex({ postings, departments, locations, filters }: Props) {
-    const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/careers', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+interface Props {
+    jobs: Job[];
+    options: {
+        position_roles: string[];
+        employment_types: string[];
+        sites: Array<{ id: number; name: string }>;
     };
+    filters: {
+        search: string;
+        position_role: string | null;
+        employment_type: string | null;
+        site: number | null;
+    };
+}
+
+export default function CareersIndex({ jobs, options, filters }: Props) {
+    function submitFilters(next: Partial<{ search: string; position_role: string; employment_type: string; site: string }>) {
+        const search = next.search ?? filters.search ?? '';
+        const positionRole = next.position_role ?? (filters.position_role ?? 'all');
+        const employmentType = next.employment_type ?? (filters.employment_type ?? 'all');
+        const site = next.site ?? (filters.site ? String(filters.site) : 'all');
+
+        router.get('/careers', {
+            ...(search !== '' ? { search } : {}),
+            ...(positionRole !== 'all' ? { position_role: positionRole } : {}),
+            ...(employmentType !== 'all' ? { employment_type: employmentType } : {}),
+            ...(site !== 'all' ? { site } : {}),
+        }, { preserveState: true, replace: true });
+    }
 
     return (
-        <MarketingLayout title="Careers" description="Join our team and make a difference in supported living.">
-            <div className="mx-auto max-w-5xl px-4 py-16 sm:px-6 lg:px-8">
-                <div className="text-center mb-12">
-                    <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
-                        Join Our Team
-                    </h1>
-                    <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
-                        We are looking for talented and passionate people to help us deliver outstanding supported living services.
-                    </p>
+        <>
+            <Head title="Careers" />
+            <div className="mx-auto max-w-5xl px-4 py-10 space-y-6">
+                <div className="space-y-2">
+                    <h1 className="text-3xl font-bold">Careers</h1>
+                    <p className="text-muted-foreground">Join our team and make a meaningful impact.</p>
                 </div>
 
-                {/* Filters */}
-                {(departments.length > 0 || locations.length > 0) && (
-                    <div className="flex flex-wrap gap-4 mb-8 justify-center">
-                        {departments.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                                <Button
-                                    variant={!filters.department ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => onFilter({ department: null })}
-                                >
-                                    All Departments
-                                </Button>
-                                {departments.map((dept) => (
-                                    <Button
-                                        key={dept}
-                                        variant={filters.department === dept ? 'default' : 'outline'}
-                                        size="sm"
-                                        onClick={() => onFilter({ department: dept })}
-                                    >
-                                        {dept}
-                                    </Button>
-                                ))}
-                            </div>
-                        )}
-                        {locations.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                                <Button
-                                    variant={!filters.location ? 'default' : 'outline'}
-                                    size="sm"
-                                    onClick={() => onFilter({ location: null })}
-                                >
-                                    All Locations
-                                </Button>
-                                {locations.map((loc) => (
-                                    <Button
-                                        key={loc}
-                                        variant={filters.location === loc ? 'default' : 'outline'}
-                                        size="sm"
-                                        onClick={() => onFilter({ location: loc })}
-                                    >
-                                        {loc}
-                                    </Button>
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                )}
+                <div className="grid gap-3 md:grid-cols-4">
+                    <Input
+                        placeholder="Search jobs..."
+                        defaultValue={filters.search}
+                        onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                                submitFilters({ search: (e.target as HTMLInputElement).value });
+                            }
+                        }}
+                    />
+                    <select
+                        className="h-10 rounded-md border bg-background px-3 text-sm"
+                        value={filters.position_role ?? 'all'}
+                        onChange={(e) => submitFilters({ position_role: e.target.value })}
+                    >
+                        <option value="all">All roles</option>
+                        {options.position_roles.map((role) => (
+                            <option key={role} value={role}>{role.replace(/_/g, ' ')}</option>
+                        ))}
+                    </select>
+                    <select
+                        className="h-10 rounded-md border bg-background px-3 text-sm"
+                        value={filters.employment_type ?? 'all'}
+                        onChange={(e) => submitFilters({ employment_type: e.target.value })}
+                    >
+                        <option value="all">All types</option>
+                        {options.employment_types.map((type) => (
+                            <option key={type} value={type}>{type.replace(/_/g, ' ')}</option>
+                        ))}
+                    </select>
+                    <select
+                        className="h-10 rounded-md border bg-background px-3 text-sm"
+                        value={filters.site ? String(filters.site) : 'all'}
+                        onChange={(e) => submitFilters({ site: e.target.value })}
+                    >
+                        <option value="all">All locations</option>
+                        {options.sites.map((site) => (
+                            <option key={site.id} value={site.id}>{site.name}</option>
+                        ))}
+                    </select>
+                </div>
 
-                {/* Job Listings */}
-                <div className="grid gap-4 md:grid-cols-2">
-                    {postings.map((posting) => (
-                        <Link key={posting.id} href={`/careers/${posting.id}`} className="block group">
-                            <Card className="h-full transition-shadow hover:shadow-lg">
-                                <CardHeader>
-                                    <CardTitle className="text-lg group-hover:text-primary transition-colors">
-                                        {posting.title}
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="pt-0">
-                                    <div className="flex flex-wrap gap-2 mb-3">
-                                        <Badge variant="secondary">
-                                            <Briefcase className="mr-1 h-3 w-3" />
-                                            {typeLabels[posting.employment_type] || posting.employment_type}
-                                        </Badge>
-                                        {posting.department && (
-                                            <Badge variant="outline">{posting.department}</Badge>
-                                        )}
-                                    </div>
-                                    <div className="flex flex-col gap-1 text-sm text-muted-foreground">
-                                        {posting.location && (
-                                            <span className="flex items-center gap-1.5">
-                                                <MapPin className="h-3.5 w-3.5" />
-                                                {posting.location}
-                                            </span>
-                                        )}
-                                        {posting.salary_range && (
-                                            <span className="flex items-center gap-1.5">
-                                                <DollarSign className="h-3.5 w-3.5" />
-                                                {posting.salary_range}
-                                            </span>
-                                        )}
-                                        {posting.closes_at && (
-                                            <span className="flex items-center gap-1.5">
-                                                <Clock className="h-3.5 w-3.5" />
-                                                Closes: {posting.closes_at}
-                                            </span>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </Link>
+                <div className="grid gap-4">
+                    {jobs.map((job) => (
+                        <Card key={job.id}>
+                            <CardHeader>
+                                <CardTitle>{job.title}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                <p className="text-sm text-muted-foreground">
+                                    {job.position_role ? job.position_role.replace('_', ' ') : 'General role'}
+                                    {' · '}
+                                    {job.employment_type.replace('_', ' ')}
+                                    {job.site?.name ? ` · ${job.site.name}` : ''}
+                                </p>
+                                {job.summary && <p className="text-sm">{job.summary}</p>}
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-muted-foreground">{job.closing_at ? `Closes ${job.closing_at}` : 'Open until filled'}</p>
+                                    <Button asChild>
+                                        <Link href={`/careers/jobs/${job.slug}/apply`}>Apply</Link>
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
                     ))}
-                </div>
 
-                {postings.length === 0 && (
-                    <div className="text-center py-16">
-                        <p className="text-lg text-muted-foreground">
-                            No open positions at the moment. Please check back soon.
-                        </p>
-                    </div>
-                )}
+                    {jobs.length === 0 && (
+                        <Card>
+                            <CardContent className="py-10 text-center text-muted-foreground">No open roles right now.</CardContent>
+                        </Card>
+                    )}
+                </div>
             </div>
-        </MarketingLayout>
+        </>
     );
 }
+

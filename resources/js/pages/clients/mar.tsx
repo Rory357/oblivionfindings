@@ -4,11 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
-import { AlertTriangle } from 'lucide-react';
+import { AlertTriangle, AlertCircle, Info, XCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type Props = {
@@ -18,6 +18,23 @@ type Props = {
   history: any[];
   break_glass?: { id: number; reason: string; expires_at?: string | null } | null;
   has_open_controlled_discrepancy: boolean;
+  controlled_discrepancies?: Array<{
+    id: number;
+    medication_name: string;
+    expected_balance: number;
+    actual_balance: number;
+    discrepancy_amount: number;
+    status: string;
+    reported_by: string;
+    created_at: string;
+  }>;
+  alerts?: Array<{
+    id: number;
+    alert_type: string;
+    severity: 'critical' | 'warning' | 'info';
+    message: string;
+    medication_name?: string;
+  }>;
   witnesses?: Array<{ id: number; name: string }>;
   can: { record: boolean; correct: boolean; export: boolean; break_glass: boolean };
 };
@@ -51,6 +68,8 @@ function pillForScheduleState(state: string) {
       return { label: 'Historical', className: 'bg-slate-100 text-slate-700 border-slate-200' };
     case 'prn':
       return { label: 'PRN', className: 'bg-indigo-100 text-indigo-800 border-indigo-200' };
+    case 'completed':
+      return { label: 'Completed', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
     default:
       return { label: state, className: 'bg-slate-100 text-slate-700 border-slate-200' };
   }
@@ -73,7 +92,7 @@ function pillForStatus(status?: string | null) {
 
 export default function ClientMar() {
   const { props } = usePage<Props>();
-  const { client, date, rows, history, can, has_open_controlled_discrepancy, break_glass, witnesses = [] } = props;
+  const { client, date, rows, history, can, has_open_controlled_discrepancy, controlled_discrepancies = [], alerts = [], break_glass, witnesses = [] } = props;
 
   const auth: any = (usePage().props as any).auth;
   const myUserId = auth?.user?.id;
@@ -182,7 +201,8 @@ export default function ClientMar() {
       administered_at: fromLocalDateTimeInput(adminForm.data.administered_at as any),
       witnessed_by: adminForm.data.witnessed_by === '__none__' ? null : adminForm.data.witnessed_by,
     };
-    adminForm.transform(() => payload).post(`/clients/${client.id}/medical/medications/${mId}/administrations`, {
+    adminForm.transform(() => payload);
+    adminForm.post(`/clients/${client.id}/medical/medications/${mId}/administrations`, {
       preserveScroll: true,
       onSuccess: () => {
         setAdminOpen(false);
@@ -208,7 +228,8 @@ export default function ClientMar() {
       ...corrForm.data,
       administered_at: fromLocalDateTimeInput(corrForm.data.administered_at as any),
     };
-    corrForm.transform(() => payload).post(`/clients/${client.id}/mar/administrations/${corrRecord.id}/corrections`, {
+    corrForm.transform(() => payload);
+    corrForm.post(`/clients/${client.id}/mar/administrations/${corrRecord.id}/corrections`, {
       preserveScroll: true,
       onSuccess: () => {
         setCorrOpen(false);
@@ -246,15 +267,62 @@ export default function ClientMar() {
           </div>
         </div>
 
-        {has_open_controlled_discrepancy && (
-          <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="mt-0.5 h-4 w-4" />
-              <div>
-                <div className="font-medium">Open controlled-drug discrepancy</div>
-                <div className="text-xs text-amber-800">Review and resolve before further controlled stock edits (unless override is granted).</div>
-              </div>
-            </div>
+        {/* Controlled Drug Discrepancies */}
+        {controlled_discrepancies.length > 0 && (
+          <Card className="border-red-200 bg-red-50">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2 text-red-900">
+                <XCircle className="h-4 w-4" />
+                Controlled Drug Discrepancies ({controlled_discrepancies.length})
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {controlled_discrepancies.map((d) => (
+                <div key={d.id} className="rounded-md border border-red-200 bg-white p-3 text-sm">
+                  <div className="flex items-start justify-between">
+                    <div className="font-medium text-red-900">{d.medication_name}</div>
+                    <Badge variant="outline" className="bg-red-100 text-red-800 border-red-200">
+                      {d.status.replace('_', ' ')}
+                    </Badge>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-600">
+                    Expected: {d.expected_balance} • Actual: {d.actual_balance} • 
+                    <span className="font-medium text-red-700"> Discrepancy: {d.discrepancy_amount > 0 ? '+' : ''}{d.discrepancy_amount}</span>
+                  </div>
+                  <div className="mt-1 text-xs text-slate-500">
+                    Reported by {d.reported_by} • {new Date(d.created_at).toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Active Medication Alerts */}
+        {alerts.length > 0 && (
+          <div className="space-y-2">
+            {alerts.map((alert) => {
+              const severityConfig = {
+                critical: { icon: XCircle, className: 'border-red-200 bg-red-50 text-red-900', iconClass: 'text-red-600' },
+                warning: { icon: AlertTriangle, className: 'border-amber-200 bg-amber-50 text-amber-900', iconClass: 'text-amber-600' },
+                info: { icon: Info, className: 'border-blue-200 bg-blue-50 text-blue-900', iconClass: 'text-blue-600' },
+              }[alert.severity];
+              const Icon = severityConfig.icon;
+              return (
+                <div key={alert.id} className={`rounded-md border p-3 text-sm ${severityConfig.className}`}>
+                  <div className="flex items-start gap-2">
+                    <Icon className={`mt-0.5 h-4 w-4 ${severityConfig.iconClass}`} />
+                    <div className="flex-1">
+                      <div className="font-medium">
+                        {alert.alert_type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                        {alert.medication_name && <span className="font-normal text-slate-600"> • {alert.medication_name}</span>}
+                      </div>
+                      <div className="text-xs opacity-90">{alert.message}</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
 

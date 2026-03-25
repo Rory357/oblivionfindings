@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SiteChecklistTemplate extends Model
@@ -12,6 +13,7 @@ class SiteChecklistTemplate extends Model
 
     protected $fillable = [
         'tenant_id',
+        'site_id',
         'key',
         'name',
         'description',
@@ -52,6 +54,19 @@ class SiteChecklistTemplate extends Model
         return $query->where(function ($q) use ($type) {
             $q->where('applicable_to_type', $type)
               ->orWhere('applicable_to_type', 'all');
+        });
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
+    }
+
+    public function scopeForSite($query, int $siteId)
+    {
+        return $query->where(function ($q) use ($siteId) {
+            $q->whereNull('site_id')
+              ->orWhere('site_id', $siteId);
         });
     }
 }

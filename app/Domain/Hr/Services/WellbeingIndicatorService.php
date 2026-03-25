@@ -16,12 +16,8 @@ class WellbeingIndicatorService
 {
     /**
      * Flag level thresholds.
-     *
-     * Each rule defines a metric, operator, threshold, and resulting flag level.
-     * Flag levels: none, amber (warning), red (critical).
      */
     public const FLAG_RULES = [
-        // Red flags - immediate attention required
         [
             'metric' => 'consecutive_days_worked',
             'operator' => '>=',
@@ -50,8 +46,6 @@ class WellbeingIndicatorService
             'flag' => 'red',
             'label' => 'Average shift length exceeds 12 hours',
         ],
-
-        // Amber flags - monitoring required
         [
             'metric' => 'consecutive_days_worked',
             'operator' => '>=',
@@ -89,41 +83,20 @@ class WellbeingIndicatorService
         ],
     ];
 
-    /**
-     * Calculate wellbeing indicators for a single employee.
-     *
-     * Evaluates timesheet and leave data to compute fatigue, overwork,
-     * and wellbeing metrics. Applies FLAG_RULES to determine the flag level.
-     *
-     * @param  User    $user
-     * @param  Carbon  $periodStart
-     * @param  Carbon  $periodEnd
-     * @return HrWellbeingIndicator
-     */
     public function calculateIndicators(User $user, Carbon $periodStart, Carbon $periodEnd): HrWellbeingIndicator
     {
-        // TODO: Query timesheets for the user within the period
-        // TODO: Calculate overtime_hours (hours beyond contracted hours_per_week)
-        // TODO: Calculate consecutive_days_worked (longest streak with no rest day)
-        // TODO: Count sick_leave_days_30d and sick_leave_days_90d from HrLeaveRequest
-        // TODO: Count shifts_worked_7d (rolling 7-day window ending at period_end)
-        // TODO: Calculate average_shift_length_hours from timesheet durations
-        // TODO: Apply FLAG_RULES to determine flag_level (highest matching flag wins)
-        // TODO: Create or update HrWellbeingIndicator record
-        // TODO: If flag_level is 'red', fire WellbeingAlert event for immediate notification
-        // TODO: Log audit trail entry
-
-        $timesheets = Timesheet::where('user_id', $user->id)
-            ->whereBetween('date', [$periodStart, $periodEnd])
+        $timesheets = Timesheet::query()
+            ->where('user_id', $user->id)
             ->where('status', 'approved')
-            ->orderBy('date')
+            ->whereBetween('work_date', [$periodStart->toDateString(), $periodEnd->toDateString()])
+            ->orderBy('work_date')
             ->get();
 
-        $overtimeHours = $this->calculateOvertime($user, $timesheets);
+        $overtimeHours = $this->calculateOvertime($user, $timesheets, $periodStart, $periodEnd);
         $consecutiveDays = $this->calculateConsecutiveDays($timesheets);
-        $sickLeave30d = $this->countSickLeaveDays($user->id, 30);
-        $sickLeave90d = $this->countSickLeaveDays($user->id, 90);
-        $shiftsWorked7d = $this->countShiftsInLastDays($user->id, 7);
+        $sickLeave30d = $this->countSickLeaveDays($user->id, 30, $periodEnd);
+        $sickLeave90d = $this->countSickLeaveDays($user->id, 90, $periodEnd);
+        $shiftsWorked7d = $this->countShiftsInLastDays($user->id, 7, $periodEnd);
         $avgShiftLength = $this->calculateAverageShiftLength($timesheets);
 
         $metrics = [
@@ -139,10 +112,10 @@ class WellbeingIndicatorService
 
         return HrWellbeingIndicator::updateOrCreate(
             [
-                'tenant_id' => $user->tenant_id,
+                'tenant_id' => $user->tenant_id ?? null,
                 'user_id' => $user->id,
-                'period_start' => $periodStart,
-                'period_end' => $periodEnd,
+                'period_start' => $periodStart->toDateString(),
+                'period_end' => $periodEnd->toDateString(),
             ],
             [
                 ...$metrics,
@@ -152,66 +125,46 @@ class WellbeingIndicatorService
         );
     }
 
-    /**
-     * Calculate wellbeing indicators for all active employees in a tenant.
-     *
-     * @param  int     $tenantId
-     * @param  Carbon  $periodStart
-     * @param  Carbon  $periodEnd
-     * @return int  Number of employees evaluated
-     */
     public function calculateAllIndicators(?int $tenantId, Carbon $periodStart, Carbon $periodEnd): int
     {
-        // TODO: Query all active employees for the tenant
-        // TODO: For each, call calculateIndicators()
-        // TODO: Return count of employees processed
-
-        $employees = User::staff()
-            ->where('tenant_id', $tenantId)
-            ->whereHas('staffProfile', fn($q) => $q->where('is_active', true))
+        $profiles = HrEmployeeProfile::query()
+            ->where('is_active', true)
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->with('user:id,name,email')
             ->get();
 
         $count = 0;
-        foreach ($employees as $user) {
+        foreach ($profiles as $profile) {
+            if (! $profile->user) {
+                continue;
+            }
+
             try {
-                $this->calculateIndicators($user, $periodStart, $periodEnd);
+                $this->calculateIndicators($profile->user, $periodStart, $periodEnd);
                 $count++;
-            } catch (\Throwable $e) {
-                Log::warning("Wellbeing calculation failed for user {$user->id}: {$e->getMessage()}");
+            } catch (\Throwable $exception) {
+                Log::warning('Wellbeing calculation failed', [
+                    'user_id' => $profile->user_id,
+                    'error' => $exception->getMessage(),
+                ]);
             }
         }
 
         return $count;
     }
 
-    /**
-     * Get all flagged staff members for a tenant.
-     *
-     * Returns employees whose most recent wellbeing indicator has an
-     * amber or red flag, ordered by severity (red first).
-     *
-     * @param  int          $tenantId
-     * @param  string|null  $flagLevel  Filter to a specific flag level ('amber' or 'red'), or null for all flagged
-     * @return Collection
-     */
     public function getFlaggedStaff(?int $tenantId, ?string $flagLevel = null): Collection
     {
-        // TODO: Query the most recent HrWellbeingIndicator per user for the tenant
-        // TODO: Filter to flag_level != 'none'
-        // TODO: Optionally filter to specific flag_level
-        // TODO: Order by flag_level (red first, then amber)
-        // TODO: Include user and profile relationships
-        // TODO: Map to a summary array with employee name, flag_level, triggered rules
-
-        $query = HrWellbeingIndicator::where('tenant_id', $tenantId)
+        $query = HrWellbeingIndicator::query()
             ->where('flag_level', '!=', 'none')
+            ->when($tenantId !== null, fn ($builder) => $builder->where('tenant_id', $tenantId))
             ->whereIn('id', function ($sub) use ($tenantId) {
                 $sub->select(DB::raw('MAX(id)'))
                     ->from('hr_wellbeing_indicators')
-                    ->where('tenant_id', $tenantId)
+                    ->when($tenantId !== null, fn ($inner) => $inner->where('tenant_id', $tenantId))
                     ->groupBy('user_id');
             })
-            ->with(['user.staffProfile']);
+            ->with(['user.hrEmployeeProfile']);
 
         if ($flagLevel) {
             $query->where('flag_level', $flagLevel);
@@ -226,40 +179,35 @@ class WellbeingIndicatorService
                 return [
                     'user_id' => $indicator->user_id,
                     'name' => $indicator->user?->name,
-                    'position_title' => $indicator->user?->staffProfile?->position_title,
+                    'position_title' => $indicator->user?->hrEmployeeProfile?->position_title,
                     'flag_level' => $indicator->flag_level,
                     'period_start' => $indicator->period_start?->toDateString(),
                     'period_end' => $indicator->period_end?->toDateString(),
                     'calculated_at' => $indicator->calculated_at?->toIso8601String(),
                     'triggered_rules' => $triggeredRules,
                     'metrics' => [
-                        'overtime_hours' => $indicator->overtime_hours,
-                        'consecutive_days_worked' => $indicator->consecutive_days_worked,
-                        'sick_leave_days_30d' => $indicator->sick_leave_days_30d,
-                        'sick_leave_days_90d' => $indicator->sick_leave_days_90d,
-                        'shifts_worked_7d' => $indicator->shifts_worked_7d,
-                        'average_shift_length_hours' => $indicator->average_shift_length_hours,
+                        'overtime_hours' => (float) $indicator->overtime_hours,
+                        'consecutive_days_worked' => (int) $indicator->consecutive_days_worked,
+                        'sick_leave_days_30d' => (int) $indicator->sick_leave_days_30d,
+                        'sick_leave_days_90d' => (int) $indicator->sick_leave_days_90d,
+                        'shifts_worked_7d' => (int) $indicator->shifts_worked_7d,
+                        'average_shift_length_hours' => (float) $indicator->average_shift_length_hours,
                     ],
                 ];
             });
     }
 
     /**
-     * Get a wellbeing summary for a tenant (dashboard widget data).
-     *
-     * @param  int  $tenantId
      * @return array{total_staff: int, flagged_red: int, flagged_amber: int, healthy: int}
      */
     public function getSummary(?int $tenantId): array
     {
-        // TODO: Count latest indicators by flag_level for the tenant
-        // TODO: Return summary counts
-
-        $latest = HrWellbeingIndicator::where('tenant_id', $tenantId)
+        $latest = HrWellbeingIndicator::query()
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
             ->whereIn('id', function ($sub) use ($tenantId) {
                 $sub->select(DB::raw('MAX(id)'))
                     ->from('hr_wellbeing_indicators')
-                    ->where('tenant_id', $tenantId)
+                    ->when($tenantId !== null, fn ($inner) => $inner->where('tenant_id', $tenantId))
                     ->groupBy('user_id');
             });
 
@@ -271,9 +219,6 @@ class WellbeingIndicatorService
         ];
     }
 
-    /**
-     * Determine the highest flag level from the metrics using FLAG_RULES.
-     */
     protected function determineFlagLevel(array $metrics): string
     {
         $flagLevel = 'none';
@@ -289,31 +234,31 @@ class WellbeingIndicatorService
                 default => false,
             };
 
-            if ($matches) {
-                if ($rule['flag'] === 'red') {
-                    return 'red';
-                }
-                if ($rule['flag'] === 'amber' && $flagLevel !== 'red') {
-                    $flagLevel = 'amber';
-                }
+            if (! $matches) {
+                continue;
+            }
+
+            if ($rule['flag'] === 'red') {
+                return 'red';
+            }
+
+            if ($rule['flag'] === 'amber' && $flagLevel !== 'red') {
+                $flagLevel = 'amber';
             }
         }
 
         return $flagLevel;
     }
 
-    /**
-     * Get the list of rules triggered by a wellbeing indicator.
-     */
     protected function getTriggeredRules(HrWellbeingIndicator $indicator): array
     {
         $metrics = [
-            'overtime_hours' => $indicator->overtime_hours,
-            'consecutive_days_worked' => $indicator->consecutive_days_worked,
-            'sick_leave_days_30d' => $indicator->sick_leave_days_30d,
-            'sick_leave_days_90d' => $indicator->sick_leave_days_90d,
-            'shifts_worked_7d' => $indicator->shifts_worked_7d,
-            'average_shift_length_hours' => $indicator->average_shift_length_hours,
+            'overtime_hours' => (float) $indicator->overtime_hours,
+            'consecutive_days_worked' => (int) $indicator->consecutive_days_worked,
+            'sick_leave_days_30d' => (int) $indicator->sick_leave_days_30d,
+            'sick_leave_days_90d' => (int) $indicator->sick_leave_days_90d,
+            'shifts_worked_7d' => (int) $indicator->shifts_worked_7d,
+            'average_shift_length_hours' => (float) $indicator->average_shift_length_hours,
         ];
 
         $triggered = [];
@@ -322,8 +267,12 @@ class WellbeingIndicatorService
             $matches = match ($rule['operator']) {
                 '>=' => $value >= $rule['threshold'],
                 '>' => $value > $rule['threshold'],
+                '<=' => $value <= $rule['threshold'],
+                '<' => $value < $rule['threshold'],
+                '==' => $value == $rule['threshold'],
                 default => false,
             };
+
             if ($matches) {
                 $triggered[] = $rule['label'];
             }
@@ -332,37 +281,23 @@ class WellbeingIndicatorService
         return $triggered;
     }
 
-    /**
-     * Calculate overtime hours from timesheets vs contracted hours.
-     */
-    protected function calculateOvertime(User $user, Collection $timesheets): float
+    protected function calculateOvertime(User $user, Collection $timesheets, Carbon $periodStart, Carbon $periodEnd): float
     {
-        // TODO: Look up contracted hours_per_week from HrEmployeeProfile
-        // TODO: Sum all timesheet hours in the period
-        // TODO: Calculate weeks in period and determine expected hours
-        // TODO: Overtime = actual - expected (if positive)
+        $contractedWeekly = (float) ($user->hrEmployeeProfile?->hours_per_week ?? 40);
+        $totalHours = $timesheets->sum(fn (Timesheet $timesheet) => $timesheet->total_hours);
 
-        $profile = $user->staffProfile;
-        $contractedWeekly = $profile ? (float) $profile->hours_per_week : 40;
-
-        $totalHours = $timesheets->sum('total_hours');
-        $weeks = max(1, $timesheets->pluck('date')->unique()->count() / 7);
-        $expectedHours = $contractedWeekly * $weeks;
+        $daysInPeriod = max(1, $periodStart->copy()->startOfDay()->diffInDays($periodEnd->copy()->endOfDay()) + 1);
+        $weeksInPeriod = $daysInPeriod / 7;
+        $expectedHours = $contractedWeekly * $weeksInPeriod;
 
         return max(0, round($totalHours - $expectedHours, 2));
     }
 
-    /**
-     * Calculate the longest streak of consecutive days worked.
-     */
     protected function calculateConsecutiveDays(Collection $timesheets): int
     {
-        // TODO: Get unique dates from timesheets, sorted ascending
-        // TODO: Walk through dates and count consecutive calendar days
-        // TODO: Return the longest streak
-
-        $dates = $timesheets->pluck('date')
-            ->map(fn($d) => Carbon::parse($d)->toDateString())
+        $dates = $timesheets->pluck('work_date')
+            ->filter()
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
             ->unique()
             ->sort()
             ->values();
@@ -374,11 +309,11 @@ class WellbeingIndicatorService
         $maxStreak = 1;
         $currentStreak = 1;
 
-        for ($i = 1; $i < $dates->count(); $i++) {
-            $prev = Carbon::parse($dates[$i - 1]);
-            $curr = Carbon::parse($dates[$i]);
+        for ($index = 1; $index < $dates->count(); $index++) {
+            $previousDate = Carbon::parse($dates[$index - 1]);
+            $currentDate = Carbon::parse($dates[$index]);
 
-            if ($prev->diffInDays($curr) === 1) {
+            if ($previousDate->diffInDays($currentDate) === 1) {
                 $currentStreak++;
                 $maxStreak = max($maxStreak, $currentStreak);
             } else {
@@ -389,48 +324,55 @@ class WellbeingIndicatorService
         return $maxStreak;
     }
 
-    /**
-     * Count sick leave days in the last N days.
-     */
-    protected function countSickLeaveDays(int $userId, int $days): int
+    protected function countSickLeaveDays(int $userId, int $days, Carbon $periodEnd): int
     {
-        // TODO: Query HrLeaveRequest for approved sick leave in the window
-        // TODO: Sum the business days between starts_at and ends_at for each request
+        $windowStart = $periodEnd->copy()->subDays($days)->startOfDay();
 
-        return HrLeaveRequest::where('user_id', $userId)
+        $requests = HrLeaveRequest::query()
+            ->where('user_id', $userId)
             ->where('leave_type', 'sick')
             ->where('status', 'approved')
-            ->where('starts_at', '>=', now()->subDays($days))
-            ->count();
+            ->where('starts_at', '<=', $periodEnd)
+            ->where('ends_at', '>=', $windowStart)
+            ->get();
+
+        $totalDays = 0;
+        foreach ($requests as $request) {
+            $start = Carbon::parse($request->starts_at)->max($windowStart);
+            $end = Carbon::parse($request->ends_at)->min($periodEnd);
+            $day = $start->copy()->startOfDay();
+
+            while ($day->lessThanOrEqualTo($end)) {
+                if (! $day->isWeekend()) {
+                    $totalDays++;
+                }
+                $day->addDay();
+            }
+        }
+
+        return $totalDays;
     }
 
-    /**
-     * Count shifts worked in the last N days.
-     */
-    protected function countShiftsInLastDays(int $userId, int $days): int
+    protected function countShiftsInLastDays(int $userId, int $days, Carbon $periodEnd): int
     {
-        // TODO: Query approved timesheets in the rolling window
-        // TODO: Count unique dates
+        $windowStart = $periodEnd->copy()->subDays($days)->toDateString();
 
-        return Timesheet::where('user_id', $userId)
+        return Timesheet::query()
+            ->where('user_id', $userId)
             ->where('status', 'approved')
-            ->where('date', '>=', now()->subDays($days))
-            ->distinct('date')
-            ->count('date');
+            ->whereBetween('work_date', [$windowStart, $periodEnd->toDateString()])
+            ->distinct('work_date')
+            ->count('work_date');
     }
 
-    /**
-     * Calculate the average shift length in hours.
-     */
     protected function calculateAverageShiftLength(Collection $timesheets): float
     {
-        // TODO: Calculate average of total_hours across all timesheets
-        // TODO: Return 0 if no timesheets
-
         if ($timesheets->isEmpty()) {
             return 0;
         }
 
-        return round($timesheets->avg('total_hours'), 2);
+        $totalHours = $timesheets->sum(fn (Timesheet $timesheet) => $timesheet->total_hours);
+        return round($totalHours / max($timesheets->count(), 1), 2);
     }
 }
+

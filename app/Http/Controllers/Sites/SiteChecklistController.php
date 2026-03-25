@@ -218,6 +218,7 @@ class SiteChecklistController extends Controller
     public function removeAssignment(Request $request, Site $site, SiteChecklistAssignment $assignment)
     {
         $this->authorize('update', $site);
+        abort_unless($assignment->site_id === $site->id, 404);
 
         // Deactivate instead of hard-delete to preserve run history
         $assignment->update(['is_active' => false]);
@@ -230,6 +231,7 @@ class SiteChecklistController extends Controller
     public function createRun(Request $request, Site $site, SiteChecklistAssignment $assignment)
     {
         $this->authorize('update', $site);
+        abort_unless($assignment->site_id === $site->id, 404);
 
         $run = SiteChecklistRun::create([
             'assignment_id' => $assignment->id,

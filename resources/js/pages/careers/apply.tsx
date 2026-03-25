@@ -1,148 +1,176 @@
-import MarketingLayout from '@/layouts/marketing-layout';
-import { Link, useForm } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
+﻿import { Head, Link, useForm } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { ArrowLeft } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 
-type Props = {
-    posting: {
-        id: number;
-        title: string;
-        department: string | null;
-        location: string | null;
-        employment_type: string;
+interface Job {
+    id: number;
+    title: string;
+    slug: string;
+    position_role: string | null;
+    employment_type: string;
+    summary: string | null;
+    description: string | null;
+    requirements: string | null;
+    responsibilities: string | null;
+    site: { id: number; name: string } | null;
+    closing_at: string | null;
+}
+
+interface Props {
+    job: Job;
+    trackingDefaults: {
+        source_channel: string;
     };
-};
+}
 
-export default function CareersApply({ posting }: Props) {
-    const { data, setData, post, processing, errors } = useForm({
+export default function CareersApply({ job, trackingDefaults }: Props) {
+    const form = useForm({
         first_name: '',
         last_name: '',
-        email: '',
-        phone: '',
+        preferred_name: '',
+        personal_email: '',
+        personal_phone: '',
         cover_letter: '',
         cv: null as File | null,
+        privacy_consent: false,
+        source_channel: trackingDefaults.source_channel || 'career_page',
+        source_reference: '',
     });
 
-    const handleSubmit = (e: React.FormEvent) => {
+    function submit(e: React.FormEvent) {
         e.preventDefault();
-        post(`/careers/${posting.id}/apply`, {
-            forceFormData: true,
-        });
-    };
+        form.post(`/careers/jobs/${job.slug}/apply`);
+    }
 
     return (
-        <MarketingLayout title={`Apply - ${posting.title}`} description={`Apply for ${posting.title} position.`}>
-            <div className="mx-auto max-w-2xl px-4 py-16 sm:px-6 lg:px-8">
-                <Link href={`/careers/${posting.id}`} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6">
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to job details
-                </Link>
-
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold tracking-tight">Apply for {posting.title}</h1>
-                    <p className="mt-2 text-muted-foreground">
-                        {posting.department && `${posting.department} `}
-                        {posting.location && `- ${posting.location}`}
+        <>
+            <Head title={`Apply - ${job.title}`} />
+            <div className="mx-auto max-w-4xl px-4 py-10 space-y-6">
+                <div>
+                    <Link href="/careers" className="text-sm text-muted-foreground hover:underline">Back to careers</Link>
+                    <h1 className="mt-2 text-3xl font-bold">Apply for {job.title}</h1>
+                    <p className="text-sm text-muted-foreground">
+                        {job.position_role ? job.position_role.replace('_', ' ') : 'General role'}
+                        {' · '}
+                        {job.employment_type.replace('_', ' ')}
+                        {job.site?.name ? ` · ${job.site.name}` : ''}
                     </p>
                 </div>
 
-                <form onSubmit={handleSubmit}>
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Your Details</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <Label htmlFor="first_name">First Name *</Label>
-                                    <Input
-                                        id="first_name"
-                                        value={data.first_name}
-                                        onChange={(e) => setData('first_name', e.target.value)}
-                                        className="mt-1"
-                                        required
-                                    />
-                                    {errors.first_name && <p className="text-sm text-destructive mt-1">{errors.first_name}</p>}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Role Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3 text-sm">
+                        {job.summary && <p>{job.summary}</p>}
+                        {job.description && <p>{job.description}</p>}
+                        {job.requirements && (
+                            <div>
+                                <p className="font-medium">Requirements</p>
+                                <p>{job.requirements}</p>
+                            </div>
+                        )}
+                        {job.responsibilities && (
+                            <div>
+                                <p className="font-medium">Responsibilities</p>
+                                <p>{job.responsibilities}</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Your Application</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={submit} className="space-y-4">
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>First name</Label>
+                                    <Input value={form.data.first_name} onChange={(e) => form.setData('first_name', e.target.value)} />
+                                    {form.errors.first_name && <p className="text-sm text-destructive">{form.errors.first_name}</p>}
                                 </div>
-                                <div>
-                                    <Label htmlFor="last_name">Last Name *</Label>
-                                    <Input
-                                        id="last_name"
-                                        value={data.last_name}
-                                        onChange={(e) => setData('last_name', e.target.value)}
-                                        className="mt-1"
-                                        required
-                                    />
-                                    {errors.last_name && <p className="text-sm text-destructive mt-1">{errors.last_name}</p>}
+                                <div className="space-y-2">
+                                    <Label>Last name</Label>
+                                    <Input value={form.data.last_name} onChange={(e) => form.setData('last_name', e.target.value)} />
+                                    {form.errors.last_name && <p className="text-sm text-destructive">{form.errors.last_name}</p>}
                                 </div>
                             </div>
 
-                            <div>
-                                <Label htmlFor="email">Email Address *</Label>
-                                <Input
-                                    id="email"
-                                    type="email"
-                                    value={data.email}
-                                    onChange={(e) => setData('email', e.target.value)}
-                                    className="mt-1"
-                                    required
-                                />
-                                {errors.email && <p className="text-sm text-destructive mt-1">{errors.email}</p>}
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>Preferred name</Label>
+                                    <Input value={form.data.preferred_name} onChange={(e) => form.setData('preferred_name', e.target.value)} />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Email</Label>
+                                    <Input type="email" value={form.data.personal_email} onChange={(e) => form.setData('personal_email', e.target.value)} />
+                                    {form.errors.personal_email && <p className="text-sm text-destructive">{form.errors.personal_email}</p>}
+                                </div>
                             </div>
 
-                            <div>
-                                <Label htmlFor="phone">Phone Number</Label>
-                                <Input
-                                    id="phone"
-                                    type="tel"
-                                    value={data.phone}
-                                    onChange={(e) => setData('phone', e.target.value)}
-                                    className="mt-1"
-                                />
-                                {errors.phone && <p className="text-sm text-destructive mt-1">{errors.phone}</p>}
+                            <div className="space-y-2">
+                                <Label>Phone</Label>
+                                <Input value={form.data.personal_phone} onChange={(e) => form.setData('personal_phone', e.target.value)} />
                             </div>
 
-                            <div>
-                                <Label htmlFor="cover_letter">Cover Letter</Label>
-                                <Textarea
-                                    id="cover_letter"
-                                    value={data.cover_letter}
-                                    onChange={(e) => setData('cover_letter', e.target.value)}
-                                    rows={6}
-                                    className="mt-1"
-                                    placeholder="Tell us why you'd be a great fit for this role..."
-                                />
-                                {errors.cover_letter && <p className="text-sm text-destructive mt-1">{errors.cover_letter}</p>}
+                            <div className="grid gap-4 md:grid-cols-2">
+                                <div className="space-y-2">
+                                    <Label>How did you hear about this role?</Label>
+                                    <select
+                                        className="h-10 w-full rounded-md border bg-background px-3 text-sm"
+                                        value={form.data.source_channel}
+                                        onChange={(e) => form.setData('source_channel', e.target.value)}
+                                    >
+                                        <option value="career_page">Career page</option>
+                                        <option value="linkedin">LinkedIn</option>
+                                        <option value="seek">SEEK</option>
+                                        <option value="indeed">Indeed</option>
+                                        <option value="referral">Referral</option>
+                                        <option value="agency">Agency</option>
+                                        <option value="social">Social media</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                    {form.errors.source_channel && <p className="text-sm text-destructive">{form.errors.source_channel}</p>}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Referral / campaign reference (optional)</Label>
+                                    <Input
+                                        value={form.data.source_reference}
+                                        onChange={(e) => form.setData('source_reference', e.target.value)}
+                                        placeholder="Name, code, or campaign"
+                                    />
+                                </div>
                             </div>
 
-                            <div>
-                                <Label htmlFor="cv">CV / Resume (PDF, DOC, DOCX - max 10MB)</Label>
-                                <Input
-                                    id="cv"
-                                    type="file"
-                                    accept=".pdf,.doc,.docx"
-                                    onChange={(e) => setData('cv', e.target.files?.[0] || null)}
-                                    className="mt-1"
-                                />
-                                {errors.cv && <p className="text-sm text-destructive mt-1">{errors.cv}</p>}
+                            <div className="space-y-2">
+                                <Label>Cover letter</Label>
+                                <Textarea rows={5} value={form.data.cover_letter} onChange={(e) => form.setData('cover_letter', e.target.value)} />
                             </div>
 
-                            <div className="pt-4 flex justify-end gap-3">
-                                <Button type="button" variant="outline" onClick={() => window.history.back()}>
-                                    Cancel
-                                </Button>
-                                <Button type="submit" disabled={processing}>
-                                    {processing ? 'Submitting...' : 'Submit Application'}
-                                </Button>
+                            <div className="space-y-2">
+                                <Label>CV (optional)</Label>
+                                <Input type="file" onChange={(e) => form.setData('cv', e.target.files?.[0] ?? null)} />
+                                {form.errors.cv && <p className="text-sm text-destructive">{form.errors.cv}</p>}
                             </div>
-                        </CardContent>
-                    </Card>
-                </form>
+
+                            <div className="flex items-center gap-2">
+                                <Checkbox checked={form.data.privacy_consent} onCheckedChange={(checked) => form.setData('privacy_consent', Boolean(checked))} id="privacy-consent" />
+                                <Label htmlFor="privacy-consent" className="font-normal">I consent to processing of my information for recruitment purposes.</Label>
+                            </div>
+                            {form.errors.privacy_consent && <p className="text-sm text-destructive">{form.errors.privacy_consent}</p>}
+
+                            <Button type="submit" disabled={form.processing}>{form.processing ? 'Submitting...' : 'Submit Application'}</Button>
+                        </form>
+                    </CardContent>
+                </Card>
             </div>
-        </MarketingLayout>
+        </>
     );
 }
+

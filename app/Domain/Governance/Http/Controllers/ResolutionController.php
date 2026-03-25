@@ -168,9 +168,9 @@ class ResolutionController extends Controller
             $boardMember,
             $validated['type'],
             $validated['description'],
+            auth()->user(),
             $validated['withdraw_from_voting'] ?? true,
             $validated['withdraw_from_discussion'] ?? false,
-            auth()->user()
         );
 
         return redirect()->back()->with('success', 'Conflict declared.');

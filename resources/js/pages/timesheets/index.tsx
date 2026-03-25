@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { formatDate } from '@/lib/date-format';
 import { useMemo, useState } from 'react';
 
 type Timesheet = {
@@ -11,6 +12,7 @@ type Timesheet = {
     ends_at: string;
     break_minutes: number;
     status: string;
+    is_residential_billable?: boolean;
     submitted_at?: string | null;
     client: { id: number; first_name: string; last_name: string };
     staff: { id: number; name: string };
@@ -258,13 +260,16 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                         </td>
                                     ) : null}
                                     <td className="p-3">
-                                        <div className="font-medium">{t.work_date}</div>
+                                        <div className="font-medium">{formatDate(t.work_date)}</div>
                                         <div className="text-xs text-muted-foreground">
                                             {new Date(t.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             {' – '}
                                             {new Date(t.ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                             {t.break_minutes ? ` • break ${t.break_minutes}m` : ''}
                                         </div>
+                                        {t.is_residential_billable ? (
+                                            <div className="mt-1 text-xs text-emerald-400">Residential billable</div>
+                                        ) : null}
                                     </td>
                                     <td className="p-3">
                                         <Link className="underline" href={`/clients/${t.client.id}`}>{t.client.first_name} {t.client.last_name}</Link>

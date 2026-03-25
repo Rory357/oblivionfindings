@@ -2,8 +2,8 @@
 
 namespace App\Http\Middleware;
 
-use App\Models\AppSetting;
 use App\Models\Announcement;
+use App\Models\AppSetting;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -37,7 +37,7 @@ class HandleInertiaRequests extends Middleware
         $labelOverrides = AppSetting::query()
             ->where('key', 'like', 'labels.%')
             ->get(['key', 'value'])
-            ->mapWithKeys(fn($row) => [str_replace('labels.', '', $row->key) => $row->value])
+            ->mapWithKeys(fn ($row) => [str_replace('labels.', '', $row->key) => $row->value])
             ->toArray();
 
         $labels = array_merge($labelDefaults, $labelOverrides);
@@ -111,7 +111,7 @@ class HandleInertiaRequests extends Middleware
                         ->latest()
                         ->limit(8)
                         ->get(['id', 'type', 'data', 'read_at', 'acknowledged_at', 'escalation_count', 'created_at'])
-                        ->map(fn($n) => [
+                        ->map(fn ($n) => [
                             'id' => $n->id,
                             'type' => $n->type,
                             'data' => $n->data,
@@ -149,9 +149,9 @@ class HandleInertiaRequests extends Middleware
 
                 'staff' => [
                     'viewAny' => $user->canDo('staff.viewAny'),
-                    'create'  => $user->canDo('staff.create'),
-                    'update'  => $user->canDo('staff.update'),
-                    'invite'  => $user->canDo('staff.invite'),
+                    'create' => $user->canDo('staff.create'),
+                    'update' => $user->canDo('staff.update'),
+                    'invite' => $user->canDo('staff.invite'),
                     'assignmentsUpdate' => $user->canDo('staff.assignments.update'),
                     'credentialsViewAny' => $user->canDo('staff.credentials.viewAny'),
                     'credentialsUpdateAny' => $user->canDo('staff.credentials.updateAny'),
@@ -161,8 +161,8 @@ class HandleInertiaRequests extends Middleware
                 ],
                 'clients' => [
                     'viewAny' => $user->canDo('clients.viewAny'),
-                    'create'  => $user->canDo('clients.create'),
-                    'update'  => $user->canDo('clients.update'),
+                    'create' => $user->canDo('clients.create'),
+                    'update' => $user->canDo('clients.update'),
                     'assignmentsUpdate' => $user->canDo('clients.assignments.update'),
                 ],
                 'shifts' => [
@@ -444,6 +444,9 @@ class HandleInertiaRequests extends Middleware
                         'view' => $user->canDo('hr.driver.view'),
                         'manage' => $user->canDo('hr.driver.manage'),
                     ],
+                    'wellbeing' => [
+                        'view' => $user->canDo('hr.wellbeing.view'),
+                    ],
                     'onboarding' => [
                         'view' => $user->canDo('hr.onboarding.view'),
                         'manage' => $user->canDo('hr.onboarding.manage'),
@@ -548,6 +551,16 @@ class HandleInertiaRequests extends Middleware
                     'actions' => [
                         'manage' => $user->canDo('governance.actions.manage'),
                     ],
+                ],
+
+                'roadmap' => [
+                    'view' => $user->canDo('roadmap.view'),
+                    'manage' => $user->canDo('roadmap.manage'),
+                    'approve' => $user->canDo('roadmap.approve'),
+                    'budgetManage' => $user->canDo('roadmap.budget.manage'),
+                    'decisionsView' => $user->canDo('roadmap.decisions.view'),
+                    'decisionsManage' => $user->canDo('roadmap.decisions.manage'),
+                    'reportsExport' => $user->canDo('roadmap.reports.export'),
                 ],
             ];
         });

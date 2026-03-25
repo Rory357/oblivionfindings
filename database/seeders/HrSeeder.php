@@ -23,7 +23,7 @@ class HrSeeder extends Seeder
             return;
         }
 
-        $tenantId = 1;
+        $tenantId = (int) (HrEmployeeProfile::query()->orderBy('id')->value('tenant_id') ?? 1);
         $adminUser = User::first();
         if (!$adminUser) {
             $this->command?->warn('No users found — skipping HrSeeder.');
@@ -32,7 +32,7 @@ class HrSeeder extends Seeder
 
         $this->seedComplianceRequirements($tenantId, $adminUser->id);
         $this->seedPolicies($tenantId, $adminUser->id);
-        $this->seedLeaveBalances($tenantId);
+        $this->seedLeaveBalances($tenantId, $adminUser->id);
         $this->seedOnboardingTemplates($tenantId, $adminUser->id);
         $this->seedEmployeeProfiles($tenantId, $adminUser->id);
 
@@ -182,30 +182,46 @@ class HrSeeder extends Seeder
                 ['policy_id' => $policy->id, 'version_number' => 1],
                 [
                     'content_summary' => $p['content'],
+                    'document_path' => "seed/hr-policies/{$p['slug']}.pdf",
                     'effective_from' => now()->subMonths(3),
                     'is_current' => true,
                     'published_by' => $createdBy,
+                    'created_at' => now(),
                 ]
             );
         }
     }
 
-    private function seedLeaveBalances(int $tenantId): void
+    private function seedLeaveBalances(int $tenantId, int $updatedBy): void
     {
-        $users = User::staff()->where('tenant_id', $tenantId)->limit(20)->get();
+        $userIds = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->pluck('user_id')
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        if ($userIds->isEmpty()) {
+            $userIds = User::staff()->limit(20)->pluck('id');
+        }
+
+        $users = User::staff()->whereIn('id', $userIds->all())->limit(20)->get();
         $year = now()->year;
 
         foreach ($users as $user) {
             foreach (['annual' => 160, 'sick' => 80] as $type => $entitlement) {
                 $taken = rand(0, (int) ($entitlement * 0.6));
+                $remaining = max($entitlement - $taken, 0);
                 HrLeaveBalance::firstOrCreate(
                     ['tenant_id' => $tenantId, 'user_id' => $user->id, 'leave_type' => $type, 'year' => $year],
                     [
-                        'entitlement_hours' => $entitlement,
-                        'taken_hours' => $taken,
+                        'balance_hours' => $remaining,
+                        'accrued_hours' => $entitlement,
+                        'used_hours' => $taken,
                         'pending_hours' => 0,
-                        'adjustment_hours' => 0,
-                        'remaining_hours' => $entitlement - $taken,
+                        'source' => 'system',
+                        'last_synced_at' => now(),
+                        'updated_by' => $updatedBy,
                     ]
                 );
             }
@@ -215,9 +231,8 @@ class HrSeeder extends Seeder
     private function seedOnboardingTemplates(int $tenantId, int $createdBy): void
     {
         HrOnboardingTemplate::firstOrCreate(
-            ['tenant_id' => $tenantId, 'role' => 'support_worker'],
+            ['tenant_id' => $tenantId, 'role' => 'support_worker', 'site_type' => 'all'],
             [
-                'site_type' => null,
                 'tasks' => [
                     ['label' => 'Complete NZ Police Vetting consent form', 'category' => 'compliance', 'days_due' => 1],
                     ['label' => 'Provide certified copies of qualifications', 'category' => 'compliance', 'days_due' => 3],
@@ -241,9 +256,8 @@ class HrSeeder extends Seeder
         );
 
         HrOnboardingTemplate::firstOrCreate(
-            ['tenant_id' => $tenantId, 'role' => 'team_lead'],
+            ['tenant_id' => $tenantId, 'role' => 'team_lead', 'site_type' => 'all'],
             [
-                'site_type' => null,
                 'tasks' => [
                     ['label' => 'Complete NZ Police Vetting consent form', 'category' => 'compliance', 'days_due' => 1],
                     ['label' => 'Provide certified copies of qualifications', 'category' => 'compliance', 'days_due' => 3],
@@ -263,13 +277,14 @@ class HrSeeder extends Seeder
 
     private function seedEmployeeProfiles(int $tenantId, int $createdBy): void
     {
-        $users = User::staff()->where('tenant_id', $tenantId)->limit(10)->get();
+        $users = User::staff()->limit(20)->get();
 
         foreach ($users as $i => $user) {
             HrEmployeeProfile::firstOrCreate(
                 ['tenant_id' => $tenantId, 'user_id' => $user->id],
                 [
                     'employee_number' => 'EMP' . str_pad($user->id, 4, '0', STR_PAD_LEFT),
+                    'work_email' => $user->email ?? ("employee{$user->id}@example.test"),
                     'position_title' => match ($user->role) {
                         'admin' => 'Operations Manager',
                         'provider_manager' => 'Service Manager',

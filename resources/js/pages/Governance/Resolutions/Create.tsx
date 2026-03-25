@@ -22,7 +22,7 @@ interface Props extends PageProps {
 }
 
 export default function CreateResolution({ auth, meetings, selectedMeetingId }: Props) {
-  const { data, setData, post, processing, errors } = useForm({
+  const { data, setData, transform, post, processing, errors } = useForm({
     title: '',
     description: '',
     type: 'ordinary',
@@ -32,8 +32,11 @@ export default function CreateResolution({ auth, meetings, selectedMeetingId }: 
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const submitData = { ...data, meeting_id: data.meeting_id === 'none' ? '' : data.meeting_id };
-    post(storeResolution.url(), { data: submitData });
+    transform((current) => ({
+      ...current,
+      meeting_id: current.meeting_id === 'none' ? '' : current.meeting_id,
+    }));
+    post(storeResolution.url());
   };
 
   return (

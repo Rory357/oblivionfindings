@@ -24,10 +24,13 @@ class HrLeaveRequest extends Model
         'supporting_doc_path',
         'status',
         'submitted_at',
+        'approval_due_at',
         'reviewed_by',
         'reviewed_at',
         'review_notes',
         'escalated_to',
+        'escalation_level',
+        'escalated_at',
         'time_off_id',
         'created_by',
     ];
@@ -37,7 +40,10 @@ class HrLeaveRequest extends Model
         'ends_at' => 'datetime',
         'hours_requested' => 'decimal:2',
         'submitted_at' => 'datetime',
+        'approval_due_at' => 'datetime',
         'reviewed_at' => 'datetime',
+        'escalation_level' => 'integer',
+        'escalated_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */

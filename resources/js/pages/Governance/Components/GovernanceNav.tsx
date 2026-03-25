@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Calendar,
+  CalendarDays,
   ShieldAlert,
   FileCheck,
   Target,
@@ -11,13 +12,20 @@ import {
   Wallet,
   Compass,
   Users,
+  BookOpen,
+  FileText,
+  ClipboardList,
+  Star,
+  FolderOpen,
+  HeartPulse,
+  Landmark,
 } from 'lucide-react';
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
-  active?: boolean;
+  matcher?: (url: string) => boolean;
 }
 
 export default function GovernanceNav() {
@@ -35,6 +43,13 @@ export default function GovernanceNav() {
       label: 'Meetings',
       href: '/governance/meetings',
       icon: <Calendar className="w-5 h-5" />,
+      matcher: (currentUrl) => currentUrl === '/governance/meetings' || currentUrl.startsWith('/governance/meetings?'),
+    },
+    {
+      label: 'Meeting Calendar',
+      href: '/governance/meetings/calendar',
+      icon: <CalendarDays className="w-5 h-5" />,
+      matcher: (currentUrl) => currentUrl.startsWith('/governance/meetings/calendar'),
     },
     ...(canManage
       ? [
@@ -80,12 +95,47 @@ export default function GovernanceNav() {
       href: '/governance/actions',
       icon: <CheckSquare className="w-5 h-5" />,
     },
+    {
+      label: 'Policies',
+      href: '/governance/policies',
+      icon: <BookOpen className="w-5 h-5" />,
+    },
+    {
+      label: 'CEO Reports',
+      href: '/governance/ceo-reports',
+      icon: <FileText className="w-5 h-5" />,
+    },
+    {
+      label: 'Interests Register',
+      href: '/governance/interests',
+      icon: <ClipboardList className="w-5 h-5" />,
+    },
+    {
+      label: 'Board Evaluations',
+      href: '/governance/evaluations',
+      icon: <Star className="w-5 h-5" />,
+    },
+    {
+      label: 'Documents',
+      href: '/governance/documents',
+      icon: <FolderOpen className="w-5 h-5" />,
+    },
+    {
+      label: 'Clinical Governance',
+      href: '/governance/clinical',
+      icon: <HeartPulse className="w-5 h-5" />,
+    },
+    {
+      label: 'Te Tiriti',
+      href: '/governance/te-tiriti',
+      icon: <Landmark className="w-5 h-5" />,
+    },
   ];
 
   return (
     <nav className="space-y-1">
       {navItems.map((item) => {
-        const isActive = url.startsWith(item.href);
+        const isActive = item.matcher ? item.matcher(url) : url.startsWith(item.href);
         return (
           <Link
             key={item.href}

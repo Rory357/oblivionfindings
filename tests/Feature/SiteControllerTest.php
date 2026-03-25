@@ -244,6 +244,22 @@ class SiteControllerTest extends TestCase
         $this->assertDatabaseHas('sites', ['name' => 'New Care Home']);
     }
 
+    public function test_site_store_accepts_residential_type(): void
+    {
+        $this->actingAs($this->admin)
+            ->post('/sites', [
+                'name' => 'Residential Home',
+                'type' => 'residential',
+                'is_active' => true,
+            ])
+            ->assertRedirect(route('sites.index'));
+
+        $this->assertDatabaseHas('sites', [
+            'name' => 'Residential Home',
+            'type' => 'residential',
+        ]);
+    }
+
     public function test_site_store_validates_required_name(): void
     {
         $this->actingAs($this->admin)

@@ -51,6 +51,7 @@ class ClientController extends Controller
             ->get([
                 'id',
                 'site_id',
+                'nhi_number',
                 'first_name',
                 'last_name',
                 'status',
@@ -68,6 +69,7 @@ class ClientController extends Controller
             $hasRespite = ((int) ($c->respite_bookings_count ?? 0) + (int) ($c->respite_booking_requests_count ?? 0)) > 0;
             return [
                 'id' => $c->id,
+                'nhi_number' => $c->nhi_number,
                 'first_name' => $c->first_name,
                 'last_name' => $c->last_name,
                 'profile_photo_url' => $c->profile_photo_url,
@@ -209,6 +211,7 @@ class ClientController extends Controller
         return inertia('clients/show', [
             'client' => [
                 'id' => $client->id,
+                'nhi_number' => $client->nhi_number,
                 'first_name' => $client->first_name,
                 'last_name' => $client->last_name,
                 'profile_photo_url' => $client->profile_photo_url,
@@ -548,7 +551,7 @@ class ClientController extends Controller
 
         return inertia('clients/edit', [
             'client' => $client->only([
-                'id','site_id','service_context_id','first_name','last_name','preferred_name','date_of_birth','gender','status',
+                'id','site_id','service_context_id','nhi_number','first_name','last_name','preferred_name','date_of_birth','gender','status',
                 'phone','email','address_line_1','address_line_2','suburb','city','postcode',
                 'profile_photo_path','funding_type','funding_notes',
             ]),

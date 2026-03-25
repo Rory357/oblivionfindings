@@ -1,0 +1,95 @@
+<?php
+
+namespace App\Domain\Hr\Models;
+
+use App\Models\Concerns\AuditableChanges;
+use App\Models\Shift;
+use App\Models\Site;
+use App\Models\Timesheet;
+use App\Models\User;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
+
+class HrAttendanceSession extends Model
+{
+    use HasFactory, AuditableChanges;
+
+    protected $fillable = [
+        'tenant_id',
+        'user_id',
+        'shift_id',
+        'site_id',
+        'clock_in_at',
+        'clock_out_at',
+        'break_minutes',
+        'status',
+        'source',
+        'location',
+        'notes',
+        'meta',
+        'created_by',
+        'closed_by',
+    ];
+
+    protected $casts = [
+        'clock_in_at' => 'datetime',
+        'clock_out_at' => 'datetime',
+        'break_minutes' => 'integer',
+        'meta' => 'array',
+    ];
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
+    public function shift(): BelongsTo
+    {
+        return $this->belongsTo(Shift::class);
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
+    }
+
+    public function timesheet(): HasOne
+    {
+        return $this->hasOne(Timesheet::class, 'attendance_session_id');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function closer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closed_by');
+    }
+
+    public function scopeOpen(Builder $query): Builder
+    {
+        return $query->where('status', 'open')->whereNull('clock_out_at');
+    }
+
+    public function scopeForTenant(Builder $query, ?int $tenantId): Builder
+    {
+        return $query->where('tenant_id', $tenantId);
+    }
+
+    public function getWorkedHoursAttribute(): float
+    {
+        if (! $this->clock_in_at || ! $this->clock_out_at) {
+            return 0.0;
+        }
+
+        $minutes = $this->clock_in_at->diffInMinutes($this->clock_out_at) - max((int) $this->break_minutes, 0);
+
+        return round(max($minutes, 0) / 60, 2);
+    }
+}
+

@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrComplianceMatrix;
 use App\Domain\Hr\Models\HrComplianceRequirement;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Models\User;
@@ -17,13 +18,18 @@ class ComplianceMatrixService
      */
     public function evaluateAllStaff(?int $tenantId): int
     {
-        $employees = User::staff()
-            ->where('tenant_id', $tenantId)
-            ->whereHas('staffProfile', fn($q) => $q->where('is_active', true))
+        $profiles = HrEmployeeProfile::query()
+            ->where('is_active', true)
+            ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
+            ->with('user')
             ->get();
 
         $count = 0;
-        foreach ($employees as $user) {
+        foreach ($profiles as $profile) {
+            $user = $profile->user;
+            if (! $user) {
+                continue;
+            }
             $this->evaluateStaff($user);
             $count++;
         }

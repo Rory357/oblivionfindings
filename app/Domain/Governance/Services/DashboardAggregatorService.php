@@ -3,6 +3,7 @@
 namespace App\Domain\Governance\Services;
 
 use App\Domain\Governance\Models\DashboardSnapshot;
+use App\Domain\Roadmap\Services\RoadmapDashboardService;
 use App\Models\ClientIncident;
 use App\Models\ControlRoomAlert;
 use App\Models\DataBreachLog;
@@ -10,40 +11,44 @@ use App\Models\SafeguardingConcern;
 use App\Models\Shift;
 use App\Models\Timesheet;
 use Carbon\Carbon;
-use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 class DashboardAggregatorService
 {
+    public function __construct(
+        protected ?RoadmapDashboardService $roadmapDashboardService = null
+    ) {}
+
     public function captureSnapshot(string $periodType, ?Carbon $start = null, ?Carbon $end = null): DashboardSnapshot
     {
         $range = $this->getDateRange($periodType, $start, $end);
-        
+
         $widgets = [];
         $widgetMethods = [
-            'top_risks' => fn() => $this->getTopRisks(),
-            'voided_risks' => fn() => $this->getVoidedRisks($range),
-            'risk_changes' => fn() => $this->getRiskChanges($range),
-            'client_safety' => fn() => $this->getClientSafetyMetrics($range),
-            'operational_safety' => fn() => $this->getOperationalSafetyMetrics($range),
-            'privacy_data' => fn() => $this->getPrivacyMetrics($range),
-            'workforce' => fn() => $this->getWorkforceMetrics($range),
-            'financial' => fn() => $this->getFinancialMetrics($range),
-            'it_cyber' => fn() => $this->getItCyberMetrics($range),
-            'fleet_assets' => fn() => $this->getFleetAssetMetrics($range),
-            'compliance_calendar' => fn() => $this->getComplianceCalendar(),
-            'decisions_required' => fn() => $this->getDecisionsRequired(),
-            'control_room' => fn() => $this->getControlRoomMetrics($range),
-            'incidents' => fn() => $this->getIncidentMetrics($range),
-            'safeguarding' => fn() => $this->getSafeguardingMetrics($range),
+            'top_risks' => fn () => $this->getTopRisks(),
+            'voided_risks' => fn () => $this->getVoidedRisks($range),
+            'risk_changes' => fn () => $this->getRiskChanges($range),
+            'client_safety' => fn () => $this->getClientSafetyMetrics($range),
+            'operational_safety' => fn () => $this->getOperationalSafetyMetrics($range),
+            'privacy_data' => fn () => $this->getPrivacyMetrics($range),
+            'workforce' => fn () => $this->getWorkforceMetrics($range),
+            'financial' => fn () => $this->getFinancialMetrics($range),
+            'it_cyber' => fn () => $this->getItCyberMetrics($range),
+            'fleet_assets' => fn () => $this->getFleetAssetMetrics($range),
+            'compliance_calendar' => fn () => $this->getComplianceCalendar(),
+            'decisions_required' => fn () => $this->getDecisionsRequired(),
+            'roadmap' => fn () => $this->getRoadmapMetrics(),
+            'control_room' => fn () => $this->getControlRoomMetrics($range),
+            'incidents' => fn () => $this->getIncidentMetrics($range),
+            'safeguarding' => fn () => $this->getSafeguardingMetrics($range),
         ];
 
         foreach ($widgetMethods as $key => $callback) {
             try {
                 $widgets[$key] = $callback();
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning("Dashboard widget '{$key}' failed: " . $e->getMessage());
+                \Illuminate\Support\Facades\Log::warning("Dashboard widget '{$key}' failed: ".$e->getMessage());
                 $widgets[$key] = ['status' => 'unavailable', 'error' => $e->getMessage()];
             }
         }
@@ -73,8 +78,8 @@ class DashboardAggregatorService
     protected function getDateRange(string $periodType, ?Carbon $start, ?Carbon $end): array
     {
         $end = $end ?? now();
-        
-        $start = match($periodType) {
+
+        $start = match ($periodType) {
             'today' => $end->copy()->startOfDay(),
             'week' => $end->copy()->startOfWeek(),
             'month' => $end->copy()->startOfMonth(),
@@ -98,7 +103,7 @@ class DashboardAggregatorService
             'high' => $risks->whereBetween('residual_score', [15, 19])->count(),
             'medium' => $risks->whereBetween('residual_score', [10, 14])->count(),
             'above_appetite' => $risks->where('within_appetite', false)->count(),
-            'items' => $risks->map(fn($r) => [
+            'items' => $risks->map(fn ($r) => [
                 'id' => $r->id,
                 'reference' => $r->risk_reference,
                 'title' => $r->title,
@@ -232,7 +237,7 @@ class DashboardAggregatorService
             ->latest('approved_by_board_at')
             ->first();
 
-        if (!$currentBudget) {
+        if (! $currentBudget) {
             return [
                 'budget_utilization' => 0,
                 'variance' => 0,
@@ -282,7 +287,7 @@ class DashboardAggregatorService
             ->limit(10)
             ->get();
 
-        return $obligations->map(fn($o) => [
+        return $obligations->map(fn ($o) => [
             'id' => $o->id,
             'framework' => $o->getFrameworkLabel(),
             'title' => $o->obligation_title,
@@ -300,18 +305,56 @@ class DashboardAggregatorService
             ->limit(10)
             ->get();
 
+        $roadmap = ['count' => 0, 'overdue' => 0, 'items' => []];
+        if (Schema::hasTable('roadmap_decision_requests') && $this->roadmapDashboardService !== null) {
+            $roadmap = $this->roadmapDashboardService->decisionsRequired(null, 10);
+        }
+
+        $resolutionItems = $resolutions->map(fn ($r) => [
+            'id' => $r->id,
+            'reference' => $r->resolution_reference,
+            'title' => $r->title,
+            'deadline' => $r->deadline?->toDateString(),
+            'is_overdue' => $r->isOverdue(),
+            'threshold' => $r->voting_threshold,
+            'source' => 'governance_resolution',
+        ])->toArray();
+
+        $roadmapItems = array_map(function (array $item) {
+            return [
+                'id' => $item['id'],
+                'reference' => 'RDR-'.$item['id'],
+                'title' => $item['request_type'].' for '.$item['source_type'].'#'.$item['source_id'],
+                'deadline' => $item['due_date'] ?? null,
+                'is_overdue' => ! empty($item['due_date']) && $item['due_date'] < now()->toDateString(),
+                'threshold' => $item['required_role'] ?? null,
+                'source' => 'roadmap_decision_request',
+            ];
+        }, $roadmap['items']);
+
+        $items = collect(array_merge($resolutionItems, $roadmapItems))
+            ->sortBy('deadline')
+            ->take(10)
+            ->values()
+            ->all();
+
         return [
-            'count' => $resolutions->count(),
-            'overdue' => $resolutions->filter(fn($r) => $r->isOverdue())->count(),
-            'items' => $resolutions->map(fn($r) => [
-                'id' => $r->id,
-                'reference' => $r->resolution_reference,
-                'title' => $r->title,
-                'deadline' => $r->deadline?->toDateString(),
-                'is_overdue' => $r->isOverdue(),
-                'threshold' => $r->voting_threshold,
-            ])->toArray(),
+            'count' => $resolutions->count() + ($roadmap['count'] ?? 0),
+            'overdue' => $resolutions->filter(fn ($r) => $r->isOverdue())->count() + ($roadmap['overdue'] ?? 0),
+            'items' => $items,
         ];
+    }
+
+    public function getRoadmapMetrics(): array
+    {
+        if (! Schema::hasTable('roadmap_initiatives') || $this->roadmapDashboardService === null) {
+            return [
+                'status' => 'unavailable',
+                'reason' => 'roadmap module not migrated',
+            ];
+        }
+
+        return $this->roadmapDashboardService->governanceWidget(null);
     }
 
     public function getControlRoomMetrics(array $range): array
@@ -344,7 +387,7 @@ class DashboardAggregatorService
     public function getIncidentMetrics(array $range): array
     {
         $total = ClientIncident::whereBetween('occurred_at', [$range['start'], $range['end']])->count();
-        
+
         $bySeverity = ClientIncident::whereBetween('occurred_at', [$range['start'], $range['end']])
             ->select('severity', DB::raw('COUNT(*) as count'))
             ->groupBy('severity')
@@ -396,7 +439,7 @@ class DashboardAggregatorService
 
         return [
             'count' => $voided->count(),
-            'items' => $voided->map(fn($r) => [
+            'items' => $voided->map(fn ($r) => [
                 'id' => $r->id,
                 'reference' => $r->risk_reference,
                 'title' => $r->title,
@@ -410,7 +453,7 @@ class DashboardAggregatorService
 
     public function getFleetAssetMetrics(array $range): array
     {
-        if (!Schema::hasTable('assets')) {
+        if (! Schema::hasTable('assets')) {
             return ['total_assets' => 0, 'overdue_inspections' => 0, 'status' => 'unknown'];
         }
 
@@ -445,7 +488,7 @@ class DashboardAggregatorService
 
     protected function determineStatus(int $value, array $thresholds): string
     {
-        return match(true) {
+        return match (true) {
             $value >= $thresholds[1] => 'critical',
             $value >= $thresholds[0] => 'warning',
             default => 'good',

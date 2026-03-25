@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\StaffTrainingRecord;
 use App\Models\TrainingCourse;
 use App\Models\Site;
@@ -11,6 +13,8 @@ use Inertia\Inertia;
 
 class TrainingDashboardController extends Controller
 {
+    use ResolvesHrTenant;
+
     /* ------------------------------------------------------------------ */
     /*  Index — training dashboard: overdue, due soon, by site             */
     /* ------------------------------------------------------------------ */
@@ -19,17 +23,28 @@ class TrainingDashboardController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.training.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $staffUserIds = $this->hrStaffUserIdsForTenant($tenantId);
 
-        $tenantId = null;
         $filterSiteId = $request->query('site_id');
 
+        if ($filterSiteId) {
+            $staffUserIds = HrEmployeeProfile::query()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($query) use ($filterSiteId) {
+                    $query->where('primary_site_id', (int) $filterSiteId)
+                        ->orWhereJsonContains('secondary_site_ids', (int) $filterSiteId);
+                })
+                ->pluck('user_id')
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+        }
+
         // Overdue / expired training records
-        // Note: StaffTrainingRecord is not tenant-aware; scoping is by user_id only
+        // StaffTrainingRecord is not tenant-aware; scope by tenant staff user IDs.
         $overdue = StaffTrainingRecord::expired()
-            ->when($filterSiteId, fn ($q) => $q->whereHas('user.staffProfile', fn ($p) =>
-                $p->where('primary_site_id', $filterSiteId)
-                  ->orWhereJsonContains('secondary_site_ids', (int) $filterSiteId)
-            ))
+            ->whereIn('user_id', $staffUserIds)
             ->with([
                 'user:id,name,email',
                 'trainingCourse:id,name,code,category',
@@ -40,10 +55,7 @@ class TrainingDashboardController extends Controller
 
         // Expiring within next 60 days
         $dueSoon = StaffTrainingRecord::expiringSoon(2)
-            ->when($filterSiteId, fn ($q) => $q->whereHas('user.staffProfile', fn ($p) =>
-                $p->where('primary_site_id', $filterSiteId)
-                  ->orWhereJsonContains('secondary_site_ids', (int) $filterSiteId)
-            ))
+            ->whereIn('user_id', $staffUserIds)
             ->with([
                 'user:id,name,email',
                 'trainingCourse:id,name,code,category',
@@ -58,72 +70,73 @@ class TrainingDashboardController extends Controller
 
         $bySite = [];
         foreach ($sites as $site) {
-            $siteUserIds = \App\Domain\Hr\Models\HrEmployeeProfile::where('is_active', true)
-                ->where(function ($q) use ($site) {
-                    $q->where('primary_site_id', $site->id)
-                      ->orWhereJsonContains('secondary_site_ids', $site->id);
+            $staffAtSite = HrEmployeeProfile::query()
+                ->where('tenant_id', $tenantId)
+                ->where(function ($query) use ($site) {
+                    $query->where('primary_site_id', $site->id)
+                        ->orWhereJsonContains('secondary_site_ids', $site->id);
                 })
                 ->pluck('user_id');
-
-            if ($siteUserIds->isEmpty()) {
-                $bySite[] = [
-                    'site_id'   => $site->id,
-                    'site_name' => $site->name,
-                    'overdue'   => 0,
-                    'due_soon'  => 0,
-                    'valid'     => 0,
-                    'total'     => 0,
-                ];
-                continue;
-            }
-
-            $overdueCount = StaffTrainingRecord::expired()
-                ->whereIn('user_id', $siteUserIds)
-                ->count();
-
-            $dueSoonCount = StaffTrainingRecord::expiringSoon(2)
-                ->whereIn('user_id', $siteUserIds)
-                ->count();
-
-            $validCount = StaffTrainingRecord::valid()
-                ->whereIn('user_id', $siteUserIds)
-                ->count();
-
-            $totalCount = StaffTrainingRecord::whereIn('user_id', $siteUserIds)->count();
 
             $bySite[] = [
                 'site_id'   => $site->id,
                 'site_name' => $site->name,
-                'overdue'   => $overdueCount,
-                'due_soon'  => $dueSoonCount,
-                'valid'     => $validCount,
-                'total'     => $totalCount,
+                'total'     => StaffTrainingRecord::whereIn('user_id', $staffAtSite)->count(),
+                'expired'   => StaffTrainingRecord::expired()->whereIn('user_id', $staffAtSite)->count(),
             ];
         }
 
-        // Course catalog summary
-        $courses = TrainingCourse::active()
-            ->withCount([
-                'trainingRecords as total_records',
-                'trainingRecords as completed_count' => fn ($q) => $q->completed(),
-                'trainingRecords as expired_count'   => fn ($q) => $q->expired(),
-            ])
-            ->orderBy('category')
-            ->orderBy('name')
-            ->get(['id', 'name', 'code', 'category', 'requires_renewal', 'validity_period_months']);
+        /* ------------------------------------------------------------------ */
+        /*  Due-soon matrix by role / competency                              */
+        /* ------------------------------------------------------------------ */
+
+        $courses = TrainingCourse::orderBy('category')->orderBy('name')->get(['id', 'name', 'category']);
+
+        $matrix = [];
+        foreach ($courses as $course) {
+            $expiringCount = StaffTrainingRecord::where('training_course_id', $course->id)
+                ->whereIn('user_id', $staffUserIds)
+                ->expiringSoon(2)
+                ->count();
+
+            if ($expiringCount > 0) {
+                $matrix[] = [
+                    'course_id'   => $course->id,
+                    'course_name' => $course->name,
+                    'category'    => $course->category,
+                    'count'       => $expiringCount,
+                ];
+            }
+        }
+
+        /* ------------------------------------------------------------------ */
+        /*  Courses needing renewal (global)                                  */
+        /* ------------------------------------------------------------------ */
+
+        $renewalNeeded = TrainingCourse::where('requires_renewal', true)
+            ->whereHas('trainingRecords', fn ($q) => $q->expired()->whereIn('user_id', $staffUserIds))
+            ->withCount(['trainingRecords' => fn ($q) => $q->expired()->whereIn('user_id', $staffUserIds)])
+            ->orderBy('training_records_count', 'desc')
+            ->limit(20)
+            ->get();
+
+        /* ------------------------------------------------------------------ */
+        /*  Return view                                                       */
+        /* ------------------------------------------------------------------ */
 
         return Inertia::render('hr/training/index', [
-            'overdue' => $overdue,
-            'dueSoon' => $dueSoon,
-            'bySite' => $bySite,
-            'courses' => $courses,
-            'sites' => $sites,
-            'filters' => [
-                'site_id' => $filterSiteId,
+            'stats' => [
+                'totalRecords'       => StaffTrainingRecord::whereIn('user_id', $staffUserIds)->count(),
+                'expiredCount'       => StaffTrainingRecord::expired()->whereIn('user_id', $staffUserIds)->count(),
+                'dueSoonCount'       => StaffTrainingRecord::expiringSoon(2)->whereIn('user_id', $staffUserIds)->count(),
+                'completedThisMonth' => StaffTrainingRecord::whereIn('user_id', $staffUserIds)->whereMonth('completed_at', now()->month)->count(),
             ],
-            'can' => [
-                'manage' => $user->canDo('hr.training.manage'),
-            ],
+            'overdue'       => $overdue,
+            'dueSoon'       => $dueSoon,
+            'bySite'        => $bySite,
+            'matrix'        => $matrix,
+            'renewalNeeded' => $renewalNeeded,
+            'filters'       => ['site_id' => $filterSiteId],
         ]);
     }
 }

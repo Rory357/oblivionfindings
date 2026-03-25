@@ -19,6 +19,7 @@ return new class extends Migration
             $table->foreignId('updated_by_user_id')->nullable()->constrained('users')->nullOnDelete();
 
             $table->string('asset_tag')->nullable()->index();
+            $table->string('qr_token', 64)->nullable()->unique();
             $table->string('name');
             $table->string('category')->nullable()->index();
             $table->text('description')->nullable();

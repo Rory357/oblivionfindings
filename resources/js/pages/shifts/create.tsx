@@ -6,7 +6,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 
-type Client = { id: number; first_name: string; last_name: string; service_context_id?: number | null };
+type Client = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    service_context_id?: number | null;
+    site?: { id: number; name: string } | null;
+};
 type Staff = { id: number; name: string; email: string };
 
 type ServiceContext = { id: number; name: string; type: string; is_active: boolean };
@@ -16,6 +22,7 @@ type Props = { clients: Client[]; staff: Staff[]; serviceContexts: ServiceContex
 export default function ShiftCreate({ clients, staff, serviceContexts, defaultServiceContextId = null, defaultClientId = null }: Props) {
     const { labels } = usePage().props as any;
     const shiftLabel = labels?.['shift.singular'] ?? 'Shift';
+    const locationForClient = (client: Client | null | undefined): string => client?.site?.name?.trim() ?? '';
 
     const initialClient = (() => {
         if (defaultClientId) {
@@ -32,7 +39,7 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
         user_id: '',
         starts_at: '',
         ends_at: '',
-        location: '',
+        location: locationForClient(initialClient),
         notes: '',
         status: 'scheduled',
         tasks: [] as Array<{ label: string }>,
@@ -108,15 +115,17 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
                                 value={form.data.client_id}
                                 onChange={(e) => {
                                     const nextId = e.target.value;
-                                    form.setData('client_id', nextId);
+                                    const client = clients.find((c) => String(c.id) === String(nextId));
+                                    form.setData('client_id', Number(nextId));
 
                                     // If service context not manually selected yet, inherit from client
                                     if (!form.data.service_context_id) {
-                                        const client = clients.find((c) => String(c.id) === String(nextId));
                                         if (client?.service_context_id) {
                                             form.setData('service_context_id', client.service_context_id as any);
                                         }
                                     }
+
+                                    form.setData('location', locationForClient(client));
                                 }}
                             >
                                 {clients.map((c) => (
@@ -276,6 +285,17 @@ export default function ShiftCreate({ clients, staff, serviceContexts, defaultSe
                             )}
                         </div>
                     </div>
+
+                    {Object.keys(form.errors).length > 0 && (
+                        <div className="rounded-md border border-red-300 bg-red-50 p-3 text-sm text-red-700">
+                            <p className="font-medium">Please fix the following errors:</p>
+                            <ul className="mt-1 list-disc pl-5">
+                                {Object.entries(form.errors).map(([field, message]) => (
+                                    <li key={field}>{message}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
 
                     <div className="flex items-center gap-2">
                         <Button type="submit" disabled={form.processing}>Create</Button>

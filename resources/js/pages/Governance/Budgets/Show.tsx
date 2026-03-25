@@ -29,6 +29,7 @@ import {
   TrendingDown,
   AlertTriangle,
   CheckCircle,
+  Clock,
   Wallet,
   Plus,
   Pencil,
@@ -79,7 +80,7 @@ interface Budget {
   currency: string;
   status: string;
   version_number: number;
-  approval_resolution: { resolution_reference: string; outcome: string } | null;
+  approval_resolution: { id: number; resolution_reference: string; outcome: string | null; status: string } | null;
   approved_by_board_at: string | null;
   proposed_by: { name: string } | null;
   proposed_at: string | null;
@@ -92,9 +93,11 @@ interface Props extends PageProps {
   budget: Budget;
   categories: Record<string, string>;
   canEdit: boolean;
+  canPropose: boolean;
+  canApprove: boolean;
 }
 
-export default function BudgetShow({ auth, budget, categories, canEdit }: Props) {
+export default function BudgetShow({ auth, budget, categories, canEdit, canPropose, canApprove }: Props) {
   const [lineItemDialogOpen, setLineItemDialogOpen] = useState(false);
   const [editingLineItem, setEditingLineItem] = useState<LineItem | null>(null);
   const [editLineItemDialogOpen, setEditLineItemDialogOpen] = useState(false);
@@ -162,20 +165,24 @@ export default function BudgetShow({ auth, budget, categories, canEdit }: Props)
 
   const calculateTotals = () => {
     const items = budget.line_items || [];
-    const totals = items.reduce(
+    const lineItemTotals = items.reduce(
       (acc, item) => ({
-        budget: acc.budget + Number(item.budget_amount),
+        allocated: acc.allocated + Number(item.budget_amount),
         forecast: acc.forecast + Number(item.forecast_amount),
         actual: acc.actual + Number(item.actual_amount),
       }),
-      { budget: 0, forecast: 0, actual: 0 }
+      { allocated: 0, forecast: 0, actual: 0 }
     );
+    const envelope = Number(budget.total_budget) || lineItemTotals.allocated;
     return {
-      ...totals,
-      variance: totals.actual - totals.budget,
-      variancePercent: totals.budget > 0 ? ((totals.actual - totals.budget) / totals.budget) * 100 : 0,
-      utilization: totals.budget > 0 ? (totals.actual / totals.budget) * 100 : 0,
-      remaining: totals.budget - totals.actual,
+      budget: envelope,
+      allocated: lineItemTotals.allocated,
+      forecast: lineItemTotals.forecast,
+      actual: lineItemTotals.actual,
+      variance: lineItemTotals.actual - envelope,
+      variancePercent: envelope > 0 ? ((lineItemTotals.actual - envelope) / envelope) * 100 : 0,
+      utilization: envelope > 0 ? (lineItemTotals.actual / envelope) * 100 : 0,
+      remaining: envelope - lineItemTotals.actual,
     };
   };
 
@@ -253,6 +260,12 @@ export default function BudgetShow({ auth, budget, categories, canEdit }: Props)
     });
   };
 
+  const approveBudget = () => {
+    router.post(`/governance/budgets/${budget.id}/approve`, {}, {
+      preserveScroll: true,
+    });
+  };
+
   const approveAdjustment = (adjustmentId: number) => {
     router.post(`/governance/budgets/${budget.id}/adjustments/${adjustmentId}/approve`, {}, {
       preserveScroll: true,
@@ -311,7 +324,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit }: Props)
                 </Link>
               </Button>
             )}
-            {budget.status === 'drafting' && (budget.line_items || []).length > 0 && (
+            {canPropose && (budget.line_items || []).length > 0 && (
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button>
@@ -332,6 +345,38 @@ export default function BudgetShow({ auth, budget, categories, canEdit }: Props)
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
+            )}
+            {canApprove && budget.approval_resolution && (
+              budget.approval_resolution.outcome === 'carried' ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button className="bg-green-600 hover:bg-green-700">
+                      <CheckCircle className="w-4 h-4 mr-1" />
+                      Approve Budget
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Approve Budget</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Resolution {budget.approval_resolution.resolution_reference} has been carried by the board.
+                        This will mark the budget ({formatCurrency(totals.budget)}) as approved.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction onClick={approveBudget} className="bg-green-600 hover:bg-green-700">
+                        Confirm Approval
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : (
+                <Button variant="outline" disabled>
+                  <Clock className="w-4 h-4 mr-1" />
+                  Awaiting Board Vote
+                </Button>
+              )
             )}
           </div>
         </div>
@@ -410,8 +455,8 @@ export default function BudgetShow({ auth, budget, categories, canEdit }: Props)
           </Card>
         </div>
 
-        {/* Approval Banner */}
-        {budget.approval_resolution && (
+        {/* Approval / Resolution Banner */}
+        {budget.status === 'approved' && budget.approval_resolution && (
           <Card className="mb-6 border-green-200 bg-green-50">
             <CardContent className="pt-6">
               <div className="flex items-center gap-3">
@@ -423,6 +468,28 @@ export default function BudgetShow({ auth, budget, categories, canEdit }: Props)
                     {budget.approved_by_board_at && ` on ${new Date(budget.approved_by_board_at).toLocaleDateString('en-NZ')}`}
                   </p>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+        {budget.status === 'proposed' && budget.approval_resolution && (
+          <Card className="mb-6 border-yellow-200 bg-yellow-50">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Clock className="w-6 h-6 text-yellow-600" />
+                  <div>
+                    <p className="font-medium text-yellow-800">Pending Board Vote</p>
+                    <p className="text-sm text-yellow-600">
+                      Resolution {budget.approval_resolution.resolution_reference} — {budget.approval_resolution.outcome ? `Outcome: ${budget.approval_resolution.outcome}` : 'Voting not yet completed'}
+                    </p>
+                  </div>
+                </div>
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={`/governance/resolutions/${budget.approval_resolution.id}`}>
+                    View Resolution
+                  </Link>
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -448,7 +515,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit }: Props)
                 <div>
                   <CardTitle>Budget Line Items</CardTitle>
                   <CardDescription>
-                    {(budget.line_items || []).length} items totaling {formatCurrency(totals.budget)}
+                    {(budget.line_items || []).length} items totaling {formatCurrency(totals.allocated)}
                   </CardDescription>
                 </div>
                 {canEdit && (
@@ -653,7 +720,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit }: Props)
                       <tfoot>
                         <tr className="border-t-2 font-semibold">
                           <td className="py-2" colSpan={2}>Totals</td>
-                          <td className="text-right py-2">{formatCurrency(totals.budget)}</td>
+                          <td className="text-right py-2">{formatCurrency(totals.allocated)}</td>
                           <td className="text-right py-2 text-gray-500">{formatCurrency(totals.forecast)}</td>
                           <td className="text-right py-2">{formatCurrency(totals.actual)}</td>
                           <td className={cn(

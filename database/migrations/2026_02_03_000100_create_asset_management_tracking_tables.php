@@ -19,6 +19,15 @@ return new class extends Migration
             $table->timestamps();
         });
 
+        Schema::table('assets', function (Blueprint $table) {
+            $table->foreignId('asset_category_id')
+                ->nullable()
+                ->after('category')
+                ->constrained('asset_categories')
+                ->nullOnDelete();
+            $table->index('asset_category_id');
+        });
+
         Schema::create('asset_ownerships', function (Blueprint $table) {
             $table->id();
             $table->foreignId('asset_id')->constrained()->cascadeOnDelete();
@@ -212,6 +221,12 @@ return new class extends Migration
 
     public function down(): void
     {
+        Schema::table('assets', function (Blueprint $table) {
+            $table->dropForeign(['asset_category_id']);
+            $table->dropIndex(['asset_category_id']);
+            $table->dropColumn('asset_category_id');
+        });
+
         Schema::dropIfExists('asset_procedure_runs');
         Schema::dropIfExists('asset_incident_links');
         Schema::dropIfExists('asset_scan_events');

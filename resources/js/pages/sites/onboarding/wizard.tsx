@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -14,13 +15,15 @@ import {
     ChevronRight,
     ChevronLeft,
     CheckCircle2,
-    BedDouble,
     DoorOpen,
     LayoutGrid,
     ClipboardCheck,
     Package,
+    Upload,
+    FileText,
+    Trash2,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import {
     Select,
     SelectContent,
@@ -57,6 +60,16 @@ type Step = {
     required: boolean;
 };
 
+type ExistingDocument = {
+    id: number;
+    title: string;
+    category?: string;
+    expiry_date?: string;
+    notes?: string;
+    original_name: string;
+    size_bytes: number;
+};
+
 type Props = {
     site: Site;
     currentStep: number;
@@ -66,6 +79,7 @@ type Props = {
         zones?: Array<{ id: number; name: string }>;
     };
     checklistTemplates: Template[];
+    existingDocuments: ExistingDocument[];
     steps: Step[];
 };
 
@@ -75,9 +89,13 @@ const typeIcons = {
     facility: Warehouse,
 };
 
-export default function OnboardingWizard({ site, currentStep, typeSpecificData, checklistTemplates, steps }: Props) {
+export default function OnboardingWizard({ site, currentStep, typeSpecificData, checklistTemplates, existingDocuments, steps }: Props) {
     const [activeStep, setActiveStep] = useState(currentStep);
     const [saving, setSaving] = useState(false);
+    const [uploadedDocs, setUploadedDocs] = useState<ExistingDocument[]>(existingDocuments ?? []);
+    const [uploading, setUploading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    const [pendingDoc, setPendingDoc] = useState({ title: '', category: '', expiry_date: '', notes: '' });
 
     // Form states for each step
     const [basicInfo, setBasicInfo] = useState({
@@ -106,9 +124,6 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
     const [assets, setAssets] = useState<{ name: string; category: string; quantity: string }[]>([{ name: '', category: '', quantity: '1' }]);
     const [contacts, setContacts] = useState<{ type: string; name: string; role: string; phone: string; email: string; is_primary: boolean; notes: string }[]>([
         { type: 'general', name: '', role: '', phone: '', email: '', is_primary: false, notes: '' },
-    ]);
-    const [documents, setDocuments] = useState<{ title: string; category: string; expiry_date: string; notes: string }[]>([
-        { title: '', category: '', expiry_date: '', notes: '' },
     ]);
     const [checklistAssignments, setChecklistAssignments] = useState<Record<number, { enabled: boolean; frequency: string; assigned_to_user_id: string }>>({});
 
@@ -158,9 +173,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                     };
                     break;
                 case 'documents':
-                    stepData = {
-                        documents: documents.filter((document) => document.title.trim()),
-                    };
+                    stepData = { document_count: uploadedDocs.length };
                     break;
                 case 'checklists':
                     stepData = {
@@ -185,7 +198,8 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
             });
             
             if (!response.ok) {
-                console.error('Failed to save step:', await response.text());
+                alert('Failed to save this step. Please try again.');
+                return;
             }
 
             if (activeStep < steps.length) {
@@ -193,12 +207,21 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                 router.visit(`/sites/${site.id}/onboarding?step=${activeStep + 1}`, { preserveState: true });
             } else {
                 // Complete onboarding
-                await fetch(`/sites/${site.id}/onboarding/complete`, {
-                    method: 'POST',
-                    headers: {
-                        'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
-                    },
-                });
+                try {
+                    const completeRes = await fetch(`/sites/${site.id}/onboarding/complete`, {
+                        method: 'POST',
+                        headers: {
+                            'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '',
+                        },
+                    });
+                    if (!completeRes.ok) {
+                        alert('Failed to complete onboarding. Please try again.');
+                        return;
+                    }
+                } catch {
+                    alert('Failed to complete onboarding. Please check your connection and try again.');
+                    return;
+                }
                 router.visit(`/sites/${site.id}`);
             }
         } finally {
@@ -257,17 +280,64 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
     };
     const removeContact = (index: number) => setContacts(contacts.filter((_, i) => i !== index));
 
-    const addDocument = () =>
-        setDocuments([
-            ...documents,
-            { title: '', category: '', expiry_date: '', notes: '' },
-        ]);
-    const updateDocument = (index: number, field: string, value: string) => {
-        const next = [...documents];
-        (next[index] as any)[field] = value;
-        setDocuments(next);
+    const csrfToken = () => (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement)?.content || '';
+
+    const handleUploadDocument = async () => {
+        const file = fileInputRef.current?.files?.[0];
+        if (!file || !pendingDoc.title.trim()) return;
+
+        setUploading(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('title', pendingDoc.title);
+            if (pendingDoc.category) formData.append('category', pendingDoc.category);
+            if (pendingDoc.expiry_date) formData.append('expiry_date', pendingDoc.expiry_date);
+            if (pendingDoc.notes) formData.append('notes', pendingDoc.notes);
+
+            const res = await fetch(`/sites/${site.id}/onboarding/documents`, {
+                method: 'POST',
+                headers: { 'X-CSRF-TOKEN': csrfToken() },
+                body: formData,
+            });
+
+            if (res.ok) {
+                const json = await res.json();
+                setUploadedDocs((prev) => [json.document, ...prev]);
+                setPendingDoc({ title: '', category: '', expiry_date: '', notes: '' });
+                if (fileInputRef.current) fileInputRef.current.value = '';
+            } else {
+                alert('Failed to upload document. Please try again.');
+            }
+        } catch {
+            alert('Upload failed. Please check your connection and try again.');
+        } finally {
+            setUploading(false);
+        }
     };
-    const removeDocument = (index: number) => setDocuments(documents.filter((_, i) => i !== index));
+
+    const handleDeleteDocument = async (docId: number) => {
+        if (!confirm('Are you sure you want to delete this document?')) return;
+        try {
+            const res = await fetch(`/sites/${site.id}/onboarding/documents/${docId}`, {
+                method: 'DELETE',
+                headers: { 'X-CSRF-TOKEN': csrfToken() },
+            });
+            if (res.ok) {
+                setUploadedDocs((prev) => prev.filter((d) => d.id !== docId));
+            } else {
+                alert('Failed to delete document.');
+            }
+        } catch {
+            alert('Delete failed. Please check your connection and try again.');
+        }
+    };
+
+    const formatFileSize = (bytes: number) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: site.name, href: `/sites/${site.id}` }, { title: 'Onboarding', href: `/sites/${site.id}/onboarding` }]}>
@@ -308,7 +378,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2">
-                            {currentStepData.key === 'rooms' && <BedDouble className="w-5 h-5" />}
+                            {currentStepData.key === 'rooms' && <DoorOpen className="w-5 h-5" />}
                             {currentStepData.key === 'resources' && <DoorOpen className="w-5 h-5" />}
                             {currentStepData.key === 'zones' && <LayoutGrid className="w-5 h-5" />}
                             {currentStepData.key === 'assets' && <Package className="w-5 h-5" />}
@@ -321,13 +391,13 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                         {/* Rooms Step */}
                         {currentStepData.key === 'rooms' && (
                             <div className="space-y-4">
-                                <p className="text-sm text-slate-400">Add bedrooms for this house. You can assign clients to rooms later.</p>
+                                <p className="text-sm text-slate-400">Add rooms for this house (bedrooms, kitchen, lounge, bathroom, etc). You can assign clients to bedrooms later.</p>
                                 {rooms.map((room, index) => (
                                     <div key={index} className="flex gap-2">
                                         <Input
                                             value={room.name}
                                             onChange={(e) => updateRoom(index, e.target.value)}
-                                            placeholder={`Bedroom ${index + 1} name`}
+                                            placeholder="e.g. Bedroom 1, Kitchen, Lounge"
                                         />
                                         {rooms.length > 1 && (
                                             <Button variant="ghost" size="sm" onClick={() => removeRoom(index)}>
@@ -337,7 +407,7 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
                                     </div>
                                 ))}
                                 <Button variant="outline" onClick={addRoom}>
-                                    Add Bedroom
+                                    Add Room
                                 </Button>
                             </div>
                         )}
@@ -634,42 +704,111 @@ export default function OnboardingWizard({ site, currentStep, typeSpecificData, 
 
                         {/* Documents Step */}
                         {currentStepData.key === 'documents' && (
-                            <div className="space-y-4">
-                                <p className="text-sm text-slate-400">Record which key documents are required first. You can upload files from the site profile after onboarding.</p>
-                                {documents.map((document, index) => (
-                                    <div key={index} className="grid gap-2 sm:grid-cols-2 p-3 rounded-lg border border">
-                                        <Input
-                                            value={document.title}
-                                            onChange={(e) => updateDocument(index, 'title', e.target.value)}
-                                            placeholder="Document title"
-                                        />
-                                        <Input
-                                            value={document.category}
-                                            onChange={(e) => updateDocument(index, 'category', e.target.value)}
-                                            placeholder="Category (e.g., evacuation_plan)"
-                                        />
-                                        <Input
-                                            type="date"
-                                            value={document.expiry_date}
-                                            onChange={(e) => updateDocument(index, 'expiry_date', e.target.value)}
-                                        />
-                                        <Input
-                                            value={document.notes}
-                                            onChange={(e) => updateDocument(index, 'notes', e.target.value)}
-                                            placeholder="Notes"
-                                        />
-                                        <div className="sm:col-span-2 flex justify-end">
-                                            {documents.length > 1 && (
-                                                <Button variant="ghost" size="sm" onClick={() => removeDocument(index)}>
-                                                    Remove
-                                                </Button>
-                                            )}
+                            <div className="space-y-6">
+                                <p className="text-sm text-slate-400">Upload key documents for this site (evacuation plans, compliance certificates, etc).</p>
+
+                                {/* Upload form */}
+                                <div className="p-4 rounded-lg border border space-y-3">
+                                    <h4 className="text-sm font-medium flex items-center gap-2">
+                                        <Upload className="w-4 h-4" />
+                                        Upload Document
+                                    </h4>
+                                    <div className="grid gap-3 sm:grid-cols-2">
+                                        <div>
+                                            <Label>Title *</Label>
+                                            <Input
+                                                value={pendingDoc.title}
+                                                onChange={(e) => setPendingDoc({ ...pendingDoc, title: e.target.value })}
+                                                placeholder="e.g. Fire Evacuation Plan"
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label>Category</Label>
+                                            <Select
+                                                value={pendingDoc.category || undefined}
+                                                onValueChange={(v) => setPendingDoc({ ...pendingDoc, category: v })}
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Select category" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="evacuation_plan">Evacuation Plan</SelectItem>
+                                                    <SelectItem value="compliance_cert">Compliance Certificate</SelectItem>
+                                                    <SelectItem value="insurance">Insurance</SelectItem>
+                                                    <SelectItem value="lease">Lease / Tenancy</SelectItem>
+                                                    <SelectItem value="safety">Health & Safety</SelectItem>
+                                                    <SelectItem value="policy">Policy</SelectItem>
+                                                    <SelectItem value="other">Other</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div>
+                                            <Label>Expiry Date</Label>
+                                            <Input
+                                                type="date"
+                                                value={pendingDoc.expiry_date}
+                                                onChange={(e) => setPendingDoc({ ...pendingDoc, expiry_date: e.target.value })}
+                                            />
                                         </div>
                                     </div>
-                                ))}
-                                <Button variant="outline" onClick={addDocument}>
-                                    Add Document Requirement
-                                </Button>
+                                    <div>
+                                        <Label>Comments</Label>
+                                        <Textarea
+                                            value={pendingDoc.notes}
+                                            onChange={(e) => setPendingDoc({ ...pendingDoc, notes: e.target.value })}
+                                            placeholder="Add any comments or notes about this document..."
+                                            rows={3}
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label>File *</Label>
+                                        <Input
+                                            ref={fileInputRef}
+                                            type="file"
+                                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.gif,.webp"
+                                            className="cursor-pointer"
+                                        />
+                                        <p className="text-xs text-slate-500 mt-1">PDF, Word, Excel, or images. Max 20MB.</p>
+                                    </div>
+                                    <Button
+                                        onClick={handleUploadDocument}
+                                        disabled={uploading || !pendingDoc.title.trim()}
+                                        className="w-full sm:w-auto"
+                                    >
+                                        <Upload className="w-4 h-4 mr-2" />
+                                        {uploading ? 'Uploading...' : 'Upload Document'}
+                                    </Button>
+                                </div>
+
+                                {/* Uploaded documents list */}
+                                {uploadedDocs.length > 0 && (
+                                    <div className="space-y-2">
+                                        <h4 className="text-sm font-medium">Uploaded Documents ({uploadedDocs.length})</h4>
+                                        {uploadedDocs.map((doc) => (
+                                            <div key={doc.id} className="flex items-center justify-between p-3 rounded-lg border border bg-slate-900/30">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <FileText className="w-5 h-5 text-indigo-400 flex-shrink-0" />
+                                                    <div className="min-w-0">
+                                                        <p className="text-sm font-medium truncate">{doc.title}</p>
+                                                        <p className="text-xs text-slate-500 truncate">
+                                                            {doc.original_name}
+                                                            {doc.size_bytes > 0 && ` · ${formatFileSize(doc.size_bytes)}`}
+                                                            {doc.category && ` · ${doc.category}`}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="text-red-400 hover:text-red-300 flex-shrink-0"
+                                                    onClick={() => handleDeleteDocument(doc.id)}
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
                             </div>
                         )}
 

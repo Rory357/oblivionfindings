@@ -139,7 +139,7 @@ class User extends Authenticatable
 
     public function staffProfile()
     {
-        return $this->hasOne(\App\Models\StaffProfile::class);
+        return $this->hasOne(\App\Models\Staff::class);
     }
 
     public function staffCredentials()
@@ -161,6 +161,22 @@ class User extends Authenticatable
     {
         return $this->hasOne(\App\Domain\Governance\Models\BoardMember::class)
             ->where('is_active', true);
+    }
+
+    /**
+     * Client record for portal users
+     */
+    public function client()
+    {
+        return $this->hasOne(\App\Models\Client::class);
+    }
+
+    /**
+     * Next of kin record
+     */
+    public function nextOfKin()
+    {
+        return $this->hasOne(\App\Models\NextOfKin::class);
     }
 
     public function shifts()

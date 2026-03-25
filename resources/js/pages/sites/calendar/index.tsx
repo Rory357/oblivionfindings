@@ -92,10 +92,14 @@ export default function SiteCalendar({ site, canCreate }: Props) {
         
         try {
             const response = await fetch(`/sites/${site.id}/calendar/events?start=${start}&end=${end}`);
+            if (!response.ok) {
+                setEvents([]);
+                return;
+            }
             const data = await response.json();
             setEvents(data.events || []);
-        } catch (error) {
-            console.error('Failed to fetch events:', error);
+        } catch {
+            setEvents([]);
         } finally {
             setLoading(false);
         }

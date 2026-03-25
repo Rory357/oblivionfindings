@@ -15,6 +15,10 @@ return new class extends Migration
 
             $table->string('title')->nullable();
             $table->string('category')->nullable();
+            $table->string('version')->nullable();
+            $table->date('effective_date')->nullable();
+            $table->date('expiry_date')->nullable();
+            $table->boolean('portal_visible')->default(false);
             $table->text('notes')->nullable();
 
             $table->string('storage_disk')->default('local');

@@ -24,7 +24,6 @@ export default function EditBudget({ auth, budget }: { auth: any; budget: Budget
         title: budget.title,
         description: budget.description ?? '',
         total_budget: budget.total_budget,
-        notes: budget.notes ?? '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -78,10 +77,6 @@ export default function EditBudget({ auth, budget }: { auth: any; budget: Budget
                                     rows={3}
                                     placeholder="Budget purpose and scope..."
                                 />
-                            </div>
-                            <div>
-                                <Label>Notes</Label>
-                                <Textarea value={data.notes} onChange={(e) => setData('notes', e.target.value)} rows={3} placeholder="Internal notes..." />
                             </div>
                             <div className="flex gap-2 pt-4">
                                 <Button type="submit" disabled={processing}>Update Budget</Button>

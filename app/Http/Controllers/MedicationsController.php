@@ -3,7 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
-use App\Services\MedicationMarService;
+use App\Services\EnhancedMarService;
+use App\Services\MedicationAlertService;
 use Illuminate\Http\Request;
 
 class MedicationsController extends Controller
@@ -26,18 +27,24 @@ class MedicationsController extends Controller
 
         // For a central "run-the-day" view, show today's due counts.
         $today = now()->startOfDay();
-        $mar = app(MedicationMarService::class);
+        $mar = app(EnhancedMarService::class);
+        $alertService = app(MedicationAlertService::class);
 
-        $cards = $clients->map(function ($c) use ($today, $mar) {
+        $cards = $clients->map(function ($c) use ($today, $mar, $alertService) {
             $payload = $mar->build($c, $today);
-            $due = 0; $late = 0; $missed = 0;
-            foreach ($payload['rows'] as $row) {
-                if ($row['scheduled_for'] === null) continue;
-                if ($row['record']) continue;
-                if ($row['schedule_state'] === 'due' || $row['schedule_state'] === 'due_soon') $due++;
-                if ($row['schedule_state'] === 'late') $late++;
-                if ($row['schedule_state'] === 'missed_auto') $missed++;
-            }
+            // Use stats from EnhancedMarService (single source of truth)
+            $stats = $payload['stats']['scheduled'];
+            $due = $stats['due'] + $stats['upcoming']; // Include 'due_soon' in due count
+            $late = $stats['late'];
+            $missed = $stats['missed'];
+            
+            // Get alerts and discrepancies for this client
+            $alerts = $alertService->getActiveAlertsForClient($c->id);
+            $discrepancies = \App\Models\ClientControlledDrugDiscrepancy::query()
+                ->where('client_id', $c->id)
+                ->whereIn('status', ['open', 'under_review'])
+                ->count();
+            
             return [
                 'id' => $c->id,
                 'name' => trim($c->first_name . ' ' . $c->last_name),
@@ -47,6 +54,9 @@ class MedicationsController extends Controller
                     'late' => $late,
                     'missed' => $missed,
                 ],
+                'has_alerts' => count($alerts) > 0,
+                'has_critical_alerts' => collect($alerts)->contains(fn($a) => $a['severity'] === 'critical'),
+                'discrepancy_count' => $discrepancies,
             ];
         })->values();
 

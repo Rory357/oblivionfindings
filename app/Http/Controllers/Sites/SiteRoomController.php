@@ -71,6 +71,7 @@ class SiteRoomController extends Controller
     public function update(Request $request, Site $site, SiteHouseRoom $room)
     {
         $this->authorize('update', $site);
+        abort_unless($room->site_id === $site->id, 404);
 
         $validated = $request->validate([
             'name' => 'required|string|max:255',

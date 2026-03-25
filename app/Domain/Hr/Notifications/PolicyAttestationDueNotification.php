@@ -43,10 +43,17 @@ class PolicyAttestationDueNotification extends Notification implements ShouldQue
     {
         return [
             'type'         => 'policy_attestation_due',
+            'title'        => "Policy Attestation: {$this->policy->title}",
+            'message'      => 'You are required to review and attest to this policy.',
             'policy_title' => $this->policy->title,
             'policy_id'    => $this->policy->id,
             'due_date'     => $this->dueDate?->toIso8601String(),
-            'action_url'   => "/hr/policies/{$this->policy->id}",
+            'url'          => "/hr/policies/{$this->policy->id}",
+            'context'      => [
+                'Policy' => $this->policy->title,
+                'Category' => ucfirst($this->policy->category ?? 'General'),
+                'Due by' => $this->dueDate?->format('d M Y') ?? 'As soon as possible',
+            ],
         ];
     }
 }

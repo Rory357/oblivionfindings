@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Models\User;
@@ -11,6 +12,8 @@ use Inertia\Inertia;
 
 class PerformanceReviewController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * List all performance reviews.
      */
@@ -19,9 +22,10 @@ class PerformanceReviewController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.view'), 403);
 
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $reviews = HrPerformanceReview::with(['employee:id,name', 'reviewer:id,name'])
+            ->where('tenant_id', $tenantId)
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->query('employee'), fn ($q, $empId) => $q->where('employee_user_id', $empId))
             ->orderByDesc('created_at')
@@ -29,6 +33,7 @@ class PerformanceReviewController extends Controller
             ->withQueryString();
 
         $probationReviews = HrProbationReview::with(['employee:id,name', 'reviewer:id,name'])
+            ->where('tenant_id', $tenantId)
             ->orderByDesc('review_date')
             ->limit(20)
             ->get();
@@ -53,8 +58,12 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
-        $staff = User::orderBy('name')
+        $staff = User::staff()
+            ->whereIn('id', $staffIds)
+            ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
         return Inertia::render('hr/performance/create-review', [
@@ -75,6 +84,8 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
 
         $review->load(['employee:id,name', 'reviewer:id,name']);
 
@@ -93,6 +104,8 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
 
         $review->load(['employee:id,name', 'reviewer:id,name']);
 
@@ -114,6 +127,7 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'employee_user_id' => ['required', 'integer', 'exists:users,id'],
@@ -131,7 +145,7 @@ class PerformanceReviewController extends Controller
         ]);
 
         HrPerformanceReview::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'reviewer_user_id' => $user->id,
             'status' => 'draft',
             'created_by' => $user->id,
@@ -148,6 +162,8 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
 
         $data = $request->validate([
             'review_type' => ['sometimes', 'string', 'in:annual,mid_year,quarterly,ad_hoc'],
@@ -189,6 +205,7 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'employee_user_id' => ['required', 'integer', 'exists:users,id'],
@@ -204,7 +221,7 @@ class PerformanceReviewController extends Controller
         ]);
 
         HrProbationReview::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'reviewer_user_id' => $user->id,
             'created_by' => $user->id,
             ...$data,
@@ -220,6 +237,8 @@ class PerformanceReviewController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
 
         $data = $request->validate([
             'review_date' => ['sometimes', 'date'],

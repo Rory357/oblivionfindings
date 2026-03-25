@@ -30,7 +30,7 @@ class SiteController extends Controller
         $sites = Site::query()
             ->whereIn('type', $allowedTypes)
             ->when(in_array($status, ['active', 'inactive']), fn($q) => $q->where('is_active', $status === 'active'))
-            ->when($type && in_array($type, ['head_office', 'house', 'facility']), fn($q) => $q->where('type', $type))
+            ->when($type && in_array($type, ['head_office', 'house', 'facility', 'residential']), fn($q) => $q->where('type', $type))
             ->when($region, fn($q) => $q->where('region', $region))
             ->when($risk === 'high_risk', fn($q) => $q->where('is_high_risk', true))
             ->when($risk === 'high_needs', fn($q) => $q->where('is_high_needs', true))
@@ -78,6 +78,7 @@ class SiteController extends Controller
                     ['value' => 'head_office', 'label' => 'Head Office'],
                     ['value' => 'house', 'label' => 'House'],
                     ['value' => 'facility', 'label' => 'Facilities'],
+                    ['value' => 'residential', 'label' => 'Residential'],
                 ],
                 'risks' => [
                     ['value' => 'high_risk', 'label' => 'High Risk'],
@@ -160,7 +161,7 @@ class SiteController extends Controller
         ];
         
         // Add type-specific checklist items
-        if ($site->type === 'house') {
+        if (in_array($site->type, ['house', 'residential'], true)) {
             $checklist[] = [
                 'key' => 'has_rooms',
                 'label' => 'At least one bedroom configured',
@@ -205,6 +206,16 @@ class SiteController extends Controller
                     'id' => $z->id,
                     'name' => $z->name,
                     'type' => $z->zone_type,
+                ]),
+            ],
+            'residential' => [
+                'rooms' => $site->houseRooms->map(fn($r) => [
+                    'id' => $r->id,
+                    'name' => $r->name,
+                    'assigned_client' => $r->assignedClient ? [
+                        'id' => $r->assignedClient->id,
+                        'name' => $r->assignedClient->first_name . ' ' . $r->assignedClient->last_name,
+                    ] : null,
                 ]),
             ],
             default => [],
@@ -325,7 +336,10 @@ class SiteController extends Controller
     {
         $this->authorize('create', Site::class);
 
-        $users = \App\Models\User::select(['id', 'name'])->orderBy('name')->get();
+        $users = \App\Models\User::staff()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
 
         return inertia('sites/create', [
             'users' => $users,
@@ -354,7 +368,14 @@ class SiteController extends Controller
     {
         $this->authorize('update', $site);
 
-        $users = \App\Models\User::select(['id', 'name'])->orderBy('name')->get();
+        $users = \App\Models\User::staff()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
+
+        $documents = \App\Models\SiteDocument::where('site_id', $site->id)
+            ->orderByDesc('created_at')
+            ->get(['id', 'title', 'category', 'expiry_date', 'notes', 'original_name', 'size_bytes']);
 
         return inertia('sites/edit', [
             'site' => [
@@ -387,6 +408,7 @@ class SiteController extends Controller
                 'primary_contact_user_id' => $site->primary_contact_user_id,
             ],
             'users' => $users,
+            'documents' => $documents,
         ]);
     }
 
@@ -413,6 +435,7 @@ class SiteController extends Controller
             'head_office' => 'sites.type.head_office.view',
             'house' => 'sites.type.house.view',
             'facility' => 'sites.type.facility.view',
+            'residential' => 'sites.type.house.view',
         ];
 
         $allowed = collect($map)

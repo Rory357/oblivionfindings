@@ -104,15 +104,22 @@ class RiskScoringService
      */
     public function isWithinAppetite(RiskRegisterEntry $risk): bool
     {
-        $threshold = $risk->appetite_threshold ?? self::DEFAULT_APPETITE_THRESHOLDS[$risk->category] ?? 15;
+        $threshold = $risk->appetite_threshold ?? $this->getAppetiteThreshold($risk->category);
         return $risk->residual_score <= $threshold;
     }
 
     /**
-     * Get appetite threshold for category
+     * Get appetite threshold for category, querying RiskAppetiteSetting first
      */
     public function getAppetiteThreshold(string $category): int
     {
+        $setting = \App\Domain\Governance\Models\RiskAppetiteSetting::where('category', $category)
+            ->first();
+
+        if ($setting) {
+            return $setting->threshold;
+        }
+
         return self::DEFAULT_APPETITE_THRESHOLDS[$category] ?? 15;
     }
 

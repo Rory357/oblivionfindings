@@ -10,12 +10,18 @@ use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\MeetingAgendaItem;
 use App\Domain\Governance\Models\MeetingAttendance;
 use App\Domain\Governance\Models\MeetingMinute;
+use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Http\Controllers\Controller;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class GovernanceMeetingController extends Controller
 {
+    public function __construct(
+        protected GovernanceWorkflowService $workflowService
+    ) {}
+
     public function create()
     {
         $boardMembers = \App\Domain\Governance\Models\BoardMember::with('user')->get();
@@ -34,6 +40,80 @@ class GovernanceMeetingController extends Controller
             ->paginate(15);
 
         return Inertia::render('Governance/Meetings/Index', [
+            'meetings' => $meetings,
+        ]);
+    }
+
+    public function calendar(Request $request)
+    {
+        $validated = $request->validate([
+            'month' => 'nullable|date_format:Y-m',
+            'date' => 'nullable|date_format:Y-m-d',
+            'meeting_type' => 'nullable|in:all,full_board,audit_risk,people,finance,special_general,executive_session',
+        ]);
+
+        $month = isset($validated['month'])
+            ? Carbon::createFromFormat('Y-m', $validated['month'])->startOfMonth()
+            : now()->startOfMonth();
+
+        $viewStart = $month->copy()->startOfMonth()->startOfWeek(Carbon::MONDAY);
+        $viewEnd = $month->copy()->endOfMonth()->endOfWeek(Carbon::SUNDAY);
+
+        $meetingType = $validated['meeting_type'] ?? 'all';
+
+        $query = GovernanceMeeting::query()
+            ->with(['chair.user', 'secretary.user'])
+            ->whereBetween('scheduled_at', [$viewStart, $viewEnd]);
+
+        if ($meetingType !== 'all') {
+            $query->where('meeting_type', $meetingType);
+        }
+
+        $meetings = $query
+            ->orderBy('scheduled_at')
+            ->get()
+            ->map(fn (GovernanceMeeting $meeting) => [
+                'id' => $meeting->id,
+                'title' => $meeting->title,
+                'meeting_type' => $meeting->meeting_type,
+                'scheduled_at' => $meeting->scheduled_at?->toIso8601String(),
+                'duration_minutes' => $meeting->duration_minutes,
+                'location' => $meeting->location,
+                'status' => $meeting->status,
+                'quorum_met' => $meeting->quorum_met,
+                'chair' => $meeting->chair?->user ? [
+                    'name' => $meeting->chair->user->name,
+                ] : null,
+                'secretary' => $meeting->secretary?->user ? [
+                    'name' => $meeting->secretary->user->name,
+                ] : null,
+            ])
+            ->values();
+
+        $selectedDate = $validated['date'] ?? null;
+        if ($selectedDate === null) {
+            $today = now()->toDateString();
+            $selectedDate = ($today >= $viewStart->toDateString() && $today <= $viewEnd->toDateString())
+                ? $today
+                : $month->toDateString();
+        }
+
+        return Inertia::render('Governance/Meetings/Calendar', [
+            'month' => $month->format('Y-m'),
+            'monthLabel' => $month->format('F Y'),
+            'previousMonth' => $month->copy()->subMonth()->format('Y-m'),
+            'nextMonth' => $month->copy()->addMonth()->format('Y-m'),
+            'selectedDate' => $selectedDate,
+            'selectedMeetingType' => $meetingType,
+            'meetingTypes' => [
+                ['value' => 'all', 'label' => 'All Types'],
+                ['value' => 'full_board', 'label' => 'Full Board'],
+                ['value' => 'audit_risk', 'label' => 'Audit & Risk'],
+                ['value' => 'people', 'label' => 'People Committee'],
+                ['value' => 'finance', 'label' => 'Finance Committee'],
+                ['value' => 'special_general', 'label' => 'Special General'],
+                ['value' => 'executive_session', 'label' => 'Executive Session'],
+            ],
             'meetings' => $meetings,
         ]);
     }
@@ -60,6 +140,7 @@ class GovernanceMeetingController extends Controller
             'canEdit' => $meeting->isEditable() && auth()->user()->can('update', $meeting),
             'canManageMinutes' => auth()->user()->can('manageMinutes', $meeting),
             'canApproveMinutes' => auth()->user()->can('approveMinutes', $meeting),
+            'workflowChecklist' => $this->workflowService->meetingChecklist($meeting, auth()->user()),
         ]);
     }
 
@@ -166,12 +247,17 @@ class GovernanceMeetingController extends Controller
         $this->authorize('manageMinutes', $meeting);
 
         $validated = $request->validate([
-            'content_blocks' => 'required|array',
+            'content_blocks' => 'nullable|array',
         ]);
+
+        $contentBlocks = $validated['content_blocks'] ?? null;
+        if (empty($contentBlocks)) {
+            $contentBlocks = $meeting->generateMinutesSkeleton();
+        }
 
         $minutes = MeetingMinute::create([
             'governance_meeting_id' => $meeting->id,
-            'content_blocks' => $validated['content_blocks'],
+            'content_blocks' => $contentBlocks,
             'status' => 'draft',
             'drafted_by' => auth()->id(),
             'drafted_at' => now(),
@@ -254,6 +340,8 @@ class GovernanceMeetingController extends Controller
 
     public function lockMeeting(GovernanceMeeting $meeting)
     {
+        $this->authorize('update', $meeting);
+
         if ($meeting->isLocked()) {
             return redirect()->back()->with('error', 'Meeting is already locked.');
         }
@@ -265,6 +353,8 @@ class GovernanceMeetingController extends Controller
 
     public function signMinutes(GovernanceMeeting $meeting)
     {
+        $this->authorize('approveMinutes', $meeting);
+
         $minutes = $meeting->minutes;
         if (!$minutes) {
             return redirect()->back()->with('error', 'No minutes found for this meeting.');
@@ -277,6 +367,46 @@ class GovernanceMeetingController extends Controller
         $minutes->sign(auth()->id());
 
         return redirect()->back()->with('success', 'Minutes signed successfully.');
+    }
+
+    public function advanceStatus(GovernanceMeeting $meeting)
+    {
+        $this->authorize('update', $meeting);
+
+        $advanced = $meeting->autoAdvanceStatus();
+
+        if (!$advanced) {
+            return redirect()->back()->with('error', 'Cannot advance meeting status. Check prerequisites.');
+        }
+
+        return redirect()->back()->with('success', 'Meeting status advanced to: ' . str_replace('_', ' ', $meeting->fresh()->status));
+    }
+
+    public function submitRsvp(Request $request, GovernanceMeeting $meeting)
+    {
+        $validated = $request->validate([
+            'status' => 'required|in:attending,apology,tentative',
+            'dietary_requirements' => 'nullable|string|max:255',
+            'notes' => 'nullable|string|max:500',
+        ]);
+
+        $boardMember = auth()->user()->boardMember;
+        if (!$boardMember) {
+            return redirect()->back()->with('error', 'You are not a board member.');
+        }
+
+        \App\Domain\Governance\Models\MeetingRsvp::updateOrCreate(
+            [
+                'governance_meeting_id' => $meeting->id,
+                'board_member_id' => $boardMember->id,
+            ],
+            [
+                ...$validated,
+                'responded_at' => now(),
+            ]
+        );
+
+        return redirect()->back()->with('success', 'RSVP recorded.');
     }
 
     protected function reorderAgendaItems(GovernanceMeeting $meeting): void

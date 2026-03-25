@@ -1,0 +1,123 @@
+<?php
+
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Role;
+use App\Models\Site;
+use App\Models\User;
+
+beforeEach(function () {
+    $this->seed(\Database\Seeders\RbacSeeder::class);
+
+    $this->hr = User::factory()->create([
+        'name' => 'HR Manager',
+        'role' => 'hr',
+        'approved_at' => now(),
+    ]);
+
+    $hrRole = Role::query()->where('name', 'hr')->first();
+    if ($hrRole) {
+        $this->hr->roles()->syncWithoutDetaching([$hrRole->id]);
+    }
+});
+
+function createEmployeeProfile(User $staff, array $overrides = []): HrEmployeeProfile
+{
+    return HrEmployeeProfile::query()->create(array_merge([
+        'tenant_id' => 1,
+        'user_id' => $staff->id,
+        'employee_number' => 'EMP-' . $staff->id . '-' . now()->timestamp,
+        'work_email' => $staff->email,
+        'position_title' => 'Support Worker',
+        'position_role' => 'support_worker',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subMonth()->toDateString(),
+        'is_active' => true,
+    ], $overrides));
+}
+
+test('people index lists all staff users including staff without employee profile', function () {
+    $staffWithProfile = User::factory()->create([
+        'name' => 'Staff With Profile',
+        'email' => 'with.profile@example.test',
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    createEmployeeProfile($staffWithProfile);
+
+    User::factory()->create([
+        'name' => 'Staff Without Profile',
+        'email' => 'without.profile@example.test',
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+
+    User::factory()->create([
+        'name' => 'Client Portal User',
+        'email' => 'client.user@example.test',
+        'role' => 'client',
+        'approved_at' => now(),
+    ]);
+
+    $response = $this->actingAs($this->hr)->get('/hr/people');
+    $response->assertOk();
+
+    $names = collect($response->inertiaProps('profiles.data'))
+        ->pluck('user.name')
+        ->all();
+
+    expect($names)->toContain('Staff With Profile');
+    expect($names)->toContain('Staff Without Profile');
+    expect($names)->not->toContain('Client Portal User');
+});
+
+test('people index status and site filters respect employee profile data', function () {
+    $site = Site::factory()->create(['name' => 'Kauri House']);
+
+    $activeStaff = User::factory()->create([
+        'name' => 'Active Staff',
+        'email' => 'active.staff@example.test',
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    createEmployeeProfile($activeStaff, [
+        'employee_number' => 'EMP-ACTIVE',
+        'primary_site_id' => $site->id,
+        'is_active' => true,
+    ]);
+
+    $inactiveStaff = User::factory()->create([
+        'name' => 'Inactive Staff',
+        'email' => 'inactive.staff@example.test',
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+    createEmployeeProfile($inactiveStaff, [
+        'employee_number' => 'EMP-INACTIVE',
+        'is_active' => false,
+    ]);
+
+    User::factory()->create([
+        'name' => 'No Profile Staff',
+        'email' => 'no.profile.staff@example.test',
+        'role' => 'support_worker',
+        'approved_at' => now(),
+    ]);
+
+    $inactiveResponse = $this->actingAs($this->hr)->get('/hr/people?status=inactive');
+    $inactiveResponse->assertOk();
+
+    $inactiveNames = collect($inactiveResponse->inertiaProps('profiles.data'))
+        ->pluck('user.name')
+        ->all();
+
+    expect($inactiveNames)->toBe(['Inactive Staff']);
+
+    $siteResponse = $this->actingAs($this->hr)->get('/hr/people?site_id=' . $site->id);
+    $siteResponse->assertOk();
+
+    $siteNames = collect($siteResponse->inertiaProps('profiles.data'))
+        ->pluck('user.name')
+        ->all();
+
+    expect($siteNames)->toBe(['Active Staff']);
+});

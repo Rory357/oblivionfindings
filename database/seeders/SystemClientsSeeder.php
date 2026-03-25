@@ -34,18 +34,18 @@ class SystemClientsSeeder extends Seeder
 
         // Create a fixed set of clients for repeatable testing.
         $seedClients = [
-            ['first_name' => 'Rosie', 'last_name' => 'Ngata'],
-            ['first_name' => 'Wiremu', 'last_name' => 'Tait'],
-            ['first_name' => 'Aroha', 'last_name' => 'Kingi'],
-            ['first_name' => 'Mila', 'last_name' => 'Singh'],
-            ['first_name' => 'Oliver', 'last_name' => 'Chen'],
-            ['first_name' => 'Hana', 'last_name' => 'Patel'],
-            ['first_name' => 'Noah', 'last_name' => 'Williams'],
-            ['first_name' => 'Sofia', 'last_name' => 'Brown'],
-            ['first_name' => 'Liam', 'last_name' => 'Davis'],
-            ['first_name' => 'Amelia', 'last_name' => 'Wilson'],
-            ['first_name' => 'Jack', 'last_name' => 'Taylor'],
-            ['first_name' => 'Isla', 'last_name' => 'Martin'],
+            ['first_name' => 'Rosie', 'last_name' => 'Ngata', 'nhi' => 'NGT1234'],
+            ['first_name' => 'Wiremu', 'last_name' => 'Tait', 'nhi' => 'TAI2345'],
+            ['first_name' => 'Aroha', 'last_name' => 'Kingi', 'nhi' => 'KIN3456'],
+            ['first_name' => 'Mila', 'last_name' => 'Singh', 'nhi' => 'SIN4567'],
+            ['first_name' => 'Oliver', 'last_name' => 'Chen', 'nhi' => 'CHE5678'],
+            ['first_name' => 'Hana', 'last_name' => 'Patel', 'nhi' => 'PAT6789'],
+            ['first_name' => 'Noah', 'last_name' => 'Williams', 'nhi' => 'WIL7890'],
+            ['first_name' => 'Sofia', 'last_name' => 'Brown', 'nhi' => 'BRO8901'],
+            ['first_name' => 'Liam', 'last_name' => 'Davis', 'nhi' => 'DAV9012'],
+            ['first_name' => 'Amelia', 'last_name' => 'Wilson', 'nhi' => 'WIL0123'],
+            ['first_name' => 'Jack', 'last_name' => 'Taylor', 'nhi' => 'TAY1235'],
+            ['first_name' => 'Isla', 'last_name' => 'Martin', 'nhi' => 'MAR2346'],
         ];
 
         $clients = collect();
@@ -58,6 +58,7 @@ class SystemClientsSeeder extends Seeder
                 [
                     'site_id' => $site->id,
                     'service_context_id' => $serviceContext->id,
+                    'nhi_number' => $c['nhi'],
                     'first_name' => $c['first_name'],
                     'last_name' => $c['last_name'],
                     'preferred_name' => $c['first_name'],

@@ -28,7 +28,7 @@ class StaffController extends Controller
             ->orderBy('name')
             ->with([
                 'roles:id,name,label',
-                'staffProfile:user_id,phone,job_title,employment_type,start_date,is_active',
+                'staffProfile:user_id,job_title,department,status,hire_date',
             ])
             ->withCount('assignedClients')
             ->paginate(20)
@@ -125,11 +125,12 @@ class StaffController extends Controller
             'role_ids' => ['array'],
             'role_ids.*' => ['integer', 'exists:roles,id'],
             'profile' => ['array'],
-            'profile.phone' => ['nullable', 'string', 'max:50'],
             'profile.job_title' => ['nullable', 'string', 'max:255'],
-            'profile.employment_type' => ['nullable', 'string', 'max:255'],
-            'profile.start_date' => ['nullable', 'date'],
-            'profile.is_active' => ['nullable', 'boolean'],
+            'profile.department' => ['nullable', 'string', 'max:255'],
+            'profile.work_phone' => ['nullable', 'string', 'max:50'],
+            'profile.mobile_phone' => ['nullable', 'string', 'max:50'],
+            'profile.hire_date' => ['nullable', 'date'],
+            'profile.status' => ['nullable', 'in:active,on_leave,suspended,terminated'],
         ]);
 
         $user->update([
@@ -151,11 +152,12 @@ class StaffController extends Controller
         $user->staffProfile()->updateOrCreate(
             ['user_id' => $user->id],
             [
-                'phone' => $profileData['phone'] ?? null,
                 'job_title' => $profileData['job_title'] ?? null,
-                'employment_type' => $profileData['employment_type'] ?? null,
-                'start_date' => $profileData['start_date'] ?? null,
-                'is_active' => (bool) ($profileData['is_active'] ?? true),
+                'department' => $profileData['department'] ?? null,
+                'work_phone' => $profileData['work_phone'] ?? null,
+                'mobile_phone' => $profileData['mobile_phone'] ?? null,
+                'hire_date' => $profileData['hire_date'] ?? null,
+                'status' => $profileData['status'] ?? 'active',
             ]
         );
 

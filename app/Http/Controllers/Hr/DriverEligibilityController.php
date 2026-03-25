@@ -3,12 +3,16 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class DriverEligibilityController extends Controller
 {
+    use ResolvesHrTenant;
+
     /* ------------------------------------------------------------------ */
     /*  Index — driver eligibility register                                */
     /* ------------------------------------------------------------------ */
@@ -18,7 +22,7 @@ class DriverEligibilityController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.driver.view'), 403);
 
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $status = $request->query('status');
         $search = trim((string) $request->query('q', ''));
 
@@ -26,6 +30,7 @@ class DriverEligibilityController extends Controller
                 'user:id,name,email',
                 'approvedBy:id,name',
             ])
+            ->where('tenant_id', $tenantId)
             ->when($status, fn ($q) => match ($status) {
                 'eligible'  => $q->eligible(),
                 'expiring'  => $q->expiring(30),
@@ -40,7 +45,7 @@ class DriverEligibilityController extends Controller
             ->withQueryString();
 
         // Summary
-        $base = HrDriverEligibility::query();
+        $base = HrDriverEligibility::query()->where('tenant_id', $tenantId);
         $summary = [
             'total'     => (clone $base)->count(),
             'eligible'  => (clone $base)->eligible()->count(),
@@ -70,6 +75,7 @@ class DriverEligibilityController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.driver.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
             'user_id'              => ['required', 'integer', 'exists:users,id'],
@@ -83,8 +89,18 @@ class DriverEligibilityController extends Controller
             'notes'                => ['nullable', 'string', 'max:5000'],
         ]);
 
+        $belongsToTenant = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $validated['user_id'])
+            ->exists();
+
+        if (! $belongsToTenant) {
+            return redirect()->back()->with('error', 'Selected staff member is not in your HR tenant scope.');
+        }
+
         // Check for existing record
         $existing = HrDriverEligibility::where('user_id', $validated['user_id'])
+            ->where('tenant_id', $tenantId)
             ->first();
 
         if ($existing) {
@@ -93,7 +109,7 @@ class DriverEligibilityController extends Controller
 
         HrDriverEligibility::create([
             ...$validated,
-            'tenant_id'       => $user->tenant_id,
+            'tenant_id'       => $tenantId,
             'status'          => 'pending_review',
             'can_drive_clients' => false,
             'next_review_at'  => now()->addMonths(12),
@@ -111,6 +127,8 @@ class DriverEligibilityController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.driver.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $eligibility->tenant_id);
 
         $validated = $request->validate([
             'licence_number'       => ['sometimes', 'required', 'string', 'max:50'],
@@ -139,6 +157,8 @@ class DriverEligibilityController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.driver.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $eligibility->tenant_id);
 
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -160,7 +180,8 @@ class DriverEligibilityController extends Controller
         ]);
 
         // Also update the employee profile flag
-        $employeeProfile = \App\Domain\Hr\Models\HrEmployeeProfile::where('user_id', $eligibility->user_id)
+        $employeeProfile = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('user_id', $eligibility->user_id)
             ->first();
 
         if ($employeeProfile) {
@@ -181,6 +202,8 @@ class DriverEligibilityController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.driver.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $eligibility->tenant_id);
 
         $validated = $request->validate([
             'suspension_reason' => ['required', 'string', 'max:2000'],
@@ -195,7 +218,8 @@ class DriverEligibilityController extends Controller
         ]);
 
         // Also update the employee profile flag
-        $employeeProfile = \App\Domain\Hr\Models\HrEmployeeProfile::where('user_id', $eligibility->user_id)
+        $employeeProfile = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('user_id', $eligibility->user_id)
             ->first();
 
         if ($employeeProfile) {

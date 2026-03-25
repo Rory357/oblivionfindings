@@ -22,6 +22,8 @@ class HrOnboardingTask extends Model
         'assigned_to_user_id',
         'assigned_to_role',
         'status',
+        'due_date',
+        'dependency_task_ids',
         'completed_at',
         'completed_by',
         'evidence_path',
@@ -34,6 +36,8 @@ class HrOnboardingTask extends Model
     protected $casts = [
         'is_required' => 'boolean',
         'sort_order' => 'integer',
+        'due_date' => 'date',
+        'dependency_task_ids' => 'array',
         'completed_at' => 'datetime',
         'sign_off_required' => 'boolean',
         'signed_off_at' => 'datetime',

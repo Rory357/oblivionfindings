@@ -11,6 +11,7 @@ class SiteChecklistTemplateItem extends Model
     use HasFactory;
 
     protected $fillable = [
+        'tenant_id',
         'template_id',
         'sort_order',
         'question',
