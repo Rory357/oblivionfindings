@@ -88,15 +88,27 @@ class ServiceAgreement extends Model
         return $this->hasMany(ServiceAgreementStatusChange::class);
     }
 
+    public function getBudgetUsedFromItemsAttribute()
+    {
+        return $this->lineItems()->sum('budget_used');
+    }
+
+    public function getBudgetAllocatedFromItemsAttribute()
+    {
+        return $this->lineItems()->sum('budget_allocated');
+    }
+
     public function getBudgetRemainingAttribute()
     {
-        return $this->total_budget - $this->budget_used;
+        $used = $this->budget_used > 0 ? $this->budget_used : $this->budget_used_from_items;
+        return $this->total_budget - $used;
     }
 
     public function getBudgetUtilisationPercentAttribute()
     {
+        $used = $this->budget_used > 0 ? $this->budget_used : $this->budget_used_from_items;
         return $this->total_budget > 0
-            ? round(($this->budget_used / $this->total_budget) * 100, 1)
+            ? round(($used / $this->total_budget) * 100, 1)
             : 0;
     }
 

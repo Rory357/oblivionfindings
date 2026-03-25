@@ -134,8 +134,22 @@ class ServiceAgreementController extends Controller
 
         $agreement->append(['budget_utilisation_percent', 'budget_remaining']);
 
+        // Calculate actual budget from line items
+        $budgetFromItems = $agreement->lineItems->sum('budget_used');
+        $allocatedFromItems = $agreement->lineItems->sum('budget_allocated');
+        $effectiveUsed = $budgetFromItems > 0 ? $budgetFromItems : (float) $agreement->budget_used;
+
         return inertia('operations/service-agreements/Show', [
             'agreement' => $agreement,
+            'budget_summary' => [
+                'total_budget' => (float) $agreement->total_budget,
+                'budget_used' => round($effectiveUsed, 2),
+                'budget_allocated' => round($allocatedFromItems, 2),
+                'budget_remaining' => round((float) $agreement->total_budget - $effectiveUsed, 2),
+                'utilisation_percent' => $agreement->total_budget > 0
+                    ? round(($effectiveUsed / (float) $agreement->total_budget) * 100, 1)
+                    : 0,
+            ],
         ]);
     }
 
