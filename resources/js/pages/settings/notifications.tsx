@@ -11,12 +11,18 @@ import { Head, useForm } from '@inertiajs/react';
 import {
     Bell,
     BellOff,
+    Check,
     CheckCircle2,
     ChevronDown,
     ChevronRight,
     ClipboardList,
     Clock,
+    Info,
+    Mail,
+    Monitor,
     Shield,
+    ShieldAlert,
+    Smartphone,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -31,6 +37,9 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Settings', href: '/settings' },
     { title: 'Notifications', href: '/settings/notifications' },
 ];
+
+/** Critical notification keys that cannot be disabled */
+const CRITICAL_KEYS = new Set(['incidents.high_severity_alert', 'breakglass.daily_report']);
 
 /** Map of notification key -> friendly name and description */
 const NOTIFICATION_META: Record<string, { name: string; description: string }> = {
@@ -53,10 +62,11 @@ const NOTIFICATION_META: Record<string, { name: string; description: string }> =
 };
 
 /** Module groupings with icons and display names */
-const MODULE_CONFIG: Record<string, { label: string; icon: typeof Clock; keys: string[] }> = {
+const MODULE_CONFIG: Record<string, { label: string; icon: typeof Clock; colour: string; keys: string[] }> = {
     operations: {
         label: 'Operations',
         icon: ClipboardList,
+        colour: 'violet',
         keys: [
             'timesheets.created', 'timesheets.updated', 'timesheets.submitted',
             'timesheets.approved', 'timesheets.rejected', 'timesheets.returned',
@@ -65,6 +75,7 @@ const MODULE_CONFIG: Record<string, { label: string; icon: typeof Clock; keys: s
     incidents: {
         label: 'Incidents & Safety',
         icon: Shield,
+        colour: 'red',
         keys: [
             'incidents.draft_created', 'incidents.submitted', 'incidents.reviewed',
             'incidents.high_severity_alert', 'breakglass.daily_report',
@@ -74,6 +85,7 @@ const MODULE_CONFIG: Record<string, { label: string; icon: typeof Clock; keys: s
     followups: {
         label: 'Follow-ups',
         icon: CheckCircle2,
+        colour: 'emerald',
         keys: [
             'followups.created', 'followups.updated', 'followups.completed',
             'followups.overdue_reminder',
@@ -93,21 +105,21 @@ function friendlyDescription(key: string): string {
 }
 
 /** Group all notification keys into modules. Keys not in any module go into "Other". */
-function groupByModule(allKeys: string[]): { moduleKey: string; label: string; icon: typeof Clock; keys: string[] }[] {
+function groupByModule(allKeys: string[]): { moduleKey: string; label: string; icon: typeof Clock; colour: string; keys: string[] }[] {
     const assigned = new Set<string>();
-    const result: { moduleKey: string; label: string; icon: typeof Clock; keys: string[] }[] = [];
+    const result: { moduleKey: string; label: string; icon: typeof Clock; colour: string; keys: string[] }[] = [];
 
     for (const [moduleKey, config] of Object.entries(MODULE_CONFIG)) {
         const matched = config.keys.filter((k) => allKeys.includes(k));
         if (matched.length > 0) {
-            result.push({ moduleKey, label: config.label, icon: config.icon, keys: matched });
+            result.push({ moduleKey, label: config.label, icon: config.icon, colour: config.colour, keys: matched });
             matched.forEach((k) => assigned.add(k));
         }
     }
 
     const remaining = allKeys.filter((k) => !assigned.has(k));
     if (remaining.length > 0) {
-        result.push({ moduleKey: 'other', label: 'Other', icon: Bell, keys: remaining });
+        result.push({ moduleKey: 'other', label: 'Other', icon: Bell, colour: 'slate', keys: remaining });
     }
 
     return result;
@@ -133,8 +145,18 @@ export default function NotificationPreferences({
     });
 
     const [doNotDisturb, setDoNotDisturb] = useState(false);
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     const enabledCount = (keys: string[]) => keys.filter((k) => Boolean((data.prefs as any)[k])).length;
+
+    const handleSave = () => {
+        put('/settings/notifications', {
+            onSuccess: () => {
+                setSaveSuccess(true);
+                setTimeout(() => setSaveSuccess(false), 3000);
+            },
+        });
+    };
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -153,6 +175,24 @@ export default function NotificationPreferences({
                             </Button>
                         )}
                     </div>
+
+                    {/* Description Card */}
+                    <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-900 dark:bg-blue-950/20">
+                        <CardContent className="flex items-start gap-3 p-4">
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/40">
+                                <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                            </div>
+                            <div>
+                                <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                                    Configure which notifications you receive
+                                </p>
+                                <p className="mt-0.5 text-xs text-blue-700/80 dark:text-blue-300/70">
+                                    Notifications marked as critical (incidents, emergencies) cannot be disabled to ensure safety compliance.
+                                    Use the toggles below to customise your notification preferences per module.
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
 
                     {/* Do Not Disturb */}
                     <Card>
@@ -199,7 +239,10 @@ export default function NotificationPreferences({
                             size="sm"
                             onClick={() => {
                                 const next: Record<string, boolean> = {};
-                                allKeys.forEach((k) => (next[k] = false));
+                                allKeys.forEach((k) => {
+                                    // Critical keys stay enabled
+                                    next[k] = CRITICAL_KEYS.has(k) ? true : false;
+                                });
                                 setData('prefs', next);
                             }}
                         >
@@ -208,7 +251,7 @@ export default function NotificationPreferences({
                     </div>
 
                     {/* Module Groups */}
-                    {modules.map((mod) => {
+                    {modules.map((mod, modIdx) => {
                         const Icon = mod.icon;
                         const enabled = enabledCount(mod.keys);
                         const isOpen = openModules[mod.moduleKey] ?? true;
@@ -253,18 +296,53 @@ export default function NotificationPreferences({
                                         </CardHeader>
                                     </CollapsibleTrigger>
                                     <CollapsibleContent>
-                                        <CardContent className="space-y-1 pt-0">
-                                            {mod.keys.map((key) => {
+                                        <CardContent className="pt-0">
+                                            {/* Channel header row */}
+                                            <div className="mb-2 flex items-center gap-4 border-b pb-2">
+                                                <div className="min-w-0 flex-1">
+                                                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notification</span>
+                                                </div>
+                                                <div className="flex shrink-0 items-center gap-6">
+                                                    <div className="flex w-14 flex-col items-center gap-0.5">
+                                                        <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
+                                                        <span className="text-[10px] font-medium text-muted-foreground">In-App</span>
+                                                    </div>
+                                                    <div className="flex w-14 flex-col items-center gap-0.5">
+                                                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                                                        <span className="text-[10px] font-medium text-muted-foreground">Email</span>
+                                                    </div>
+                                                    <div className="flex w-14 flex-col items-center gap-0.5">
+                                                        <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
+                                                        <span className="text-[10px] font-medium text-muted-foreground">Push</span>
+                                                    </div>
+                                                    <div className="w-12">
+                                                        <span className="text-[10px] font-medium text-muted-foreground">Enable</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {mod.keys.map((key, idx) => {
                                                 const checked = Boolean((data.prefs as any)[key]);
                                                 const roleDefault = roleDefaults[key];
+                                                const isCritical = CRITICAL_KEYS.has(key);
+
                                                 return (
                                                     <div
                                                         key={key}
-                                                        className="flex items-center justify-between gap-4 rounded-lg px-3 py-3 transition-colors hover:bg-muted/50"
+                                                        className={`flex items-center gap-4 rounded-lg px-3 py-3 transition-colors hover:bg-muted/50 ${
+                                                            idx < mod.keys.length - 1 ? 'border-b border-border/40' : ''
+                                                        }`}
                                                     >
                                                         <div className="min-w-0 flex-1">
-                                                            <div className="text-sm font-medium">
-                                                                {friendlyName(key)}
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-sm font-medium">
+                                                                    {friendlyName(key)}
+                                                                </span>
+                                                                {isCritical && (
+                                                                    <Badge className="bg-red-100 text-red-700 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 text-[10px] px-1.5 py-0">
+                                                                        <ShieldAlert className="mr-0.5 h-3 w-3" />
+                                                                        Critical
+                                                                    </Badge>
+                                                                )}
                                                             </div>
                                                             {friendlyDescription(key) && (
                                                                 <div className="text-xs text-muted-foreground">
@@ -277,15 +355,41 @@ export default function NotificationPreferences({
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <Switch
-                                                            checked={checked}
-                                                            onCheckedChange={(v) =>
-                                                                setData('prefs', {
-                                                                    ...(data.prefs as any),
-                                                                    [key]: Boolean(v),
-                                                                })
-                                                            }
-                                                        />
+                                                        <div className="flex shrink-0 items-center gap-6">
+                                                            {/* In-App: always on */}
+                                                            <div className="flex w-14 justify-center">
+                                                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                                                                    <Check className="h-3.5 w-3.5 text-slate-500" />
+                                                                </div>
+                                                            </div>
+                                                            {/* Email: placeholder */}
+                                                            <div className="flex w-14 justify-center">
+                                                                <button
+                                                                    type="button"
+                                                                    className="text-[10px] font-medium text-violet-600 hover:underline dark:text-violet-400"
+                                                                    onClick={() => {/* Future: configure email */}}
+                                                                >
+                                                                    Configure
+                                                                </button>
+                                                            </div>
+                                                            {/* Push: coming soon */}
+                                                            <div className="flex w-14 justify-center">
+                                                                <span className="text-[10px] text-muted-foreground/60">Soon</span>
+                                                            </div>
+                                                            {/* Main toggle */}
+                                                            <div className="w-12 flex justify-center">
+                                                                <Switch
+                                                                    checked={isCritical ? true : checked}
+                                                                    disabled={isCritical}
+                                                                    onCheckedChange={(v) =>
+                                                                        setData('prefs', {
+                                                                            ...(data.prefs as any),
+                                                                            [key]: Boolean(v),
+                                                                        })
+                                                                    }
+                                                                />
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 );
                                             })}
@@ -297,13 +401,19 @@ export default function NotificationPreferences({
                     })}
 
                     {/* Save */}
-                    <div className="flex justify-end">
+                    <div className="flex items-center justify-end gap-3">
+                        {saveSuccess && (
+                            <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                                <CheckCircle2 className="h-4 w-4" />
+                                Preferences saved successfully
+                            </div>
+                        )}
                         <Button
                             disabled={processing}
-                            onClick={() => put('/settings/notifications')}
+                            onClick={handleSave}
                             className="bg-violet-600 hover:bg-violet-700"
                         >
-                            Save Preferences
+                            {processing ? 'Saving...' : 'Save Preferences'}
                         </Button>
                     </div>
                 </div>

@@ -16,7 +16,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Link, usePage, router } from '@inertiajs/react';
 import {
+    ArrowRight,
     Bell,
+    BellOff,
     Building2,
     ClipboardList,
     Megaphone,
@@ -53,21 +55,18 @@ type InboxPayload = {
     };
 };
 
-function Badge({ count }: { count: number }) {
+function UnreadBadge({ count }: { count: number }) {
     if (!count) return null;
     return (
-        <span className="absolute -right-1 -top-1 inline-flex min-w-4 items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-semibold leading-4 text-white">
+        <span className="absolute -right-1 -top-1 inline-flex min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold leading-[18px] text-white shadow-sm">
             {count > 99 ? '99+' : count}
         </span>
     );
 }
 
 function notificationTitle(n: { type: string; data: any }) {
-    // Prefer explicit titles
     const t = n?.data?.title || n?.data?.subject;
     if (typeof t === 'string' && t.trim() !== '') return t;
-
-    // Fall back to the notification class name
     const parts = String(n.type ?? '').split('\\');
     return parts[parts.length - 1] || 'Notification';
 }
@@ -99,6 +98,22 @@ function getModuleDotClass(module?: string): string {
     return MODULE_DOT_COLOURS[key] ?? MODULE_DOT_COLOURS.system;
 }
 
+function relativeTime(dateStr: string | null): string {
+    if (!dateStr) return '';
+    const now = Date.now();
+    const then = new Date(dateStr).getTime();
+    const diff = now - then;
+    const seconds = Math.floor(diff / 1000);
+    if (seconds < 60) return 'now';
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d`;
+    return new Date(dateStr).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
 function isToday(dateStr: string | null): boolean {
     if (!dateStr) return false;
     const d = new Date(dateStr);
@@ -126,7 +141,6 @@ export default function InboxMenus() {
     const mustAckBeforeClose = !!openNotification?.data?.must_ack_before_close && !!openNotification?.data?.ack_required && !openNotification?.acknowledged_at;
 
     const reloadInbox = () => {
-        // Refresh just the inbox payload so counts / read state update immediately.
         router.reload({ only: ['inbox'] });
     };
 
@@ -157,16 +171,16 @@ export default function InboxMenus() {
                         aria-label="Notifications"
                     >
                         <Bell className="h-5 w-5" />
-                        <Badge count={unreadNotifications} />
+                        <UnreadBadge count={unreadNotifications} />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-96">
-                    <div className="flex items-center justify-between">
-                        <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                    <div className="flex items-center justify-between px-1">
+                        <DropdownMenuLabel className="text-sm font-semibold">Notifications</DropdownMenuLabel>
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 px-2 text-xs"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                             disabled={!unreadNotifications}
                             onClick={() =>
                                 router.post(
@@ -181,100 +195,82 @@ export default function InboxMenus() {
                     </div>
                     <DropdownMenuSeparator />
 
-                    {inbox.notifications.items.length === 0 && (
-                        <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                            No notifications yet.
+                    {inbox.notifications.items.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center px-4 py-10">
+                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
+                                <BellOff className="h-7 w-7 text-muted-foreground/50" />
+                            </div>
+                            <p className="text-sm font-medium text-muted-foreground">No notifications yet</p>
+                            <p className="mt-1 text-xs text-muted-foreground/70">You're all caught up</p>
                         </div>
-                    )}
+                    ) : (
+                        (() => {
+                            const visible = inbox.notifications.items.slice(0, 10);
+                            const todayItems = visible.filter((n) => isToday(n.created_at));
+                            const earlierItems = visible.filter((n) => !isToday(n.created_at));
 
-                    {(() => {
-                        const visible = inbox.notifications.items.slice(0, 10);
-                        const todayItems = visible.filter((n) => isToday(n.created_at));
-                        const earlierItems = visible.filter((n) => !isToday(n.created_at));
-
-                        const renderItem = (n: (typeof visible)[0]) => {
-                            const title = notificationTitle(n);
-                            const body = notificationBody(n);
-                            const isUnread = !n.read_at;
-                            const dotClass = getModuleDotClass(n.data?.module);
-                            return (
-                                <DropdownMenuItem
-                                    key={n.id}
-                                    className="flex cursor-pointer flex-col items-start gap-1 whitespace-normal"
-                                    onSelect={(e) => {
-                                        e.preventDefault();
-                                    }}
-                                >
-                                    <div className="flex w-full items-center justify-between gap-2">
-                                        <div className="flex items-center gap-2">
+                            const renderItem = (n: (typeof visible)[0]) => {
+                                const title = notificationTitle(n);
+                                const isUnread = !n.read_at;
+                                const dotClass = getModuleDotClass(n.data?.module);
+                                return (
+                                    <DropdownMenuItem
+                                        key={n.id}
+                                        className="cursor-pointer rounded-md px-3 py-2.5 focus:bg-accent"
+                                        onSelect={(e) => {
+                                            e.preventDefault();
+                                            setOpenAnnouncementId(null);
+                                            setOpenNotifId(n.id);
+                                            if (isUnread) markNotificationRead(n.id);
+                                        }}
+                                    >
+                                        <div className="flex w-full items-center gap-2.5">
                                             <span className={`inline-block h-2 w-2 shrink-0 rounded-full ${dotClass}`} />
-                                            <span className={isUnread ? 'font-semibold' : 'font-medium'}>
+                                            <span className={`min-w-0 flex-1 truncate text-sm ${isUnread ? 'font-semibold text-foreground' : 'font-normal text-muted-foreground'}`}>
                                                 {title}
                                             </span>
-                                        </div>
-                                        {isUnread && (
-                                            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                                New
+                                            <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
+                                                {relativeTime(n.created_at)}
                                             </span>
-                                        )}
-                                    </div>
-                                    {body && (
-                                        <span className="line-clamp-2 pl-4 text-xs text-muted-foreground">
-                                            {body}
-                                        </span>
+                                            {isUnread && (
+                                                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-violet-500" />
+                                            )}
+                                        </div>
+                                    </DropdownMenuItem>
+                                );
+                            };
+
+                            return (
+                                <div className="max-h-[400px] overflow-y-auto">
+                                    {todayItems.length > 0 && (
+                                        <>
+                                            <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">Today</div>
+                                            {todayItems.map(renderItem)}
+                                        </>
                                     )}
-
-                                    <div className="mt-1 flex w-full justify-end">
-                                        <Button
-                                            type="button"
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-7 px-2 text-xs"
-                                            onClick={() => {
-                                                setOpenAnnouncementId(null);
-                                                setOpenNotifId(n.id);
-                                                if (isUnread) markNotificationRead(n.id);
-                                            }}
-                                        >
-                                            View
-                                        </Button>
-                                    </div>
-                                </DropdownMenuItem>
+                                    {earlierItems.length > 0 && (
+                                        <>
+                                            {todayItems.length > 0 && <DropdownMenuSeparator className="my-1" />}
+                                            <div className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground/60">Earlier</div>
+                                            {earlierItems.map(renderItem)}
+                                        </>
+                                    )}
+                                </div>
                             );
-                        };
-
-                        return (
-                            <>
-                                {todayItems.length > 0 && (
-                                    <>
-                                        <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">Today</div>
-                                        {todayItems.map(renderItem)}
-                                    </>
-                                )}
-                                {earlierItems.length > 0 && (
-                                    <>
-                                        {todayItems.length > 0 && <DropdownMenuSeparator />}
-                                        <div className="px-2 py-1 text-[11px] font-semibold text-muted-foreground">Earlier</div>
-                                        {earlierItems.map(renderItem)}
-                                    </>
-                                )}
-                            </>
-                        );
-                    })()}
-
-                    {inbox.notifications.items.length > 0 && (
-                        <>
-                            <DropdownMenuSeparator />
-                            <div className="p-1">
-                                <Link
-                                    href="/notifications"
-                                    className="flex w-full items-center justify-center rounded-sm px-2 py-1.5 text-sm font-medium text-violet-600 hover:bg-accent hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
-                                >
-                                    View All Notifications
-                                </Link>
-                            </div>
-                        </>
+                        })()
                     )}
+
+                    {/* Always show View All link at the bottom */}
+                    <DropdownMenuSeparator />
+                    <div className="p-1.5">
+                        <Link
+                            href="/notifications"
+                            className="flex w-full items-center justify-center gap-1.5 rounded-md px-2 py-2 text-sm font-medium text-violet-600 transition-colors hover:bg-violet-50 dark:text-violet-400 dark:hover:bg-violet-950/30"
+                        >
+                            View All Notifications
+                            <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                    </div>
                 </DropdownMenuContent>
             </DropdownMenu>
 
@@ -288,16 +284,16 @@ export default function InboxMenus() {
                         aria-label="Announcements"
                     >
                         <Megaphone className="h-5 w-5" />
-                        <Badge count={unreadAnnouncements} />
+                        <UnreadBadge count={unreadAnnouncements} />
                     </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-96">
-                    <div className="flex items-center justify-between">
-                        <DropdownMenuLabel>Announcements</DropdownMenuLabel>
+                    <div className="flex items-center justify-between px-1">
+                        <DropdownMenuLabel className="text-sm font-semibold">Announcements</DropdownMenuLabel>
                         <Button
                             variant="ghost"
                             size="sm"
-                            className="h-8 px-2 text-xs"
+                            className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                             disabled={!unreadAnnouncements}
                             onClick={() =>
                                 router.post(
@@ -312,61 +308,61 @@ export default function InboxMenus() {
                     </div>
                     <DropdownMenuSeparator />
 
-                    {inbox.announcements.items.length === 0 && (
-                        <div className="px-3 py-6 text-center text-sm text-muted-foreground">
-                            No announcements yet.
+                    {inbox.announcements.items.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center px-4 py-10">
+                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-muted/60">
+                                <Megaphone className="h-7 w-7 text-muted-foreground/50" />
+                            </div>
+                            <p className="text-sm font-medium text-muted-foreground">No announcements yet</p>
+                            <p className="mt-1 text-xs text-muted-foreground/70">Check back later</p>
                         </div>
-                    )}
-
-                    {inbox.announcements.items.map((a) => {
-                        const isUnread = !a.read_at;
-                        return (
-                            <DropdownMenuItem
-                                key={a.id}
-                                className="flex cursor-pointer flex-col items-start gap-1 whitespace-normal"
-                                onSelect={(e) => {
-                                    e.preventDefault();
-                                }}
-                            >
-                                <div className="flex w-full items-center justify-between gap-2">
-                                    <span className={isUnread ? 'font-semibold' : 'font-medium'}>
-                                        {a.title}
-                                    </span>
-                                    {isUnread && (
-                                        <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] text-muted-foreground">
-                                            New
-                                        </span>
-                                    )}
-                                </div>
-                                {a.body && (
-                                    <span className="line-clamp-2 text-xs text-muted-foreground">
-                                        {a.body}
-                                    </span>
-                                )}
-                                {a.author && (
-                                    <span className="text-[11px] text-muted-foreground">
-                                        From {a.author.name}
-                                    </span>
-                                )}
-
-                                <div className="mt-1 flex w-full justify-end">
-                                    <Button
-                                        type="button"
-                                        variant="ghost"
-                                        size="sm"
-                                        className="h-7 px-2 text-xs"
-                                        onClick={() => {
+                    ) : (
+                        <div className="max-h-[400px] overflow-y-auto">
+                            {inbox.announcements.items.map((a) => {
+                                const isUnread = !a.read_at;
+                                return (
+                                    <DropdownMenuItem
+                                        key={a.id}
+                                        className="cursor-pointer rounded-md px-3 py-2.5 focus:bg-accent"
+                                        onSelect={(e) => {
+                                            e.preventDefault();
                                             setOpenNotifId(null);
                                             setOpenAnnouncementId(a.id);
                                             if (isUnread) markAnnouncementRead(a.id);
                                         }}
                                     >
-                                        View
-                                    </Button>
-                                </div>
-                            </DropdownMenuItem>
-                        );
-                    })}
+                                        <div className="flex w-full flex-col gap-1">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className={`min-w-0 flex-1 truncate text-sm ${isUnread ? 'font-semibold' : 'font-medium text-muted-foreground'}`}>
+                                                    {a.title}
+                                                </span>
+                                                {isUnread && (
+                                                    <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500" />
+                                                )}
+                                            </div>
+                                            {a.body && (
+                                                <span className="line-clamp-1 text-xs text-muted-foreground/80">
+                                                    {a.body}
+                                                </span>
+                                            )}
+                                            <div className="flex items-center justify-between">
+                                                {a.author && (
+                                                    <span className="text-[11px] text-muted-foreground/60">
+                                                        {a.author.name}
+                                                    </span>
+                                                )}
+                                                {a.created_at && (
+                                                    <span className="text-[11px] tabular-nums text-muted-foreground/60">
+                                                        {relativeTime(a.created_at)}
+                                                    </span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </DropdownMenuItem>
+                                );
+                            })}
+                        </div>
+                    )}
                 </DropdownMenuContent>
             </DropdownMenu>
 

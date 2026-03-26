@@ -11,8 +11,20 @@ import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { AlertTriangle, ChevronDown, Settings2 } from 'lucide-react';
-import { useState } from 'react';
+import {
+    AlertTriangle,
+    ArrowRight,
+    Bell,
+    CheckCircle2,
+    ChevronDown,
+    Clock,
+    Mail,
+    Settings2,
+    Shield,
+    TrendingUp,
+    Zap,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type GroupedEvents = Record<string, string[]>;
 
@@ -66,26 +78,83 @@ function friendlyName(key: string): string {
         .replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function buildPreviewText(r: Rule, availableRoleGroups: Record<string, string>): string {
-    if (!r.enabled) return 'Disabled';
-    const parts: string[] = [];
-    if (r.require_ack) {
-        parts.push(`If not acknowledged within ${r.remind_after_minutes} min`);
-        parts.push(`remind every ${r.repeat_every_minutes} min`);
-        if (r.max_reminders > 0) {
-            parts.push(`max ${r.max_reminders} reminders`);
-        } else {
-            parts.push('unlimited reminders');
+/** Visual escalation timeline component */
+function EscalationTimeline({ rule, availableRoleGroups }: { rule: Rule; availableRoleGroups: Record<string, string> }) {
+    if (!rule.enabled) return null;
+
+    const steps: { icon: typeof Clock; label: string; sublabel?: string; colour: string }[] = [];
+
+    if (rule.require_ack) {
+        // Step 1: Initial wait
+        steps.push({
+            icon: Clock,
+            label: `${rule.remind_after_minutes} min`,
+            sublabel: 'First reminder',
+            colour: 'text-blue-600 bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+        });
+
+        // Step 2: Repeat reminders
+        if (rule.repeat_every_minutes > 0) {
+            const maxLabel = rule.max_reminders > 0 ? `${rule.max_reminders}x max` : 'unlimited';
+            steps.push({
+                icon: Mail,
+                label: `Every ${rule.repeat_every_minutes} min`,
+                sublabel: `Remind (${maxLabel})`,
+                colour: 'text-amber-600 bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+            });
         }
     }
-    const groups = (r.escalate_to_role_groups || [])
-        .map((g) => availableRoleGroups[g] || g)
-        .join(', ');
-    if (groups) {
-        parts.push(`escalate to ${groups}`);
+
+    // Step 3: Escalation groups
+    const groups = (rule.escalate_to_role_groups || [])
+        .map((g) => availableRoleGroups[g] || g);
+    if (groups.length > 0) {
+        steps.push({
+            icon: TrendingUp,
+            label: 'Escalate',
+            sublabel: groups.join(', '),
+            colour: 'text-red-600 bg-red-100 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
+        });
     }
-    if (parts.length === 0) return 'Enabled with default settings';
-    return parts.join(' \u2192 ');
+
+    if (steps.length === 0) {
+        return (
+            <div className="rounded-lg border border-dashed border-muted-foreground/30 px-4 py-3 text-sm text-muted-foreground">
+                Enabled with default settings. Configure acknowledgement or escalation groups below.
+            </div>
+        );
+    }
+
+    return (
+        <div className="rounded-lg border bg-muted/20 p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Escalation Flow</div>
+            <div className="flex flex-wrap items-center gap-1">
+                {steps.map((step, i) => {
+                    const StepIcon = step.icon;
+                    return (
+                        <div key={i} className="flex items-center gap-1">
+                            {i > 0 && (
+                                <div className="flex items-center px-1">
+                                    <div className="h-px w-4 bg-border" />
+                                    <ArrowRight className="h-3 w-3 text-muted-foreground/50" />
+                                    <div className="h-px w-4 bg-border" />
+                                </div>
+                            )}
+                            <div className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${step.colour}`}>
+                                <StepIcon className="h-4 w-4 shrink-0" />
+                                <div className="min-w-0">
+                                    <div className="text-xs font-semibold">{step.label}</div>
+                                    {step.sublabel && (
+                                        <div className="text-[11px] opacity-80">{step.sublabel}</div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
 }
 
 export default function NotificationEscalations({
@@ -99,6 +168,7 @@ export default function NotificationEscalations({
 
     const [tierErrors, setTierErrors] = useState<Record<string, string>>({});
     const [advancedOpen, setAdvancedOpen] = useState<Record<string, boolean>>({});
+    const [saveSuccess, setSaveSuccess] = useState(false);
 
     const setRule = (key: string, patch: Partial<Rule>) => {
         form.setData('rules', {
@@ -121,6 +191,20 @@ export default function NotificationEscalations({
 
     const allKeys = Object.values(groups).flat();
 
+    // Compute stats
+    const totalRules = allKeys.length;
+    const activeRules = useMemo(() => allKeys.filter((k) => form.data.rules[k]?.enabled).length, [allKeys, form.data.rules]);
+    const ackRequired = useMemo(() => allKeys.filter((k) => form.data.rules[k]?.enabled && form.data.rules[k]?.require_ack).length, [allKeys, form.data.rules]);
+
+    // Sort: enabled first, disabled at bottom
+    const sortedKeys = useMemo(() => {
+        return [...allKeys].sort((a, b) => {
+            const aEnabled = form.data.rules[a]?.enabled ? 1 : 0;
+            const bEnabled = form.data.rules[b]?.enabled ? 1 : 0;
+            return bEnabled - aEnabled;
+        });
+    }, [allKeys, form.data.rules]);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Escalation Rules" />
@@ -129,7 +213,12 @@ export default function NotificationEscalations({
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
-                        form.put('/settings/notifications/escalations');
+                        form.put('/settings/notifications/escalations', {
+                            onSuccess: () => {
+                                setSaveSuccess(true);
+                                setTimeout(() => setSaveSuccess(false), 3000);
+                            },
+                        });
                     }}
                     className="space-y-6"
                 >
@@ -139,8 +228,45 @@ export default function NotificationEscalations({
                         description="Configure automatic reminders and escalation chains for operational notifications"
                     />
 
-                    {/* Event Cards */}
-                    {allKeys.map((k) => {
+                    {/* Stats Row */}
+                    <div className="grid grid-cols-3 gap-3">
+                        <Card className="border-indigo-200 dark:border-indigo-800">
+                            <CardContent className="flex items-center gap-3 p-4">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                                    <Shield className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
+                                </div>
+                                <div>
+                                    <p className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{totalRules}</p>
+                                    <p className="text-xs text-muted-foreground">Total Rules</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-emerald-200 dark:border-emerald-800">
+                            <CardContent className="flex items-center gap-3 p-4">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                                    <Zap className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                                </div>
+                                <div>
+                                    <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">{activeRules}</p>
+                                    <p className="text-xs text-muted-foreground">Active Rules</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-amber-200 dark:border-amber-800">
+                            <CardContent className="flex items-center gap-3 p-4">
+                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                                    <Bell className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <div>
+                                    <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{ackRequired}</p>
+                                    <p className="text-xs text-muted-foreground">Require Ack</p>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Event Cards - sorted: active first */}
+                    {sortedKeys.map((k) => {
                         const r = form.data.rules[k];
                         if (!r) return null;
 
@@ -150,7 +276,7 @@ export default function NotificationEscalations({
                         return (
                             <Card
                                 key={k}
-                                className={!isEnabled ? 'opacity-60' : ''}
+                                className={`transition-opacity ${!isEnabled ? 'opacity-50' : ''}`}
                             >
                                 <CardHeader>
                                     <div className="flex items-center justify-between gap-4">
@@ -159,9 +285,20 @@ export default function NotificationEscalations({
                                                 <AlertTriangle className={`h-4 w-4 ${isEnabled ? 'text-violet-600 dark:text-violet-400' : 'text-muted-foreground'}`} />
                                             </div>
                                             <div>
-                                                <CardTitle className="text-base">
-                                                    {friendlyName(k)}
-                                                </CardTitle>
+                                                <div className="flex items-center gap-2">
+                                                    <CardTitle className="text-base">
+                                                        {friendlyName(k)}
+                                                    </CardTitle>
+                                                    {isEnabled ? (
+                                                        <Badge className="bg-emerald-100 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-900/30 dark:text-emerald-400 text-[10px]">
+                                                            Active
+                                                        </Badge>
+                                                    ) : (
+                                                        <Badge variant="secondary" className="text-[10px]">
+                                                            Disabled
+                                                        </Badge>
+                                                    )}
+                                                </div>
                                                 <CardDescription className="text-xs">
                                                     {k}
                                                 </CardDescription>
@@ -176,15 +313,8 @@ export default function NotificationEscalations({
 
                                 {isEnabled ? (
                                     <CardContent className="space-y-4 pt-0">
-                                        {/* Escalation Preview */}
-                                        <div className="rounded-lg border border-violet-200 bg-violet-50 px-4 py-3 dark:border-violet-800 dark:bg-violet-950/30">
-                                            <div className="text-xs font-medium text-violet-700 dark:text-violet-300">
-                                                Escalation Flow
-                                            </div>
-                                            <div className="mt-1 text-sm text-violet-600 dark:text-violet-400">
-                                                {buildPreviewText(r, availableRoleGroups)}
-                                            </div>
-                                        </div>
+                                        {/* Visual Escalation Timeline */}
+                                        <EscalationTimeline rule={r} availableRoleGroups={availableRoleGroups} />
 
                                         {/* Advanced Settings */}
                                         <Collapsible
@@ -354,13 +484,19 @@ export default function NotificationEscalations({
                     )}
 
                     {/* Save */}
-                    <div className="flex justify-end">
+                    <div className="flex items-center justify-end gap-3">
+                        {saveSuccess && (
+                            <div className="flex items-center gap-1.5 text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                                <CheckCircle2 className="h-4 w-4" />
+                                Escalation rules saved
+                            </div>
+                        )}
                         <Button
                             type="submit"
                             disabled={form.processing}
                             className="bg-violet-600 hover:bg-violet-700"
                         >
-                            Save Escalation Rules
+                            {form.processing ? 'Saving...' : 'Save Escalation Rules'}
                         </Button>
                     </div>
                 </form>

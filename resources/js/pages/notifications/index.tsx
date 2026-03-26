@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 import {
     Select,
     SelectContent,
@@ -7,23 +8,30 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
+    ArrowRight,
     Bell,
     BellOff,
+    BellRing,
     Building2,
     CheckCircle2,
     ClipboardList,
     ExternalLink,
+    Filter,
+    Inbox,
     Megaphone,
+    Search,
+    Settings,
     ShieldAlert,
     TriangleAlert,
     Users,
     Wrench,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -75,13 +83,13 @@ interface Props {
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const MODULE_COLOURS: Record<string, { border: string; bg: string; text: string; icon: typeof Bell }> = {
-    operations: { border: 'border-l-violet-500', bg: 'bg-violet-100 dark:bg-violet-900/30', text: 'text-violet-700 dark:text-violet-300', icon: ClipboardList },
-    hr: { border: 'border-l-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', icon: Users },
-    governance: { border: 'border-l-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300', icon: ShieldAlert },
-    sites: { border: 'border-l-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300', icon: Building2 },
-    incidents: { border: 'border-l-red-500', bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', icon: TriangleAlert },
-    system: { border: 'border-l-slate-500', bg: 'bg-slate-100 dark:bg-slate-900/30', text: 'text-slate-700 dark:text-slate-300', icon: Wrench },
+const MODULE_COLOURS: Record<string, { border: string; bg: string; text: string; icon: typeof Bell; dot: string }> = {
+    operations: { border: 'border-l-violet-500', bg: 'bg-violet-100 dark:bg-violet-900/30', text: 'text-violet-700 dark:text-violet-300', icon: ClipboardList, dot: 'bg-violet-500' },
+    hr: { border: 'border-l-blue-500', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300', icon: Users, dot: 'bg-blue-500' },
+    governance: { border: 'border-l-emerald-500', bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300', icon: ShieldAlert, dot: 'bg-emerald-500' },
+    sites: { border: 'border-l-amber-500', bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300', icon: Building2, dot: 'bg-amber-500' },
+    incidents: { border: 'border-l-red-500', bg: 'bg-red-100 dark:bg-red-900/30', text: 'text-red-700 dark:text-red-300', icon: TriangleAlert, dot: 'bg-red-500' },
+    system: { border: 'border-l-slate-500', bg: 'bg-slate-100 dark:bg-slate-900/30', text: 'text-slate-700 dark:text-slate-300', icon: Wrench, dot: 'bg-slate-500' },
 };
 
 function getModuleStyle(module?: string) {
@@ -138,6 +146,35 @@ export default function NotificationsIndex({
     const unread = unread_count ?? 0;
 
     const [expandedAnnouncement, setExpandedAnnouncement] = useState<number | null>(null);
+    const [searchText, setSearchText] = useState('');
+    const [doNotDisturb, setDoNotDisturb] = useState(false);
+
+    // Derive stats
+    const acknowledged = useMemo(() => notifData.filter((n) => n.acknowledged_at).length, [notifData]);
+    const requiresAction = useMemo(() => notifData.filter((n) => !!n.data?.ack_required && !n.acknowledged_at).length, [notifData]);
+
+    // Module counts for sidebar
+    const moduleCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        Object.keys(MODULE_COLOURS).forEach((m) => (counts[m] = 0));
+        notifData.forEach((n) => {
+            const mod = (n.data?.module ?? 'system').toLowerCase();
+            counts[mod] = (counts[mod] ?? 0) + 1;
+        });
+        return counts;
+    }, [notifData]);
+
+    // Filter by search text client-side
+    const filteredNotifData = useMemo(() => {
+        if (!searchText.trim()) return notifData;
+        const q = searchText.toLowerCase();
+        return notifData.filter((n) => {
+            const title = notificationTitle(n).toLowerCase();
+            const body = (notificationBody(n) ?? '').toLowerCase();
+            const mod = (n.data?.module ?? '').toLowerCase();
+            return title.includes(q) || body.includes(q) || mod.includes(q);
+        });
+    }, [notifData, searchText]);
 
     const markRead = (id: string) => {
         router.post(`/inbox/notifications/${id}/read`, {}, { preserveScroll: true });
@@ -157,13 +194,13 @@ export default function NotificationsIndex({
             type: currentType,
             [key]: value,
         };
-        // Remove default values
         if (params.filter === 'all') delete params.filter;
         if (params.type === 'all') delete params.type;
         router.get('/notifications', params, { preserveState: true, preserveScroll: true });
     };
 
     const clearFilters = () => {
+        setSearchText('');
         router.get('/notifications', {}, { preserveState: true, preserveScroll: true });
     };
 
@@ -173,16 +210,17 @@ export default function NotificationsIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Notification Centre" />
 
-            <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-6 lg:px-8">
+            <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
                 {/* Header */}
                 <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold tracking-tight">Notification Centre</h1>
-                        {unread > 0 && (
-                            <Badge variant="secondary" className="bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
-                                {unread} unread
-                            </Badge>
-                        )}
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-100 dark:bg-indigo-900/30">
+                            <Bell className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight">Notification Centre</h1>
+                            <p className="text-sm text-muted-foreground">Stay on top of what matters</p>
+                        </div>
                     </div>
                     <Button
                         variant="default"
@@ -196,263 +234,414 @@ export default function NotificationsIndex({
                     </Button>
                 </div>
 
-                <TabsRoot defaultValue="notifications">
-                    <TabsList>
-                        <TabsTrigger value="notifications">
-                            <Bell className="mr-1.5 h-4 w-4" />
-                            Notifications
-                            {totalNotifs > 0 && (
-                                <Badge variant="secondary" className="ml-2 text-xs">
-                                    {totalNotifs}
-                                </Badge>
-                            )}
-                        </TabsTrigger>
-                        <TabsTrigger value="announcements">
-                            <Megaphone className="mr-1.5 h-4 w-4" />
-                            Announcements
-                            {announcementList.length > 0 && (
-                                <Badge variant="secondary" className="ml-2 text-xs">
-                                    {announcementList.length}
-                                </Badge>
-                            )}
-                        </TabsTrigger>
-                    </TabsList>
-
-                    {/* ========== NOTIFICATIONS TAB ========== */}
-                    <TabsContent value="notifications" className="mt-6">
-                        {/* Filter bar */}
-                        <div className="mb-4 flex flex-wrap items-center gap-3">
-                            <Select value={currentFilter} onValueChange={(v) => applyFilter('filter', v)}>
-                                <SelectTrigger className="w-36">
-                                    <SelectValue placeholder="Read status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All</SelectItem>
-                                    <SelectItem value="unread">Unread</SelectItem>
-                                    <SelectItem value="read">Read</SelectItem>
-                                </SelectContent>
-                            </Select>
-
-                            <Select value={currentType} onValueChange={(v) => applyFilter('type', v)}>
-                                <SelectTrigger className="w-40">
-                                    <SelectValue placeholder="Type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All</SelectItem>
-                                    <SelectItem value="operations">Operations</SelectItem>
-                                    <SelectItem value="hr">HR</SelectItem>
-                                    <SelectItem value="governance">Governance</SelectItem>
-                                    <SelectItem value="sites">Sites</SelectItem>
-                                    <SelectItem value="incidents">Incidents</SelectItem>
-                                    <SelectItem value="system">System</SelectItem>
-                                </SelectContent>
-                            </Select>
-
-                            {hasActiveFilters && (
-                                <button
-                                    type="button"
-                                    onClick={clearFilters}
-                                    className="text-sm text-muted-foreground underline underline-offset-2 hover:text-foreground"
-                                >
-                                    Clear filters
-                                </button>
-                            )}
-                        </div>
-
-                        {/* Notification cards */}
-                        {notifData.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16">
-                                <BellOff className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                                <p className="text-lg font-medium text-muted-foreground">No notifications</p>
-                                <p className="mt-1 text-sm text-muted-foreground/70">You're all caught up!</p>
+                {/* Stats Row */}
+                <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <Card className="border-indigo-200 dark:border-indigo-800">
+                        <CardContent className="flex items-center gap-3 p-4">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/30">
+                                <Inbox className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                             </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {notifData.map((n) => {
-                                    const isUnread = !n.read_at;
-                                    const module = getModuleStyle(n.data?.module);
-                                    const Icon = module.icon;
-                                    const title = notificationTitle(n);
-                                    const body = notificationBody(n);
-                                    const url = n.data?.url || n.data?.action_url;
-                                    const needsAck = !!n.data?.ack_required && !n.acknowledged_at;
+                            <div>
+                                <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">{totalNotifs}</p>
+                                <p className="text-xs font-medium text-muted-foreground">Total</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-violet-200 dark:border-violet-800">
+                        <CardContent className="flex items-center gap-3 p-4">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/30">
+                                <BellRing className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">{unread}</p>
+                                <p className="text-xs font-medium text-muted-foreground">Unread</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-emerald-200 dark:border-emerald-800">
+                        <CardContent className="flex items-center gap-3 p-4">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-900/30">
+                                <CheckCircle2 className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">{acknowledged}</p>
+                                <p className="text-xs font-medium text-muted-foreground">Acknowledged</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-amber-200 dark:border-amber-800">
+                        <CardContent className="flex items-center gap-3 p-4">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-900/30">
+                                <TriangleAlert className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                            </div>
+                            <div>
+                                <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{requiresAction}</p>
+                                <p className="text-xs font-medium text-muted-foreground">Requires Action</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
 
-                                    return (
-                                        <div
-                                            key={n.id}
-                                            role="button"
-                                            tabIndex={0}
-                                            className={`flex items-start gap-3 rounded-lg border-l-4 p-4 transition-colors hover:bg-accent/50 ${
-                                                isUnread
-                                                    ? `bg-white dark:bg-card ${module.border}`
-                                                    : `bg-muted/40 ${module.border} opacity-80`
-                                            }`}
-                                            onClick={() => {
-                                                if (isUnread) markRead(n.id);
-                                            }}
-                                            onKeyDown={(e) => {
-                                                if (e.key === 'Enter' && isUnread) markRead(n.id);
-                                            }}
-                                        >
-                                            {/* Icon */}
-                                            <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${module.bg}`}>
-                                                <Icon className={`h-4 w-4 ${module.text}`} />
-                                            </div>
+                {/* Main layout: content + sidebar */}
+                <div className="flex gap-6">
+                    {/* Main content area */}
+                    <div className="min-w-0 flex-1">
+                        <TabsRoot defaultValue="notifications">
+                            <TabsList>
+                                <TabsTrigger value="notifications">
+                                    <Bell className="mr-1.5 h-4 w-4" />
+                                    Notifications
+                                    {totalNotifs > 0 && (
+                                        <Badge variant="secondary" className="ml-2 bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300 text-xs">
+                                            {totalNotifs}
+                                        </Badge>
+                                    )}
+                                </TabsTrigger>
+                                <TabsTrigger value="announcements">
+                                    <Megaphone className="mr-1.5 h-4 w-4" />
+                                    Announcements
+                                    {announcementList.length > 0 && (
+                                        <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 text-xs">
+                                            {announcementList.length}
+                                        </Badge>
+                                    )}
+                                </TabsTrigger>
+                            </TabsList>
 
-                                            {/* Content */}
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-start justify-between gap-2">
-                                                    <div className="min-w-0 flex-1">
-                                                        <p className={`text-sm ${isUnread ? 'font-semibold' : 'font-normal text-muted-foreground'}`}>
-                                                            {title}
-                                                        </p>
-                                                        {body && (
-                                                            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
-                                                                {body}
-                                                            </p>
-                                                        )}
-                                                        <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                                                            <Badge variant="outline" className={`text-[10px] ${module.text}`}>
-                                                                {(n.data?.module ?? 'system').charAt(0).toUpperCase() + (n.data?.module ?? 'system').slice(1)}
-                                                            </Badge>
-                                                            {needsAck && (
-                                                                <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-                                                                    Acknowledge Required
-                                                                </Badge>
-                                                            )}
-                                                        </div>
-                                                    </div>
-
-                                                    {/* Right side */}
-                                                    <div className="flex shrink-0 flex-col items-end gap-1.5">
-                                                        <span className="text-xs text-muted-foreground">
-                                                            {relativeTime(n.created_at)}
-                                                        </span>
-                                                        <div className="flex items-center gap-1.5">
-                                                            {needsAck && (
-                                                                <Button
-                                                                    variant="outline"
-                                                                    size="sm"
-                                                                    className="h-7 border-amber-300 px-2 text-xs text-amber-700 hover:bg-amber-50"
-                                                                    onClick={(e) => {
-                                                                        e.stopPropagation();
-                                                                        acknowledge(n.id);
-                                                                    }}
-                                                                >
-                                                                    Acknowledge
-                                                                </Button>
-                                                            )}
-                                                            {url && (
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="h-7 px-2 text-xs"
-                                                                    asChild
-                                                                    onClick={(e) => e.stopPropagation()}
-                                                                >
-                                                                    <Link href={url}>
-                                                                        View
-                                                                        <ExternalLink className="ml-1 h-3 w-3" />
-                                                                    </Link>
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
+                            {/* ========== NOTIFICATIONS TAB ========== */}
+                            <TabsContent value="notifications" className="mt-6">
+                                {/* Filter bar */}
+                                <Card className="mb-4">
+                                    <CardContent className="flex flex-wrap items-center gap-3 p-3">
+                                        <div className="flex items-center gap-2">
+                                            <Filter className="h-4 w-4 text-muted-foreground" />
+                                            <span className="text-xs font-medium text-muted-foreground">Filters</span>
                                         </div>
-                                    );
-                                })}
-                            </div>
-                        )}
 
-                        {/* Pagination */}
-                        {lastPage > 1 && (
-                            <div className="mt-6 flex items-center justify-center gap-1">
-                                {notifLinks.map((link, idx) => (
-                                    <Button
-                                        key={idx}
-                                        variant={link.active ? 'default' : 'outline'}
-                                        size="sm"
-                                        disabled={!link.url}
-                                        asChild={!!link.url}
-                                    >
-                                        {link.url ? (
-                                            <Link href={link.url} preserveScroll dangerouslySetInnerHTML={{ __html: link.label }} />
-                                        ) : (
-                                            <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                        <div className="flex items-center gap-1.5">
+                                            <label className="text-xs text-muted-foreground">Status:</label>
+                                            <Select value={currentFilter} onValueChange={(v) => applyFilter('filter', v)}>
+                                                <SelectTrigger className="h-8 w-32 text-xs">
+                                                    <SelectValue placeholder="Read status" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">All</SelectItem>
+                                                    <SelectItem value="unread">Unread</SelectItem>
+                                                    <SelectItem value="read">Read</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="flex items-center gap-1.5">
+                                            <label className="text-xs text-muted-foreground">Module:</label>
+                                            <Select value={currentType} onValueChange={(v) => applyFilter('type', v)}>
+                                                <SelectTrigger className="h-8 w-36 text-xs">
+                                                    <SelectValue placeholder="Type" />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">All Modules</SelectItem>
+                                                    <SelectItem value="operations">Operations</SelectItem>
+                                                    <SelectItem value="hr">HR</SelectItem>
+                                                    <SelectItem value="governance">Governance</SelectItem>
+                                                    <SelectItem value="sites">Sites</SelectItem>
+                                                    <SelectItem value="incidents">Incidents</SelectItem>
+                                                    <SelectItem value="system">System</SelectItem>
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        <div className="relative ml-auto flex-1 sm:max-w-xs">
+                                            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                            <input
+                                                type="text"
+                                                placeholder="Search notifications..."
+                                                value={searchText}
+                                                onChange={(e) => setSearchText(e.target.value)}
+                                                className="h-8 w-full rounded-md border bg-background pl-8 pr-3 text-xs placeholder:text-muted-foreground focus:border-violet-400 focus:ring-1 focus:ring-violet-400 focus:outline-none"
+                                            />
+                                        </div>
+
+                                        {(hasActiveFilters || searchText) && (
+                                            <button
+                                                type="button"
+                                                onClick={clearFilters}
+                                                className="text-xs font-medium text-violet-600 underline underline-offset-2 hover:text-violet-700 dark:text-violet-400"
+                                            >
+                                                Clear all
+                                            </button>
                                         )}
-                                    </Button>
-                                ))}
-                            </div>
-                        )}
-                    </TabsContent>
+                                    </CardContent>
+                                </Card>
 
-                    {/* ========== ANNOUNCEMENTS TAB ========== */}
-                    <TabsContent value="announcements" className="mt-6">
-                        {announcementList.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16">
-                                <Megaphone className="mb-3 h-10 w-10 text-muted-foreground/50" />
-                                <p className="text-lg font-medium text-muted-foreground">No announcements</p>
-                                <p className="mt-1 text-sm text-muted-foreground/70">Check back later for updates.</p>
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {announcementList.map((a) => {
-                                    const isExpanded = expandedAnnouncement === a.id;
-                                    return (
-                                        <div
-                                            key={a.id}
-                                            className="rounded-lg border bg-card p-4"
+                                {/* Notification cards */}
+                                {filteredNotifData.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-20">
+                                        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-violet-100 to-indigo-100 dark:from-violet-900/30 dark:to-indigo-900/30">
+                                            <BellOff className="h-10 w-10 text-violet-400 dark:text-violet-500" />
+                                        </div>
+                                        <h3 className="text-xl font-semibold text-foreground">All caught up!</h3>
+                                        <p className="mt-2 max-w-sm text-center text-sm text-muted-foreground">
+                                            No new notifications. We'll let you know when something needs your attention.
+                                        </p>
+                                        <Link
+                                            href="/settings/notifications"
+                                            className="mt-5 inline-flex items-center gap-1.5 text-sm font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400 dark:hover:text-violet-300"
                                         >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div className="min-w-0 flex-1">
-                                                    <p className="font-semibold">{a.title}</p>
-                                                    {a.body && (
-                                                        <div className="mt-1.5">
-                                                            <p className={`text-sm text-muted-foreground ${isExpanded ? '' : 'line-clamp-2'}`}>
-                                                                {a.body}
-                                                            </p>
-                                                            {a.body.length > 150 && (
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={() => setExpandedAnnouncement(isExpanded ? null : a.id)}
-                                                                    className="mt-1 text-xs text-violet-600 hover:underline dark:text-violet-400"
-                                                                >
-                                                                    {isExpanded ? 'Show less' : 'Read more'}
-                                                                </button>
+                                            Manage notification preferences
+                                            <ArrowRight className="h-4 w-4" />
+                                        </Link>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-2">
+                                        {filteredNotifData.map((n) => {
+                                            const isUnread = !n.read_at;
+                                            const module = getModuleStyle(n.data?.module);
+                                            const Icon = module.icon;
+                                            const title = notificationTitle(n);
+                                            const body = notificationBody(n);
+                                            const url = n.data?.url || n.data?.action_url;
+                                            const needsAck = !!n.data?.ack_required && !n.acknowledged_at;
+
+                                            return (
+                                                <div
+                                                    key={n.id}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    className={`flex items-start gap-3 rounded-lg border-l-4 p-4 transition-colors hover:bg-accent/50 ${
+                                                        isUnread
+                                                            ? `bg-white dark:bg-card ${module.border} shadow-sm`
+                                                            : `bg-muted/40 ${module.border} opacity-80`
+                                                    }`}
+                                                    onClick={() => {
+                                                        if (isUnread) markRead(n.id);
+                                                    }}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter' && isUnread) markRead(n.id);
+                                                    }}
+                                                >
+                                                    {/* Icon */}
+                                                    <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${module.bg}`}>
+                                                        <Icon className={`h-4 w-4 ${module.text}`} />
+                                                    </div>
+
+                                                    {/* Content */}
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="min-w-0 flex-1">
+                                                                <p className={`text-sm ${isUnread ? 'font-semibold' : 'font-normal text-muted-foreground'}`}>
+                                                                    {title}
+                                                                </p>
+                                                                {body && (
+                                                                    <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                                                        {body}
+                                                                    </p>
+                                                                )}
+                                                                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                                                                    <Badge variant="outline" className={`text-[10px] ${module.text}`}>
+                                                                        {(n.data?.module ?? 'system').charAt(0).toUpperCase() + (n.data?.module ?? 'system').slice(1)}
+                                                                    </Badge>
+                                                                    {needsAck && (
+                                                                        <Badge className="bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                                                                            Acknowledge Required
+                                                                        </Badge>
+                                                                    )}
+                                                                    {isUnread && (
+                                                                        <span className="inline-block h-2 w-2 rounded-full bg-violet-500" />
+                                                                    )}
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Right side */}
+                                                            <div className="flex shrink-0 flex-col items-end gap-1.5">
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    {relativeTime(n.created_at)}
+                                                                </span>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    {needsAck && (
+                                                                        <Button
+                                                                            variant="outline"
+                                                                            size="sm"
+                                                                            className="h-7 border-amber-300 px-2 text-xs text-amber-700 hover:bg-amber-50"
+                                                                            onClick={(e) => {
+                                                                                e.stopPropagation();
+                                                                                acknowledge(n.id);
+                                                                            }}
+                                                                        >
+                                                                            Acknowledge
+                                                                        </Button>
+                                                                    )}
+                                                                    {url && (
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="sm"
+                                                                            className="h-7 px-2 text-xs"
+                                                                            asChild
+                                                                            onClick={(e) => e.stopPropagation()}
+                                                                        >
+                                                                            <Link href={url}>
+                                                                                View
+                                                                                <ExternalLink className="ml-1 h-3 w-3" />
+                                                                            </Link>
+                                                                        </Button>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* Pagination */}
+                                {lastPage > 1 && (
+                                    <div className="mt-6 flex items-center justify-center gap-1">
+                                        {notifLinks.map((link, idx) => (
+                                            <Button
+                                                key={idx}
+                                                variant={link.active ? 'default' : 'outline'}
+                                                size="sm"
+                                                disabled={!link.url}
+                                                asChild={!!link.url}
+                                            >
+                                                {link.url ? (
+                                                    <Link href={link.url} preserveScroll dangerouslySetInnerHTML={{ __html: link.label }} />
+                                                ) : (
+                                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                                )}
+                                            </Button>
+                                        ))}
+                                    </div>
+                                )}
+                            </TabsContent>
+
+                            {/* ========== ANNOUNCEMENTS TAB ========== */}
+                            <TabsContent value="announcements" className="mt-6">
+                                {announcementList.length === 0 ? (
+                                    <div className="flex flex-col items-center justify-center rounded-xl border-2 border-dashed border-muted-foreground/20 bg-muted/30 py-20">
+                                        <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-blue-100 to-indigo-100 dark:from-blue-900/30 dark:to-indigo-900/30">
+                                            <Megaphone className="h-10 w-10 text-blue-400 dark:text-blue-500" />
+                                        </div>
+                                        <h3 className="text-xl font-semibold text-foreground">No announcements</h3>
+                                        <p className="mt-2 text-sm text-muted-foreground">Check back later for updates.</p>
+                                    </div>
+                                ) : (
+                                    <div className="space-y-3">
+                                        {announcementList.map((a) => {
+                                            const isExpanded = expandedAnnouncement === a.id;
+                                            return (
+                                                <div
+                                                    key={a.id}
+                                                    className="rounded-lg border bg-card p-4"
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <p className="font-semibold">{a.title}</p>
+                                                            {a.body && (
+                                                                <div className="mt-1.5">
+                                                                    <p className={`text-sm text-muted-foreground ${isExpanded ? '' : 'line-clamp-2'}`}>
+                                                                        {a.body}
+                                                                    </p>
+                                                                    {a.body.length > 150 && (
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => setExpandedAnnouncement(isExpanded ? null : a.id)}
+                                                                            className="mt-1 text-xs text-violet-600 hover:underline dark:text-violet-400"
+                                                                        >
+                                                                            {isExpanded ? 'Show less' : 'Read more'}
+                                                                        </button>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                                                                {a.author_name && <span>By {a.author_name}</span>}
+                                                                {a.starts_at && a.ends_at && (
+                                                                    <span>
+                                                                        {new Date(a.starts_at).toLocaleDateString()} &ndash; {new Date(a.ends_at).toLocaleDateString()}
+                                                                    </span>
+                                                                )}
+                                                                {a.created_at && !a.starts_at && (
+                                                                    <span>{new Date(a.created_at).toLocaleDateString()}</span>
+                                                                )}
+                                                            </div>
+                                                            {Array.isArray(a.roles) && a.roles.length > 0 && (
+                                                                <div className="mt-2 flex flex-wrap gap-1">
+                                                                    {a.roles.map((role) => (
+                                                                        <Badge key={role} variant="outline" className="text-[10px]">
+                                                                            {role}
+                                                                        </Badge>
+                                                                    ))}
+                                                                </div>
                                                             )}
                                                         </div>
-                                                    )}
-                                                    <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                                        {a.author_name && <span>By {a.author_name}</span>}
-                                                        {a.starts_at && a.ends_at && (
-                                                            <span>
-                                                                {new Date(a.starts_at).toLocaleDateString()} &ndash; {new Date(a.ends_at).toLocaleDateString()}
-                                                            </span>
-                                                        )}
-                                                        {a.created_at && !a.starts_at && (
-                                                            <span>{new Date(a.created_at).toLocaleDateString()}</span>
-                                                        )}
                                                     </div>
-                                                    {Array.isArray(a.roles) && a.roles.length > 0 && (
-                                                        <div className="mt-2 flex flex-wrap gap-1">
-                                                            {a.roles.map((role) => (
-                                                                <Badge key={role} variant="outline" className="text-[10px]">
-                                                                    {role}
-                                                                </Badge>
-                                                            ))}
-                                                        </div>
-                                                    )}
                                                 </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </TabsContent>
+                        </TabsRoot>
+                    </div>
+
+                    {/* Right sidebar - desktop only */}
+                    <div className="hidden w-72 shrink-0 space-y-4 lg:block">
+                        {/* Quick Settings */}
+                        <Card>
+                            <CardContent className="p-4">
+                                <div className="mb-3 flex items-center gap-2">
+                                    <Settings className="h-4 w-4 text-muted-foreground" />
+                                    <h3 className="text-sm font-semibold">Quick Settings</h3>
+                                </div>
+                                <div className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2.5">
+                                    <div className="flex items-center gap-2">
+                                        <BellOff className="h-4 w-4 text-muted-foreground" />
+                                        <span className="text-xs font-medium">Do Not Disturb</span>
+                                    </div>
+                                    <Switch
+                                        checked={doNotDisturb}
+                                        onCheckedChange={setDoNotDisturb}
+                                    />
+                                </div>
+                                <Link
+                                    href="/settings/notifications"
+                                    className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-violet-600 hover:text-violet-700 dark:text-violet-400"
+                                >
+                                    All notification settings
+                                    <ArrowRight className="h-3 w-3" />
+                                </Link>
+                            </CardContent>
+                        </Card>
+
+                        {/* Recent Activity by Module */}
+                        <Card>
+                            <CardContent className="p-4">
+                                <h3 className="mb-3 text-sm font-semibold">Activity by Module</h3>
+                                <div className="space-y-2">
+                                    {Object.entries(MODULE_COLOURS).map(([mod, style]) => {
+                                        const ModIcon = style.icon;
+                                        const count = moduleCounts[mod] ?? 0;
+                                        return (
+                                            <div
+                                                key={mod}
+                                                className="flex items-center justify-between rounded-lg px-2.5 py-1.5 transition-colors hover:bg-muted/50"
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    <span className={`inline-block h-2 w-2 rounded-full ${style.dot}`} />
+                                                    <span className="text-xs font-medium capitalize">{mod}</span>
+                                                </div>
+                                                <span className={`text-xs font-semibold ${count > 0 ? style.text : 'text-muted-foreground'}`}>
+                                                    {count}
+                                                </span>
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </TabsContent>
-                </TabsRoot>
+                                        );
+                                    })}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
             </div>
         </AppLayout>
     );
