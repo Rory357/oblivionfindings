@@ -121,10 +121,11 @@ export default function SsoSettings() {
 
                     {/* Tabbed Configuration */}
                     <Tabs defaultValue="microsoft">
-                        <TabsList className="grid w-full grid-cols-4">
+                        <TabsList className="grid w-full grid-cols-5">
                             <TabsTrigger value="microsoft">Microsoft 365</TabsTrigger>
                             <TabsTrigger value="google">Google Workspace</TabsTrigger>
                             <TabsTrigger value="provisioning">Provisioning</TabsTrigger>
+                            <TabsTrigger value="groups">Group Mapping</TabsTrigger>
                             <TabsTrigger value="urls">URLs &amp; Setup</TabsTrigger>
                         </TabsList>
 
@@ -280,6 +281,53 @@ export default function SsoSettings() {
                                         <Switch checked={groupSync} onCheckedChange={setGroupSync} />
                                     </div>
                                     <Button className="mt-4 bg-violet-600 hover:bg-violet-700">Save Provisioning Settings</Button>
+                                </CardContent>
+                            </Card>
+                        </TabsContent>
+
+                        {/* Group Mapping Tab */}
+                        <TabsContent value="groups">
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <CardTitle className="flex items-center gap-2">
+                                                <Users className="h-5 w-5 text-violet-600" />
+                                                Security Group Mapping
+                                            </CardTitle>
+                                            <CardDescription>Map Azure AD or Google Workspace security groups to application roles</CardDescription>
+                                        </div>
+                                        <Button asChild className="bg-violet-600 hover:bg-violet-700">
+                                            <Link href="/settings/sso-groups">Open Full Manager</Link>
+                                        </Button>
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <div className="rounded-lg border bg-muted/30 p-6 text-center">
+                                        <Users className="mx-auto h-10 w-10 text-muted-foreground/40 mb-3" />
+                                        <p className="font-medium">Map identity provider groups to roles</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            When users sign in via Microsoft or Google, their group memberships can automatically assign application roles.
+                                        </p>
+                                        <div className="mt-4 flex justify-center gap-3">
+                                            <Button variant="outline" asChild>
+                                                <Link href="/settings/sso-groups">
+                                                    <Users className="mr-1.5 h-3.5 w-3.5" /> Manage Mappings
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="rounded-lg bg-violet-50 p-4 text-sm dark:bg-violet-950/20">
+                                        <p className="flex items-center gap-2 font-medium text-violet-800 dark:text-violet-300">
+                                            <Info className="h-4 w-4" /> How it works
+                                        </p>
+                                        <ul className="mt-2 space-y-1 text-xs text-violet-700 dark:text-violet-400 list-disc list-inside">
+                                            <li>Create mappings between external security groups and app roles</li>
+                                            <li>When a user signs in via SSO, their groups are checked</li>
+                                            <li>Roles are auto-assigned or removed based on your mappings</li>
+                                            <li>Enable "Sync on login" in the Provisioning tab to activate</li>
+                                        </ul>
+                                    </div>
                                 </CardContent>
                             </Card>
                         </TabsContent>
