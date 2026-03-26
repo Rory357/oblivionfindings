@@ -252,6 +252,11 @@ class User extends Authenticatable
         return $this->hasMany(\App\Models\UserNotificationPreference::class);
     }
 
+    public function identities()
+    {
+        return $this->hasMany(\App\Models\Identity::class);
+    }
+
     public function breakGlassAccesses()
     {
         return $this->hasMany(\App\Models\ClientBreakGlassAccess::class);

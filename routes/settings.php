@@ -158,6 +158,9 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:settings.access.manage')
         ->name('settings.notifications.escalations.update');
 
+    // Email configuration
+    Route::get('settings/email', fn () => Inertia::render('settings/email-settings'))->name('settings.email');
+
     // Email & SMS Templates (UI-first, no backend yet)
     Route::get('settings/templates', fn () => Inertia::render('settings/templates'))->name('settings.templates');
 
