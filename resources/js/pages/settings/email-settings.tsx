@@ -25,6 +25,7 @@ export default function EmailSettings() {
     const [provider, setProvider] = useState<EmailProvider>('smtp');
     const [smtpHost, setSmtpHost] = useState('');
     const [smtpPort, setSmtpPort] = useState('587');
+    const [smtpEncryption, setSmtpEncryption] = useState<'tls' | 'ssl' | 'none'>('tls');
     const [smtpUsername, setSmtpUsername] = useState('');
     const [smtpPassword, setSmtpPassword] = useState('');
     const [fromAddress, setFromAddress] = useState('');
@@ -192,42 +193,33 @@ export default function EmailSettings() {
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="grid gap-2">
                                     <Label htmlFor="smtp-host">Host</Label>
-                                    <Input
-                                        id="smtp-host"
-                                        placeholder="smtp.example.com"
-                                        value={smtpHost}
-                                        onChange={(e) => setSmtpHost(e.target.value)}
-                                    />
+                                    <Input id="smtp-host" placeholder="smtp.example.com" value={smtpHost} onChange={(e) => setSmtpHost(e.target.value)} />
+                                    <p className="text-xs text-muted-foreground">e.g. smtp.office365.com, smtp.gmail.com</p>
                                 </div>
-                                <div className="grid gap-2">
-                                    <Label htmlFor="smtp-port">Port</Label>
-                                    <Input
-                                        id="smtp-port"
-                                        placeholder="587"
-                                        value={smtpPort}
-                                        onChange={(e) => setSmtpPort(e.target.value)}
-                                    />
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div className="grid gap-2">
+                                        <Label htmlFor="smtp-port">Port</Label>
+                                        <Input id="smtp-port" placeholder="587" value={smtpPort} onChange={(e) => setSmtpPort(e.target.value)} />
+                                    </div>
+                                    <div className="grid gap-2">
+                                        <Label>Encryption</Label>
+                                        <select className="flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm" value={smtpEncryption} onChange={(e) => setSmtpEncryption(e.target.value as any)}>
+                                            <option value="tls">TLS (recommended)</option>
+                                            <option value="ssl">SSL</option>
+                                            <option value="none">None</option>
+                                        </select>
+                                    </div>
                                 </div>
                             </div>
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="grid gap-2">
                                     <Label htmlFor="smtp-username">Username</Label>
-                                    <Input
-                                        id="smtp-username"
-                                        placeholder="user@example.com"
-                                        value={smtpUsername}
-                                        onChange={(e) => setSmtpUsername(e.target.value)}
-                                    />
+                                    <Input id="smtp-username" placeholder="user@example.com" value={smtpUsername} onChange={(e) => setSmtpUsername(e.target.value)} />
                                 </div>
                                 <div className="grid gap-2">
-                                    <Label htmlFor="smtp-password">Password</Label>
-                                    <Input
-                                        id="smtp-password"
-                                        type="password"
-                                        placeholder="••••••••"
-                                        value={smtpPassword}
-                                        onChange={(e) => setSmtpPassword(e.target.value)}
-                                    />
+                                    <Label htmlFor="smtp-password">Password / App Password</Label>
+                                    <Input id="smtp-password" type="password" placeholder="••••••••" value={smtpPassword} onChange={(e) => setSmtpPassword(e.target.value)} />
+                                    <p className="text-xs text-muted-foreground">For Gmail/Outlook, use an App Password if 2FA is enabled</p>
                                 </div>
                             </div>
                         </CardContent>
@@ -254,7 +246,7 @@ export default function EmailSettings() {
                                     <div className="text-xs text-muted-foreground">
                                         {microsoftConnected
                                             ? 'Emails will be sent from your Microsoft 365 mailbox.'
-                                            : 'Connect your Microsoft account in the Integration Hub to enable this provider.'}
+                                            : 'Connect your Microsoft account to send emails via Graph API.'}
                                     </div>
                                 </div>
                                 {microsoftConnected ? (
@@ -264,7 +256,7 @@ export default function EmailSettings() {
                                     </Badge>
                                 ) : (
                                     <Button variant="outline" size="sm" asChild>
-                                        <a href="/settings/integrations">Connect</a>
+                                        <a href="/auth/microsoft/redirect?link=1">Connect Microsoft</a>
                                     </Button>
                                 )}
                             </div>
@@ -292,7 +284,7 @@ export default function EmailSettings() {
                                     <div className="text-xs text-muted-foreground">
                                         {googleConnected
                                             ? 'Emails will be sent from your Google Workspace mailbox.'
-                                            : 'Connect your Google account in the Integration Hub to enable this provider.'}
+                                            : 'Connect your Google account to send emails via Gmail API.'}
                                     </div>
                                 </div>
                                 {googleConnected ? (
@@ -302,7 +294,7 @@ export default function EmailSettings() {
                                     </Badge>
                                 ) : (
                                     <Button variant="outline" size="sm" asChild>
-                                        <a href="/settings/integrations">Connect</a>
+                                        <a href="/auth/google/redirect?link=1">Connect Google</a>
                                     </Button>
                                 )}
                             </div>
