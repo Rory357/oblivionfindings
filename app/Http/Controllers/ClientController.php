@@ -32,7 +32,7 @@ class ClientController extends Controller
 
         $clients = Client::query()
             ->when(
-                $user->hasRole('support_worker'),
+                $user->hasRole('support_worker') && !$user->hasRole('admin', 'manager', 'coordinator'),
                 fn($q) => $q->whereHas('supportWorkers', fn($q) => $q->whereKey($user->id))
             )
             ->with(['site:id,name,is_active', 'onboardingOverrides:id,client_id,key,value'])
