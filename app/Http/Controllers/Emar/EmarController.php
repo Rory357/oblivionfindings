@@ -1031,7 +1031,7 @@ class EmarController extends Controller
             'disposal_method' => 'required|string|max:255',
             'is_controlled_drug' => 'nullable|boolean',
             'controlled_drug_class' => 'nullable|string|max:50',
-            'witness_1_id' => 'required|exists:users,id|different:destroyed_by_placeholder',
+            'witness_1_id' => 'required|exists:users,id',
             'witness_2_id' => 'nullable|exists:users,id',
             'authorised_by_name' => 'nullable|string|max:255',
             'authorised_by_registration' => 'nullable|string|max:255',
@@ -1054,15 +1054,16 @@ class EmarController extends Controller
         $validated['destroyed_by'] = auth()->id();
         $validated['destroyed_at'] = now();
 
-        $destruction = MedicationDestruction::create($validated);
+        DB::transaction(function () use ($validated) {
+            MedicationDestruction::create($validated);
 
-        // If linked to a medication, decrease stock on_hand
-        if (!empty($validated['client_medication_id'])) {
-            $stock = ClientMedicationStock::where('client_medication_id', $validated['client_medication_id'])->first();
-            if ($stock) {
-                $stock->decrement('on_hand', $validated['quantity']);
+            if (!empty($validated['client_medication_id'])) {
+                $stock = ClientMedicationStock::where('client_medication_id', $validated['client_medication_id'])->first();
+                if ($stock) {
+                    $stock->decrement('on_hand', $validated['quantity']);
+                }
             }
-        }
+        });
 
         return redirect()->back();
     }
@@ -1187,8 +1188,14 @@ class EmarController extends Controller
                 $updateData['quantity_received'] = $request->input('quantity_received', $order->quantity_ordered);
                 $updateData['delivery_notes'] = $request->input('delivery_notes');
 
-                // Increase stock on_hand
-                $quantityReceived = $updateData['quantity_received'];
+                break;
+        }
+
+        DB::transaction(function () use ($order, $updateData, $nextStatus) {
+            $order->update($updateData);
+
+            if ($nextStatus === 'delivered') {
+                $quantityReceived = $updateData['quantity_received'] ?? 0;
                 if ($order->client_medication_id && $quantityReceived > 0) {
                     $stock = ClientMedicationStock::firstOrCreate(
                         ['client_medication_id' => $order->client_medication_id],
@@ -1196,10 +1203,8 @@ class EmarController extends Controller
                     );
                     $stock->increment('on_hand', $quantityReceived);
                 }
-                break;
-        }
-
-        $order->update($updateData);
+            }
+        });
 
         return redirect()->back();
     }
@@ -1211,13 +1216,14 @@ class EmarController extends Controller
             'quantity' => 'required|integer|min:1',
         ]);
 
-        $stock = ClientMedicationStock::firstOrCreate(
-            ['client_medication_id' => $validated['client_medication_id']],
-            ['on_hand' => 0, 'unit' => 'units']
-        );
-
-        $stock->increment('on_hand', $validated['quantity']);
-        $stock->update(['last_counted_at' => now()]);
+        DB::transaction(function () use ($validated) {
+            $stock = ClientMedicationStock::firstOrCreate(
+                ['client_medication_id' => $validated['client_medication_id']],
+                ['on_hand' => 0, 'unit' => 'units']
+            );
+            $stock->increment('on_hand', $validated['quantity']);
+            $stock->update(['last_counted_at' => now()]);
+        });
 
         return redirect()->back();
     }
@@ -1230,16 +1236,17 @@ class EmarController extends Controller
             'reason' => 'required|string|max:500',
         ]);
 
-        $stock = ClientMedicationStock::firstOrCreate(
-            ['client_medication_id' => $validated['client_medication_id']],
-            ['on_hand' => 0, 'unit' => 'units']
-        );
-
-        $stock->update([
-            'on_hand' => $validated['new_quantity'],
-            'last_counted_at' => now(),
-            'notes' => 'Stock adjustment: ' . $validated['reason'],
-        ]);
+        DB::transaction(function () use ($validated) {
+            $stock = ClientMedicationStock::firstOrCreate(
+                ['client_medication_id' => $validated['client_medication_id']],
+                ['on_hand' => 0, 'unit' => 'units']
+            );
+            $stock->update([
+                'on_hand' => $validated['new_quantity'],
+                'last_counted_at' => now(),
+                'notes' => 'Stock adjustment: ' . $validated['reason'],
+            ]);
+        });
 
         return redirect()->back();
     }

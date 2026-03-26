@@ -17,6 +17,7 @@ class ClientMedicationAdministration extends Model
         'client_id',
         'client_medication_id',
         'shift_id',
+        'medication_round_id',
         'service_context_id',
         'administered_by',
         'witnessed_by',

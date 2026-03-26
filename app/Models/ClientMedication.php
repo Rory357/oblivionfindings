@@ -36,7 +36,6 @@ class ClientMedication extends Model
         'prescriber',
         'indication',
         'pharmacy',
-        'indication',
         'start_date',
         'end_date',
         'review_date',
