@@ -20,6 +20,13 @@ use App\Http\Controllers\CalendarController;
  * calendar, and RAG/AI queries.
  */
 
+// Portal SSO routes (outside auth middleware - these are for login)
+Route::get('portal/login', fn () => \Inertia\Inertia::render('portal/login'))->name('portal.login')->middleware('guest');
+Route::get('portal/auth/microsoft/redirect', [\App\Http\Controllers\Auth\PortalOAuthController::class, 'redirectMicrosoft'])->name('portal.auth.microsoft');
+Route::get('portal/auth/microsoft/callback', [\App\Http\Controllers\Auth\PortalOAuthController::class, 'callbackMicrosoft']);
+Route::get('portal/auth/google/redirect', [\App\Http\Controllers\Auth\PortalOAuthController::class, 'redirectGoogle'])->name('portal.auth.google');
+Route::get('portal/auth/google/callback', [\App\Http\Controllers\Auth\PortalOAuthController::class, 'callbackGoogle']);
+
 Route::middleware(['auth'])->group(function () {
     // Client/Next-of-kin Portal
     Route::get('/portal', [PortalController::class, 'index'])->name('portal.index');

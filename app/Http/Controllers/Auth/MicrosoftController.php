@@ -13,6 +13,11 @@ class MicrosoftController extends Controller
 {
     public function redirect()
     {
+        // If ?link=1, store the current user ID so callback links the identity
+        if (request()->query('link') == '1' && auth()->check()) {
+            session(['oauth_link_user' => auth()->id()]);
+        }
+
         return Socialite::driver('microsoft')
             ->with(['prompt' => 'select_account'])
             ->redirect();
@@ -30,6 +35,22 @@ class MicrosoftController extends Controller
         );
 
         abort_unless($email !== '', 401, 'No email returned from Microsoft.');
+
+        // If linking to an existing user (came from ?link=1)
+        $linkUserId = session()->pull('oauth_link_user');
+        if ($linkUserId) {
+            $linkUser = User::findOrFail($linkUserId);
+            $linkUser->identities()->updateOrCreate(
+                ['provider' => 'microsoft', 'provider_user_id' => $m->getId()],
+                [
+                    'email' => $email,
+                    'access_token' => $m->token,
+                    'refresh_token' => $m->refreshToken,
+                    'token_expires_at' => $m->expiresIn ? now()->addSeconds($m->expiresIn) : null,
+                ]
+            );
+            return redirect('/settings/profile')->with('success', 'Microsoft account linked.');
+        }
 
         // Org-only rule: domain must match
         $orgDomain = strtolower(env('ORG_DOMAIN', ''));
@@ -60,6 +81,17 @@ class MicrosoftController extends Controller
                 $user->forceFill(['role' => 'support_worker'])->save();
             }
         }
+
+        // Store identity for the user
+        $user->identities()->updateOrCreate(
+            ['provider' => 'microsoft', 'provider_user_id' => $m->getId()],
+            [
+                'email' => $email,
+                'access_token' => $m->token,
+                'refresh_token' => $m->refreshToken,
+                'token_expires_at' => $m->expiresIn ? now()->addSeconds($m->expiresIn) : null,
+            ]
+        );
 
         Auth::login($user, remember: true);
 

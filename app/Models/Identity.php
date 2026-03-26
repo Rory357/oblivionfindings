@@ -37,6 +37,15 @@ class Identity extends Model
     }
 
     /**
+     * Determine if the access token has expired.
+     */
+    public function isExpired(): bool
+    {
+        if (!$this->token_expires_at) return true;
+        return $this->token_expires_at->isPast();
+    }
+
+    /**
      * Determine if the access token needs to be refreshed.
      */
     public function needsRefresh(): bool
