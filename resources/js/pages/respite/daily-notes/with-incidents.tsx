@@ -1,0 +1,83 @@
+import AppLayout from '@/layouts/app-layout';
+import { Button } from '@/components/ui/button';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import RespiteSubnav from '@/components/respite-subnav';
+import { formatDateTime } from '@/lib/date-format';
+import { Head, Link, router } from '@inertiajs/react';
+
+type Props = {
+    notes: { data: any[]; links: any[] };
+};
+
+export default function DailyNotesWithIncidents({ notes }: Props) {
+    return (
+        <AppLayout breadcrumbs={[
+            { title: 'Respite', href: '/respite' },
+            { title: 'Daily Notes', href: '/respite/daily-notes' },
+            { title: 'With Incidents', href: '/respite/daily-notes/with-incidents' },
+        ]}>
+            <Head title="Notes with Incidents" />
+
+            <div className="space-y-4">
+                <div>
+                    <h1 className="text-lg font-semibold">Notes with Incidents</h1>
+                    <div className="mt-1 text-sm text-slate-500">
+                        Daily notes linked to incidents.
+                    </div>
+                </div>
+                <RespiteSubnav />
+
+                <div className="space-y-2">
+                    {notes.data.map((note: any) => (
+                        <Card key={note.id}>
+                            <CardHeader>
+                                <CardTitle className="text-base">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex-1">
+                                            <div className="font-semibold">
+                                                {note.stay?.client?.first_name} {note.stay?.client?.last_name}
+                                            </div>
+                                            <div className="mt-2 flex flex-wrap gap-2">
+                                                <Badge variant="outline">{note.shift_period}</Badge>
+                                                {note.mood && <Badge variant="outline">{note.mood}</Badge>}
+                                                <Badge variant="outline">Incident</Badge>
+                                            </div>
+                                            <div className="mt-2 text-xs text-slate-500">
+                                                {formatDateTime(note.note_date)}
+                                            </div>
+                                        </div>
+                                        <Link href={`/respite/daily-notes/${note.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                                            View
+                                        </Link>
+                                    </div>
+                                </CardTitle>
+                            </CardHeader>
+                        </Card>
+                    ))}
+                    {!notes.data.length && (
+                        <div className="py-8 text-center text-sm text-slate-500">
+                            No items found.
+                        </div>
+                    )}
+                </div>
+
+                {notes?.links?.length ? (
+                    <div className="flex flex-wrap gap-2">
+                        {notes.links.map((l: any) => (
+                            <Button
+                                key={l.label}
+                                variant="outline"
+                                size="sm"
+                                disabled={!l.url}
+                                className={l.active ? 'bg-muted' : ''}
+                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
+                                dangerouslySetInnerHTML={{ __html: l.label }}
+                            />
+                        ))}
+                    </div>
+                ) : null}
+            </div>
+        </AppLayout>
+    );
+}

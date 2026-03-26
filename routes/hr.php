@@ -14,7 +14,9 @@ use App\Http\Controllers\Hr\VettingController;
 use App\Http\Controllers\Hr\DriverEligibilityController;
 use App\Http\Controllers\Hr\LeaveController;
 use App\Http\Controllers\Hr\OnboardingController;
+use App\Http\Controllers\Hr\OnboardingEmailController;
 use App\Http\Controllers\Hr\OffboardingController;
+use App\Http\Controllers\Hr\ComplianceCalendarController;
 use App\Http\Controllers\Hr\SupervisionController;
 use App\Http\Controllers\Hr\PerformanceReviewController;
 use App\Http\Controllers\Hr\HrCaseController;
@@ -158,6 +160,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.compliance.view')->group(function () {
         Route::get('/compliance', [ComplianceController::class, 'index'])->name('compliance.index');
+        Route::get('/compliance/calendar', [ComplianceCalendarController::class, 'index'])->name('compliance.calendar');
         Route::get('/compliance/staff/{user}', [ComplianceController::class, 'staffDetail'])->name('compliance.staff');
 
         Route::middleware('permission:hr.compliance.manage')->group(function () {
@@ -254,6 +257,17 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/onboarding', [OnboardingController::class, 'store'])->name('onboarding.store');
             Route::post('/onboarding/tasks/{task}/complete', [OnboardingController::class, 'completeTask'])->name('onboarding.tasks.complete');
             Route::put('/onboarding/templates', [OnboardingController::class, 'updateTemplates'])->name('onboarding.templates.update');
+        });
+
+        // Onboarding Email Templates (must be above {checklist} wildcard)
+        Route::get('/onboarding/emails', [OnboardingEmailController::class, 'index'])->name('onboarding.emails.index');
+        Route::get('/onboarding/emails/log', [OnboardingEmailController::class, 'log'])->name('onboarding.emails.log');
+        Route::get('/onboarding/emails/{email}/preview', [OnboardingEmailController::class, 'preview'])->name('onboarding.emails.preview');
+
+        Route::middleware('permission:hr.onboarding.manage')->group(function () {
+            Route::post('/onboarding/emails', [OnboardingEmailController::class, 'store'])->name('onboarding.emails.store');
+            Route::put('/onboarding/emails/{email}', [OnboardingEmailController::class, 'update'])->name('onboarding.emails.update');
+            Route::delete('/onboarding/emails/{email}', [OnboardingEmailController::class, 'destroy'])->name('onboarding.emails.destroy');
         });
 
         Route::get('/onboarding/{checklist}', [OnboardingController::class, 'show'])->name('onboarding.show');

@@ -94,8 +94,13 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.integration-alerts.create-incident');
     });
 
+    // Alerts list (real implementation)
+    Route::get('/control-room/alerts', [ControlRoomAlertController::class, 'index'])
+        ->middleware('permission:controlRoom.viewAny')
+        ->name('control-room.alerts.index');
+
     // Placeholder routes for future Control Room features
-    $placeholders = ['map', 'shifts', 'alerts', 'escalations', 'incidents', 'broadcast', 'messaging', 'stats'];
+    $placeholders = ['map', 'shifts', 'escalations', 'incidents', 'broadcast', 'messaging', 'stats'];
     foreach ($placeholders as $feature) {
         Route::get("/control-room/{$feature}", function () use ($feature) {
             return inertia('control-room/Placeholder', [

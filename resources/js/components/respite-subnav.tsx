@@ -10,6 +10,13 @@ export default function RespiteSubnav() {
         { href: '/respite/bookings', label: 'Approved Bookings', show: !!can.bookingsManage },
         { href: '/respite/resources', label: 'Resources', show: !!can.resourcesManage },
         { href: '/respite/procedures', label: 'Procedures', show: !!can.proceduresManage },
+        { href: '/respite/procedure-runs', label: 'Procedure Runs', show: true },
+        { href: '/respite/tasks', label: 'Tasks', show: true },
+        { href: '/respite/daily-notes', label: 'Daily Notes', show: true },
+        { href: '/respite/handover-notes', label: 'Handover Notes', show: true },
+        { href: '/respite/communication-logs', label: 'Comms Log', show: true },
+        { href: '/respite/evidence-packs', label: 'Evidence Packs', show: true },
+        { href: '/respite/risk-plan-activations', label: 'Risk Plans', show: true },
         { href: '/respite/calendar', label: 'Calendar', show: !!can.calendarView },
     ];
 

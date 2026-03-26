@@ -1,0 +1,198 @@
+import { Head } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import AppLayout from '@/layouts/app-layout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { BarChart3, CheckCircle2, Users, ClipboardList } from 'lucide-react';
+
+interface Props extends PageProps {
+    evaluation: any;
+}
+
+const statusColors: Record<string, string> = {
+    draft: 'bg-gray-100 text-gray-800',
+    open: 'bg-blue-100 text-blue-800',
+    closed: 'bg-green-100 text-green-800',
+    completed: 'bg-green-100 text-green-800',
+};
+
+const typeLabels: Record<string, string> = {
+    board: 'Board Evaluation',
+    chair: 'Chair Evaluation',
+    self: 'Self-Assessment',
+    peer: 'Peer Review',
+    committee: 'Committee Evaluation',
+};
+
+export default function EvaluationResults({ auth, evaluation }: Props) {
+    const questions = evaluation.questions ?? [];
+    const responses = evaluation.responses ?? [];
+    const aggregateResults = evaluation.aggregate_results ?? [];
+
+    const completedResponses = responses.filter((r: any) => r.is_complete);
+    const completionRate = responses.length > 0
+        ? Math.round((completedResponses.length / responses.length) * 100)
+        : 0;
+
+    const getAggregateForQuestion = (questionId: number) =>
+        aggregateResults.find((a: any) => a.question_id === questionId);
+
+    const formatDate = (d: string | null) =>
+        d ? new Date(d).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' }) : '-';
+
+    return (
+        <AppLayout
+            user={auth.user}
+            breadcrumbs={[
+                { title: 'Governance', href: '/governance/dashboard' },
+                { title: 'Evaluations', href: '/governance/evaluations' },
+                { title: 'Results', href: '#' },
+            ]}
+        >
+            <Head title={`${evaluation.title} - Results`} />
+
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                <div className="mb-6">
+                    <h1 className="text-3xl font-bold text-gray-900">{evaluation.title} Results</h1>
+                    <p className="text-gray-500 mt-1">Evaluation outcome summary and analysis</p>
+                </div>
+
+                {/* Summary Card */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-500">Type</p>
+                                    <Badge className={cn('mt-1', statusColors[evaluation.evaluation_type] || 'bg-gray-100 text-gray-800')}>
+                                        {typeLabels[evaluation.evaluation_type] ?? evaluation.evaluation_type}
+                                    </Badge>
+                                </div>
+                                <ClipboardList className="w-8 h-8 text-gray-400" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-500">Status</p>
+                                    <Badge className={cn('mt-1', statusColors[evaluation.status] || 'bg-gray-100 text-gray-800')}>
+                                        {evaluation.status}
+                                    </Badge>
+                                </div>
+                                <CheckCircle2 className="w-8 h-8 text-gray-400" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm text-gray-500">Completion Rate</p>
+                                    <p className="text-3xl font-bold">{completionRate}%</p>
+                                    <p className="text-xs text-gray-500">
+                                        {completedResponses.length} / {responses.length} responses
+                                    </p>
+                                </div>
+                                <Users className="w-8 h-8 text-gray-400" />
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Per-Question Results */}
+                <Card className="mb-6">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                            <BarChart3 className="w-5 h-5" />
+                            Question Results
+                        </CardTitle>
+                        <CardDescription>{questions.length} questions</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {questions.length === 0 ? (
+                            <p className="text-center text-gray-500 py-8">No questions found.</p>
+                        ) : (
+                            <div className="space-y-6">
+                                {questions.map((q: any, idx: number) => {
+                                    const agg = getAggregateForQuestion(q.id);
+                                    return (
+                                        <div key={q.id} className="p-4 rounded-lg border">
+                                            <div className="flex items-start gap-3">
+                                                <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-gray-100 text-gray-700 text-sm font-medium shrink-0">
+                                                    {idx + 1}
+                                                </span>
+                                                <div className="flex-1">
+                                                    <p className="font-medium text-gray-900">{q.text ?? q.question}</p>
+                                                    {agg && (
+                                                        <div className="mt-3 space-y-2">
+                                                            {agg.average_score !== undefined && agg.average_score !== null && (
+                                                                <div className="flex items-center gap-3">
+                                                                    <span className="text-sm text-gray-500">Average Score:</span>
+                                                                    <Badge className="bg-blue-100 text-blue-800 text-lg px-3">
+                                                                        {typeof agg.average_score === 'number'
+                                                                            ? agg.average_score.toFixed(1)
+                                                                            : agg.average_score}
+                                                                    </Badge>
+                                                                </div>
+                                                            )}
+                                                            {agg.distribution && (
+                                                                <div className="space-y-1">
+                                                                    <span className="text-sm text-gray-500">Distribution:</span>
+                                                                    <div className="flex gap-2 flex-wrap">
+                                                                        {Object.entries(agg.distribution).map(([score, count]) => (
+                                                                            <Badge key={score} variant="outline">
+                                                                                {score}: {count as number}
+                                                                            </Badge>
+                                                                        ))}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                    {!agg && (
+                                                        <p className="mt-2 text-sm text-gray-400">No aggregate data available.</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
+                {/* Respondents */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Respondents</CardTitle>
+                        <CardDescription>Board members who completed the evaluation</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {completedResponses.length === 0 ? (
+                            <p className="text-center text-gray-500 py-8">No completed responses yet.</p>
+                        ) : (
+                            <div className="space-y-2">
+                                {completedResponses.map((resp: any) => (
+                                    <div key={resp.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-gray-50">
+                                        <div>
+                                            <p className="font-medium text-gray-900">
+                                                {resp.board_member?.user?.name ?? resp.board_member?.name ?? 'Unknown'}
+                                            </p>
+                                        </div>
+                                        <span className="text-sm text-gray-500">
+                                            Submitted: {formatDate(resp.submitted_at)}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </AppLayout>
+    );
+}

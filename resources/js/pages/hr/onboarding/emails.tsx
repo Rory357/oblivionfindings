@@ -1,0 +1,257 @@
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, router } from '@inertiajs/react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { type BreadcrumbItem } from '@/types';
+import { Mail, Eye, Trash2, Pencil, Clock, Send, FileText } from 'lucide-react';
+import { useState } from 'react';
+
+interface Props {
+    templates: {
+        data: any[];
+        links: any[];
+    };
+    preview?: {
+        id: number;
+        template_name: string;
+        subject: string;
+        body: string;
+    };
+    emailLog?: any[];
+    showLog?: boolean;
+    can: {
+        manage: boolean;
+    };
+}
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'HR', href: '/hr/people' },
+    { title: 'Onboarding', href: '/hr/onboarding' },
+    { title: 'Email Templates', href: '/hr/onboarding/emails' },
+];
+
+type Tab = 'templates' | 'preview' | 'log';
+
+export default function OnboardingEmails({ templates, preview, emailLog, showLog, can }: Props) {
+    const hasPreview = !!preview;
+    const hasLog = !!showLog;
+
+    const [activeTab, setActiveTab] = useState<Tab>(
+        hasPreview ? 'preview' : hasLog ? 'log' : 'templates',
+    );
+
+    const formatDate = (d: string) =>
+        new Date(d).toLocaleDateString('en-NZ', {
+            day: '2-digit',
+            month: 'short',
+            year: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+
+    const tabs: { key: Tab; label: string; show: boolean }[] = [
+        { key: 'templates', label: 'Templates', show: true },
+        { key: 'preview', label: 'Preview', show: hasPreview },
+        { key: 'log', label: 'Sent Log', show: true },
+    ];
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title="Onboarding Email Templates" />
+            <div className="flex flex-col gap-6 p-6">
+                <div className="flex items-center justify-between">
+                    <h1 className="text-2xl font-bold">Onboarding Email Templates</h1>
+                </div>
+
+                {/* Tab Navigation */}
+                <div className="flex gap-1 border-b">
+                    {tabs
+                        .filter((t) => t.show)
+                        .map((tab) => (
+                            <button
+                                key={tab.key}
+                                onClick={() => {
+                                    if (tab.key === 'log') {
+                                        router.get('/hr/onboarding/emails/log', {}, { preserveState: true });
+                                    } else if (tab.key === 'templates') {
+                                        router.get('/hr/onboarding/emails', {}, { preserveState: true });
+                                    }
+                                    setActiveTab(tab.key);
+                                }}
+                                className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                                    activeTab === tab.key
+                                        ? 'border-primary text-primary'
+                                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                                }`}
+                            >
+                                {tab.label}
+                            </button>
+                        ))}
+                </div>
+
+                {/* Templates Tab */}
+                {activeTab === 'templates' && (
+                    <div className="space-y-3">
+                        {templates.data.length === 0 ? (
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="py-8 text-center text-sm text-muted-foreground">
+                                        <Mail className="mx-auto mb-3 h-12 w-12 opacity-50" />
+                                        <p>No email templates configured yet.</p>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            templates.data.map((tpl: any) => (
+                                <Card key={tpl.id}>
+                                    <CardContent className="pt-4">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <Mail className="h-4 w-4 text-muted-foreground" />
+                                                    <span className="font-medium">{tpl.template_name}</span>
+                                                    {tpl.trigger && (
+                                                        <Badge variant="outline" className="capitalize">
+                                                            {tpl.trigger.replace(/_/g, ' ')}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                {tpl.subject && (
+                                                    <p className="mt-1 text-sm text-muted-foreground truncate">
+                                                        Subject: {tpl.subject}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <Button variant="ghost" size="sm" asChild>
+                                                    <Link href={`/hr/onboarding/emails/${tpl.id}/preview`}>
+                                                        <Eye className="h-4 w-4" />
+                                                    </Link>
+                                                </Button>
+                                                {can.manage && (
+                                                    <>
+                                                        <Button variant="ghost" size="sm" asChild>
+                                                            <Link href={`/hr/onboarding/emails/${tpl.id}/edit`}>
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Link>
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                if (confirm('Are you sure you want to delete this template?')) {
+                                                                    router.delete(`/hr/onboarding/emails/${tpl.id}`);
+                                                                }
+                                                            }}
+                                                        >
+                                                            <Trash2 className="h-4 w-4 text-destructive" />
+                                                        </Button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))
+                        )}
+
+                        {/* Pagination */}
+                        {templates.links?.length > 3 && (
+                            <div className="flex justify-center gap-2">
+                                {templates.links.map((link: any, i: number) => (
+                                    <Button key={i} variant={link.active ? 'default' : 'outline'} size="sm" disabled={!link.url}
+                                        onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}>
+                                        <span dangerouslySetInnerHTML={{ __html: link.label }} />
+                                    </Button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Preview Tab */}
+                {activeTab === 'preview' && preview && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <FileText className="h-5 w-5" />
+                                {preview.template_name}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="rounded-lg border bg-white">
+                                <div className="border-b px-6 py-3">
+                                    <p className="text-sm text-muted-foreground">Subject</p>
+                                    <p className="font-medium">{preview.subject}</p>
+                                </div>
+                                <div className="px-6 py-4">
+                                    <div
+                                        className="prose prose-sm max-w-none"
+                                        dangerouslySetInnerHTML={{ __html: preview.body }}
+                                    />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Log Tab */}
+                {activeTab === 'log' && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                                <Send className="h-5 w-5" />
+                                Sent Email Log
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {!emailLog || emailLog.length === 0 ? (
+                                <div className="py-8 text-center text-sm text-muted-foreground">
+                                    <Send className="mx-auto mb-3 h-12 w-12 opacity-50" />
+                                    <p>No emails have been sent yet.</p>
+                                </div>
+                            ) : (
+                                <table className="w-full text-sm">
+                                    <thead className="border-b bg-muted/50">
+                                        <tr>
+                                            <th className="px-4 py-3 text-left font-medium">Recipient</th>
+                                            <th className="px-4 py-3 text-left font-medium">Template</th>
+                                            <th className="px-4 py-3 text-left font-medium">Sent At</th>
+                                            <th className="px-4 py-3 text-center font-medium">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y">
+                                        {emailLog.map((entry: any, i: number) => (
+                                            <tr key={entry.id ?? i} className="hover:bg-muted/30">
+                                                <td className="px-4 py-3">{entry.recipient ?? entry.to ?? '-'}</td>
+                                                <td className="px-4 py-3">{entry.template_name ?? entry.template ?? '-'}</td>
+                                                <td className="px-4 py-3">
+                                                    <span className="flex items-center gap-1 text-muted-foreground">
+                                                        <Clock className="h-3 w-3" />
+                                                        {entry.sent_at ? formatDate(entry.sent_at) : '-'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">
+                                                    <Badge className={
+                                                        entry.status === 'sent' || entry.status === 'delivered'
+                                                            ? 'bg-green-100 text-green-800'
+                                                            : entry.status === 'failed'
+                                                              ? 'bg-red-100 text-red-800'
+                                                              : 'bg-gray-100 text-gray-800'
+                                                    }>
+                                                        {entry.status ?? 'unknown'}
+                                                    </Badge>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+            </div>
+        </AppLayout>
+    );
+}
