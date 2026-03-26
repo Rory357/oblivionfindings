@@ -32,6 +32,8 @@ class User extends Authenticatable
         'approved_by',
 
         'profile_photo_path',
+        'cellphone',
+        'work_phone',
     ];
 
     /**
@@ -139,7 +141,7 @@ class User extends Authenticatable
 
     public function staffProfile()
     {
-        return $this->hasOne(\App\Models\Staff::class);
+        return $this->hasOne(\App\Models\StaffProfile::class);
     }
 
     public function staffCredentials()
@@ -250,11 +252,6 @@ class User extends Authenticatable
     public function notificationPreferences()
     {
         return $this->hasMany(\App\Models\UserNotificationPreference::class);
-    }
-
-    public function identities()
-    {
-        return $this->hasMany(\App\Models\Identity::class);
     }
 
     public function breakGlassAccesses()

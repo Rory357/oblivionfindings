@@ -11,6 +11,7 @@ use App\Http\Controllers\Settings\ServiceContextController;
 use App\Http\Controllers\Settings\NotificationPreferencesController;
 use App\Http\Controllers\Settings\NotificationEscalationsController;
 use App\Http\Controllers\Settings\IntegrationHubController;
+use App\Http\Controllers\Settings\NotificationTemplateController;
 use App\Http\Controllers\Settings\UnifiSettingsController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -36,35 +37,6 @@ Route::middleware('auth')->group(function () {
 
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
-
-    // User Management
-    Route::get('settings/users', [\App\Http\Controllers\System\UsersController::class, 'index'])
-        ->middleware('permission:settings.access.manage')
-        ->name('settings.users.index');
-    Route::get('settings/users/{target}', [\App\Http\Controllers\System\UsersController::class, 'show'])
-        ->middleware('permission:settings.access.manage')
-        ->name('settings.users.show');
-    Route::put('settings/users/{target}', [\App\Http\Controllers\System\UsersController::class, 'update'])
-        ->middleware('permission:settings.access.manage')
-        ->name('settings.users.update');
-    Route::post('settings/users/{target}/approve', [\App\Http\Controllers\System\UsersController::class, 'approve'])
-        ->middleware('permission:settings.access.manage')
-        ->name('settings.users.approve');
-    Route::put('settings/users/{target}/roles', function (\Illuminate\Http\Request $request, \App\Models\User $target) {
-        abort_unless($request->user()?->canDo('settings.access.manage'), 403);
-        $data = $request->validate(['role_ids' => 'array', 'role_ids.*' => 'integer|exists:roles,id']);
-        $target->roles()->sync($data['role_ids'] ?? []);
-        return back()->with('success', 'Roles updated.');
-    })->middleware('permission:settings.access.manage')->name('settings.users.roles.sync');
-    Route::post('settings/users/{target}/suspend', [\App\Http\Controllers\System\UsersController::class, 'suspend'])
-        ->middleware('permission:settings.access.manage')
-        ->name('settings.users.suspend');
-    Route::delete('settings/users/{target}/sessions/{session}', [\App\Http\Controllers\System\UsersController::class, 'terminateSession'])
-        ->middleware('permission:settings.access.manage')
-        ->name('settings.users.sessions.destroy');
-    Route::delete('settings/users/{target}/sessions', [\App\Http\Controllers\System\UsersController::class, 'terminateAllSessions'])
-        ->middleware('permission:settings.access.manage')
-        ->name('settings.users.sessions.destroyAll');
 
     // Admin access controls (roles & per-user overrides)
     Route::get('settings/access', [AccessController::class, 'index'])
@@ -158,11 +130,12 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:settings.access.manage')
         ->name('settings.notifications.escalations.update');
 
-    // Email configuration
-    Route::get('settings/email', fn () => Inertia::render('settings/email-settings'))->name('settings.email');
-
-    // Email & SMS Templates (UI-first, no backend yet)
-    Route::get('settings/templates', fn () => Inertia::render('settings/templates'))->name('settings.templates');
+    // Email & SMS Templates
+    Route::get('settings/templates', [NotificationTemplateController::class, 'index'])->name('settings.templates');
+    Route::put('settings/templates/{template}', [NotificationTemplateController::class, 'update'])->name('settings.templates.update');
+    Route::post('settings/templates/{template}/preview', [NotificationTemplateController::class, 'preview'])->name('settings.templates.preview');
+    Route::post('settings/templates/{template}/send-test', [NotificationTemplateController::class, 'sendTest'])->name('settings.templates.send-test');
+    Route::post('settings/templates/{template}/reset', [NotificationTemplateController::class, 'reset'])->name('settings.templates.reset');
 
     // API & Webhooks (UI-first, no backend yet)
     Route::get('settings/api', fn () => Inertia::render('settings/api'))->name('settings.api');
@@ -177,20 +150,6 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/integrations', [IntegrationHubController::class, 'index'])
         ->middleware('permission:integrations.view')
         ->name('settings.integrations.index');
-
-    // SSO Configuration
-    Route::get('settings/sso', fn () => \Inertia\Inertia::render('settings/sso', [
-        'microsoft_configured' => !empty(config('services.microsoft.client_id')),
-        'google_configured' => !empty(config('services.google.client_id')),
-        'group_mapping_count' => \App\Models\SsoGroupMapping::count(),
-    ]))->middleware('permission:settings.access.manage')->name('settings.sso');
-
-    // SSO Group Mapping
-    Route::get('settings/sso-groups', [\App\Http\Controllers\Settings\SsoGroupController::class, 'index'])->middleware('permission:settings.access.manage')->name('settings.sso-groups');
-    Route::post('settings/sso-groups/fetch', [\App\Http\Controllers\Settings\SsoGroupController::class, 'fetchGroups'])->middleware('permission:settings.access.manage');
-    Route::post('settings/sso-groups', [\App\Http\Controllers\Settings\SsoGroupController::class, 'store'])->middleware('permission:settings.access.manage');
-    Route::put('settings/sso-groups/{mapping}', [\App\Http\Controllers\Settings\SsoGroupController::class, 'update'])->middleware('permission:settings.access.manage');
-    Route::delete('settings/sso-groups/{mapping}', [\App\Http\Controllers\Settings\SsoGroupController::class, 'destroy'])->middleware('permission:settings.access.manage');
 
     // UniFi integration settings
     Route::prefix('settings/integrations/unifi')->middleware('permission:integrations.manage_tenant_secrets')->group(function () {
