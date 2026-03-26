@@ -72,7 +72,7 @@ const navSections: NavSection[] = [
         items: [
             { icon: Users, title: 'Users', href: '/settings/users' },
             { icon: Shield, title: 'Roles', href: '/settings/roles' },
-            { icon: UserCog, title: 'Access Control', href: '/settings/access' },
+            { icon: UserCog, title: 'Overrides & Governance', href: '/settings/access' },
         ],
     },
     {
