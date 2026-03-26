@@ -23,7 +23,8 @@ class RolesController extends Controller
         $roles = Role::query()
             ->orderBy('label')
             ->with(['permissions:id,key,description'])
-            ->get(['id', 'name', 'label']);
+            ->withCount('users')
+            ->get(['id', 'name', 'label', 'description']);
 
         $permissions = Permission::query()
             ->orderBy('key')
@@ -34,6 +35,8 @@ class RolesController extends Controller
                 'id' => $r->id,
                 'name' => $r->name,
                 'label' => $r->label,
+                'description' => $r->description,
+                'users_count' => $r->users_count,
                 'permission_keys' => $r->permissions->pluck('key')->values(),
             ])->values(),
             'permissions' => $permissions,
@@ -46,9 +49,25 @@ class RolesController extends Controller
 
         $permissions = Permission::query()->orderBy('key')->get(['id', 'key', 'description']);
 
+        // Support cloning from an existing role
+        $cloneRole = null;
+        if ($cloneId = $request->query('clone')) {
+            $source = Role::with('permissions:id,key')->find($cloneId);
+            if ($source) {
+                $cloneRole = [
+                    'id' => 0,
+                    'name' => $source->name . '_copy',
+                    'label' => $source->label . ' (Copy)',
+                    'description' => $source->description,
+                    'users_count' => 0,
+                    'permission_keys' => $source->permissions->pluck('key')->values(),
+                ];
+            }
+        }
+
         return inertia('settings/roles/edit', [
             'mode' => 'create',
-            'role' => null,
+            'role' => $cloneRole,
             'permissions' => $permissions,
         ]);
     }
@@ -60,6 +79,7 @@ class RolesController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:50', 'regex:/^[a-z0-9_]+$/', Rule::unique('roles', 'name')],
             'label' => ['required', 'string', 'max:80'],
+            'description' => ['nullable', 'string', 'max:500'],
             'permission_keys' => ['array'],
             'permission_keys.*' => ['string', Rule::exists('permissions', 'key')],
         ], [
@@ -69,6 +89,7 @@ class RolesController extends Controller
         $role = Role::create([
             'name' => $data['name'],
             'label' => $data['label'],
+            'description' => $data['description'] ?? null,
         ]);
 
         $keys = collect($data['permission_keys'] ?? [])->unique()->values();
@@ -85,6 +106,7 @@ class RolesController extends Controller
         $this->gate($request);
 
         $role->load(['permissions:id,key,description']);
+        $role->loadCount('users');
         $permissions = Permission::query()->orderBy('key')->get(['id', 'key', 'description']);
 
         return inertia('settings/roles/edit', [
@@ -93,6 +115,8 @@ class RolesController extends Controller
                 'id' => $role->id,
                 'name' => $role->name,
                 'label' => $role->label,
+                'description' => $role->description,
+                'users_count' => $role->users_count,
                 'permission_keys' => $role->permissions->pluck('key')->values(),
             ],
             'permissions' => $permissions,
@@ -106,6 +130,7 @@ class RolesController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:50', 'regex:/^[a-z0-9_]+$/', Rule::unique('roles', 'name')->ignore($role->id)],
             'label' => ['required', 'string', 'max:80'],
+            'description' => ['nullable', 'string', 'max:500'],
             'permission_keys' => ['array'],
             'permission_keys.*' => ['string', Rule::exists('permissions', 'key')],
         ], [
@@ -115,6 +140,7 @@ class RolesController extends Controller
         $role->update([
             'name' => $data['name'],
             'label' => $data['label'],
+            'description' => $data['description'] ?? null,
         ]);
 
         $keys = collect($data['permission_keys'] ?? [])->unique()->values();
