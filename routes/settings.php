@@ -37,6 +37,35 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/two-factor', [TwoFactorAuthenticationController::class, 'show'])
         ->name('two-factor.show');
 
+    // User Management
+    Route::get('settings/users', [\App\Http\Controllers\System\UsersController::class, 'index'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.index');
+    Route::get('settings/users/{target}', [\App\Http\Controllers\System\UsersController::class, 'show'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.show');
+    Route::put('settings/users/{target}', [\App\Http\Controllers\System\UsersController::class, 'update'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.update');
+    Route::post('settings/users/{target}/approve', [\App\Http\Controllers\System\UsersController::class, 'approve'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.approve');
+    Route::put('settings/users/{target}/roles', function (\Illuminate\Http\Request $request, \App\Models\User $target) {
+        abort_unless($request->user()?->canDo('settings.access.manage'), 403);
+        $data = $request->validate(['role_ids' => 'array', 'role_ids.*' => 'integer|exists:roles,id']);
+        $target->roles()->sync($data['role_ids'] ?? []);
+        return back()->with('success', 'Roles updated.');
+    })->middleware('permission:settings.access.manage')->name('settings.users.roles.sync');
+    Route::post('settings/users/{target}/suspend', [\App\Http\Controllers\System\UsersController::class, 'suspend'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.suspend');
+    Route::delete('settings/users/{target}/sessions/{session}', [\App\Http\Controllers\System\UsersController::class, 'terminateSession'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.sessions.destroy');
+    Route::delete('settings/users/{target}/sessions', [\App\Http\Controllers\System\UsersController::class, 'terminateAllSessions'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.users.sessions.destroyAll');
+
     // Admin access controls (roles & per-user overrides)
     Route::get('settings/access', [AccessController::class, 'index'])
         ->middleware('permission:settings.access.manage')
