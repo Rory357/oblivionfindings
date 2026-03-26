@@ -179,7 +179,11 @@ Route::middleware('auth')->group(function () {
         ->name('settings.integrations.index');
 
     // SSO Configuration
-    Route::get('settings/sso', fn () => \Inertia\Inertia::render('settings/sso'))->middleware('permission:settings.access.manage')->name('settings.sso');
+    Route::get('settings/sso', fn () => \Inertia\Inertia::render('settings/sso', [
+        'microsoft_configured' => !empty(config('services.microsoft.client_id')),
+        'google_configured' => !empty(config('services.google.client_id')),
+        'group_mapping_count' => \App\Models\SsoGroupMapping::count(),
+    ]))->middleware('permission:settings.access.manage')->name('settings.sso');
 
     // SSO Group Mapping
     Route::get('settings/sso-groups', [\App\Http\Controllers\Settings\SsoGroupController::class, 'index'])->middleware('permission:settings.access.manage')->name('settings.sso-groups');
