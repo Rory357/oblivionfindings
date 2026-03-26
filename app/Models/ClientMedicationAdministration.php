@@ -64,4 +64,14 @@ class ClientMedicationAdministration extends Model
     {
         return $this->belongsTo(User::class, 'witnessed_by');
     }
+
+    public function round()
+    {
+        return $this->belongsTo(MedicationRound::class, 'medication_round_id');
+    }
+
+    public function prnEffectiveness()
+    {
+        return $this->hasOne(MedicationPrnEffectiveness::class, 'client_medication_administration_id');
+    }
 }

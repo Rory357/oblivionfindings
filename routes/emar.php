@@ -1,30 +1,92 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\MedicationsController;
-use App\Http\Controllers\MedicationAuditController;
-use App\Http\Controllers\MedicationsReportController;
+use App\Http\Controllers\Emar\EmarController;
 use App\Http\Controllers\EmergencyAccessController;
+use App\Http\Controllers\MedicationAuditController;
+use App\Http\Controllers\MedicationsController;
+use App\Http\Controllers\MedicationsReportController;
+use Illuminate\Support\Facades\Route;
 
 /**
  * eMAR (Electronic Medication Administration Record) Routes
  *
- * Placeholder module - full eMAR will be built as a separate module.
- * Currently contains migrated medication management routes.
+ * Comprehensive eMAR system for NZ residential care / supported living.
+ * Covers medication administration, controlled drugs, prescriber orders,
+ * reviews, competency, stock, pharmacy, rounds, and compliance.
  */
 
 Route::middleware(['auth'])->prefix('emar')->group(function () {
-    // Dashboard (placeholder)
+    // Dashboard
     Route::get('/', function () {
         return \Inertia\Inertia::render('emar/Index');
     })->middleware('permission:medications.view')->name('emar.index');
 
-    // Daily overview (migrated from /medications)
+    // Daily overview
     Route::get('/daily', [MedicationsController::class, 'index'])
         ->middleware('permission:medications.view')
         ->name('emar.daily');
 
-    // Audit trail (migrated from /medications/audit)
+    // MAR Charts
+    Route::get('/mar', [EmarController::class, 'mar'])
+        ->middleware('permission:medications.view')
+        ->name('emar.mar');
+
+    // PRN Records
+    Route::get('/prn', [EmarController::class, 'prn'])
+        ->middleware('permission:medications.view')
+        ->name('emar.prn');
+
+    // Controlled Drugs
+    Route::get('/controlled', [EmarController::class, 'controlled'])
+        ->middleware('permission:medications.view')
+        ->name('emar.controlled');
+
+    // Medications Database
+    Route::get('/medications', [EmarController::class, 'medications'])
+        ->middleware('permission:medications.view')
+        ->name('emar.medications');
+
+    // Stock Management
+    Route::get('/stock', [EmarController::class, 'stock'])
+        ->middleware('permission:medications.view')
+        ->name('emar.stock');
+
+    // Prescriptions & Prescriber Orders
+    Route::get('/prescriptions', [EmarController::class, 'prescriptions'])
+        ->middleware('permission:medications.view')
+        ->name('emar.prescriptions');
+
+    // Competency Assessments
+    Route::get('/competency', [EmarController::class, 'competency'])
+        ->middleware('permission:medications.view')
+        ->name('emar.competency');
+
+    // Medication Reviews
+    Route::get('/reviews', [EmarController::class, 'reviews'])
+        ->middleware('permission:medications.view')
+        ->name('emar.reviews');
+
+    // Medication Rounds
+    Route::get('/rounds', [EmarController::class, 'rounds'])
+        ->middleware('permission:medications.view')
+        ->name('emar.rounds');
+
+    // Self-Administration Assessments
+    Route::get('/self-admin', [EmarController::class, 'selfAdmin'])
+        ->middleware('permission:medications.view')
+        ->name('emar.self_admin');
+
+    // Destruction / Disposal Records
+    Route::get('/destructions', [EmarController::class, 'destructions'])
+        ->middleware('permission:medications.view')
+        ->name('emar.destructions');
+
+    // Medication Handovers
+    Route::get('/handovers', [EmarController::class, 'handovers'])
+        ->middleware('permission:medications.view')
+        ->name('emar.handovers');
+
+    // Audit trail
     Route::get('/audit', [MedicationAuditController::class, 'index'])
         ->middleware('permission:medications.audit.view')
         ->name('emar.audit');
@@ -32,12 +94,12 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->middleware('permission:medications.reports.export')
         ->name('emar.audit.export');
 
-    // Emergency access (migrated from /emergency-access)
+    // Emergency access
     Route::get('/emergency-access', [EmergencyAccessController::class, 'index'])
         ->middleware('permission:medications.breakGlass')
         ->name('emar.emergency_access');
 
-    // Reports (migrated from /reports/medications)
+    // Reports
     Route::middleware('permission:reports.viewAny')->group(function () {
         Route::get('/reports', [MedicationsReportController::class, 'index'])
             ->name('emar.reports');
@@ -46,21 +108,4 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         Route::get('/reports/export-controlled-discrepancies', [MedicationsReportController::class, 'exportDiscrepanciesCsv'])
             ->name('emar.reports.export_discrepancies');
     });
-
-    // Placeholder routes for future eMAR features
-    // These will render placeholder pages
-    Route::get('/mar', fn () => \Inertia\Inertia::render('emar/Placeholder', ['feature' => 'MAR Charts']))
-        ->middleware('permission:medications.view')->name('emar.mar');
-    Route::get('/prn', fn () => \Inertia\Inertia::render('emar/Placeholder', ['feature' => 'PRN Records']))
-        ->middleware('permission:medications.view')->name('emar.prn');
-    Route::get('/controlled', fn () => \Inertia\Inertia::render('emar/Placeholder', ['feature' => 'Controlled Drugs']))
-        ->middleware('permission:medications.view')->name('emar.controlled');
-    Route::get('/medications', fn () => \Inertia\Inertia::render('emar/Placeholder', ['feature' => 'Medications']))
-        ->middleware('permission:medications.view')->name('emar.medications');
-    Route::get('/stock', fn () => \Inertia\Inertia::render('emar/Placeholder', ['feature' => 'Stock Management']))
-        ->middleware('permission:medications.view')->name('emar.stock');
-    Route::get('/prescriptions', fn () => \Inertia\Inertia::render('emar/Placeholder', ['feature' => 'Prescriptions']))
-        ->middleware('permission:medications.view')->name('emar.prescriptions');
-    Route::get('/competency', fn () => \Inertia\Inertia::render('emar/Placeholder', ['feature' => 'Competency']))
-        ->middleware('permission:medications.view')->name('emar.competency');
 });

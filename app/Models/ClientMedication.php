@@ -105,6 +105,27 @@ class ClientMedication extends Model
         return $this->hasMany(MedicationDashboardAlert::class, 'client_medication_id');
     }
 
+    public function prescriberOrders(): HasMany
+    {
+        return $this->hasMany(MedicationPrescriberOrder::class, 'client_medication_id');
+    }
+
+    public function destructions(): HasMany
+    {
+        return $this->hasMany(MedicationDestruction::class, 'client_medication_id');
+    }
+
+    public function covertAuthorisation(): HasOne
+    {
+        return $this->hasOne(MedicationCovertAuthorisation::class, 'client_medication_id')
+            ->where('status', 'active');
+    }
+
+    public function pharmacyOrders(): HasMany
+    {
+        return $this->hasMany(MedicationPharmacyOrder::class, 'client_medication_id');
+    }
+
     public function supersededBy(): BelongsTo
     {
         return $this->belongsTo(self::class, 'superseded_by');

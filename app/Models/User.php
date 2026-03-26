@@ -308,4 +308,9 @@ class User extends Authenticatable
             ->whereHas('permissions', fn($q) => $q->where('key', $permissionKey))
             ->exists();
     }
+
+    public function medicationCompetencyAssessments()
+    {
+        return $this->hasMany(MedicationCompetencyAssessment::class);
+    }
 }
