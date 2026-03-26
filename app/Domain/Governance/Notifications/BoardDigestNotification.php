@@ -43,11 +43,6 @@ class BoardDigestNotification extends Notification
         return [
             'type' => 'board_digest',
             'title' => 'Weekly Board Digest',
-            'message' => 'Your weekly board activity digest is ready.',
-            'url' => '/governance',
-            'context' => [
-                'Period' => now()->subWeek()->format('j M') . ' - ' . now()->format('j M Y'),
-            ],
             'sent_at' => now()->toIso8601String(),
         ];
     }

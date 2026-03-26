@@ -37,12 +37,6 @@ class ActionItemEscalatedNotification extends Notification
     {
         return [
             'type' => 'action_item_escalated',
-            'title' => "Action Item Escalated: {$this->actionItem->action_reference}",
-            'message' => 'An overdue action item has been escalated and requires your attention.',
-            'url' => "/governance/actions/{$this->actionItem->id}",
-            'context' => [
-                'Reference' => $this->actionItem->action_reference,
-            ],
             'action_id' => $this->actionItem->id,
             'reference' => $this->actionItem->action_reference,
         ];

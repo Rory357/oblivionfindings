@@ -3,9 +3,12 @@
 namespace App\Domain\Hr\Notifications;
 
 use App\Domain\Hr\Models\HrReportExport;
+use App\Models\NotificationTemplate;
+use App\Services\TemplateRenderService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class HrScheduledReportReadyNotification extends Notification
 {
@@ -22,6 +25,23 @@ class HrScheduledReportReadyNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $template = NotificationTemplate::findByKey('hr_report_ready');
+
+        if ($template && $template->is_active) {
+            $service = app(TemplateRenderService::class);
+            $context = [
+                'document_name' => ucwords(str_replace('_', ' ', $this->export->report_type)),
+                'date' => optional($this->export->generated_at)->format('d/m/Y') ?? now()->format('d/m/Y'),
+            ];
+
+            $body = $service->render($template, $notifiable, $context);
+            $subject = $service->renderSubject($template, $notifiable, $context);
+
+            return (new MailMessage)
+                ->subject($subject)
+                ->line(new HtmlString(nl2br(e($body))));
+        }
+
         return (new MailMessage)
             ->subject('HR scheduled report ready')
             ->line('A scheduled HR report export has been generated.')
@@ -51,4 +71,3 @@ class HrScheduledReportReadyNotification extends Notification
         ];
     }
 }
-

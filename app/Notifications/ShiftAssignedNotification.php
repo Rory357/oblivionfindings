@@ -2,9 +2,12 @@
 
 namespace App\Notifications;
 
+use App\Models\NotificationTemplate;
+use App\Services\TemplateRenderService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class ShiftAssignedNotification extends Notification
 {
@@ -24,6 +27,27 @@ class ShiftAssignedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $template = NotificationTemplate::findByKey('shift_reminder');
+
+        if ($template && $template->is_active) {
+            $service = app(TemplateRenderService::class);
+            $context = [
+                'client' => $this->clientName,
+                'date' => $this->shiftDate,
+                'start_time' => $this->shiftTime,
+                'end_time' => '',
+                'location' => $this->siteName,
+            ];
+
+            $body = $service->render($template, $notifiable, $context);
+            $subject = $service->renderSubject($template, $notifiable, $context);
+
+            return (new MailMessage)
+                ->subject($subject)
+                ->line(new HtmlString(nl2br(e($body))));
+        }
+
+        // Fallback to hardcoded content
         return (new MailMessage)
             ->subject("Shift Assigned: {$this->clientName} on {$this->shiftDate}")
             ->greeting('Hello ' . ($notifiable->name ?? 'there') . ',')

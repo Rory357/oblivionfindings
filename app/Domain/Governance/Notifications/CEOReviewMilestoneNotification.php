@@ -43,12 +43,6 @@ class CEOReviewMilestoneNotification extends Notification implements ShouldQueue
     {
         return [
             'type' => 'ceo_review_milestone',
-            'title' => 'CEO Review: ' . ucfirst(str_replace('_', ' ', $this->milestone)),
-            'message' => 'A CEO review milestone has been reached.',
-            'url' => "/governance/performance-reviews/{$this->review->id}",
-            'context' => [
-                'Milestone' => ucfirst(str_replace('_', ' ', $this->milestone)),
-            ],
             'review_id' => $this->review->id,
             'milestone' => $this->milestone,
         ];

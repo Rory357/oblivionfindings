@@ -40,13 +40,6 @@ class BoardPackPublishedNotification extends Notification
     {
         return [
             'type' => 'board_pack_published',
-            'title' => 'Board Pack Published',
-            'message' => 'A new board pack has been published for your review.',
-            'url' => "/governance/board-packs/{$this->pack->id}",
-            'context' => [
-                'Meeting' => $this->pack->meeting?->title ?? 'N/A',
-                'Scheduled' => $this->pack->meeting?->scheduled_at?->format('j M Y') ?? 'N/A',
-            ],
             'pack_id' => $this->pack->id,
             'meeting_id' => $this->pack->meeting_id,
         ];

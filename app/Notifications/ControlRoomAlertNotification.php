@@ -23,14 +23,6 @@ class ControlRoomAlertNotification extends Notification
     {
         return [
             'type' => 'control_room_alert',
-            'title' => "Control Room Alert: {$this->alert->alert_type}",
-            'message' => "A {$this->alert->severity} alert has been triggered.",
-            'url' => '/control-room',
-            'context' => [
-                'Type' => $this->alert->alert_type,
-                'Severity' => $this->alert->severity,
-                'Source' => $this->alert->source,
-            ],
             'alert_id' => $this->alert->id,
             'severity' => $this->alert->severity,
             'status' => $this->alert->status,

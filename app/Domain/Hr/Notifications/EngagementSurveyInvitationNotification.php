@@ -3,9 +3,12 @@
 namespace App\Domain\Hr\Notifications;
 
 use App\Domain\Hr\Models\HrEngagementSurvey;
+use App\Models\NotificationTemplate;
+use App\Services\TemplateRenderService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class EngagementSurveyInvitationNotification extends Notification
 {
@@ -22,6 +25,22 @@ class EngagementSurveyInvitationNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $template = NotificationTemplate::findByKey('survey_invitation');
+
+        if ($template && $template->is_active) {
+            $service = app(TemplateRenderService::class);
+            $context = [
+                'document_name' => $this->survey->title,
+            ];
+
+            $body = $service->render($template, $notifiable, $context);
+            $subject = $service->renderSubject($template, $notifiable, $context);
+
+            return (new MailMessage)
+                ->subject($subject)
+                ->line(new HtmlString(nl2br(e($body))));
+        }
+
         return (new MailMessage)
             ->subject('New Engagement Survey: ' . $this->survey->title)
             ->line('A new engagement survey is available and ready for your response.')

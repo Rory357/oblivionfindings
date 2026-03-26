@@ -40,22 +40,13 @@ class ComplianceExpiryNotification extends Notification implements ShouldQueue
 
     public function toArray(object $notifiable): array
     {
-        $name = $this->requirement['name'] ?? 'Unknown Requirement';
-        $expiresAt = $this->requirement['expires_at'] ?? null;
-
         return [
             'type'             => 'compliance_expiry',
-            'title'            => "Compliance Expiry: {$name}",
-            'message'          => "Compliance item expiring: {$name}",
-            'url'              => '/hr/compliance',
-            'action_url'       => '/hr/compliance',
-            'context'          => [
-                'Requirement' => $name,
-                'Expires'     => $expiresAt ? \Carbon\Carbon::parse($expiresAt)->toDateString() : 'N/A',
-            ],
+            'message'          => "Compliance item expiring: {$this->requirement['name']}",
             'requirement_code' => $this->requirement['requirement_code'] ?? null,
-            'expires_at'       => $expiresAt,
+            'expires_at'       => $this->requirement['expires_at'] ?? null,
             'user_id'          => $this->user->id,
+            'action_url'       => '/hr/compliance',
         ];
     }
 }

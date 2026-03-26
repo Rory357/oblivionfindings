@@ -2,9 +2,12 @@
 
 namespace App\Notifications;
 
+use App\Models\NotificationTemplate;
+use App\Services\TemplateRenderService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class CertificationExpiringNotification extends Notification
 {
@@ -24,6 +27,26 @@ class CertificationExpiringNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $template = NotificationTemplate::findByKey('certification_expiring');
+
+        if ($template && $template->is_active) {
+            $service = app(TemplateRenderService::class);
+            $context = [
+                'document_name' => $this->certificationName,
+                'expiry_date' => $this->expiryDate,
+                'days_remaining' => (string) $this->daysRemaining,
+                'recipient' => $this->staffName,
+            ];
+
+            $body = $service->render($template, $notifiable, $context);
+            $subject = $service->renderSubject($template, $notifiable, $context);
+
+            return (new MailMessage)
+                ->subject($subject)
+                ->line(new HtmlString(nl2br(e($body))));
+        }
+
+        // Fallback to hardcoded content
         return (new MailMessage)
             ->subject("Certification Expiring: {$this->staffName} - {$this->certificationName}")
             ->greeting('Hello ' . ($notifiable->name ?? 'there') . ',')

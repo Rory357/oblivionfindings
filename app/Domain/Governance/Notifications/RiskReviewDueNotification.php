@@ -38,15 +38,9 @@ class RiskReviewDueNotification extends Notification
     {
         return [
             'type' => 'risk_review_due',
-            'title' => "Risk Review Due: {$this->risk->title}",
-            'message' => "Risk {$this->risk->risk_reference} is due for review.",
-            'url' => "/governance/risks/{$this->risk->id}",
-            'context' => [
-                'Reference' => $this->risk->risk_reference,
-                'Due date' => $this->risk->next_review_date->toDateString(),
-            ],
             'risk_id' => $this->risk->id,
             'risk_reference' => $this->risk->risk_reference,
+            'title' => $this->risk->title,
             'due_date' => $this->risk->next_review_date->toDateString(),
         ];
     }

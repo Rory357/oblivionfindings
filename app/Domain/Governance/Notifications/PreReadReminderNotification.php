@@ -37,13 +37,6 @@ class PreReadReminderNotification extends Notification implements ShouldQueue
     {
         return [
             'type' => 'pre_read_reminder',
-            'title' => "Pre-Read Reminder: {$this->meeting->title}",
-            'message' => 'Please review the pre-read materials before the upcoming meeting.',
-            'url' => "/governance/meetings/{$this->meeting->id}",
-            'context' => [
-                'Meeting' => $this->meeting->title,
-                'Scheduled at' => $this->meeting->scheduled_at->format('j M Y, g:i A'),
-            ],
             'meeting_id' => $this->meeting->id,
             'meeting_title' => $this->meeting->title,
             'scheduled_at' => $this->meeting->scheduled_at->toIso8601String(),

@@ -3,9 +3,12 @@
 namespace App\Domain\Hr\Notifications;
 
 use App\Domain\Hr\Models\HrEngagementActionPlan;
+use App\Models\NotificationTemplate;
+use App\Services\TemplateRenderService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class EngagementActionPlanDueNotification extends Notification
 {
@@ -24,6 +27,25 @@ class EngagementActionPlanDueNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $templateKey = $this->reminderKind === 'overdue' ? 'action_plan_overdue' : 'action_plan_due';
+        $template = NotificationTemplate::findByKey($templateKey);
+
+        if ($template && $template->is_active) {
+            $service = app(TemplateRenderService::class);
+            $context = [
+                'document_name' => $this->plan->title,
+                'due_date' => optional($this->plan->due_date)->format('d/m/Y') ?? 'Not set',
+                'days_remaining' => (string) abs($this->daysUntilDue),
+            ];
+
+            $body = $service->render($template, $notifiable, $context);
+            $subject = $service->renderSubject($template, $notifiable, $context);
+
+            return (new MailMessage)
+                ->subject($subject)
+                ->line(new HtmlString(nl2br(e($body))));
+        }
+
         $subject = $this->reminderKind === 'overdue'
             ? 'Action plan overdue'
             : 'Action plan due soon';
@@ -68,4 +90,3 @@ class EngagementActionPlanDueNotification extends Notification
         ];
     }
 }
-

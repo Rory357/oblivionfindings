@@ -2,9 +2,12 @@
 
 namespace App\Notifications;
 
+use App\Models\NotificationTemplate;
+use App\Services\TemplateRenderService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class LeaveRequestNotification extends Notification
 {
@@ -27,6 +30,25 @@ class LeaveRequestNotification extends Notification
     public function toMail(object $notifiable): MailMessage
     {
         if ($this->status === 'pending') {
+            $template = NotificationTemplate::findByKey('leave_request_pending');
+
+            if ($template && $template->is_active) {
+                $service = app(TemplateRenderService::class);
+                $context = [
+                    'leave_type' => $this->leaveType,
+                    'dates' => "{$this->startDate} to {$this->endDate}",
+                    'recipient' => $this->staffName,
+                ];
+
+                $body = $service->render($template, $notifiable, $context);
+                $subject = $service->renderSubject($template, $notifiable, $context);
+
+                return (new MailMessage)
+                    ->subject($subject)
+                    ->line(new HtmlString(nl2br(e($body))));
+            }
+
+            // Fallback for pending
             return (new MailMessage)
                 ->subject("Leave Request: {$this->staffName} ({$this->leaveType})")
                 ->greeting('Hello ' . ($notifiable->name ?? 'there') . ',')
@@ -37,6 +59,28 @@ class LeaveRequestNotification extends Notification
                 ->line('Please review and respond to this request.');
         }
 
+        // Approved / declined
+        $templateKey = $this->status === 'approved' ? 'leave_approved' : 'leave_declined';
+        $template = NotificationTemplate::findByKey($templateKey);
+
+        if ($template && $template->is_active) {
+            $service = app(TemplateRenderService::class);
+            $context = [
+                'leave_type' => $this->leaveType,
+                'dates' => "{$this->startDate} to {$this->endDate}",
+                'approver' => '',
+                'reason' => '',
+            ];
+
+            $body = $service->render($template, $notifiable, $context);
+            $subject = $service->renderSubject($template, $notifiable, $context);
+
+            return (new MailMessage)
+                ->subject($subject)
+                ->line(new HtmlString(nl2br(e($body))));
+        }
+
+        // Fallback for approved/declined
         $decision = ucfirst($this->status);
 
         return (new MailMessage)

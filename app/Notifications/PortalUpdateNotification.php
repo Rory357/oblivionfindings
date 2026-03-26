@@ -2,9 +2,12 @@
 
 namespace App\Notifications;
 
+use App\Models\NotificationTemplate;
+use App\Services\TemplateRenderService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class PortalUpdateNotification extends Notification
 {
@@ -24,6 +27,25 @@ class PortalUpdateNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $template = NotificationTemplate::findByKey('portal_update');
+
+        if ($template && $template->is_active) {
+            $service = app(TemplateRenderService::class);
+            $context = [
+                'client' => $this->clientName,
+                'recipient' => $this->authorName,
+                'document_name' => $this->noteType,
+            ];
+
+            $body = $service->render($template, $notifiable, $context);
+            $subject = $service->renderSubject($template, $notifiable, $context);
+
+            return (new MailMessage)
+                ->subject($subject)
+                ->line(new HtmlString(nl2br(e($body))));
+        }
+
+        // Fallback to hardcoded content
         return (new MailMessage)
             ->subject("Update for {$this->clientName}: New {$this->noteType}")
             ->greeting('Hello ' . ($notifiable->name ?? 'there') . ',')

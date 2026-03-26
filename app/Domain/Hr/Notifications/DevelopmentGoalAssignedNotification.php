@@ -3,9 +3,12 @@
 namespace App\Domain\Hr\Notifications;
 
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Models\NotificationTemplate;
+use App\Services\TemplateRenderService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class DevelopmentGoalAssignedNotification extends Notification
 {
@@ -22,6 +25,23 @@ class DevelopmentGoalAssignedNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $template = NotificationTemplate::findByKey('development_goal_assigned');
+
+        if ($template && $template->is_active) {
+            $service = app(TemplateRenderService::class);
+            $context = [
+                'document_name' => $this->goal->title,
+                'due_date' => optional($this->goal->due_date)->format('d/m/Y') ?? 'Not set',
+            ];
+
+            $body = $service->render($template, $notifiable, $context);
+            $subject = $service->renderSubject($template, $notifiable, $context);
+
+            return (new MailMessage)
+                ->subject($subject)
+                ->line(new HtmlString(nl2br(e($body))));
+        }
+
         return (new MailMessage)
             ->subject('New Development Goal Assigned')
             ->line('A new development goal has been assigned to you.')

@@ -2,9 +2,12 @@
 
 namespace App\Notifications;
 
+use App\Models\NotificationTemplate;
+use App\Services\TemplateRenderService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
+use Illuminate\Support\HtmlString;
 
 class HighSeverityIncidentNotification extends Notification
 {
@@ -25,6 +28,27 @@ class HighSeverityIncidentNotification extends Notification
 
     public function toMail(object $notifiable): MailMessage
     {
+        $template = NotificationTemplate::findByKey('incident_alert');
+
+        if ($template && $template->is_active) {
+            $service = app(TemplateRenderService::class);
+            $severityLabel = strtoupper($this->severity);
+            $context = [
+                'incident_type' => $this->incidentTitle,
+                'severity' => $severityLabel,
+                'reporter' => $this->reportedBy,
+                'location' => $this->siteName,
+            ];
+
+            $body = $service->render($template, $notifiable, $context);
+            $subject = $service->renderSubject($template, $notifiable, $context);
+
+            return (new MailMessage)
+                ->subject($subject)
+                ->line(new HtmlString(nl2br(e($body))));
+        }
+
+        // Fallback to hardcoded content
         $severityLabel = strtoupper($this->severity);
 
         return (new MailMessage)

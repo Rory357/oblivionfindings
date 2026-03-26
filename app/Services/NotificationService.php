@@ -329,6 +329,18 @@ class NotificationService
         };
     }
 
+    /**
+     * Filter recipients based on user/role notification preferences.
+     *
+     * NOTE: This only filters the "enabled" flag. The channel_email / channel_inapp
+     * preferences stored on UserNotificationPreference are NOT yet respected here or
+     * in the standalone notification classes' via() methods. To fully support per-channel
+     * preferences, each notification class should consult the user's channel preferences
+     * inside its via() method (e.g. only include 'mail' if channel_email is true).
+     *
+     * TODO: Implement channel-level preference checks in via() methods across all
+     * notification classes, or introduce a shared trait/base class that handles this.
+     */
     public function applyPreferences(Collection $recipients, string $eventKey): Collection
     {
         if ($recipients->isEmpty()) return $recipients;
