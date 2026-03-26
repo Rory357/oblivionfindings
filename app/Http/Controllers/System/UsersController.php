@@ -9,7 +9,9 @@ use App\Models\Role;
 use App\Models\Staff;
 use App\Models\User;
 use App\Models\UserInvitation;
+use App\Models\UserLoginLog;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -28,6 +30,8 @@ class UsersController extends Controller
         $statusFilter = $request->query('status', 'all'); // all, active, pending
         $roleFilter = $request->query('role', 'all'); // all, specific role id
         $typeFilter = $request->query('type', 'all'); // all, staff, client, next_of_kin, board
+        $has2fa = $request->query('has_2fa', 'all'); // all, yes, no
+        $activity = $request->query('activity', 'all'); // all, today, week, inactive
 
         $query = User::query()
             ->with(['roles:id,name,label,level', 'staffProfile:id,user_id,job_title,status'])
@@ -67,6 +71,29 @@ class UsersController extends Controller
                 break;
         }
 
+        // 2FA filter
+        if ($has2fa === 'yes') {
+            $query->whereNotNull('two_factor_confirmed_at');
+        } elseif ($has2fa === 'no') {
+            $query->whereNull('two_factor_confirmed_at');
+        }
+
+        // Activity filter
+        switch ($activity) {
+            case 'today':
+                $query->where('last_login_at', '>=', now()->startOfDay());
+                break;
+            case 'week':
+                $query->where('last_login_at', '>=', now()->startOfWeek());
+                break;
+            case 'inactive':
+                $query->where(function ($q) {
+                    $q->whereNull('last_login_at')
+                      ->orWhere('last_login_at', '<', now()->subDays(30));
+                });
+                break;
+        }
+
         $users = $query->orderBy('name')
             ->paginate(20)
             ->through(fn($user) => [
@@ -87,6 +114,11 @@ class UsersController extends Controller
                     'job_title' => $user->staffProfile->job_title,
                     'status' => $user->staffProfile->status,
                 ] : null,
+                'last_login_at' => $user->last_login_at,
+                'last_login_ip' => $user->last_login_ip,
+                'login_count' => $user->login_count ?? 0,
+                'two_factor_confirmed_at' => $user->two_factor_confirmed_at,
+                'session_count' => DB::table('sessions')->where('user_id', $user->id)->count(),
             ]);
 
         // Get all roles for filter dropdown
@@ -99,6 +131,8 @@ class UsersController extends Controller
                 'status' => $statusFilter,
                 'role' => $roleFilter,
                 'type' => $typeFilter,
+                'has_2fa' => $has2fa,
+                'activity' => $activity,
             ],
             'roles' => $roles,
             'stats' => [
@@ -263,8 +297,36 @@ class UsersController extends Controller
                 'roles' => $target->roles,
                 'user_type' => $this->getUserType($target),
                 'staff_profile' => $target->staffProfile,
+                'last_login_at' => $target->last_login_at,
+                'last_login_ip' => $target->last_login_ip,
+                'login_count' => $target->login_count ?? 0,
+                'two_factor_confirmed_at' => $target->two_factor_confirmed_at,
             ],
             'allRoles' => $allRoles,
+            'login_logs' => UserLoginLog::where('user_id', $target->id)
+                ->orderByDesc('created_at')
+                ->limit(50)
+                ->get(),
+            'active_sessions' => DB::table('sessions')
+                ->where('user_id', $target->id)
+                ->get()
+                ->map(fn ($s) => [
+                    'id' => $s->id,
+                    'ip_address' => $s->ip_address,
+                    'user_agent' => $s->user_agent,
+                    'last_activity' => $s->last_activity,
+                    'is_current' => $s->id === session()->getId(),
+                ]),
+            'login_stats' => [
+                'this_month' => UserLoginLog::where('user_id', $target->id)
+                    ->where('event_type', 'login')
+                    ->where('created_at', '>=', now()->startOfMonth())
+                    ->count(),
+                'last_ip' => $target->last_login_ip,
+                'active_sessions' => DB::table('sessions')
+                    ->where('user_id', $target->id)
+                    ->count(),
+            ],
         ]);
     }
 
@@ -365,6 +427,36 @@ class UsersController extends Controller
         }
 
         return redirect()->back()->with('success', 'User suspended successfully.');
+    }
+
+    /**
+     * Terminate a specific session for a user
+     */
+    public function terminateSession(Request $request, User $target, string $sessionId)
+    {
+        abort_unless($request->user()?->canDo('settings.access.manage'), 403);
+
+        DB::table('sessions')
+            ->where('id', $sessionId)
+            ->where('user_id', $target->id)
+            ->delete();
+
+        return back()->with('success', 'Session terminated.');
+    }
+
+    /**
+     * Terminate all other sessions for a user
+     */
+    public function terminateAllSessions(Request $request, User $target)
+    {
+        abort_unless($request->user()?->canDo('settings.access.manage'), 403);
+
+        DB::table('sessions')
+            ->where('user_id', $target->id)
+            ->where('id', '!=', session()->getId())
+            ->delete();
+
+        return back()->with('success', 'All other sessions terminated.');
     }
 
     /**

@@ -38,12 +38,14 @@ import { Head, Link, router, useForm } from '@inertiajs/react';
 import {
     CheckCircle,
     Clock,
+    Download,
     Mail,
     MoreHorizontal,
     Pencil,
     Search,
     Shield,
     ShieldCheck,
+    ShieldAlert,
     UserMinus,
     UserPlus,
     Users,
@@ -71,6 +73,11 @@ type UserItem = {
     roles: { id: number; label: string; level?: number }[];
     user_type: string;
     staff_profile?: { job_title?: string | null; status?: string | null } | null;
+    last_login_at?: string | null;
+    last_login_ip?: string | null;
+    login_count?: number;
+    two_factor_confirmed_at?: string | null;
+    session_count?: number;
 };
 
 type Props = {
@@ -87,6 +94,8 @@ type Props = {
         status?: string;
         role?: string;
         type?: string;
+        has_2fa?: string;
+        activity?: string;
     };
     stats: {
         total: number;
@@ -151,6 +160,8 @@ export default function UsersIndex({
     const [search, setSearch] = useState(filters.search ?? '');
     const [statusFilter, setStatusFilter] = useState(filters.status ?? 'all');
     const [roleFilter, setRoleFilter] = useState(filters.role ?? 'all');
+    const [twoFaFilter, setTwoFaFilter] = useState(filters.has_2fa ?? 'all');
+    const [activityFilter, setActivityFilter] = useState(filters.activity ?? 'all');
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [inviteOpen, setInviteOpen] = useState(false);
 
@@ -169,9 +180,34 @@ export default function UsersIndex({
                 search: overrides.search ?? search,
                 status: overrides.status ?? statusFilter,
                 role: overrides.role ?? roleFilter,
+                has_2fa: overrides.has_2fa ?? twoFaFilter,
+                activity: overrides.activity ?? activityFilter,
             },
             { preserveState: true, preserveScroll: true },
         );
+    }
+
+    function handleExportCsv() {
+        const headers = ['Name', 'Email', 'Type', 'Status', 'Roles', 'Last Login', 'Sessions', '2FA', 'Created'];
+        const rows = allData.map((u) => [
+            u.name,
+            u.email,
+            u.user_type,
+            u.is_active ? 'Active' : 'Inactive',
+            (u.roles ?? []).map((r) => r.label).join('; '),
+            u.last_login_at ? new Date(u.last_login_at).toLocaleDateString('en-NZ') : 'Never',
+            u.session_count ?? 0,
+            u.two_factor_confirmed_at ? 'Yes' : 'No',
+            u.created_at ? new Date(u.created_at).toLocaleDateString('en-NZ') : '',
+        ]);
+        const csv = [headers, ...rows].map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `users-export-${new Date().toISOString().slice(0, 10)}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
     }
 
     function handleSearch(e: React.FormEvent) {
@@ -224,13 +260,18 @@ export default function UsersIndex({
                         title="User Management"
                         description="Manage user accounts, roles, and access across your organisation"
                         actions={
-                            <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
-                                <DialogTrigger asChild>
-                                    <Button className="bg-violet-600 hover:bg-violet-700">
-                                        <UserPlus className="mr-2 h-4 w-4" />
-                                        Invite User
-                                    </Button>
-                                </DialogTrigger>
+                            <div className="flex items-center gap-2">
+                                <Button variant="outline" onClick={handleExportCsv}>
+                                    <Download className="mr-2 h-4 w-4" />
+                                    Export CSV
+                                </Button>
+                                <Dialog open={inviteOpen} onOpenChange={setInviteOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button className="bg-violet-600 hover:bg-violet-700">
+                                            <UserPlus className="mr-2 h-4 w-4" />
+                                            Invite User
+                                        </Button>
+                                    </DialogTrigger>
                                 <DialogContent>
                                     <DialogHeader>
                                         <DialogTitle>Invite New User</DialogTitle>
@@ -298,6 +339,7 @@ export default function UsersIndex({
                                     </form>
                                 </DialogContent>
                             </Dialog>
+                            </div>
                         }
                     />
 
@@ -377,6 +419,39 @@ export default function UsersIndex({
                                         <SelectItem value="pending">Pending</SelectItem>
                                     </SelectContent>
                                 </Select>
+                                <Select
+                                    value={twoFaFilter}
+                                    onValueChange={(val) => {
+                                        setTwoFaFilter(val);
+                                        applyFilters({ has_2fa: val });
+                                    }}
+                                >
+                                    <SelectTrigger className="w-[140px]">
+                                        <SelectValue placeholder="2FA" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All 2FA</SelectItem>
+                                        <SelectItem value="yes">2FA Enabled</SelectItem>
+                                        <SelectItem value="no">2FA Disabled</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                                <Select
+                                    value={activityFilter}
+                                    onValueChange={(val) => {
+                                        setActivityFilter(val);
+                                        applyFilters({ activity: val });
+                                    }}
+                                >
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="Activity" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Activity</SelectItem>
+                                        <SelectItem value="today">Active Today</SelectItem>
+                                        <SelectItem value="week">This Week</SelectItem>
+                                        <SelectItem value="inactive">Inactive 30+ Days</SelectItem>
+                                    </SelectContent>
+                                </Select>
                                 <Button type="submit" variant="outline">
                                     <Search className="mr-2 h-4 w-4" />
                                     Search
@@ -450,6 +525,8 @@ export default function UsersIndex({
                                             <TableHead>Type</TableHead>
                                             <TableHead>Status</TableHead>
                                             <TableHead>Created</TableHead>
+                                            <TableHead>Last Login</TableHead>
+                                            <TableHead className="w-20">Sessions</TableHead>
                                             <TableHead className="w-10">2FA</TableHead>
                                             <TableHead className="w-20">Actions</TableHead>
                                         </TableRow>
@@ -511,7 +588,21 @@ export default function UsersIndex({
                                                     </span>
                                                 </TableCell>
                                                 <TableCell>
-                                                    <Shield className="h-4 w-4 text-muted-foreground/30" />
+                                                    <span className="text-sm text-muted-foreground" title={user.last_login_at ? new Date(user.last_login_at).toLocaleString('en-NZ') : undefined}>
+                                                        {relativeTime(user.last_login_at)}
+                                                    </span>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant="secondary" className="text-xs">
+                                                        {user.session_count ?? 0}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {user.two_factor_confirmed_at ? (
+                                                        <ShieldCheck className="h-4 w-4 text-emerald-600" />
+                                                    ) : (
+                                                        <ShieldAlert className="h-4 w-4 text-muted-foreground/30" />
+                                                    )}
                                                 </TableCell>
                                                 <TableCell onClick={(e) => e.stopPropagation()}>
                                                     <div className="flex gap-1">

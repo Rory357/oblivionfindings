@@ -6,10 +6,73 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { ArrowLeft, Calendar, CheckCircle2, Clock, Mail, Plus, Shield, ShieldAlert, User, X, XCircle } from 'lucide-react';
+import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import {
+    ArrowLeft,
+    Calendar,
+    CheckCircle2,
+    Clock,
+    Globe,
+    KeyRound,
+    LogIn,
+    LogOut,
+    Mail,
+    Monitor,
+    Phone,
+    Plus,
+    Shield,
+    ShieldAlert,
+    ShieldCheck,
+    Smartphone,
+    Trash2,
+    User,
+    UserCog,
+    X,
+    XCircle,
+} from 'lucide-react';
 import { useState } from 'react';
 
 type Role = { id: number; name: string; label?: string };
+
+type LoginLog = {
+    id: number;
+    event_type: string;
+    ip_address: string;
+    user_agent?: string;
+    location?: string;
+    metadata?: Record<string, any>;
+    created_at: string;
+};
+
+type Session = {
+    id: string;
+    ip_address?: string;
+    user_agent?: string;
+    last_activity: number;
+    is_current?: boolean;
+};
+
+type StaffProfile = {
+    id?: number;
+    employee_id?: string;
+    job_title?: string;
+    department?: string;
+    hire_date?: string;
+    status?: string;
+    work_phone?: string;
+    mobile_phone?: string;
+    emergency_contact_name?: string;
+    emergency_contact_phone?: string;
+    emergency_contact_relationship?: string;
+};
+
 type Props = {
     user: {
         id: number;
@@ -21,23 +84,97 @@ type Props = {
         created_at?: string;
         roles?: Role[];
         user_type?: string;
-        staff_profile?: any;
+        staff_profile?: StaffProfile | null;
+        last_login_at?: string;
+        last_login_ip?: string;
+        login_count?: number;
+        two_factor_confirmed_at?: string;
     };
     allRoles?: Role[];
+    login_logs?: LoginLog[];
+    active_sessions?: Session[];
+    login_stats?: { this_month: number; last_ip?: string; active_sessions: number };
 };
 
-export default function UserShow({ user, allRoles = [] }: Props) {
-    const u = user ?? {} as any;
+function relativeTime(dateStr?: string | null): string {
+    if (!dateStr) return 'Never';
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHours = Math.floor(diffMins / 60);
+    if (diffHours < 24) return `${diffHours}h ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function absoluteTime(dateStr?: string | null): string {
+    if (!dateStr) return '';
+    return new Date(dateStr).toLocaleString('en-NZ', {
+        day: 'numeric', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit',
+    });
+}
+
+function parseBrowser(ua?: string | null): { browser: string; os: string } {
+    if (!ua) return { browser: 'Unknown', os: 'Unknown' };
+    let browser = 'Unknown';
+    if (ua.includes('Edg/') || ua.includes('Edge/')) browser = 'Edge';
+    else if (ua.includes('Chrome/') && !ua.includes('Edg/')) browser = 'Chrome';
+    else if (ua.includes('Firefox/')) browser = 'Firefox';
+    else if (ua.includes('Safari/') && !ua.includes('Chrome/')) browser = 'Safari';
+
+    let os = 'Unknown';
+    if (ua.includes('Windows')) os = 'Windows';
+    else if (ua.includes('Mac OS')) os = 'Mac';
+    else if (ua.includes('Linux') && !ua.includes('Android')) os = 'Linux';
+    else if (ua.includes('Android')) os = 'Android';
+    else if (ua.includes('iPhone') || ua.includes('iPad')) os = 'iOS';
+
+    return { browser, os };
+}
+
+const eventConfig: Record<string, { label: string; color: string; icon: typeof LogIn }> = {
+    login: { label: 'Signed in', color: 'bg-emerald-500', icon: LogIn },
+    logout: { label: 'Signed out', color: 'bg-blue-500', icon: LogOut },
+    failed_login: { label: 'Failed login attempt', color: 'bg-red-500', icon: XCircle },
+    password_changed: { label: 'Password changed', color: 'bg-amber-500', icon: KeyRound },
+    role_changed: { label: 'Role changed', color: 'bg-amber-500', icon: Shield },
+    '2fa_enabled': { label: '2FA enabled', color: 'bg-amber-500', icon: ShieldCheck },
+    '2fa_disabled': { label: '2FA disabled', color: 'bg-amber-500', icon: ShieldAlert },
+    approved: { label: 'Account approved', color: 'bg-violet-500', icon: CheckCircle2 },
+    suspended: { label: 'Account suspended', color: 'bg-violet-500', icon: ShieldAlert },
+};
+
+const eventFilterCategories: Record<string, string[]> = {
+    all: [],
+    logins: ['login'],
+    logouts: ['logout'],
+    failed: ['failed_login'],
+    security: ['password_changed', 'role_changed', '2fa_enabled', '2fa_disabled', 'approved', 'suspended'],
+};
+
+export default function UserShow({ user, allRoles = [], login_logs = [], active_sessions = [], login_stats }: Props) {
+    const u = user ?? ({} as any);
     const roles: Role[] = u.roles ?? [];
     const initials = (u.name ?? '?').split(' ').map((n: string) => n[0]).join('').slice(0, 2).toUpperCase();
     const [showAddRole, setShowAddRole] = useState(false);
     const assignedIds = new Set(roles.map((r: Role) => r.id));
     const availableRoles = allRoles.filter((r) => !assignedIds.has(r.id));
+    const [eventFilter, setEventFilter] = useState('all');
+    const stats = login_stats ?? { this_month: 0, last_ip: undefined, active_sessions: 0 };
+
+    const filteredLogs = eventFilter === 'all'
+        ? login_logs
+        : login_logs.filter((log) => eventFilterCategories[eventFilter]?.includes(log.event_type));
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Settings', href: '/settings' },
         { title: 'Users', href: '/settings/users' },
-        { title: u.name ?? 'User' },
+        { title: u.name ?? 'User', href: `/settings/users/${u.id}` },
     ];
 
     return (
@@ -92,140 +229,453 @@ export default function UserShow({ user, allRoles = [] }: Props) {
                         </div>
                     </div>
 
-                    {/* Two-column layout */}
-                    <div className="grid gap-6 lg:grid-cols-[1fr_0.67fr]">
-                        {/* Left column */}
-                        <div className="space-y-6">
-                            {/* Account Details */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <User className="h-5 w-5 text-violet-600" /> Account Details
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    <div className="grid grid-cols-3 gap-2 text-sm">
-                                        <span className="text-muted-foreground">Name</span>
-                                        <span className="col-span-2 font-medium">{u.name}</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 text-sm">
-                                        <span className="text-muted-foreground">Email</span>
-                                        <span className="col-span-2">{u.email}</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 text-sm">
-                                        <span className="text-muted-foreground">User Type</span>
-                                        <span className="col-span-2 capitalize">{u.user_type ?? '—'}</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 text-sm">
-                                        <span className="text-muted-foreground">Status</span>
-                                        <span className="col-span-2">
-                                            {u.is_active ? (
-                                                <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Active</span>
-                                            ) : (
-                                                <span className="flex items-center gap-1 text-red-600"><XCircle className="h-3.5 w-3.5" /> Inactive</span>
-                                            )}
-                                        </span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 text-sm">
-                                        <span className="text-muted-foreground">Approved</span>
-                                        <span className="col-span-2">{u.approved_at ? new Date(u.approved_at).toLocaleDateString('en-NZ') : '—'}</span>
-                                    </div>
-                                    <div className="grid grid-cols-3 gap-2 text-sm">
-                                        <span className="text-muted-foreground">Member since</span>
-                                        <span className="col-span-2 flex items-center gap-1">
-                                            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
-                                            {u.created_at ? new Date(u.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
-                                        </span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
+                    {/* Tabs */}
+                    <Tabs defaultValue="overview">
+                        <TabsList>
+                            <TabsTrigger value="overview">Overview</TabsTrigger>
+                            <TabsTrigger value="activity">Activity & Security</TabsTrigger>
+                            <TabsTrigger value="sessions">Sessions</TabsTrigger>
+                            {u.staff_profile && (
+                                <TabsTrigger value="staff">Staff Profile</TabsTrigger>
+                            )}
+                        </TabsList>
 
-                        {/* Right column */}
-                        <div className="space-y-6">
-                            {/* Roles */}
-                            <Card>
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <CardTitle className="flex items-center gap-2">
-                                                <Shield className="h-5 w-5 text-violet-600" /> Roles
-                                            </CardTitle>
-                                            <CardDescription>Assign or remove roles for this user</CardDescription>
+                        {/* Tab 1: Overview */}
+                        <TabsContent value="overview" className="mt-6">
+                            <div className="grid gap-6 lg:grid-cols-[1fr_0.67fr]">
+                                {/* Left column — Account Details */}
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <User className="h-5 w-5 text-violet-600" /> Account Details
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Name</span>
+                                            <span className="col-span-2 font-medium">{u.name}</span>
                                         </div>
-                                        {availableRoles.length > 0 && (
-                                            <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowAddRole(!showAddRole)}>
-                                                <Plus className="h-3.5 w-3.5" /> Add
-                                            </Button>
-                                        )}
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {/* Add role dropdown */}
-                                    {showAddRole && availableRoles.length > 0 && (
-                                        <div className="flex flex-wrap gap-1.5 rounded-lg border border-dashed border-violet-300 bg-violet-50/50 p-3">
-                                            <span className="text-xs text-muted-foreground w-full mb-1">Click to assign:</span>
-                                            {availableRoles.map((role) => (
-                                                <button
-                                                    key={role.id}
-                                                    onClick={() => {
-                                                        const newIds = [...Array.from(assignedIds), role.id];
-                                                        router.put(`/settings/users/${u.id}/roles`, { role_ids: newIds }, { preserveScroll: true });
-                                                        setShowAddRole(false);
-                                                    }}
-                                                    className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors"
-                                                >
-                                                    <Plus className="h-3 w-3" /> {role.label || role.name}
-                                                </button>
-                                            ))}
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Email</span>
+                                            <span className="col-span-2">{u.email}</span>
                                         </div>
-                                    )}
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">User Type</span>
+                                            <span className="col-span-2 capitalize">{u.user_type ?? '—'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Status</span>
+                                            <span className="col-span-2">
+                                                {u.is_active ? (
+                                                    <span className="flex items-center gap-1 text-emerald-600"><CheckCircle2 className="h-3.5 w-3.5" /> Active</span>
+                                                ) : (
+                                                    <span className="flex items-center gap-1 text-red-600"><XCircle className="h-3.5 w-3.5" /> Inactive</span>
+                                                )}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Approved</span>
+                                            <span className="col-span-2">{u.approved_at ? new Date(u.approved_at).toLocaleDateString('en-NZ') : '—'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Member since</span>
+                                            <span className="col-span-2 flex items-center gap-1">
+                                                <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+                                                {u.created_at ? new Date(u.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' }) : '—'}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Last Login</span>
+                                            <span className="col-span-2" title={absoluteTime(u.last_login_at)}>
+                                                {u.last_login_at ? (
+                                                    <>{relativeTime(u.last_login_at)} <span className="text-muted-foreground">({absoluteTime(u.last_login_at)})</span></>
+                                                ) : '—'}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Login Count</span>
+                                            <span className="col-span-2 font-medium">{u.login_count ?? 0}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Last IP</span>
+                                            <span className="col-span-2 font-mono text-xs">{u.last_login_ip ?? '—'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">2FA Status</span>
+                                            <span className="col-span-2">
+                                                {u.two_factor_confirmed_at ? (
+                                                    <Badge className="bg-emerald-100 text-emerald-700 text-xs gap-1">
+                                                        <ShieldCheck className="h-3 w-3" /> Enabled
+                                                    </Badge>
+                                                ) : (
+                                                    <Badge className="bg-amber-100 text-amber-700 text-xs gap-1">
+                                                        <ShieldAlert className="h-3 w-3" /> Not Enabled
+                                                    </Badge>
+                                                )}
+                                            </span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
 
-                                    {/* Current roles */}
-                                    {roles.length === 0 ? (
-                                        <p className="text-sm text-muted-foreground">No roles assigned</p>
-                                    ) : (
-                                        <div className="space-y-2">
-                                            {roles.map((role: Role) => (
-                                                <div key={role.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <Shield className="h-3.5 w-3.5 text-violet-600" />
-                                                        <span className="text-sm font-medium">{role.label || role.name}</span>
-                                                    </div>
-                                                    <button
-                                                        onClick={() => {
-                                                            const newIds = Array.from(assignedIds).filter(id => id !== role.id);
-                                                            router.put(`/settings/users/${u.id}/roles`, { role_ids: newIds }, { preserveScroll: true });
-                                                        }}
-                                                        className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors"
-                                                        title="Remove role"
-                                                    >
-                                                        <X className="h-3.5 w-3.5" />
-                                                    </button>
+                                {/* Right column */}
+                                <div className="space-y-6">
+                                    {/* Roles */}
+                                    <Card>
+                                        <CardHeader>
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <CardTitle className="flex items-center gap-2">
+                                                        <Shield className="h-5 w-5 text-violet-600" /> Roles
+                                                    </CardTitle>
+                                                    <CardDescription>Assign or remove roles for this user</CardDescription>
                                                 </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                                {availableRoles.length > 0 && (
+                                                    <Button size="sm" variant="outline" className="gap-1" onClick={() => setShowAddRole(!showAddRole)}>
+                                                        <Plus className="h-3.5 w-3.5" /> Add
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent className="space-y-3">
+                                            {showAddRole && availableRoles.length > 0 && (
+                                                <div className="flex flex-wrap gap-1.5 rounded-lg border border-dashed border-violet-300 bg-violet-50/50 p-3">
+                                                    <span className="text-xs text-muted-foreground w-full mb-1">Click to assign:</span>
+                                                    {availableRoles.map((role) => (
+                                                        <button
+                                                            key={role.id}
+                                                            onClick={() => {
+                                                                const newIds = [...Array.from(assignedIds), role.id];
+                                                                router.put(`/settings/users/${u.id}/roles`, { role_ids: newIds }, { preserveScroll: true });
+                                                                setShowAddRole(false);
+                                                            }}
+                                                            className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-white px-2.5 py-1 text-xs font-medium text-violet-700 hover:bg-violet-100 transition-colors"
+                                                        >
+                                                            <Plus className="h-3 w-3" /> {role.label || role.name}
+                                                        </button>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {roles.length === 0 ? (
+                                                <p className="text-sm text-muted-foreground">No roles assigned</p>
+                                            ) : (
+                                                <div className="space-y-2">
+                                                    {roles.map((role: Role) => (
+                                                        <div key={role.id} className="flex items-center justify-between rounded-lg border px-3 py-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <Shield className="h-3.5 w-3.5 text-violet-600" />
+                                                                <span className="text-sm font-medium">{role.label || role.name}</span>
+                                                            </div>
+                                                            <button
+                                                                onClick={() => {
+                                                                    const newIds = Array.from(assignedIds).filter(id => id !== role.id);
+                                                                    router.put(`/settings/users/${u.id}/roles`, { role_ids: newIds }, { preserveScroll: true });
+                                                                }}
+                                                                className="rounded p-1 text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors"
+                                                                title="Remove role"
+                                                            >
+                                                                <X className="h-3.5 w-3.5" />
+                                                            </button>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </CardContent>
+                                    </Card>
 
-                            {/* Quick Actions */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Clock className="h-5 w-5 text-violet-600" /> Quick Actions
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                    <Link href="/settings/access">
-                                        <Button variant="outline" size="sm" className="w-full justify-start gap-2">
-                                            <Shield className="h-3.5 w-3.5" /> Edit Permissions
-                                        </Button>
-                                    </Link>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </div>
+                                    {/* Quick Stats */}
+                                    <Card>
+                                        <CardHeader>
+                                            <CardTitle className="flex items-center gap-2">
+                                                <Clock className="h-5 w-5 text-violet-600" /> Quick Stats
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-3">
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="text-muted-foreground">Logins this month</span>
+                                                <span className="font-medium">{stats.this_month}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="text-muted-foreground">Active sessions</span>
+                                                <Badge variant="secondary" className="text-xs">{stats.active_sessions}</Badge>
+                                            </div>
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="text-muted-foreground">Last IP</span>
+                                                <span className="font-mono text-xs">{stats.last_ip ?? '—'}</span>
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            </div>
+                        </TabsContent>
+
+                        {/* Tab 2: Activity & Security */}
+                        <TabsContent value="activity" className="mt-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <h2 className="text-lg font-semibold">Activity Log</h2>
+                                <Select value={eventFilter} onValueChange={setEventFilter}>
+                                    <SelectTrigger className="w-[180px]">
+                                        <SelectValue placeholder="All Events" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All Events</SelectItem>
+                                        <SelectItem value="logins">Logins</SelectItem>
+                                        <SelectItem value="logouts">Logouts</SelectItem>
+                                        <SelectItem value="failed">Failed Attempts</SelectItem>
+                                        <SelectItem value="security">Security</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {filteredLogs.length === 0 ? (
+                                <Card>
+                                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                                        <div className="mb-4 rounded-full bg-muted p-4">
+                                            <Clock className="h-8 w-8 text-muted-foreground" />
+                                        </div>
+                                        <h3 className="text-lg font-semibold">No activity recorded yet</h3>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            Login events and security actions will appear here.
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <div className="space-y-2">
+                                    {filteredLogs.map((log) => {
+                                        const config = eventConfig[log.event_type] ?? {
+                                            label: log.event_type.replace(/_/g, ' '),
+                                            color: 'bg-gray-400',
+                                            icon: Clock,
+                                        };
+                                        const Icon = config.icon;
+                                        const { browser, os } = parseBrowser(log.user_agent);
+                                        const isFailed = log.event_type === 'failed_login';
+                                        let description = config.label;
+                                        if (log.event_type === 'role_changed' && log.metadata) {
+                                            const meta = log.metadata;
+                                            if (meta.added) description = `Role changed: added ${meta.added}`;
+                                            else if (meta.removed) description = `Role changed: removed ${meta.removed}`;
+                                            else if (meta.description) description = meta.description;
+                                        }
+
+                                        return (
+                                            <div
+                                                key={log.id}
+                                                className={`flex items-start gap-4 rounded-lg border bg-white p-4 dark:bg-gray-950 ${isFailed ? 'border-l-4 border-l-red-400' : ''}`}
+                                            >
+                                                <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-white ${config.color}`}>
+                                                    <Icon className="h-4 w-4" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-medium">{description}</p>
+                                                    <div className="mt-1 flex flex-wrap items-center gap-2">
+                                                        {log.ip_address && (
+                                                            <Badge variant="outline" className="text-xs font-mono">
+                                                                <Globe className="mr-1 h-3 w-3" />
+                                                                {log.ip_address}
+                                                            </Badge>
+                                                        )}
+                                                        {log.user_agent && (
+                                                            <span className="text-xs text-muted-foreground">
+                                                                {browser} on {os}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <span
+                                                    className="shrink-0 text-xs text-muted-foreground"
+                                                    title={absoluteTime(log.created_at)}
+                                                >
+                                                    {relativeTime(log.created_at)}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </TabsContent>
+
+                        {/* Tab 3: Sessions */}
+                        <TabsContent value="sessions" className="mt-6 space-y-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-muted-foreground">
+                                    {active_sessions.length} active session{active_sessions.length !== 1 ? 's' : ''}
+                                </p>
+                                {active_sessions.length > 1 && (
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => router.delete(`/settings/users/${u.id}/sessions`, { preserveScroll: true })}
+                                    >
+                                        <Trash2 className="mr-1.5 h-3.5 w-3.5" />
+                                        Terminate All Other Sessions
+                                    </Button>
+                                )}
+                            </div>
+
+                            {active_sessions.length === 0 ? (
+                                <Card>
+                                    <CardContent className="flex flex-col items-center justify-center py-12 text-center">
+                                        <div className="mb-4 rounded-full bg-muted p-4">
+                                            <Monitor className="h-8 w-8 text-muted-foreground" />
+                                        </div>
+                                        <h3 className="text-lg font-semibold">No active sessions</h3>
+                                        <p className="mt-1 text-sm text-muted-foreground">
+                                            This user does not have any active sessions.
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <div className="space-y-2">
+                                    {active_sessions.map((session) => {
+                                        const { browser, os } = parseBrowser(session.user_agent);
+                                        const lastActive = session.last_activity
+                                            ? Math.floor((Date.now() / 1000 - session.last_activity) / 60)
+                                            : null;
+                                        const BrowserIcon = os === 'iOS' || os === 'Android' ? Smartphone : Monitor;
+
+                                        return (
+                                            <div key={session.id} className="flex items-center gap-4 rounded-lg border bg-white p-4 dark:bg-gray-950">
+                                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-600">
+                                                    <BrowserIcon className="h-5 w-5" />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2">
+                                                        <p className="text-sm font-medium">{browser} on {os}</p>
+                                                        {session.is_current && (
+                                                            <Badge className="bg-emerald-100 text-emerald-700 text-xs">Current Session</Badge>
+                                                        )}
+                                                    </div>
+                                                    <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                                        {session.ip_address && (
+                                                            <span className="font-mono">{session.ip_address}</span>
+                                                        )}
+                                                        {lastActive !== null && (
+                                                            <span>Last active: {lastActive < 1 ? 'just now' : `${lastActive} min ago`}</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {!session.is_current && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="text-red-600 border-red-300 hover:bg-red-50"
+                                                        onClick={() => router.delete(`/settings/users/${u.id}/sessions/${session.id}`, { preserveScroll: true })}
+                                                    >
+                                                        Terminate
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </TabsContent>
+
+                        {/* Tab 4: Staff Profile */}
+                        {u.staff_profile && (
+                            <TabsContent value="staff" className="mt-6">
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center gap-2">
+                                            <UserCog className="h-5 w-5 text-violet-600" /> Staff Profile
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="space-y-4">
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Employee ID</span>
+                                            <span className="col-span-2 font-mono">{u.staff_profile.employee_id ?? '—'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Job Title</span>
+                                            <span className="col-span-2 font-medium">{u.staff_profile.job_title ?? '—'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Department</span>
+                                            <span className="col-span-2">{u.staff_profile.department ?? '—'}</span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Hire Date</span>
+                                            <span className="col-span-2">
+                                                {u.staff_profile.hire_date
+                                                    ? new Date(u.staff_profile.hire_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'long', year: 'numeric' })
+                                                    : '—'}
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-2 text-sm">
+                                            <span className="text-muted-foreground">Status</span>
+                                            <span className="col-span-2">
+                                                {u.staff_profile.status === 'active' && (
+                                                    <Badge className="bg-emerald-100 text-emerald-700 text-xs">Active</Badge>
+                                                )}
+                                                {u.staff_profile.status === 'on_leave' && (
+                                                    <Badge className="bg-amber-100 text-amber-700 text-xs">On Leave</Badge>
+                                                )}
+                                                {u.staff_profile.status === 'terminated' && (
+                                                    <Badge variant="destructive" className="text-xs">Terminated</Badge>
+                                                )}
+                                                {!u.staff_profile.status && '—'}
+                                            </span>
+                                        </div>
+                                        {u.staff_profile.work_phone && (
+                                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                                <span className="text-muted-foreground">Work Phone</span>
+                                                <span className="col-span-2 flex items-center gap-1">
+                                                    <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                                                    {u.staff_profile.work_phone}
+                                                </span>
+                                            </div>
+                                        )}
+                                        {u.staff_profile.mobile_phone && (
+                                            <div className="grid grid-cols-3 gap-2 text-sm">
+                                                <span className="text-muted-foreground">Mobile Phone</span>
+                                                <span className="col-span-2 flex items-center gap-1">
+                                                    <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
+                                                    {u.staff_profile.mobile_phone}
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {/* Emergency Contact */}
+                                        {u.staff_profile.emergency_contact_name && (
+                                            <>
+                                                <div className="border-t pt-4 mt-4">
+                                                    <h4 className="text-sm font-semibold mb-3">Emergency Contact</h4>
+                                                </div>
+                                                <div className="grid grid-cols-3 gap-2 text-sm">
+                                                    <span className="text-muted-foreground">Name</span>
+                                                    <span className="col-span-2 font-medium">{u.staff_profile.emergency_contact_name}</span>
+                                                </div>
+                                                {u.staff_profile.emergency_contact_phone && (
+                                                    <div className="grid grid-cols-3 gap-2 text-sm">
+                                                        <span className="text-muted-foreground">Phone</span>
+                                                        <span className="col-span-2">{u.staff_profile.emergency_contact_phone}</span>
+                                                    </div>
+                                                )}
+                                                {u.staff_profile.emergency_contact_relationship && (
+                                                    <div className="grid grid-cols-3 gap-2 text-sm">
+                                                        <span className="text-muted-foreground">Relationship</span>
+                                                        <span className="col-span-2 capitalize">{u.staff_profile.emergency_contact_relationship}</span>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+
+                                        {/* View Full HR Profile link */}
+                                        {u.staff_profile.id && (
+                                            <div className="pt-4 border-t">
+                                                <Button variant="outline" asChild>
+                                                    <Link href={`/hr/staff/${u.staff_profile.id}`}>
+                                                        <UserCog className="mr-2 h-4 w-4" />
+                                                        View Full HR Profile
+                                                    </Link>
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+                        )}
+                    </Tabs>
                 </div>
             </SettingsLayout>
         </AppLayout>

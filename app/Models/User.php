@@ -32,10 +32,6 @@ class User extends Authenticatable
         'approved_by',
 
         'profile_photo_path',
-
-        // Presence / chat
-        'last_seen_at',
-        'presence_status',
     ];
 
     /**
@@ -65,7 +61,6 @@ class User extends Authenticatable
             'password' => 'hashed',
             'two_factor_confirmed_at' => 'datetime',
             'approved_at' => 'datetime',
-            'last_seen_at' => 'datetime',
         ];
     }
 
@@ -144,7 +139,7 @@ class User extends Authenticatable
 
     public function staffProfile()
     {
-        return $this->hasOne(\App\Models\Staff::class);
+        return $this->hasOne(\App\Models\StaffProfile::class);
     }
 
     public function staffCredentials()
@@ -166,22 +161,6 @@ class User extends Authenticatable
     {
         return $this->hasOne(\App\Domain\Governance\Models\BoardMember::class)
             ->where('is_active', true);
-    }
-
-    /**
-     * Client record for portal users
-     */
-    public function client()
-    {
-        return $this->hasOne(\App\Models\Client::class);
-    }
-
-    /**
-     * Next of kin record
-     */
-    public function nextOfKin()
-    {
-        return $this->hasOne(\App\Models\NextOfKin::class);
     }
 
     public function shifts()
