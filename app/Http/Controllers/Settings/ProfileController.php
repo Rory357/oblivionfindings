@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Settings;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Settings\ProfileUpdateRequest;
-use App\Models\Client;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -66,8 +65,6 @@ class ProfileController extends Controller
 
         $user->forceFill(['profile_photo_path' => $path])->save();
 
-        $this->syncClientPhoto($user->id, $path);
-
         return back()->with('success', 'Profile photo updated.');
     }
 
@@ -85,27 +82,7 @@ class ProfileController extends Controller
 
         $user->forceFill(['profile_photo_path' => null])->save();
 
-        $this->syncClientPhoto($user->id, null);
-
         return back()->with('success', 'Profile photo removed.');
-    }
-
-    /**
-     * If this user is linked to a Client record, keep the client photo in sync.
-     */
-    private function syncClientPhoto(int $userId, ?string $photoPath): void
-    {
-        $client = Client::where('user_id', $userId)->first();
-        if (!$client) {
-            return;
-        }
-
-        // Remove old client-specific photo if it differs from the user photo
-        if ($client->profile_photo_path && $client->profile_photo_path !== $photoPath) {
-            Storage::disk('public')->delete($client->profile_photo_path);
-        }
-
-        $client->forceFill(['profile_photo_path' => $photoPath])->save();
     }
 
     /**

@@ -139,7 +139,7 @@ class User extends Authenticatable
 
     public function staffProfile()
     {
-        return $this->hasOne(\App\Models\Staff::class);
+        return $this->hasOne(\App\Models\StaffProfile::class);
     }
 
     public function staffCredentials()

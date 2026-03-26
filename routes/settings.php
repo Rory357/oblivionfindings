@@ -175,6 +175,13 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:integrations.view')
         ->name('settings.integrations.index');
 
+    // SSO Group Mapping
+    Route::get('settings/sso-groups', [\App\Http\Controllers\Settings\SsoGroupController::class, 'index'])->middleware('permission:settings.access.manage')->name('settings.sso-groups');
+    Route::post('settings/sso-groups/fetch', [\App\Http\Controllers\Settings\SsoGroupController::class, 'fetchGroups'])->middleware('permission:settings.access.manage');
+    Route::post('settings/sso-groups', [\App\Http\Controllers\Settings\SsoGroupController::class, 'store'])->middleware('permission:settings.access.manage');
+    Route::put('settings/sso-groups/{mapping}', [\App\Http\Controllers\Settings\SsoGroupController::class, 'update'])->middleware('permission:settings.access.manage');
+    Route::delete('settings/sso-groups/{mapping}', [\App\Http\Controllers\Settings\SsoGroupController::class, 'destroy'])->middleware('permission:settings.access.manage');
+
     // UniFi integration settings
     Route::prefix('settings/integrations/unifi')->middleware('permission:integrations.manage_tenant_secrets')->group(function () {
         Route::get('/', [UnifiSettingsController::class, 'index'])->name('settings.integrations.unifi');

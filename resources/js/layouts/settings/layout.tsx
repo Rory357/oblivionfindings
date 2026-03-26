@@ -13,6 +13,7 @@ import {
     Database,
     FileText,
     Key,
+    Languages,
     Lock,
     Mail,
     Menu,
@@ -48,6 +49,8 @@ const navSections: NavSection[] = [
         label: 'General',
         items: [
             { icon: User, title: 'Profile', href: edit() },
+            { icon: Lock, title: 'Password', href: editPassword() },
+            { icon: ShieldCheck, title: 'Two-Factor Auth', href: show() },
             { icon: Palette, title: 'Appearance', href: editAppearance() },
         ],
     },
@@ -61,6 +64,7 @@ const navSections: NavSection[] = [
     {
         label: 'Organisation',
         items: [
+            { icon: Languages, title: 'Terminology', href: '/settings/terminology', permission: 'settings.manageTerminology' },
             { icon: Building2, title: 'Service Contexts', href: '/settings/service-contexts', permission: 'settings.manageServiceContexts' },
         ],
     },
@@ -228,8 +232,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
                 {/* Content area */}
                 <div className="flex-1 overflow-y-auto p-6">
-                    <div className="mx-auto max-w-5xl">
-                        <section className="space-y-6">{children}</section>
+                    <div className="mx-auto max-w-4xl">
+                        <section className="space-y-12">{children}</section>
                     </div>
                 </div>
             </div>
