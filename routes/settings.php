@@ -178,6 +178,9 @@ Route::middleware('auth')->group(function () {
         ->middleware('permission:integrations.view')
         ->name('settings.integrations.index');
 
+    // SSO Configuration
+    Route::get('settings/sso', fn () => \Inertia\Inertia::render('settings/sso'))->middleware('permission:settings.access.manage')->name('settings.sso');
+
     // SSO Group Mapping
     Route::get('settings/sso-groups', [\App\Http\Controllers\Settings\SsoGroupController::class, 'index'])->middleware('permission:settings.access.manage')->name('settings.sso-groups');
     Route::post('settings/sso-groups/fetch', [\App\Http\Controllers\Settings\SsoGroupController::class, 'fetchGroups'])->middleware('permission:settings.access.manage');

@@ -85,7 +85,8 @@ const navSections: NavSection[] = [
         label: 'Identity & SSO',
         permission: 'settings.manageAccess',
         items: [
-            { icon: ShieldCheck, title: 'SSO Group Mapping', href: '/settings/sso-groups' },
+            { icon: ShieldCheck, title: 'SSO Configuration', href: '/settings/sso' },
+            { icon: Shield, title: 'Group Mapping', href: '/settings/sso-groups' },
         ],
     },
     {
