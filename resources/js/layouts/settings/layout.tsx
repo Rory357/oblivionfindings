@@ -50,8 +50,6 @@ const navSections: NavSection[] = [
         label: 'General',
         items: [
             { icon: User, title: 'Profile', href: edit() },
-            { icon: Lock, title: 'Password', href: editPassword() },
-            { icon: ShieldCheck, title: 'Two-Factor Auth', href: show() },
             { icon: Palette, title: 'Appearance', href: editAppearance() },
         ],
     },
@@ -65,7 +63,6 @@ const navSections: NavSection[] = [
     {
         label: 'Organisation',
         items: [
-            { icon: Languages, title: 'Terminology', href: '/settings/terminology', permission: 'settings.manageTerminology' },
             { icon: Building2, title: 'Service Contexts', href: '/settings/service-contexts', permission: 'settings.manageServiceContexts' },
         ],
     },
@@ -82,6 +79,13 @@ const navSections: NavSection[] = [
         permission: 'settings.manageAccess',
         items: [
             { icon: Shield, title: 'Roles', href: '/settings/roles' },
+        ],
+    },
+    {
+        label: 'Identity & SSO',
+        permission: 'settings.manageAccess',
+        items: [
+            { icon: ShieldCheck, title: 'SSO Group Mapping', href: '/settings/sso-groups' },
         ],
     },
     {
