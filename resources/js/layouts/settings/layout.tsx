@@ -232,8 +232,8 @@ export default function SettingsLayout({ children }: PropsWithChildren) {
 
                 {/* Content area */}
                 <div className="flex-1 overflow-y-auto p-6">
-                    <div className="mx-auto max-w-4xl">
-                        <section className="space-y-12">{children}</section>
+                    <div className="mx-auto max-w-5xl">
+                        <section className="space-y-6">{children}</section>
                     </div>
                 </div>
             </div>
