@@ -22,7 +22,7 @@ class ClientPolicy
         }
 
         // If they have a global view permission (manager/admin), allow
-        if ($user->canDo('clients.viewAny') && !$user->hasRole('support_worker')) {
+        if ($user->canDo('clients.viewAny') && ($user->hasRole('admin', 'manager', 'coordinator') || !$user->hasRole('support_worker'))) {
             return true;
         }
 
@@ -48,7 +48,7 @@ class ClientPolicy
         }
 
         // Managers/admins: global.
-        if ($user->canDo('clients.viewAny') && !$user->hasRole('support_worker')) {
+        if ($user->canDo('clients.viewAny') && ($user->hasRole('admin', 'manager', 'coordinator') || !$user->hasRole('support_worker'))) {
             return $user->canDo('medications.view');
         }
 

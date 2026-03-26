@@ -97,9 +97,6 @@ class ClientMedicalProfile extends Model
 
     protected $casts = [
         'organ_donor' => 'boolean',
-    ];
-
-    protected $casts = [
         'disabilities' => 'array',
         'allergies' => 'array',
     ];
