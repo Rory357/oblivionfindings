@@ -177,9 +177,14 @@ Route::middleware('auth')->group(function () {
     Route::delete('settings/users/{target}/sessions', [UsersController::class, 'terminateAllSessions'])->name('settings.users.terminate-all-sessions');
 
     // SSO Configuration
-    Route::get('settings/sso', fn () => Inertia::render('settings/sso-groups', [
+    Route::get('settings/sso', fn () => Inertia::render('settings/sso-config', [
         'mappings' => \App\Models\SsoGroupMapping::with('role:id,name,label')->orderBy('provider')->get(),
         'roles' => \App\Models\Role::select('id', 'name', 'label')->orderBy('label')->get(),
+        'stats' => [
+            'total' => \App\Models\SsoGroupMapping::count(),
+            'microsoft' => \App\Models\SsoGroupMapping::where('provider', 'microsoft')->count(),
+            'google' => \App\Models\SsoGroupMapping::where('provider', 'google')->count(),
+        ],
     ]))->name('settings.sso');
     Route::get('settings/sso-groups', [SsoGroupController::class, 'index'])->name('settings.sso_groups.index');
     Route::post('settings/sso-groups', [SsoGroupController::class, 'store'])->name('settings.sso_groups.store');
