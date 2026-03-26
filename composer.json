@@ -9,6 +9,8 @@
     ],
     "license": "MIT",
     "require": {
+        "php": "^8.2",
+        "barryvdh/laravel-dompdf": "^3.1",
         "endroid/qr-code": "^6.0",
         "inertiajs/inertia-laravel": "^2.0",
         "laravel/fortify": "^1.30",
@@ -16,7 +18,6 @@
         "laravel/socialite": "^5.24",
         "laravel/tinker": "^2.10.1",
         "laravel/wayfinder": "^0.1.9",
-        "php": "^8.2",
         "predis/predis": "^2.2",
         "socialiteproviders/google": "^4.1",
         "socialiteproviders/microsoft": "^4.6"

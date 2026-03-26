@@ -281,8 +281,16 @@ export default function Destructions({ destructions, filters, staff, clients, me
                                         <td className="p-3 text-xs">{d.witness_1?.name ?? '—'}</td>
                                         <td className="p-3 text-xs">{d.witness_2?.name ?? '—'}</td>
                                         <td className="p-3 text-right">
-                                            <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => router.delete(`/emar/destructions/${d.id}`)}>
-                                                <Trash2 className="h-4 w-4" />
+                                            <Button
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={() => {
+                                                    if (confirm('Are you sure you want to delete this destruction record?')) {
+                                                        router.delete(`/emar/destructions/${d.id}`);
+                                                    }
+                                                }}
+                                            >
+                                                <Trash2 className="h-4 w-4 text-red-500" />
                                             </Button>
                                         </td>
                                     </tr>

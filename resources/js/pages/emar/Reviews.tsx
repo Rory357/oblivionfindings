@@ -12,7 +12,7 @@ import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/componen
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { AlertTriangle, Calendar, CheckCircle, Clock, Plus, Trash2 } from 'lucide-react';
+import { AlertTriangle, Calendar, CheckCircle, Clock, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type Props = {
@@ -197,7 +197,92 @@ function CompleteReviewDialog({ review }: { review: any }) {
     );
 }
 
+function EditReviewDialog({ review, clients, open, onOpenChange }: { review: any; clients: Props['clients']; open: boolean; onOpenChange: (open: boolean) => void }) {
+    const form = useForm({
+        review_type: review.review_type ?? '',
+        scheduled_date: review.scheduled_date ? review.scheduled_date.split('T')[0] : '',
+        reviewer_name: review.reviewer_name ?? '',
+        reviewer_role: review.reviewer_role ?? '',
+        trigger_reason: review.trigger_reason ?? '',
+    });
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        form.put(`/emar/reviews/${review.id}`, {
+            onSuccess: () => { onOpenChange(false); form.reset(); },
+        });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Edit Medication Review</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Review Type</Label>
+                        <Select value={form.data.review_type} onValueChange={(v) => form.setData('review_type', v)}>
+                            <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="routine">Routine</SelectItem>
+                                <SelectItem value="triggered">Triggered</SelectItem>
+                                <SelectItem value="comprehensive">Comprehensive</SelectItem>
+                                <SelectItem value="admission">Admission</SelectItem>
+                                <SelectItem value="discharge">Discharge</SelectItem>
+                                <SelectItem value="incident">Incident</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        {form.errors.review_type && <p className="text-sm text-red-600">{form.errors.review_type}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Scheduled Date</Label>
+                        <Input type="date" value={form.data.scheduled_date} onChange={(e) => form.setData('scheduled_date', e.target.value)} />
+                        {form.errors.scheduled_date && <p className="text-sm text-red-600">{form.errors.scheduled_date}</p>}
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Reviewer Name</Label>
+                        <Input value={form.data.reviewer_name} onChange={(e) => form.setData('reviewer_name', e.target.value)} placeholder="Reviewer name" />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Reviewer Role</Label>
+                        <Select value={form.data.reviewer_role} onValueChange={(v) => form.setData('reviewer_role', v)}>
+                            <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="pharmacist">Pharmacist</SelectItem>
+                                <SelectItem value="gp">GP</SelectItem>
+                                <SelectItem value="nurse">Nurse</SelectItem>
+                                <SelectItem value="specialist">Specialist</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Trigger Reason</Label>
+                        <Textarea value={form.data.trigger_reason} onChange={(e) => form.setData('trigger_reason', e.target.value)} placeholder="Reason for triggered review..." rows={3} />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="submit" disabled={form.processing}>Save Changes</Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export default function Reviews({ reviews, overdueReviews, upcomingReviews, clients, staff, filters }: Props) {
+    const [editOpen, setEditOpen] = useState(false);
+    const [editingReview, setEditingReview] = useState<any>(null);
+
+    function openEditReview(review: any) {
+        setEditingReview(review);
+        setEditOpen(true);
+    }
     function updateFilter(key: string, value: string) {
         router.get('/emar/reviews', { ...filters, [key]: value || undefined }, { preserveState: true });
     }
@@ -314,11 +399,16 @@ export default function Reviews({ reviews, overdueReviews, upcomingReviews, clie
                                         <td className="p-3">{r.whanau_involved ? <CheckCircle className="h-4 w-4 text-green-600" /> : <span className="text-muted-foreground">—</span>}</td>
                                         <td className="p-3">
                                             <div className="flex items-center gap-1">
+                                                {r.status !== 'completed' && r.status !== 'cancelled' && (
+                                                    <Button size="icon" variant="ghost" onClick={() => openEditReview(r)}>
+                                                        <Pencil className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                )}
                                                 {(r.status === 'scheduled' || r.status === 'overdue' || r.status === 'in_progress') && (
                                                     <CompleteReviewDialog review={r} />
                                                 )}
-                                                {r.status !== 'completed' && r.status !== 'cancelled' && (
-                                                    <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteReview(r.id)}>
+                                                {r.status !== 'completed' && (
+                                                    <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteReview(r.id)}>
                                                         <Trash2 className="h-3.5 w-3.5" />
                                                     </Button>
                                                 )}
@@ -332,6 +422,15 @@ export default function Reviews({ reviews, overdueReviews, upcomingReviews, clie
                     </CardContent>
                 </Card>
             </PageShell>
+
+            {editingReview && (
+                <EditReviewDialog
+                    review={editingReview}
+                    clients={clients}
+                    open={editOpen}
+                    onOpenChange={(open) => { setEditOpen(open); if (!open) setEditingReview(null); }}
+                />
+            )}
         </AppLayout>
     );
 }

@@ -28,12 +28,27 @@ class ClientMedicationAdministration extends Model
         'correction_reason',
         'dose_given',
         'notes',
+        'blood_glucose_level',
+        'insulin_units_given',
+        'injection_site',
+        'inhaler_technique_observed',
+        'spacer_used',
+        'peak_flow_before',
+        'peak_flow_after',
+        'topical_area',
+        'topical_skin_condition',
     ];
 
     protected $casts = [
         'scheduled_for' => 'datetime',
         'administered_at' => 'datetime',
         'is_correction' => 'boolean',
+        'blood_glucose_level' => 'decimal:1',
+        'insulin_units_given' => 'decimal:1',
+        'inhaler_technique_observed' => 'boolean',
+        'spacer_used' => 'boolean',
+        'peak_flow_before' => 'integer',
+        'peak_flow_after' => 'integer',
     ];
 
     public function client()

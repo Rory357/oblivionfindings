@@ -12,7 +12,7 @@ import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/componen
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { AlertTriangle, Award, CheckCircle, Clock, Plus, Trash2, UserX, XCircle } from 'lucide-react';
+import { AlertTriangle, Award, CheckCircle, Clock, Pencil, Plus, Trash2, UserX, XCircle } from 'lucide-react';
 import { useState } from 'react';
 
 type Props = {
@@ -216,7 +216,164 @@ function NewAssessmentDialog({ staff, staffWithoutAssessment }: { staff: Props['
     );
 }
 
+function EditAssessmentDialog({ assessment, staff, staffWithoutAssessment, open, onOpenChange }: { assessment: any; staff: Props['staff']; staffWithoutAssessment: Props['staffWithoutAssessment']; open: boolean; onOpenChange: (open: boolean) => void }) {
+    const allStaffOptions = (() => {
+        const map = new Map<number, { id: number; name: string }>();
+        staffWithoutAssessment.forEach((s) => map.set(s.id, { id: s.id, name: s.name }));
+        staff.forEach((s) => map.set(s.id, s));
+        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
+    })();
+
+    const form = useForm<Record<string, any>>({
+        user_id: assessment.user_id?.toString() ?? '',
+        assessment_type: assessment.assessment_type ?? '',
+        assessment_date: assessment.assessment_date ? assessment.assessment_date.split('T')[0] : '',
+        expiry_date: assessment.expiry_date ? assessment.expiry_date.split('T')[0] : '',
+        medication_knowledge: assessment.medication_knowledge ?? false,
+        five_rights: assessment.five_rights ?? false,
+        safety_checks: assessment.safety_checks ?? false,
+        documentation: assessment.documentation ?? false,
+        controlled_drugs: assessment.controlled_drugs ?? false,
+        prn_assessment: assessment.prn_assessment ?? false,
+        insulin_competent: assessment.insulin_competent ?? false,
+        inhaler_competent: assessment.inhaler_competent ?? false,
+        topical_competent: assessment.topical_competent ?? false,
+        covert_admin_knowledge: assessment.covert_admin_knowledge ?? false,
+        error_reporting: assessment.error_reporting ?? false,
+        allergy_awareness: assessment.allergy_awareness ?? false,
+        can_administer_unsupervised: assessment.can_administer_unsupervised ?? false,
+        can_witness_controlled: assessment.can_witness_controlled ?? false,
+        strengths: assessment.strengths ?? '',
+        areas_for_improvement: assessment.areas_for_improvement ?? '',
+        assessor_comments: assessment.assessor_comments ?? '',
+    });
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        form.put(`/emar/competency/${assessment.id}`, {
+            onSuccess: () => { onOpenChange(false); form.reset(); },
+        });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Edit Competency Assessment</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-2">
+                            <Label>Staff Member</Label>
+                            <Select value={form.data.user_id} onValueChange={(v) => form.setData('user_id', v)}>
+                                <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+                                <SelectContent>
+                                    {allStaffOptions.map((s) => (
+                                        <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {form.errors.user_id && <p className="text-sm text-red-600">{form.errors.user_id}</p>}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Assessment Type</Label>
+                            <Select value={form.data.assessment_type} onValueChange={(v) => form.setData('assessment_type', v)}>
+                                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="initial">Initial</SelectItem>
+                                    <SelectItem value="annual">Annual</SelectItem>
+                                    <SelectItem value="refresher">Refresher</SelectItem>
+                                    <SelectItem value="remedial">Remedial</SelectItem>
+                                </SelectContent>
+                            </Select>
+                            {form.errors.assessment_type && <p className="text-sm text-red-600">{form.errors.assessment_type}</p>}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Assessment Date</Label>
+                            <Input type="date" value={form.data.assessment_date} onChange={(e) => form.setData('assessment_date', e.target.value)} />
+                            {form.errors.assessment_date && <p className="text-sm text-red-600">{form.errors.assessment_date}</p>}
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label>Expiry Date</Label>
+                            <Input type="date" value={form.data.expiry_date} onChange={(e) => form.setData('expiry_date', e.target.value)} />
+                            {form.errors.expiry_date && <p className="text-sm text-red-600">{form.errors.expiry_date}</p>}
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-base font-semibold">Competencies</Label>
+                        <div className="grid grid-cols-2 gap-3">
+                            {competencyFields.map((field) => (
+                                <div key={field.key} className="flex items-center gap-2">
+                                    <Checkbox
+                                        id={`edit-comp-${field.key}`}
+                                        checked={form.data[field.key] as boolean}
+                                        onCheckedChange={(checked) => form.setData(field.key, checked === true)}
+                                    />
+                                    <Label htmlFor={`edit-comp-${field.key}`} className="text-sm font-normal">{field.label}</Label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="space-y-3 rounded-lg border p-3">
+                        <Label className="text-base font-semibold">Permissions</Label>
+                        <div className="flex flex-col gap-3">
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    id="edit-comp-unsupervised"
+                                    checked={form.data.can_administer_unsupervised as boolean}
+                                    onCheckedChange={(checked) => form.setData('can_administer_unsupervised', checked === true)}
+                                />
+                                <Label htmlFor="edit-comp-unsupervised" className="text-sm font-normal">Can administer unsupervised</Label>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <Checkbox
+                                    id="edit-comp-witness"
+                                    checked={form.data.can_witness_controlled as boolean}
+                                    onCheckedChange={(checked) => form.setData('can_witness_controlled', checked === true)}
+                                />
+                                <Label htmlFor="edit-comp-witness" className="text-sm font-normal">Can witness controlled drugs</Label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Strengths</Label>
+                        <Textarea value={form.data.strengths} onChange={(e) => form.setData('strengths', e.target.value)} placeholder="Staff strengths observed..." rows={3} />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Areas for Improvement</Label>
+                        <Textarea value={form.data.areas_for_improvement} onChange={(e) => form.setData('areas_for_improvement', e.target.value)} placeholder="Areas requiring further development..." rows={3} />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label>Assessor Comments</Label>
+                        <Textarea value={form.data.assessor_comments} onChange={(e) => form.setData('assessor_comments', e.target.value)} placeholder="Additional assessor notes..." rows={3} />
+                    </div>
+
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="submit" disabled={form.processing}>Save Changes</Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export default function Competency({ assessments, expiringSoon, expired, staffWithoutAssessment, staff, filters }: Props) {
+    const [editOpen, setEditOpen] = useState(false);
+    const [editingAssessment, setEditingAssessment] = useState<any>(null);
+
+    function openEditAssessment(assessment: any) {
+        setEditingAssessment(assessment);
+        setEditOpen(true);
+    }
     function deleteAssessment(id: number) {
         if (!confirm('Are you sure you want to delete this assessment?')) return;
         router.delete(`/emar/competency/${id}`);
@@ -310,9 +467,14 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                                                         </div>
                                                     </td>
                                                     <td className="p-3">
-                                                        <Button size="sm" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteAssessment(a.id)}>
-                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                        </Button>
+                                                        <div className="flex items-center gap-1">
+                                                            <Button size="icon" variant="ghost" onClick={() => openEditAssessment(a)}>
+                                                                <Pencil className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                            <Button size="icon" variant="ghost" className="text-red-600 hover:text-red-700" onClick={() => deleteAssessment(a.id)}>
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             );
@@ -367,6 +529,16 @@ export default function Competency({ assessments, expiringSoon, expired, staffWi
                     </TabsContent>
                 </Tabs>
             </PageShell>
+
+            {editingAssessment && (
+                <EditAssessmentDialog
+                    assessment={editingAssessment}
+                    staff={staff}
+                    staffWithoutAssessment={staffWithoutAssessment}
+                    open={editOpen}
+                    onOpenChange={(open) => { setEditOpen(open); if (!open) setEditingAssessment(null); }}
+                />
+            )}
         </AppLayout>
     );
 }

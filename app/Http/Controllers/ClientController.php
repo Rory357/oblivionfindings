@@ -4,6 +4,10 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientDocument;
+use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
+use App\Models\MedicationDashboardAlert;
+use App\Models\MedicationReview;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
 use App\Models\Shift;
@@ -425,6 +429,24 @@ class ClientController extends Controller
                 'manage_onboarding' => $request->user()?->canDo('clients.onboarding.manage') ?? false,
                 'create_shift' => $request->user()?->canDo('shifts.create') ?? false,
                 'manage_onboarding_workflow' => $request->user()?->canDo('onboarding.edit') ?? false,
+            ],
+            'emar_summary' => [
+                'active_medications_count' => ClientMedication::where('client_id', $client->id)
+                    ->where('active', true)
+                    ->whereNull('ceased_at')
+                    ->count(),
+                'last_administration' => ClientMedicationAdministration::where('client_id', $client->id)
+                    ->whereNotNull('administered_at')
+                    ->max('administered_at'),
+                'pending_alerts_count' => MedicationDashboardAlert::where('client_id', $client->id)
+                    ->where('status', 'active')
+                    ->count(),
+                'next_review_date' => MedicationReview::where('client_id', $client->id)
+                    ->where('status', '!=', 'completed')
+                    ->whereNotNull('scheduled_date')
+                    ->where('scheduled_date', '>=', now()->toDateString())
+                    ->orderBy('scheduled_date')
+                    ->value('scheduled_date'),
             ],
         ]);
     }

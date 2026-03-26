@@ -354,6 +354,7 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.medications?.view) compliance.push({ title: 'Competency', href: '/emar/competency', icon: ClipboardCheck });
     if (can?.medications?.view) compliance.push({ title: 'Destructions', href: '/emar/destructions', icon: Trash2 });
     if (can?.medications?.view) compliance.push({ title: 'Handovers', href: '/emar/handovers', icon: GitBranch });
+    if (can?.medications?.view) compliance.push({ title: 'Medication Errors', href: '/emar/errors', icon: AlertTriangle });
     if (compliance.length > 0) groups.push({ label: 'Compliance', items: compliance });
 
     return groups;
