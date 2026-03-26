@@ -25,6 +25,8 @@ type OnboardingWorkflow = {
     completed_at: string | null;
     steps_total: number;
     steps_completed: number;
+    steps_count: number;
+    completed_steps_count: number;
     overdue_steps: number;
     client: { id: number; first_name: string; last_name: string } | null;
     assigned_to: { id: number; name: string } | null;
@@ -153,7 +155,9 @@ export default function OnboardingDashboard({ workflows = { data: [], links: [],
                                 </Card>
                             )}
                             {(workflows?.data ?? []).map((wf) => {
-                                const pct = wf.steps_total > 0 ? Math.round((wf.steps_completed / wf.steps_total) * 100) : 0;
+                                const stepsTotal = wf.steps_total || wf.steps_count || 0;
+                                const stepsCompleted = wf.steps_completed || wf.completed_steps_count || 0;
+                                const pct = stepsTotal > 0 ? Math.round((stepsCompleted / stepsTotal) * 100) : 0;
                                 const hasOverdue = (wf.overdue_steps ?? 0) > 0;
                                 return (
                                     <Card key={wf.id} className={`transition-all hover:border-border hover:shadow-sm ${hasOverdue ? 'border-red-200 dark:border-red-900/40' : ''}`}>
@@ -188,7 +192,7 @@ export default function OnboardingDashboard({ workflows = { data: [], links: [],
                                                         />
                                                     </div>
                                                     <span className="text-[10px] tabular-nums text-muted-foreground">
-                                                        {wf.steps_completed}/{wf.steps_total} ({pct}%)
+                                                        {stepsCompleted}/{stepsTotal} ({pct}%)
                                                     </span>
                                                 </div>
                                             </div>
