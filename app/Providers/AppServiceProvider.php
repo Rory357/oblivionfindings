@@ -49,6 +49,16 @@ class AppServiceProvider extends ServiceProvider
         SiteHazard::observe(SiteHazardObserver::class);
         SiteChecklistRun::observe(SiteChecklistRunObserver::class);
 
+        // Register Socialite providers (Microsoft + Google)
+        Event::listen(
+            \SocialiteProviders\Manager\SocialiteWasCalled::class,
+            [\SocialiteProviders\Microsoft\MicrosoftExtendSocialite::class, 'handle']
+        );
+        Event::listen(
+            \SocialiteProviders\Manager\SocialiteWasCalled::class,
+            [\SocialiteProviders\Google\GoogleExtendSocialite::class, 'handle']
+        );
+
         Event::listen(FleetSignalEmitted::class, function (FleetSignalEmitted $event) {
             AuditLogger::log('fleet.signal.emitted', $event->signal->asset, [
                 'signal_id' => $event->signal->id,
