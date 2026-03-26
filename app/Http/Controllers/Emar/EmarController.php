@@ -27,6 +27,116 @@ use Inertia\Inertia;
 
 class EmarController extends Controller
 {
+    // ─── Dashboard ─────────────────────────────────────────
+    public function dashboard()
+    {
+        $today = today();
+
+        // Today's administration stats
+        $todayAdmins = ClientMedicationAdministration::whereDate('scheduled_for', $today)
+            ->orWhereDate('administered_at', $today)
+            ->selectRaw("
+                COUNT(*) as total,
+                SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given,
+                SUM(CASE WHEN status = 'refused' THEN 1 ELSE 0 END) as refused,
+                SUM(CASE WHEN status = 'withheld' THEN 1 ELSE 0 END) as withheld,
+                SUM(CASE WHEN status = 'missed' THEN 1 ELSE 0 END) as missed,
+                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
+            ")->first();
+
+        $totalToday = (int) ($todayAdmins->total ?? 0);
+        $givenToday = (int) ($todayAdmins->given ?? 0);
+        $adminRate = $totalToday > 0 ? round(($givenToday / $totalToday) * 100, 1) : 0;
+
+        // 7-day administration trend
+        $trend = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = $today->copy()->subDays($i);
+            $dayStats = ClientMedicationAdministration::whereDate('scheduled_for', $date)
+                ->orWhereDate('administered_at', $date)
+                ->selectRaw("
+                    SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given,
+                    SUM(CASE WHEN status = 'refused' THEN 1 ELSE 0 END) as refused,
+                    SUM(CASE WHEN status = 'missed' THEN 1 ELSE 0 END) as missed,
+                    COUNT(*) as total
+                ")->first();
+            $trend[] = [
+                'date' => $date->format('D'),
+                'given' => (int) ($dayStats->given ?? 0),
+                'refused' => (int) ($dayStats->refused ?? 0),
+                'missed' => (int) ($dayStats->missed ?? 0),
+                'total' => (int) ($dayStats->total ?? 0),
+            ];
+        }
+
+        // PRN stats
+        $prnToday = ClientMedicationAdministration::whereDate('administered_at', $today)
+            ->where('status', 'given')
+            ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->count();
+        $prnNearLimit = ClientMedication::active()->prn()->get()->filter(fn ($m) => $m->isPrnNearLimit())->count();
+
+        // Controlled drugs
+        $controlledCount = ClientMedication::active()->controlled()->count();
+        $activeDiscrepancies = ClientControlledDrugDiscrepancy::whereIn('status', ['reported', 'investigating'])->count();
+
+        // Overdue reviews
+        $overdueReviews = MedicationReview::where('status', 'scheduled')
+            ->where('scheduled_date', '<', $today->toDateString())
+            ->count();
+
+        // Expiring competencies
+        $expiringCompetencies = MedicationCompetencyAssessment::where('status', 'passed')
+            ->whereBetween('expiry_date', [$today->toDateString(), $today->copy()->addDays(30)->toDateString()])
+            ->count();
+
+        // Active alerts
+        $activeAlerts = MedicationDashboardAlert::where('status', 'active')->count();
+
+        // Low stock
+        $lowStock = ClientMedicationStock::whereHas('medication', fn ($q) => $q->active())
+            ->whereNotNull('reorder_level')
+            ->whereColumn('on_hand', '<=', 'reorder_level')
+            ->count();
+
+        // Active medications & clients
+        $activeMedications = ClientMedication::active()->count();
+        $activeClients = Client::whereHas('medications', fn ($q) => $q->active())->count();
+
+        // Rounds today
+        $roundsToday = MedicationRound::forDate($today)->count();
+        $roundsCompleted = MedicationRound::forDate($today)->where('status', 'completed')->count();
+
+        // Sparkline data (last 7 days given counts)
+        $givenTrend = array_map(fn ($d) => $d['given'], $trend);
+
+        return Inertia::render('emar/Index', [
+            'stats' => [
+                'totalToday' => $totalToday,
+                'givenToday' => $givenToday,
+                'refusedToday' => (int) ($todayAdmins->refused ?? 0),
+                'withheldToday' => (int) ($todayAdmins->withheld ?? 0),
+                'missedToday' => (int) ($todayAdmins->missed ?? 0),
+                'pendingToday' => (int) ($todayAdmins->pending ?? 0),
+                'adminRate' => $adminRate,
+                'prnToday' => $prnToday,
+                'prnNearLimit' => $prnNearLimit,
+                'controlledCount' => $controlledCount,
+                'activeDiscrepancies' => $activeDiscrepancies,
+                'overdueReviews' => $overdueReviews,
+                'expiringCompetencies' => $expiringCompetencies,
+                'activeAlerts' => $activeAlerts,
+                'lowStock' => $lowStock,
+                'activeMedications' => $activeMedications,
+                'activeClients' => $activeClients,
+                'roundsToday' => $roundsToday,
+                'roundsCompleted' => $roundsCompleted,
+                'givenTrend' => $givenTrend,
+            ],
+            'trend' => $trend,
+        ]);
+    }
+
     // ─── MAR Charts ────────────────────────────────────────
     public function mar(Request $request)
     {

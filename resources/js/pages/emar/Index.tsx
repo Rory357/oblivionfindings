@@ -1,7 +1,8 @@
+import { BarChart, DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -9,72 +10,276 @@ import {
     AlertTriangle,
     ArrowRight,
     Award,
-    BookOpen,
-    CalendarCheck,
-    ClipboardCheck,
+    CheckCircle,
     Clock,
-    FileBarChart,
     Lock,
     Package,
     Pill,
-    Scroll,
     Shield,
-    Trash2,
-    User,
+    TrendingUp,
+    Users,
+    XCircle,
 } from 'lucide-react';
+import {
+    Area,
+    AreaChart,
+    CartesianGrid,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
-const modules = [
-    { title: 'Daily Overview', description: 'Today\'s medication rounds and administration status across all clients.', href: '/emar/daily', icon: Activity, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300', ready: true },
-    { title: 'MAR Charts', description: 'Medication Administration Record charts by client with date navigation.', href: '/emar/mar', icon: ClipboardCheck, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300', ready: true },
-    { title: 'Medication Rounds', description: 'Round management, staff assignment, progress tracking, and completion.', href: '/emar/rounds', icon: Clock, color: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300', ready: true },
-    { title: 'PRN Records', description: 'As-needed medication records, effectiveness reviews, and limit tracking.', href: '/emar/prn', icon: BookOpen, color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300', ready: true },
-    { title: 'Controlled Drugs', description: 'Controlled substance registers, balance tracking, discrepancies, and destructions.', href: '/emar/controlled', icon: Lock, color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300', ready: true },
-    { title: 'Medications', description: 'Central medication database with search, filtering, and status tracking.', href: '/emar/medications', icon: Pill, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300', ready: true },
-    { title: 'Stock Management', description: 'Track medication stock levels, low stock alerts, and pharmacy orders.', href: '/emar/stock', icon: Package, color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300', ready: true },
-    { title: 'Prescriptions', description: 'Prescriber orders, verbal/telephone orders, countersignatures, and covert authorisations.', href: '/emar/prescriptions', icon: Scroll, color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300', ready: true },
-    { title: 'Medication Reviews', description: 'Schedule and track routine, triggered, and comprehensive medication reviews.', href: '/emar/reviews', icon: CalendarCheck, color: 'bg-lime-100 text-lime-700 dark:bg-lime-900/40 dark:text-lime-300', ready: true },
-    { title: 'Competency', description: 'Staff medication competency assessments, certifications, and renewals.', href: '/emar/competency', icon: Award, color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300', ready: true },
-    { title: 'Self-Administration', description: 'Client capacity assessments per NZ MOH medication support categories.', href: '/emar/self-admin', icon: User, color: 'bg-pink-100 text-pink-700 dark:bg-pink-900/40 dark:text-pink-300', ready: true },
-    { title: 'Destructions', description: 'Medication destruction and disposal records with dual-witness verification.', href: '/emar/destructions', icon: Trash2, color: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300', ready: true },
-    { title: 'Handovers', description: 'Shift handover records with controlled drug counts and outstanding items.', href: '/emar/handovers', icon: ArrowRight, color: 'bg-fuchsia-100 text-fuchsia-700 dark:bg-fuchsia-900/40 dark:text-fuchsia-300', ready: true },
-    { title: 'Emergency Access', description: 'Break-glass emergency medication access with full audit trail.', href: '/emar/emergency-access', icon: AlertTriangle, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300', ready: true },
-    { title: 'Audit Trail', description: 'Full audit log of all medication events, changes, and access.', href: '/emar/audit', icon: Shield, color: 'bg-slate-100 text-slate-700 dark:bg-slate-800/40 dark:text-slate-300', ready: true },
-    { title: 'Reports', description: 'Medication compliance, administration, PRN usage, and incident reports.', href: '/emar/reports', icon: FileBarChart, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300', ready: true },
-];
+type Stats = {
+    totalToday: number;
+    givenToday: number;
+    refusedToday: number;
+    withheldToday: number;
+    missedToday: number;
+    pendingToday: number;
+    adminRate: number;
+    prnToday: number;
+    prnNearLimit: number;
+    controlledCount: number;
+    activeDiscrepancies: number;
+    overdueReviews: number;
+    expiringCompetencies: number;
+    activeAlerts: number;
+    lowStock: number;
+    activeMedications: number;
+    activeClients: number;
+    roundsToday: number;
+    roundsCompleted: number;
+    givenTrend: number[];
+};
 
-export default function EmarDashboard() {
+type TrendDay = {
+    date: string;
+    given: number;
+    refused: number;
+    missed: number;
+    total: number;
+};
+
+type Props = {
+    stats: Stats;
+    trend: TrendDay[];
+};
+
+function AlertCard({ icon: Icon, title, count, color, href }: { icon: any; title: string; count: number; color: string; href: string }) {
+    if (count === 0) return null;
+    return (
+        <Link href={href} className="block">
+            <Card className={`border-${color}-200 dark:border-${color}-800 transition-all hover:shadow-md hover:-translate-y-0.5`}>
+                <CardContent className="flex items-center gap-3 p-3">
+                    <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-${color}-100 dark:bg-${color}-900/40`}>
+                        <Icon className={`h-4 w-4 text-${color}-600`} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium">{title}</p>
+                    </div>
+                    <Badge variant="destructive" className="text-xs">{count}</Badge>
+                </CardContent>
+            </Card>
+        </Link>
+    );
+}
+
+export default function EmarDashboard({ stats, trend }: Props) {
+    const donutSegments = [
+        { label: 'Given', value: stats.givenToday, color: OPS_COLORS.success },
+        { label: 'Refused', value: stats.refusedToday, color: OPS_COLORS.warning },
+        { label: 'Withheld', value: stats.withheldToday, color: OPS_COLORS.neutral },
+        { label: 'Missed', value: stats.missedToday, color: OPS_COLORS.danger },
+        { label: 'Pending', value: stats.pendingToday, color: '#cbd5e1' },
+    ];
+
+    const barData = trend.map((d) => ({ label: d.date, value: d.given }));
+
+    const totalAlerts = stats.activeDiscrepancies + stats.overdueReviews + stats.expiringCompetencies + stats.lowStock;
+
     return (
         <AppLayout>
-            <Head title="eMAR" />
+            <Head title="eMAR Dashboard" />
             <PageHeader
-                title="eMAR — Electronic Medication Administration"
-                description="Comprehensive electronic medication management for NZ residential care and supported living."
+                title="eMAR Dashboard"
+                description="Electronic Medication Administration — real-time overview."
             />
             <PageShell>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {modules.map((mod) => {
-                        const Icon = mod.icon;
-                        return (
-                            <Link key={mod.href} href={mod.href} className="block">
-                                <Card className="h-full transition-all hover:border-border hover:shadow-md hover:-translate-y-0.5">
-                                    <CardContent className="p-4">
-                                        <div className="flex items-start gap-3">
-                                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${mod.color}`}>
-                                                <Icon className="h-5 w-5" />
-                                            </div>
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="text-sm font-semibold">{mod.title}</h3>
-                                                </div>
-                                                <p className="mt-0.5 text-xs text-muted-foreground">{mod.description}</p>
-                                            </div>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </Link>
-                        );
-                    })}
+                {/* ── KPI Cards ─────────────────────────────────────── */}
+                <div className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+                    <OpsStatCard
+                        label="Admin Rate"
+                        value={`${stats.adminRate}%`}
+                        icon={TrendingUp}
+                        color="emerald"
+                        subtitle={`${stats.givenToday} of ${stats.totalToday} today`}
+                        trend={stats.givenTrend}
+                    />
+                    <OpsStatCard
+                        label="Active Clients"
+                        value={stats.activeClients}
+                        icon={Users}
+                        color="indigo"
+                        subtitle={`${stats.activeMedications} active medications`}
+                    />
+                    <OpsStatCard
+                        label="PRN Given Today"
+                        value={stats.prnToday}
+                        icon={Activity}
+                        color="violet"
+                        subtitle={stats.prnNearLimit > 0 ? `${stats.prnNearLimit} near limit` : 'No limits reached'}
+                    />
+                    <OpsStatCard
+                        label="Controlled Drugs"
+                        value={stats.controlledCount}
+                        icon={Lock}
+                        color="red"
+                        subtitle={stats.activeDiscrepancies > 0 ? `${stats.activeDiscrepancies} discrepancies` : 'No discrepancies'}
+                    />
+                    <OpsStatCard
+                        label="Rounds Today"
+                        value={stats.roundsToday}
+                        icon={Clock}
+                        color="blue"
+                        subtitle={`${stats.roundsCompleted} completed`}
+                    />
+                    <OpsStatCard
+                        label="Active Alerts"
+                        value={stats.activeAlerts + totalAlerts}
+                        icon={AlertTriangle}
+                        color={totalAlerts > 0 ? 'amber' : 'slate'}
+                        subtitle={totalAlerts > 0 ? 'Attention needed' : 'All clear'}
+                    />
                 </div>
+
+                {/* ── Charts Row ─────────────────────────────────────── */}
+                <div className="mb-6 grid gap-4 lg:grid-cols-3">
+                    {/* 7-Day Trend Area Chart */}
+                    <Card className="lg:col-span-2">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">7-Day Administration Trend</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={220}>
+                                <AreaChart data={trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                    <defs>
+                                        <linearGradient id="gradGiven" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor={OPS_COLORS.success} stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor={OPS_COLORS.success} stopOpacity={0} />
+                                        </linearGradient>
+                                        <linearGradient id="gradMissed" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor={OPS_COLORS.danger} stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor={OPS_COLORS.danger} stopOpacity={0} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted/30" />
+                                    <XAxis dataKey="date" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                                    <YAxis tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                                    <Tooltip
+                                        contentStyle={{ borderRadius: 8, fontSize: 12, border: '1px solid hsl(var(--border))' }}
+                                        labelStyle={{ fontWeight: 600 }}
+                                    />
+                                    <Area type="monotone" dataKey="given" stroke={OPS_COLORS.success} fill="url(#gradGiven)" strokeWidth={2} name="Given" />
+                                    <Area type="monotone" dataKey="refused" stroke={OPS_COLORS.warning} fill="none" strokeWidth={1.5} strokeDasharray="4 4" name="Refused" />
+                                    <Area type="monotone" dataKey="missed" stroke={OPS_COLORS.danger} fill="url(#gradMissed)" strokeWidth={1.5} name="Missed" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Today's Outcomes Donut */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Today's Outcomes</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex flex-col items-center">
+                            <DonutChart
+                                segments={donutSegments}
+                                size={160}
+                                strokeWidth={20}
+                                centerValue={stats.totalToday}
+                                centerLabel="Total"
+                            />
+                            <div className="mt-4 grid w-full grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                                {donutSegments.filter(s => s.value > 0).map((s) => (
+                                    <div key={s.label} className="flex items-center gap-2">
+                                        <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: s.color }} />
+                                        <span className="text-muted-foreground">{s.label}</span>
+                                        <span className="ml-auto font-medium">{s.value}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* ── Bar Chart + Alerts Row ─────────────────────────── */}
+                <div className="mb-6 grid gap-4 lg:grid-cols-2">
+                    {/* Daily Given Bar Chart */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Doses Given (Last 7 Days)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <BarChart data={barData} height={140} barColor={OPS_COLORS.primary} />
+                        </CardContent>
+                    </Card>
+
+                    {/* Alerts & Attention */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                Needs Attention
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            <AlertCard icon={Shield} title="CD Discrepancies" count={stats.activeDiscrepancies} color="red" href="/emar/controlled" />
+                            <AlertCard icon={Clock} title="Overdue Reviews" count={stats.overdueReviews} color="amber" href="/emar/reviews" />
+                            <AlertCard icon={Award} title="Expiring Competencies" count={stats.expiringCompetencies} color="orange" href="/emar/competency" />
+                            <AlertCard icon={Package} title="Low Stock Items" count={stats.lowStock} color="cyan" href="/emar/stock" />
+                            {stats.prnNearLimit > 0 && (
+                                <AlertCard icon={Activity} title="PRN Near Daily Limit" count={stats.prnNearLimit} color="violet" href="/emar/prn" />
+                            )}
+                            {totalAlerts === 0 && stats.prnNearLimit === 0 && (
+                                <div className="flex flex-col items-center py-6 text-center">
+                                    <CheckCircle className="mb-2 h-8 w-8 text-emerald-500" />
+                                    <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">All Clear</p>
+                                    <p className="text-xs text-muted-foreground">No outstanding issues.</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* ── Quick Access ───────────────────────────────────── */}
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Quick Access</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                            {[
+                                { title: 'Daily Overview', href: '/emar/daily', icon: Activity, color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
+                                { title: 'MAR Charts', href: '/emar/mar', icon: Pill, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },
+                                { title: 'Controlled Drugs', href: '/emar/controlled', icon: Lock, color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' },
+                                { title: 'Reports', href: '/emar/reports', icon: TrendingUp, color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300' },
+                            ].map((item) => {
+                                const Icon = item.icon;
+                                return (
+                                    <Link key={item.href} href={item.href} className="group flex items-center gap-3 rounded-lg border p-3 transition-all hover:bg-muted/50 hover:shadow-sm">
+                                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${item.color}`}>
+                                            <Icon className="h-4 w-4" />
+                                        </div>
+                                        <span className="text-sm font-medium">{item.title}</span>
+                                        <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
             </PageShell>
         </AppLayout>
     );

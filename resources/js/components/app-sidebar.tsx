@@ -57,6 +57,7 @@ import {
     ShieldCheck,
     Smartphone,
     Target,
+    Trash2,
     Truck,
     UserCheck,
     Users,
@@ -331,6 +332,7 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     // Administration
     const admin: NavItem[] = [];
     if (can?.medications?.view) admin.push({ title: 'MAR Charts', href: '/emar/mar', icon: ClipboardCheck });
+    if (can?.medications?.view) admin.push({ title: 'Medication Rounds', href: '/emar/rounds', icon: Clock });
     if (can?.medications?.view) admin.push({ title: 'PRN Records', href: '/emar/prn', icon: BookOpen });
     if (can?.medications?.view) admin.push({ title: 'Controlled Drugs', href: '/emar/controlled', icon: Shield });
     if (can?.medications?.breakGlass) admin.push({ title: 'Emergency Access', href: '/emar/emergency-access', icon: ShieldAlert });
@@ -341,6 +343,8 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.medications?.view) mgmt.push({ title: 'Medications', href: '/emar/medications', icon: Pill });
     if (can?.medications?.view) mgmt.push({ title: 'Stock Management', href: '/emar/stock', icon: Package });
     if (can?.medications?.view) mgmt.push({ title: 'Prescriptions', href: '/emar/prescriptions', icon: FileText });
+    if (can?.medications?.view) mgmt.push({ title: 'Medication Reviews', href: '/emar/reviews', icon: CalendarDays });
+    if (can?.medications?.view) mgmt.push({ title: 'Self-Administration', href: '/emar/self-admin', icon: Users });
     if (mgmt.length > 0) groups.push({ label: 'Management', items: mgmt });
 
     // Compliance
@@ -348,6 +352,8 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.medications?.audit?.view) compliance.push({ title: 'Audit Trail', href: '/emar/audit', icon: Shield });
     if (can?.reports?.viewAny) compliance.push({ title: 'Reports', href: '/emar/reports', icon: PieChart });
     if (can?.medications?.view) compliance.push({ title: 'Competency', href: '/emar/competency', icon: ClipboardCheck });
+    if (can?.medications?.view) compliance.push({ title: 'Destructions', href: '/emar/destructions', icon: Trash2 });
+    if (can?.medications?.view) compliance.push({ title: 'Handovers', href: '/emar/handovers', icon: GitBranch });
     if (compliance.length > 0) groups.push({ label: 'Compliance', items: compliance });
 
     return groups;

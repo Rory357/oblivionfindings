@@ -17,9 +17,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->prefix('emar')->group(function () {
     // Dashboard
-    Route::get('/', function () {
-        return \Inertia\Inertia::render('emar/Index');
-    })->middleware('permission:medications.view')->name('emar.index');
+    Route::get('/', [EmarController::class, 'dashboard'])
+        ->middleware('permission:medications.view')
+        ->name('emar.index');
 
     // Daily overview
     Route::get('/daily', [MedicationsController::class, 'index'])
