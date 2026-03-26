@@ -20,6 +20,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -46,6 +47,9 @@ import {
     Upload,
     Users,
     XCircle,
+    Database,
+    Landmark,
+    Settings,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -472,7 +476,21 @@ export default function Data() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Data & Privacy" />
             <SettingsLayout>
-                <div className="space-y-8">
+                <div className="mb-6">
+                    <h2 className="text-2xl font-bold">Data & Privacy</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">Manage data exports, privacy requests, retention policies, and compliance settings.</p>
+                </div>
+
+                <TabsRoot defaultValue="export" className="space-y-6">
+                    <TabsList className="w-full justify-start border-b bg-transparent p-0">
+                        <TabsTrigger value="export" className="gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 rounded-none"><Database className="h-3.5 w-3.5" />Export & Import</TabsTrigger>
+                        <TabsTrigger value="requests" className="gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 rounded-none"><Shield className="h-3.5 w-3.5" />Privacy Requests</TabsTrigger>
+                        <TabsTrigger value="retention" className="gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 rounded-none"><Clock className="h-3.5 w-3.5" />Retention</TabsTrigger>
+                        <TabsTrigger value="compliance" className="gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 rounded-none"><Landmark className="h-3.5 w-3.5" />Compliance</TabsTrigger>
+                        <TabsTrigger value="settings" className="gap-1.5 data-[state=active]:border-b-2 data-[state=active]:border-violet-600 rounded-none"><Settings className="h-3.5 w-3.5" />Settings</TabsTrigger>
+                    </TabsList>
+
+                <TabsContent value="export" className="space-y-8">
 
                     {/* ==========================================================
                         SECTION 1 — Data Export
@@ -675,6 +693,64 @@ export default function Data() {
                     </Card>
 
                     {/* ==========================================================
+                        SECTION 8 -- Data Import
+                    ========================================================== */}
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
+                                    <Upload className="h-5 w-5 text-violet-600" />
+                                </div>
+                                <div>
+                                    <CardTitle>Data Import</CardTitle>
+                                    <CardDescription>Import data from other systems or spreadsheets</CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-5">
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <FileSpreadsheet className="h-4 w-4" />
+                                Supported formats: CSV, JSON, Excel (.xlsx)
+                            </div>
+
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                {importTypes.map((imp) => {
+                                    const Icon = imp.icon;
+                                    return (
+                                        <div
+                                            key={imp.id}
+                                            className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-5 text-center transition hover:border-violet-300 hover:bg-violet-50/50 dark:hover:border-violet-700 dark:hover:bg-violet-950/20"
+                                        >
+                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/40">
+                                                <Icon className="h-5 w-5 text-violet-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-sm font-medium">{imp.title}</p>
+                                                <p className="mt-0.5 text-xs text-muted-foreground">{imp.description}</p>
+                                            </div>
+                                            <Button variant="outline" size="sm" className="mt-1">
+                                                <Upload className="mr-1.5 h-3 w-3" /> Choose File
+                                            </Button>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400">
+                                <Info className="mt-0.5 h-4 w-4 shrink-0" />
+                                <span>
+                                    Data imports are validated before processing. You'll be able to review and confirm before any
+                                    records are created.
+                                </span>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                </TabsContent>
+
+                <TabsContent value="requests" className="space-y-8">
+
+                    {/* ==========================================================
                         SECTION 2 -- Data Subject Access Requests (DSAR)
                     ========================================================== */}
                     <Card>
@@ -834,6 +910,10 @@ export default function Data() {
                         </CardContent>
                     </Card>
 
+                </TabsContent>
+
+                <TabsContent value="retention" className="space-y-8">
+
                     {/* ==========================================================
                         SECTION 4 -- Data Retention
                     ========================================================== */}
@@ -903,6 +983,74 @@ export default function Data() {
                             </div>
                         </CardContent>
                     </Card>
+
+                    {/* ==========================================================
+                        SECTION 6 — Danger Zone
+                    ========================================================== */}
+                    <Card className="border-red-200 dark:border-red-900">
+                        <CardHeader>
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/40">
+                                    <Trash2 className="h-5 w-5 text-red-600" />
+                                </div>
+                                <div>
+                                    <CardTitle className="text-red-600">Danger Zone</CardTitle>
+                                    <CardDescription>Irreversible actions that affect all organisation data</CardDescription>
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-4">
+                            {/* Purge deleted records */}
+                            <div className="flex items-center justify-between rounded-lg border border-red-200 p-4 dark:border-red-900">
+                                <div>
+                                    <p className="text-sm font-medium">Purge All Deleted Records</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Permanently remove all soft-deleted records across all modules
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950/30"
+                                    onClick={() => setShowPurgeDialog(true)}
+                                >
+                                    Purge Records
+                                </Button>
+                            </div>
+
+                            {/* Reset demo data */}
+                            <div className="flex items-center justify-between rounded-lg border border-red-200 p-4 dark:border-red-900">
+                                <div>
+                                    <p className="text-sm font-medium">Reset Demo Data</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Remove all demo/seed data and start fresh (demo mode only)
+                                    </p>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950/30"
+                                >
+                                    Reset Demo
+                                </Button>
+                            </div>
+
+                            {/* Delete organisation */}
+                            <div className="flex items-center justify-between rounded-lg border border-red-200 p-4 dark:border-red-900">
+                                <div>
+                                    <p className="text-sm font-medium">Delete Organisation</p>
+                                    <p className="text-xs text-muted-foreground">
+                                        Permanently delete your entire organisation and all associated data
+                                    </p>
+                                </div>
+                                <Button variant="destructive" onClick={() => setShowDeleteOrgDialog(true)}>
+                                    Delete Organisation
+                                </Button>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                </TabsContent>
+
+                <TabsContent value="compliance" className="space-y-8">
 
                     {/* ==========================================================
                         SECTION 3 — Privacy & Consent
@@ -1223,124 +1371,9 @@ export default function Data() {
                         </CardContent>
                     </Card>
 
-                    {/* ==========================================================
-                        SECTION 8 -- Data Import
-                    ========================================================== */}
-                    <Card>
-                        <CardHeader>
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-100 dark:bg-violet-900/40">
-                                    <Upload className="h-5 w-5 text-violet-600" />
-                                </div>
-                                <div>
-                                    <CardTitle>Data Import</CardTitle>
-                                    <CardDescription>Import data from other systems or spreadsheets</CardDescription>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-5">
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                                <FileSpreadsheet className="h-4 w-4" />
-                                Supported formats: CSV, JSON, Excel (.xlsx)
-                            </div>
+                </TabsContent>
 
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                                {importTypes.map((imp) => {
-                                    const Icon = imp.icon;
-                                    return (
-                                        <div
-                                            key={imp.id}
-                                            className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-5 text-center transition hover:border-violet-300 hover:bg-violet-50/50 dark:hover:border-violet-700 dark:hover:bg-violet-950/20"
-                                        >
-                                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-violet-100 dark:bg-violet-900/40">
-                                                <Icon className="h-5 w-5 text-violet-600" />
-                                            </div>
-                                            <div>
-                                                <p className="text-sm font-medium">{imp.title}</p>
-                                                <p className="mt-0.5 text-xs text-muted-foreground">{imp.description}</p>
-                                            </div>
-                                            <Button variant="outline" size="sm" className="mt-1">
-                                                <Upload className="mr-1.5 h-3 w-3" /> Choose File
-                                            </Button>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            <div className="flex items-start gap-2 rounded-lg border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 dark:border-blue-800 dark:bg-blue-950/30 dark:text-blue-400">
-                                <Info className="mt-0.5 h-4 w-4 shrink-0" />
-                                <span>
-                                    Data imports are validated before processing. You'll be able to review and confirm before any
-                                    records are created.
-                                </span>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    {/* ==========================================================
-                        SECTION 6 — Danger Zone
-                    ========================================================== */}
-                    <Card className="border-red-200 dark:border-red-900">
-                        <CardHeader>
-                            <div className="flex items-center gap-3">
-                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-red-100 dark:bg-red-900/40">
-                                    <Trash2 className="h-5 w-5 text-red-600" />
-                                </div>
-                                <div>
-                                    <CardTitle className="text-red-600">Danger Zone</CardTitle>
-                                    <CardDescription>Irreversible actions that affect all organisation data</CardDescription>
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            {/* Purge deleted records */}
-                            <div className="flex items-center justify-between rounded-lg border border-red-200 p-4 dark:border-red-900">
-                                <div>
-                                    <p className="text-sm font-medium">Purge All Deleted Records</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Permanently remove all soft-deleted records across all modules
-                                    </p>
-                                </div>
-                                <Button
-                                    variant="outline"
-                                    className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950/30"
-                                    onClick={() => setShowPurgeDialog(true)}
-                                >
-                                    Purge Records
-                                </Button>
-                            </div>
-
-                            {/* Reset demo data */}
-                            <div className="flex items-center justify-between rounded-lg border border-red-200 p-4 dark:border-red-900">
-                                <div>
-                                    <p className="text-sm font-medium">Reset Demo Data</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Remove all demo/seed data and start fresh (demo mode only)
-                                    </p>
-                                </div>
-                                <Button
-                                    variant="outline"
-                                    className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950/30"
-                                >
-                                    Reset Demo
-                                </Button>
-                            </div>
-
-                            {/* Delete organisation */}
-                            <div className="flex items-center justify-between rounded-lg border border-red-200 p-4 dark:border-red-900">
-                                <div>
-                                    <p className="text-sm font-medium">Delete Organisation</p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Permanently delete your entire organisation and all associated data
-                                    </p>
-                                </div>
-                                <Button variant="destructive" onClick={() => setShowDeleteOrgDialog(true)}>
-                                    Delete Organisation
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+                </TabsRoot>
 
                 {/* ==============================================================
                     DIALOGS
