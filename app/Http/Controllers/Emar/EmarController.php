@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
+use App\Models\ControlledDrugLossReport;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
@@ -14,6 +15,7 @@ use App\Models\MedicationCovertAuthorisation;
 use App\Models\MedicationDashboardAlert;
 use App\Models\MedicationDestruction;
 use App\Models\MedicationHandover;
+use App\Models\MedicationInteraction;
 use App\Models\MedicationPharmacyOrder;
 use App\Models\MedicationPrescriberOrder;
 use App\Models\MedicationPrnEffectiveness;
@@ -23,6 +25,7 @@ use App\Models\MedicationRoundTemplate;
 use App\Models\MedicationSelfAdminAssessment;
 use App\Models\Site;
 use App\Models\User;
+use App\Services\DoseSchedulingService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -124,6 +127,59 @@ class EmarController extends Controller
         // Sparkline data (last 7 days given counts)
         $givenTrend = array_map(fn ($d) => $d['given'], $trend);
 
+        // Overdue medications (scheduled but not administered, past their window)
+        $overdueMedications = ClientMedicationAdministration::where('status', 'pending')
+            ->where('scheduled_for', '<', now()->subMinutes(60))
+            ->whereDate('scheduled_for', $today)
+            ->with(['client:id,first_name,last_name', 'medication:id,client_id,name,dosage'])
+            ->limit(10)
+            ->get();
+
+        // Upcoming round (next pending round today)
+        $nextRound = MedicationRound::where('status', 'pending')
+            ->whereDate('round_date', $today)
+            ->orderBy('scheduled_time')
+            ->with('assignedTo:id,name')
+            ->first();
+
+        // Client status grid (per-client medication summary for today)
+        $clientStatuses = Client::query()
+            ->select(['id', 'first_name', 'last_name'])
+            ->withCount([
+                'medications as active_medications_count' => fn ($q) => $q->active(),
+                'medicationAdministrations as given_today' => fn ($q) => $q->whereDate('administered_at', $today)->where('status', 'given'),
+                'medicationAdministrations as pending_today' => fn ($q) => $q->whereDate('scheduled_for', $today)->where('status', 'pending'),
+                'medicationAdministrations as missed_today' => fn ($q) => $q->whereDate('scheduled_for', $today)->where('status', 'missed'),
+            ])
+            ->having('active_medications_count', '>', 0)
+            ->orderBy('last_name')
+            ->get();
+
+        // Recent activity feed (last 20 administrations)
+        $recentActivity = ClientMedicationAdministration::with([
+                'client:id,first_name,last_name',
+                'medication:id,client_id,name',
+                'administeredBy:id,name',
+            ])
+            ->latest('administered_at')
+            ->limit(20)
+            ->get();
+
+        // Active alerts from MedicationDashboardAlert
+        $activeAlertsList = MedicationDashboardAlert::active()
+            ->with(['client:id,first_name,last_name', 'medication:id,client_id,name'])
+            ->latest()
+            ->limit(10)
+            ->get();
+
+        // Compliance snapshot
+        $compliance = [
+            'competencyExpiring' => MedicationCompetencyAssessment::where('expiry_date', '<=', now()->addDays(30))->where('expiry_date', '>', now())->count(),
+            'competencyExpired' => MedicationCompetencyAssessment::where('expiry_date', '<', now())->count(),
+            'pendingReviews' => MedicationReview::where('status', 'scheduled')->where('scheduled_date', '<=', now())->count(),
+            'overdueReviews' => MedicationReview::where('status', 'overdue')->count(),
+        ];
+
         return Inertia::render('emar/Index', [
             'stats' => [
                 'totalToday' => $totalToday,
@@ -148,6 +204,12 @@ class EmarController extends Controller
                 'givenTrend' => $givenTrend,
             ],
             'trend' => $trend,
+            'overdueMedications' => $overdueMedications,
+            'nextRound' => $nextRound,
+            'clientStatuses' => $clientStatuses,
+            'recentActivity' => $recentActivity,
+            'activeAlertsList' => $activeAlertsList,
+            'compliance' => $compliance,
         ]);
     }
 
@@ -180,6 +242,8 @@ class EmarController extends Controller
             'marData' => $marData,
             'date' => $request->input('date', today()->toDateString()),
             'staff' => $this->getStaffList(),
+            'allergies' => $selectedClient ? $selectedClient->medicationAllergies()->get(['allergen', 'reaction', 'severity']) : [],
+            'interactions' => $selectedClient ? $this->getActiveInteractions($selectedClient) : [],
         ]);
     }
 
@@ -193,19 +257,59 @@ class EmarController extends Controller
         $prn = $medications->where('is_prn', true)->values();
 
         return [
-            'scheduled' => $scheduled->map(fn ($med) => [
-                'id' => $med->id,
-                'name' => $med->name,
-                'dosage' => $med->formatted_dose,
-                'frequency' => $med->frequency,
-                'route' => $med->route,
-                'form' => $med->form,
-                'instructions' => $med->instructions,
-                'controlled_drug' => $med->controlled_drug,
-                'high_risk' => $med->high_risk,
-                'witness_required' => $med->requiresWitness(),
-                'dose_times' => $med->dose_times ?? [],
-                'administrations' => $med->administrations->map(fn ($a) => [
+            'scheduled' => $scheduled->map(function ($med) use ($date) {
+                $doseTimes = $med->dose_times ?? [];
+
+                // If no dose_times stored yet, auto-calculate from frequency
+                if (empty($doseTimes) && $med->frequency) {
+                    $doseTimes = DoseSchedulingService::calculateDoseTimes($med->frequency);
+                }
+
+                // Build administration slots: for each dose_time, find matching admin record
+                $administrations = collect($doseTimes)->map(function ($time) use ($med, $date) {
+                    $scheduledDatetime = $date . ' ' . $time . ':00';
+
+                    // Find an administration record matching this time slot
+                    $admin = $med->administrations->first(function ($a) use ($time) {
+                        if (!$a->scheduled_for) return false;
+                        return $a->scheduled_for->format('H:i') === $time;
+                    });
+
+                    if ($admin) {
+                        return [
+                            'id' => $admin->id,
+                            'scheduled_for' => $admin->scheduled_for?->toIso8601String(),
+                            'administered_at' => $admin->administered_at?->toIso8601String(),
+                            'status' => $admin->status,
+                            'administered_by' => $admin->administeredBy?->name,
+                            'witnessed_by' => $admin->witnessedBy?->name,
+                            'notes' => $admin->notes,
+                            'reason' => $admin->reason,
+                        ];
+                    }
+
+                    // No record yet: determine if pending or missed
+                    $now = now();
+                    $scheduledAt = \Carbon\Carbon::parse($scheduledDatetime);
+                    $status = $now->greaterThan($scheduledAt->copy()->addHour()) ? 'missed' : 'pending';
+
+                    return [
+                        'id' => null,
+                        'scheduled_for' => $scheduledAt->toIso8601String(),
+                        'administered_at' => null,
+                        'status' => $status,
+                        'administered_by' => null,
+                        'witnessed_by' => null,
+                        'notes' => null,
+                        'reason' => null,
+                    ];
+                })->values();
+
+                // Also include any administration records that don't match a dose_time slot
+                $unmatchedAdmins = $med->administrations->filter(function ($a) use ($doseTimes) {
+                    if (!$a->scheduled_for) return true;
+                    return !in_array($a->scheduled_for->format('H:i'), $doseTimes);
+                })->map(fn ($a) => [
                     'id' => $a->id,
                     'scheduled_for' => $a->scheduled_for?->toIso8601String(),
                     'administered_at' => $a->administered_at?->toIso8601String(),
@@ -214,8 +318,23 @@ class EmarController extends Controller
                     'witnessed_by' => $a->witnessedBy?->name,
                     'notes' => $a->notes,
                     'reason' => $a->reason,
-                ]),
-            ]),
+                ]);
+
+                return [
+                    'id' => $med->id,
+                    'name' => $med->name,
+                    'dosage' => $med->formatted_dose,
+                    'frequency' => $med->frequency,
+                    'route' => $med->route,
+                    'form' => $med->form,
+                    'instructions' => $med->instructions,
+                    'controlled_drug' => $med->controlled_drug,
+                    'high_risk' => $med->high_risk,
+                    'witness_required' => $med->requiresWitness(),
+                    'dose_times' => $doseTimes,
+                    'administrations' => $administrations->merge($unmatchedAdmins)->values(),
+                ];
+            }),
             'prn' => $prn->map(fn ($med) => [
                 'id' => $med->id,
                 'name' => $med->name,
@@ -244,6 +363,44 @@ class EmarController extends Controller
                 'pending' => $medications->flatMap->administrations->where('status', 'pending')->count(),
             ],
         ];
+    }
+
+    private function getActiveInteractions(Client $client): array
+    {
+        $medicationNames = $client->medications()
+            ->active()
+            ->pluck('name')
+            ->map(fn ($name) => strtolower($name))
+            ->toArray();
+
+        if (count($medicationNames) < 2) {
+            return [];
+        }
+
+        $interactions = MedicationInteraction::active()
+            ->where(function ($query) use ($medicationNames) {
+                foreach ($medicationNames as $name) {
+                    $query->orWhere(function ($q) use ($name, $medicationNames) {
+                        $q->where(function ($inner) use ($name) {
+                            $inner->whereRaw('LOWER(medication_a) LIKE ?', ["%{$name}%"]);
+                        })->where(function ($inner) use ($medicationNames, $name) {
+                            foreach ($medicationNames as $otherName) {
+                                if ($otherName !== $name) {
+                                    $inner->orWhereRaw('LOWER(medication_b) LIKE ?', ["%{$otherName}%"]);
+                                }
+                            }
+                        });
+                    });
+                }
+            })
+            ->get();
+
+        return $interactions->map(fn ($i) => [
+            'drug_a' => $i->medication_a,
+            'drug_b' => $i->medication_b,
+            'severity' => $i->severity,
+            'description' => $i->description,
+        ])->toArray();
     }
 
     // ─── PRN Records ───────────────────────────────────────
@@ -323,11 +480,16 @@ class EmarController extends Controller
             ->limit(20)
             ->get();
 
+        $lossReports = ControlledDrugLossReport::with(['client:id,first_name,last_name', 'discoveredBy:id,name'])
+            ->latest()
+            ->get();
+
         return Inertia::render('emar/ControlledDrugs', [
             'medications' => $controlledMedications,
             'recentEntries' => $recentEntries,
             'discrepancies' => $discrepancies,
             'destructions' => $destructions,
+            'lossReports' => $lossReports,
             'staff' => $this->getStaffList(),
             'clients' => $this->getClientsList(),
         ]);
@@ -351,11 +513,49 @@ class EmarController extends Controller
 
         $clients = Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']);
 
+        // Build a map of medication IDs that have known interactions with other active meds for the same client
+        $interactionMap = [];
+        $medsByClient = $medications->getCollection()->groupBy('client_id');
+        foreach ($medsByClient as $clientId => $clientMeds) {
+            $names = $clientMeds->pluck('name')->map(fn ($n) => strtolower($n))->toArray();
+            if (count($names) < 2) continue;
+
+            $clientInteractions = MedicationInteraction::active()
+                ->where(function ($query) use ($names) {
+                    foreach ($names as $name) {
+                        $query->orWhere(function ($q) use ($name, $names) {
+                            $q->whereRaw('LOWER(medication_a) LIKE ?', ["%{$name}%"])
+                              ->where(function ($inner) use ($names, $name) {
+                                  foreach ($names as $other) {
+                                      if ($other !== $name) {
+                                          $inner->orWhereRaw('LOWER(medication_b) LIKE ?', ["%{$other}%"]);
+                                      }
+                                  }
+                              });
+                        });
+                    }
+                })
+                ->get();
+
+            foreach ($clientInteractions as $interaction) {
+                foreach ($clientMeds as $med) {
+                    $medLower = strtolower($med->name);
+                    if (
+                        str_contains(strtolower($interaction->medication_a), $medLower) ||
+                        str_contains(strtolower($interaction->medication_b), $medLower)
+                    ) {
+                        $interactionMap[$med->id] = $interaction->severity;
+                    }
+                }
+            }
+        }
+
         return Inertia::render('emar/Medications', [
             'medications' => $medications,
             'clients' => $clients,
             'staff' => $this->getStaffList(),
             'filters' => $request->only(['search', 'status', 'type', 'client_id']),
+            'interactionMap' => $interactionMap,
         ]);
     }
 
@@ -376,8 +576,15 @@ class EmarController extends Controller
                 'unit' => $s->unit,
                 'reorder_level' => $s->reorder_level,
                 'last_counted_at' => $s->last_counted_at,
-                'is_low' => $s->reorder_level && $s->on_hand <= $s->reorder_level,
+                'is_low' => $s->isLowStock(),
                 'controlled' => $s->medication?->controlled_drug,
+                'expiry_date' => $s->expiry_date?->toDateString(),
+                'batch_number' => $s->batch_number,
+                'supplier_name' => $s->supplier_name,
+                'reorder_quantity' => $s->reorder_quantity,
+                'is_expired' => $s->isExpired(),
+                'is_expiring_soon' => $s->isExpiringSoon(30),
+                'is_expiring_90' => $s->isExpiringSoon(90),
             ]);
 
         $lowStockCount = $stockItems->where('is_low', true)->count();
@@ -392,6 +599,8 @@ class EmarController extends Controller
         return Inertia::render('emar/StockManagement', [
             'stockItems' => $stockItems,
             'lowStockCount' => $lowStockCount,
+            'expiringCount' => ClientMedicationStock::expiringSoon()->count(),
+            'expiredCount' => ClientMedicationStock::expired()->count(),
             'pharmacyOrders' => $pharmacyOrders,
             'clients' => $this->getClientsList(),
             'activeMedications' => ClientMedication::active()->with('client:id,first_name,last_name')->orderBy('name')->get(['id', 'name', 'client_id']),
@@ -494,13 +703,22 @@ class EmarController extends Controller
             ->orderBy('scheduled_time')
             ->get();
 
-        $templates = MedicationRoundTemplate::active()->orderBy('scheduled_time')->get();
+        $templates = MedicationRoundTemplate::query()
+            ->with('defaultAssignedTo:id,name')
+            ->orderBy('scheduled_time')
+            ->get();
+
+        // Last auto-generated round timestamp
+        $lastGenerated = MedicationRound::whereNotNull('round_template_id')
+            ->latest('created_at')
+            ->value('created_at');
 
         return Inertia::render('emar/Rounds', [
             'rounds' => $rounds,
             'templates' => $templates,
             'staff' => $this->getStaffList(),
             'date' => $date,
+            'lastGenerated' => $lastGenerated?->toIso8601String(),
         ]);
     }
 
@@ -823,6 +1041,7 @@ class EmarController extends Controller
             'days_of_week' => 'nullable|array',
             'days_of_week.*' => 'integer|min:0|max:6',
             'site_id' => 'nullable|exists:sites,id',
+            'default_assigned_to' => 'nullable|exists:users,id',
         ]);
 
         $validated['active'] = true;
@@ -841,6 +1060,7 @@ class EmarController extends Controller
             'days_of_week' => 'nullable|array',
             'days_of_week.*' => 'integer|min:0|max:6',
             'active' => 'nullable|boolean',
+            'default_assigned_to' => 'nullable|exists:users,id',
         ]);
 
         $template->update($validated);
@@ -862,7 +1082,7 @@ class EmarController extends Controller
         ]);
 
         $date = \Carbon\Carbon::parse($validated['date']);
-        $dayOfWeek = $date->dayOfWeek;
+        $dayOfWeek = $date->dayOfWeekIso; // 1=Mon, 7=Sun
 
         $templates = MedicationRoundTemplate::active()->get();
         $totalMedications = ClientMedication::active()->count();
@@ -874,9 +1094,8 @@ class EmarController extends Controller
             }
 
             // Skip if round already exists for this template on this date
-            $exists = MedicationRound::where('round_date', $date->toDateString())
-                ->where('name', $template->name)
-                ->where('scheduled_time', $template->scheduled_time)
+            $exists = MedicationRound::where('round_template_id', $template->id)
+                ->whereDate('round_date', $date)
                 ->exists();
 
             if ($exists) {
@@ -885,10 +1104,13 @@ class EmarController extends Controller
 
             MedicationRound::create([
                 'name' => $template->name,
+                'round_template_id' => $template->id,
+                'round_type' => 'scheduled',
                 'scheduled_time' => $template->scheduled_time,
-                'window_minutes' => $template->window_minutes,
+                'window_minutes' => $template->window_minutes ?? 60,
                 'round_date' => $date->toDateString(),
                 'status' => 'pending',
+                'assigned_to' => $template->default_assigned_to,
                 'total_medications' => $totalMedications,
                 'site_id' => $template->site_id,
                 'service_context_id' => $template->service_context_id,
@@ -1089,6 +1311,20 @@ class EmarController extends Controller
             'prn_given' => 'nullable|array',
             'flagged_clients' => 'nullable|array',
             'general_notes' => 'nullable|string',
+            'checklist_items' => 'nullable|array',
+            'checklist_items.*.label' => 'required|string|max:255',
+            'checklist_items.*.checked' => 'required|boolean',
+            'checklist_items.*.notes' => 'nullable|string|max:500',
+            'safety_concerns' => 'nullable|string|max:5000',
+            'medication_errors_count' => 'nullable|integer|min:0',
+            'pending_gp_followups' => 'nullable|integer|min:0',
+            'clients_requiring_attention' => 'nullable|array',
+            'clients_requiring_attention.*.client_id' => 'nullable|string',
+            'clients_requiring_attention.*.client_name' => 'required|string|max:255',
+            'clients_requiring_attention.*.reason' => 'required|string|max:500',
+            'previous_shift_notes_read' => 'nullable|boolean',
+            'stock_issues_identified' => 'nullable|string|max:5000',
+            'prescriber_changes_summary' => 'nullable|string|max:5000',
         ]);
 
         $validated['outgoing_user_id'] = auth()->id();
@@ -1307,7 +1543,7 @@ class EmarController extends Controller
             'prescriber_name' => 'nullable|string|max:255',
         ]);
 
-        ClientMedication::create([
+        $medication = ClientMedication::create([
             'client_id' => $validated['client_id'],
             'name' => $validated['medication_name'],
             'brand_name' => $validated['brand_name'] ?? null,
@@ -1328,6 +1564,11 @@ class EmarController extends Controller
             'start_date' => $validated['start_date'] ?? now()->toDateString(),
             'prescriber_name' => $validated['prescriber_name'] ?? null,
             'state' => 'active',
+        ]);
+
+        // Auto-calculate dose times from the frequency
+        $medication->update([
+            'dose_times' => DoseSchedulingService::calculateDoseTimes($validated['frequency']),
         ]);
 
         return redirect()->back();
@@ -1360,6 +1601,11 @@ class EmarController extends Controller
         if (isset($validated['dose'])) $updateData['dosage'] = $validated['dose'];
         unset($validated['medication_name'], $validated['dose']);
         $updateData = array_merge($updateData, $validated);
+
+        // Recalculate dose_times if frequency changed
+        if (isset($validated['frequency']) && $validated['frequency'] !== $medication->frequency) {
+            $updateData['dose_times'] = DoseSchedulingService::calculateDoseTimes($validated['frequency']);
+        }
 
         $medication->update($updateData);
 
@@ -1512,6 +1758,20 @@ class EmarController extends Controller
             'incoming_user_id' => 'sometimes|exists:users,id',
             'controlled_drugs_verified' => 'nullable|boolean',
             'general_notes' => 'nullable|string|max:5000',
+            'checklist_items' => 'nullable|array',
+            'checklist_items.*.label' => 'required|string|max:255',
+            'checklist_items.*.checked' => 'required|boolean',
+            'checklist_items.*.notes' => 'nullable|string|max:500',
+            'safety_concerns' => 'nullable|string|max:5000',
+            'medication_errors_count' => 'nullable|integer|min:0',
+            'pending_gp_followups' => 'nullable|integer|min:0',
+            'clients_requiring_attention' => 'nullable|array',
+            'clients_requiring_attention.*.client_id' => 'nullable|string',
+            'clients_requiring_attention.*.client_name' => 'required|string|max:255',
+            'clients_requiring_attention.*.reason' => 'required|string|max:500',
+            'previous_shift_notes_read' => 'nullable|boolean',
+            'stock_issues_identified' => 'nullable|string|max:5000',
+            'prescriber_changes_summary' => 'nullable|string|max:5000',
         ]);
 
         $handover->update($validated);
@@ -1531,6 +1791,99 @@ class EmarController extends Controller
     public function destroyDestruction(MedicationDestruction $destruction)
     {
         $destruction->delete();
+
+        return redirect()->back();
+    }
+
+    // ─── Medications CSV Import ──────────────────────────
+
+    public function importMedications(Request $request)
+    {
+        $request->validate([
+            'csv_file' => 'required|file|mimes:csv,txt|max:2048',
+        ]);
+
+        $file = $request->file('csv_file');
+        $handle = fopen($file->getRealPath(), 'r');
+
+        if (! $handle) {
+            return redirect()->back()->withErrors(['csv_file' => 'Unable to read the CSV file.']);
+        }
+
+        $imported = 0;
+        $skipped = 0;
+        $rowNumber = 0;
+
+        while (($row = fgetcsv($handle)) !== false) {
+            $rowNumber++;
+
+            // Skip empty rows
+            if (empty(array_filter($row))) {
+                continue;
+            }
+
+            // Skip header row
+            if ($rowNumber === 1 && stripos($row[0] ?? '', 'client') !== false) {
+                continue;
+            }
+
+            // Expect: client_name, medication_name, dose, frequency, route
+            if (count($row) < 4) {
+                $skipped++;
+                continue;
+            }
+
+            $clientName = trim($row[0] ?? '');
+            $medicationName = trim($row[1] ?? '');
+            $dose = trim($row[2] ?? '');
+            $frequency = trim($row[3] ?? '');
+            $route = trim($row[4] ?? 'oral');
+
+            if (! $clientName || ! $medicationName || ! $dose || ! $frequency) {
+                $skipped++;
+                continue;
+            }
+
+            // Try to match client by name ("Last, First" or "First Last")
+            $client = null;
+            if (str_contains($clientName, ',')) {
+                [$lastName, $firstName] = array_map('trim', explode(',', $clientName, 2));
+                $client = Client::where('last_name', $lastName)
+                    ->where('first_name', $firstName)
+                    ->first();
+            } else {
+                $parts = explode(' ', $clientName, 2);
+                if (count($parts) === 2) {
+                    $client = Client::where('first_name', $parts[0])
+                        ->where('last_name', $parts[1])
+                        ->first();
+                }
+            }
+
+            if (! $client) {
+                $skipped++;
+                continue;
+            }
+
+            // Calculate dose times from frequency
+            $doseTimes = DoseSchedulingService::calculateDoseTimes($frequency);
+
+            ClientMedication::create([
+                'client_id' => $client->id,
+                'name' => $medicationName,
+                'dosage' => $dose,
+                'frequency' => $frequency,
+                'dose_times' => $doseTimes,
+                'route' => $route,
+                'state' => 'active',
+                'active' => true,
+                'start_date' => now()->toDateString(),
+            ]);
+
+            $imported++;
+        }
+
+        fclose($handle);
 
         return redirect()->back();
     }

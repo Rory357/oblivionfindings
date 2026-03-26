@@ -187,6 +187,9 @@ export default function ClientMedical({
                         <div className="text-xs text-slate-500">Medication orders & medical profile</div>
                     </div>
                     <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={() => (window.location.href = `/emar/mar?client_id=${client.id}`)}>
+                            eMAR Dashboard
+                        </Button>
                         <Button variant="outline" onClick={() => (window.location.href = `/clients/${client.id}/mar`)}>
                             Open Daily MAR
                         </Button>
@@ -639,21 +642,30 @@ export default function ClientMedical({
                                         <div className="text-sm font-medium">
                                             {m.name}
                                         </div>
-                                        {can_edit && (
+                                        <div className="flex items-center gap-2">
                                             <Button
-                                                variant="destructive"
-                                                onClick={() =>
-                                                    medForm.delete(
-                                                        `/clients/${client.id}/medical/medications/${m.id}`,
-                                                        {
-                                                            preserveScroll: true,
-                                                        },
-                                                    )
-                                                }
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => (window.location.href = `/emar/mar?client_id=${client.id}`)}
                                             >
-                                                Remove
+                                                View in eMAR
                                             </Button>
-                                        )}
+                                            {can_edit && (
+                                                <Button
+                                                    variant="destructive"
+                                                    onClick={() =>
+                                                        medForm.delete(
+                                                            `/clients/${client.id}/medical/medications/${m.id}`,
+                                                            {
+                                                                preserveScroll: true,
+                                                            },
+                                                        )
+                                                    }
+                                                >
+                                                    Remove
+                                                </Button>
+                                            )}
+                                        </div>
                                     </div>
                                     <div className="mt-1 text-xs text-slate-500">
                                         {[

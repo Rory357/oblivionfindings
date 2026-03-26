@@ -8,20 +8,25 @@ import { Button } from '@/components/ui/button';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
+    AlertCircle,
     AlertTriangle,
     ArrowRightLeft,
     ArrowRight,
     Award,
+    Bell,
     CheckCircle,
     ClipboardCheck,
     Clock,
     FileText,
+    Info,
     Lock,
     Package,
     Pill,
+    Play,
     Shield,
     Syringe,
     TrendingUp,
+    User,
     Users,
     XCircle,
 } from 'lucide-react';
@@ -66,9 +71,67 @@ type TrendDay = {
     total: number;
 };
 
+type OverdueMedication = {
+    id: number;
+    scheduled_for: string;
+    client: { id: number; first_name: string; last_name: string } | null;
+    medication: { id: number; name: string; dosage: string } | null;
+};
+
+type NextRound = {
+    id: number;
+    name: string;
+    scheduled_time: string;
+    round_date: string;
+    assigned_to: { id: number; name: string } | null;
+} | null;
+
+type ClientStatus = {
+    id: number;
+    first_name: string;
+    last_name: string;
+    active_medications_count: number;
+    given_today: number;
+    pending_today: number;
+    missed_today: number;
+};
+
+type RecentActivityItem = {
+    id: number;
+    status: string;
+    administered_at: string | null;
+    scheduled_for: string | null;
+    client: { id: number; first_name: string; last_name: string } | null;
+    medication: { id: number; name: string } | null;
+    administered_by: { id: number; name: string } | null;
+};
+
+type DashboardAlert = {
+    id: number;
+    alert_type: string;
+    severity: string;
+    message: string;
+    created_at: string;
+    client: { id: number; first_name: string; last_name: string } | null;
+    medication: { id: number; name: string } | null;
+};
+
+type Compliance = {
+    competencyExpiring: number;
+    competencyExpired: number;
+    pendingReviews: number;
+    overdueReviews: number;
+};
+
 type Props = {
     stats: Stats;
     trend: TrendDay[];
+    overdueMedications: OverdueMedication[];
+    nextRound: NextRound;
+    clientStatuses: ClientStatus[];
+    recentActivity: RecentActivityItem[];
+    activeAlertsList: DashboardAlert[];
+    compliance: Compliance;
 };
 
 function AlertCard({ icon: Icon, title, count, color, href }: { icon: any; title: string; count: number; color: string; href: string }) {
@@ -90,7 +153,54 @@ function AlertCard({ icon: Icon, title, count, color, href }: { icon: any; title
     );
 }
 
-export default function EmarDashboard({ stats, trend }: Props) {
+function formatTime(dateStr: string | null): string {
+    if (!dateStr) return '--:--';
+    const d = new Date(dateStr);
+    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatTimeAgo(dateStr: string | null): string {
+    if (!dateStr) return '';
+    const now = new Date();
+    const then = new Date(dateStr);
+    const diffMs = now.getTime() - then.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    const diffHrs = Math.floor(diffMins / 60);
+    if (diffHrs < 24) return `${diffHrs}h ago`;
+    return `${Math.floor(diffHrs / 24)}d ago`;
+}
+
+const severityIcon: Record<string, typeof Info> = {
+    info: Info,
+    warning: AlertTriangle,
+    critical: AlertCircle,
+};
+
+const severityColor: Record<string, string> = {
+    info: 'text-blue-500',
+    warning: 'text-amber-500',
+    critical: 'text-red-500',
+};
+
+const statusIcon: Record<string, typeof CheckCircle> = {
+    given: CheckCircle,
+    refused: XCircle,
+    missed: AlertCircle,
+    withheld: Shield,
+    pending: Clock,
+};
+
+const statusColor: Record<string, string> = {
+    given: 'text-emerald-500',
+    refused: 'text-amber-500',
+    missed: 'text-red-500',
+    withheld: 'text-slate-500',
+    pending: 'text-blue-500',
+};
+
+export default function EmarDashboard({ stats, trend, overdueMedications, nextRound, clientStatuses, recentActivity, activeAlertsList, compliance }: Props) {
     const donutSegments = [
         { label: 'Given', value: stats.givenToday, color: OPS_COLORS.success },
         { label: 'Refused', value: stats.refusedToday, color: OPS_COLORS.warning },
@@ -156,6 +266,73 @@ export default function EmarDashboard({ stats, trend }: Props) {
                         color={totalAlerts > 0 ? 'amber' : 'slate'}
                         subtitle={totalAlerts > 0 ? 'Attention needed' : 'All clear'}
                     />
+                </div>
+
+                {/* ── Overdue Medications Alert + Upcoming Round ────── */}
+                <div className="mb-6 grid gap-4 lg:grid-cols-2">
+                    {overdueMedications.length > 0 && (
+                        <Card className="border-red-300 dark:border-red-800">
+                            <CardHeader className="pb-2">
+                                <CardTitle className="flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-400">
+                                    <AlertCircle className="h-4 w-4" />
+                                    Overdue Medications ({overdueMedications.length})
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                {overdueMedications.map((item) => (
+                                    <div key={item.id} className="flex items-center justify-between rounded-lg border border-red-100 bg-red-50/50 p-2.5 dark:border-red-900/40 dark:bg-red-950/20">
+                                        <div className="min-w-0 flex-1">
+                                            <p className="text-sm font-medium">
+                                                {item.client ? `${item.client.first_name} ${item.client.last_name}` : 'Unknown Client'}
+                                            </p>
+                                            <p className="text-xs text-muted-foreground">
+                                                {item.medication?.name} {item.medication?.dosage ? `(${item.medication.dosage})` : ''} — due at {formatTime(item.scheduled_for)}
+                                            </p>
+                                        </div>
+                                        <Link href={`/emar/mar?client_id=${item.client?.id ?? ''}`}>
+                                            <Button size="sm" variant="destructive" className="ml-2 h-7 text-xs">
+                                                Record Now
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    <Card className={overdueMedications.length === 0 ? 'lg:col-span-2 max-w-md' : ''}>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                <Play className="h-4 w-4 text-blue-500" />
+                                Upcoming Round
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {nextRound ? (
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-sm font-medium">{nextRound.name}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Scheduled for {nextRound.scheduled_time}
+                                            {nextRound.assigned_to ? ` — assigned to ${nextRound.assigned_to.name}` : ''}
+                                        </p>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        className="ml-2"
+                                        onClick={() => router.post('/emar/rounds/generate', { date: new Date().toISOString().split('T')[0] })}
+                                    >
+                                        Start Round
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center py-4 text-center">
+                                    <CheckCircle className="mb-2 h-6 w-6 text-emerald-500" />
+                                    <p className="text-sm text-muted-foreground">No rounds pending today</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
 
                 {/* ── Charts Row ─────────────────────────────────────── */}
@@ -257,6 +434,195 @@ export default function EmarDashboard({ stats, trend }: Props) {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* ── Client Status Grid ───────────────────────────── */}
+                {clientStatuses.length > 0 && (
+                    <Card className="mb-6">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                <Users className="h-4 w-4 text-indigo-500" />
+                                Client Status — Today
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                {clientStatuses.map((cs) => {
+                                    const allDone = cs.pending_today === 0 && cs.missed_today === 0 && cs.given_today > 0;
+                                    const hasMissed = cs.missed_today > 0;
+                                    const borderClass = hasMissed
+                                        ? 'border-red-300 dark:border-red-800'
+                                        : allDone
+                                          ? 'border-emerald-300 dark:border-emerald-800'
+                                          : 'border-amber-300 dark:border-amber-800';
+                                    return (
+                                        <Link
+                                            key={cs.id}
+                                            href={`/emar/mar?client_id=${cs.id}`}
+                                            className={`group block rounded-lg border p-3 transition-all hover:shadow-md hover:-translate-y-0.5 ${borderClass}`}
+                                        >
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/40">
+                                                    <User className="h-3.5 w-3.5 text-indigo-600" />
+                                                </div>
+                                                <p className="text-sm font-medium truncate">{cs.first_name} {cs.last_name}</p>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 text-xs">
+                                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                                                    {cs.active_medications_count} meds
+                                                </Badge>
+                                                {cs.given_today > 0 && (
+                                                    <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300 text-[10px] px-1.5 py-0">
+                                                        {cs.given_today} given
+                                                    </Badge>
+                                                )}
+                                                {cs.pending_today > 0 && (
+                                                    <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 text-[10px] px-1.5 py-0">
+                                                        {cs.pending_today} pending
+                                                    </Badge>
+                                                )}
+                                                {cs.missed_today > 0 && (
+                                                    <Badge className="bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300 text-[10px] px-1.5 py-0">
+                                                        {cs.missed_today} missed
+                                                    </Badge>
+                                                )}
+                                            </div>
+                                        </Link>
+                                    );
+                                })}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* ── Active Alerts Panel + Recent Activity Feed ────── */}
+                <div className="mb-6 grid gap-4 lg:grid-cols-2">
+                    {/* Active Alerts Panel */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                <Bell className="h-4 w-4 text-amber-500" />
+                                Active Alerts
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {activeAlertsList.length > 0 ? (
+                                <div className="space-y-2">
+                                    {activeAlertsList.map((alert) => {
+                                        const SeverityIcon = severityIcon[alert.severity] ?? Info;
+                                        const iconColor = severityColor[alert.severity] ?? 'text-slate-500';
+                                        return (
+                                            <div key={alert.id} className="flex items-start gap-3 rounded-lg border p-2.5">
+                                                <SeverityIcon className={`mt-0.5 h-4 w-4 shrink-0 ${iconColor}`} />
+                                                <div className="min-w-0 flex-1">
+                                                    <p className="text-sm font-medium">
+                                                        {alert.client ? `${alert.client.first_name} ${alert.client.last_name}` : ''}
+                                                        {alert.medication ? ` — ${alert.medication.name}` : ''}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">{alert.message}</p>
+                                                    <p className="mt-0.5 text-[10px] text-muted-foreground/60">{formatTimeAgo(alert.created_at)}</p>
+                                                </div>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-7 text-xs"
+                                                    onClick={() => router.post(`/emar/alerts/${alert.id}/dismiss`)}
+                                                >
+                                                    Dismiss
+                                                </Button>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center py-6 text-center">
+                                    <CheckCircle className="mb-2 h-6 w-6 text-emerald-500" />
+                                    <p className="text-sm text-muted-foreground">No active alerts</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Recent Activity Feed */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                <Activity className="h-4 w-4 text-blue-500" />
+                                Recent Activity
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {recentActivity.length > 0 ? (
+                                <div className="max-h-[320px] space-y-1.5 overflow-y-auto pr-1">
+                                    {recentActivity.map((entry) => {
+                                        const StatusIcon = statusIcon[entry.status] ?? Clock;
+                                        const iconClr = statusColor[entry.status] ?? 'text-slate-400';
+                                        return (
+                                            <div key={entry.id} className="flex items-center gap-2.5 rounded-md px-2 py-1.5 hover:bg-muted/50">
+                                                <StatusIcon className={`h-3.5 w-3.5 shrink-0 ${iconClr}`} />
+                                                <div className="min-w-0 flex-1 text-xs">
+                                                    <span className="font-medium">{entry.medication?.name ?? 'Unknown'}</span>
+                                                    <span className="text-muted-foreground"> for </span>
+                                                    <span className="font-medium">
+                                                        {entry.client ? `${entry.client.first_name} ${entry.client.last_name}` : 'Unknown'}
+                                                    </span>
+                                                    {entry.administered_by && (
+                                                        <span className="text-muted-foreground"> by {entry.administered_by.name}</span>
+                                                    )}
+                                                </div>
+                                                <span className="shrink-0 text-[10px] text-muted-foreground/60">
+                                                    {formatTimeAgo(entry.administered_at ?? entry.scheduled_for)}
+                                                </span>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            ) : (
+                                <div className="flex flex-col items-center py-6 text-center">
+                                    <Clock className="mb-2 h-6 w-6 text-slate-400" />
+                                    <p className="text-sm text-muted-foreground">No recent activity</p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* ── Compliance Snapshot ──────────────────────────── */}
+                <Card className="mb-6">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                            <ClipboardCheck className="h-4 w-4 text-indigo-500" />
+                            Compliance Snapshot
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                            <Link href="/emar/competency" className="group block">
+                                <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-3 transition-all hover:shadow-sm dark:border-amber-800 dark:bg-amber-950/20">
+                                    <p className="text-2xl font-bold text-amber-700 dark:text-amber-400">{compliance.competencyExpiring}</p>
+                                    <p className="text-xs text-muted-foreground">Competency Expiring (30d)</p>
+                                </div>
+                            </Link>
+                            <Link href="/emar/competency" className="group block">
+                                <div className="rounded-lg border border-red-200 bg-red-50/50 p-3 transition-all hover:shadow-sm dark:border-red-800 dark:bg-red-950/20">
+                                    <p className="text-2xl font-bold text-red-700 dark:text-red-400">{compliance.competencyExpired}</p>
+                                    <p className="text-xs text-muted-foreground">Competency Expired</p>
+                                </div>
+                            </Link>
+                            <Link href="/emar/reviews" className="group block">
+                                <div className="rounded-lg border border-blue-200 bg-blue-50/50 p-3 transition-all hover:shadow-sm dark:border-blue-800 dark:bg-blue-950/20">
+                                    <p className="text-2xl font-bold text-blue-700 dark:text-blue-400">{compliance.pendingReviews}</p>
+                                    <p className="text-xs text-muted-foreground">Pending Reviews</p>
+                                </div>
+                            </Link>
+                            <Link href="/emar/reviews" className="group block">
+                                <div className="rounded-lg border border-red-200 bg-red-50/50 p-3 transition-all hover:shadow-sm dark:border-red-800 dark:bg-red-950/20">
+                                    <p className="text-2xl font-bold text-red-700 dark:text-red-400">{compliance.overdueReviews}</p>
+                                    <p className="text-xs text-muted-foreground">Overdue Reviews</p>
+                                </div>
+                            </Link>
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* ── Quick Actions ─────────────────────────────────── */}
                 <Card className="mb-6">

@@ -10,15 +10,17 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Ban, Pencil, Pill, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { AlertTriangle, Ban, Clock, FileUp, Pencil, Pill, Plus } from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 
 type Props = {
     medications: { data: any[]; links: any };
     clients: { id: number; first_name: string; last_name: string }[];
     staff: { id: number; name: string }[];
     filters: { search?: string; status?: string; type?: string; client_id?: string };
+    interactionMap: Record<number, string>;
 };
 
 const doseUnits = ['mg', 'mcg', 'g', 'ml', 'units', 'tablets', 'capsules', 'drops', 'puffs'];
@@ -35,6 +37,76 @@ const forms = [
     'tablet', 'capsule', 'liquid', 'cream', 'ointment', 'gel', 'patch',
     'inhaler', 'injection', 'suppository', 'drops', 'spray', 'powder',
 ];
+
+/** Maps frequency values to their calculated dose times (mirrors PHP DoseSchedulingService). */
+function calculateDoseTimes(frequency: string): string[] {
+    const normalised = frequency.toLowerCase().replace(/[\s\-_]/g, '');
+    const map: Record<string, string[]> = {
+        oncedaily: ['08:00'],
+        daily: ['08:00'],
+        od: ['08:00'],
+        twicedaily: ['08:00', '20:00'],
+        bd: ['08:00', '20:00'],
+        bid: ['08:00', '20:00'],
+        threetimesdaily: ['08:00', '14:00', '20:00'],
+        tds: ['08:00', '14:00', '20:00'],
+        tid: ['08:00', '14:00', '20:00'],
+        fourtimesdaily: ['08:00', '12:00', '18:00', '22:00'],
+        qds: ['08:00', '12:00', '18:00', '22:00'],
+        qid: ['08:00', '12:00', '18:00', '22:00'],
+        every4hours: ['06:00', '10:00', '14:00', '18:00', '22:00'],
+        q4h: ['06:00', '10:00', '14:00', '18:00', '22:00'],
+        every6hours: ['06:00', '12:00', '18:00', '00:00'],
+        q6h: ['06:00', '12:00', '18:00', '00:00'],
+        every8hours: ['06:00', '14:00', '22:00'],
+        q8h: ['06:00', '14:00', '22:00'],
+        every12hours: ['08:00', '20:00'],
+        q12h: ['08:00', '20:00'],
+        everymorning: ['08:00'],
+        mane: ['08:00'],
+        everynight: ['22:00'],
+        nocte: ['22:00'],
+        weekly: ['08:00'],
+        fortnightly: ['08:00'],
+        monthly: ['08:00'],
+        prn: [],
+        asneeded: [],
+        whenrequired: [],
+        stat: [],
+    };
+    return map[normalised] ?? ['08:00'];
+}
+
+function DoseTimesPreview({ frequency }: { frequency: string }) {
+    const times = useMemo(() => (frequency ? calculateDoseTimes(frequency) : []), [frequency]);
+
+    if (!frequency) return null;
+
+    return (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-800 dark:bg-emerald-950/30">
+            <div className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+                <Clock className="h-4 w-4" />
+                Scheduled Dose Times
+            </div>
+            {times.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-2">
+                    {times.map((t) => (
+                        <span
+                            key={t}
+                            className="inline-flex items-center rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-medium text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200"
+                        >
+                            {t}
+                        </span>
+                    ))}
+                </div>
+            ) : (
+                <p className="mt-1 text-xs text-emerald-600 dark:text-emerald-400">
+                    No fixed schedule — administered as needed or one-off.
+                </p>
+            )}
+        </div>
+    );
+}
 
 function defaultFormData() {
     return {
@@ -149,6 +221,8 @@ function MedicationFormFields({
                     {form.errors.frequency && <p className="text-xs text-red-600">{form.errors.frequency}</p>}
                 </div>
             </div>
+
+            <DoseTimesPreview frequency={form.data.frequency} />
 
             <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
@@ -401,7 +475,70 @@ function EditMedicationDialog({ med, clients }: { med: any; clients: Props['clie
     );
 }
 
-export default function Medications({ medications, clients, staff, filters }: Props) {
+function ImportCsvDialog() {
+    const [open, setOpen] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const fileRef = useRef<HTMLInputElement>(null);
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        const file = fileRef.current?.files?.[0];
+        if (!file) return;
+
+        setUploading(true);
+        const formData = new FormData();
+        formData.append('csv_file', file);
+
+        router.post('/emar/medications/import', formData, {
+            forceFormData: true,
+            onFinish: () => {
+                setUploading(false);
+                setOpen(false);
+                if (fileRef.current) fileRef.current.value = '';
+            },
+        });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                    <FileUp className="mr-1 h-4 w-4" /> Import CSV
+                </Button>
+            </DialogTrigger>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Import Medications from CSV</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                    <div className="rounded-md border border-blue-200 bg-blue-50/50 p-3 text-sm dark:border-blue-800 dark:bg-blue-950/30">
+                        <p className="font-medium text-blue-700 dark:text-blue-400">CSV Format</p>
+                        <p className="mt-1 text-xs text-blue-600 dark:text-blue-300">
+                            client_name, medication_name, dose, frequency, route
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                            Client name should match &quot;Last, First&quot; or &quot;First Last&quot; format. First row can be a header (it will be skipped if it contains &quot;client_name&quot;).
+                        </p>
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="csv_file">CSV File</Label>
+                        <Input id="csv_file" ref={fileRef} type="file" accept=".csv" />
+                    </div>
+                    <div className="flex justify-end gap-2 pt-2">
+                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button type="submit" disabled={uploading}>
+                            {uploading ? 'Importing...' : 'Import'}
+                        </Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+export default function Medications({ medications, clients, staff, filters, interactionMap = {} }: Props) {
     function updateFilter(key: string, value: string) {
         router.get('/emar/medications', { ...filters, [key]: value || undefined }, { preserveState: true });
     }
@@ -445,7 +582,8 @@ export default function Medications({ medications, clients, staff, filters }: Pr
                             ))}
                         </SelectContent>
                     </Select>
-                    <div className="ml-auto">
+                    <div className="ml-auto flex gap-2">
+                        <ImportCsvDialog />
                         <AddMedicationDialog clients={clients} />
                     </div>
                 </div>
@@ -483,6 +621,22 @@ export default function Medications({ medications, clients, staff, filters }: Pr
                                                 {m.controlled_drug && <Badge variant="destructive" className="text-[10px]">CD</Badge>}
                                                 {m.high_risk && <Badge className="bg-amber-100 text-amber-700 text-[10px]">HR</Badge>}
                                                 {m.witness_required && <Badge variant="secondary" className="text-[10px]">W</Badge>}
+                                                {interactionMap[m.id] && (
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger>
+                                                                <AlertTriangle className={`h-4 w-4 ${
+                                                                    interactionMap[m.id] === 'contraindicated' ? 'text-red-600' :
+                                                                    interactionMap[m.id] === 'major' ? 'text-orange-600' :
+                                                                    'text-yellow-600'
+                                                                }`} />
+                                                            </TooltipTrigger>
+                                                            <TooltipContent>
+                                                                Drug interaction ({interactionMap[m.id]})
+                                                            </TooltipContent>
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                )}
                                             </div>
                                         </td>
                                         <td className="p-3">

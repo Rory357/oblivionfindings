@@ -21,6 +21,7 @@ import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { AlertTriangle, Calendar, Clock, Pill } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type Props = {
@@ -97,6 +98,12 @@ type Props = {
         percent: number;
         status: 'complete' | 'incomplete';
     };
+    emar_summary?: {
+        active_medications_count: number;
+        last_administration: string | null;
+        pending_alerts_count: number;
+        next_review_date: string | null;
+    };
     can: {
         edit: boolean;
         assign_workers: boolean;
@@ -131,6 +138,7 @@ export default function ClientShow({
     onboarding,
     shifts_summary,
     respite,
+    emar_summary,
     can,
 }: Props) {
     const { auth, labels } = usePage().props as any;
@@ -369,6 +377,65 @@ export default function ClientShow({
                             ))}
                     </div>
                 </div>
+
+                {/* eMAR Summary Card */}
+                {emar_summary && (
+                    <Card className="mb-4 border-blue-200 bg-blue-50/30">
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Pill className="h-4 w-4 text-blue-600" />
+                                    eMAR Summary
+                                </CardTitle>
+                                <Button size="sm" asChild>
+                                    <Link href={`/emar/mar?client_id=${client.id}`}>
+                                        Open eMAR
+                                    </Link>
+                                </Button>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+                                <div className="flex items-center gap-2">
+                                    <Pill className="h-4 w-4 text-slate-500" />
+                                    <div>
+                                        <div className="text-sm font-medium">{emar_summary.active_medications_count}</div>
+                                        <div className="text-xs text-slate-500">Active medications</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Clock className="h-4 w-4 text-slate-500" />
+                                    <div>
+                                        <div className="text-sm font-medium">
+                                            {emar_summary.last_administration
+                                                ? formatDateTime(emar_summary.last_administration)
+                                                : 'None'}
+                                        </div>
+                                        <div className="text-xs text-slate-500">Last administration</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <AlertTriangle className={`h-4 w-4 ${emar_summary.pending_alerts_count > 0 ? 'text-amber-500' : 'text-slate-500'}`} />
+                                    <div>
+                                        <div className="text-sm font-medium">{emar_summary.pending_alerts_count}</div>
+                                        <div className="text-xs text-slate-500">Active alerts</div>
+                                    </div>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Calendar className="h-4 w-4 text-slate-500" />
+                                    <div>
+                                        <div className="text-sm font-medium">
+                                            {emar_summary.next_review_date
+                                                ? new Date(emar_summary.next_review_date).toLocaleDateString('en-NZ')
+                                                : 'Not scheduled'}
+                                        </div>
+                                        <div className="text-xs text-slate-500">Next review</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {tab === 'profile' && (
                     <Card>

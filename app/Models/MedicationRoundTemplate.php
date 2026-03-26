@@ -17,6 +17,7 @@ class MedicationRoundTemplate extends Model
         'window_minutes',
         'days_of_week',
         'active',
+        'default_assigned_to',
     ];
 
     protected $casts = [
@@ -33,6 +34,16 @@ class MedicationRoundTemplate extends Model
     public function serviceContext()
     {
         return $this->belongsTo(ServiceContext::class);
+    }
+
+    public function defaultAssignedTo()
+    {
+        return $this->belongsTo(User::class, 'default_assigned_to');
+    }
+
+    public function rounds()
+    {
+        return $this->hasMany(MedicationRound::class, 'round_template_id');
     }
 
     public function scopeActive($query)

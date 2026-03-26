@@ -14,6 +14,7 @@ class MedicationRound extends Model
         'service_context_id',
         'site_id',
         'name',
+        'round_template_id',
         'round_type',
         'scheduled_time',
         'window_minutes',
@@ -43,6 +44,11 @@ class MedicationRound extends Model
         'withheld_count' => 'integer',
         'missed_count' => 'integer',
     ];
+
+    public function template()
+    {
+        return $this->belongsTo(MedicationRoundTemplate::class, 'round_template_id');
+    }
 
     public function site()
     {

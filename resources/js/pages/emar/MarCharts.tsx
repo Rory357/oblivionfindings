@@ -1,3 +1,5 @@
+import ClientAllergyBanner from '@/components/emar/ClientAllergyBanner';
+import DrugInteractionAlert from '@/components/emar/DrugInteractionAlert';
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import RecordAdministrationDialog from '@/components/medications/RecordAdministrationDialog';
@@ -20,6 +22,7 @@ import {
     Clock,
     Eye,
     MinusCircle,
+    FileDown,
     Pill,
     Plus,
     Shield,
@@ -89,12 +92,27 @@ type Client = {
     active_medications_count: number;
 };
 
+type Allergy = {
+    allergen: string;
+    reaction: string;
+    severity: string;
+};
+
+type Interaction = {
+    drug_a: string;
+    drug_b: string;
+    severity: string;
+    description: string;
+};
+
 type Props = {
     clients: Client[];
     selectedClient: Client | null;
     marData: MarData;
     date: string;
     staff: { id: number; name: string }[];
+    allergies: Allergy[];
+    interactions: Interaction[];
 };
 
 function statusIcon(status: string) {
@@ -125,7 +143,7 @@ function statusBadge(status: string) {
     return <Badge variant={variant} className="text-xs">{status}</Badge>;
 }
 
-export default function MarCharts({ clients, selectedClient, marData, date, staff }: Props) {
+export default function MarCharts({ clients, selectedClient, marData, date, staff, allergies, interactions }: Props) {
     const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
     const [selectedClientId, setSelectedClientId] = useState<string>(selectedClient?.id?.toString() ?? '');
     const [selectedMed, setSelectedMed] = useState<(ScheduledMed | PrnMed) | null>(null);
@@ -231,6 +249,16 @@ export default function MarCharts({ clients, selectedClient, marData, date, staf
                         <Button variant="outline" size="icon" onClick={() => navigateDate(1)}><ChevronRight className="h-4 w-4" /></Button>
                         <Button variant="outline" size="sm" onClick={() => router.get('/emar/mar', { client_id: selectedClientId, date: new Date().toISOString().split('T')[0] }, { preserveState: true })}>Today</Button>
                     </div>
+                    {selectedClientId && (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.open(`/emar/pdf/mar-chart?client_id=${selectedClientId}&date_from=${date}&date_to=${date}`, '_blank')}
+                        >
+                            <FileDown className="mr-1 h-4 w-4" />
+                            Print PDF
+                        </Button>
+                    )}
                 </div>
 
                 {!selectedClient ? (
@@ -258,6 +286,18 @@ export default function MarCharts({ clients, selectedClient, marData, date, staf
                                 </div>
                             )}
                         </div>
+
+                        {/* Allergy & Interaction Warnings */}
+                        {allergies && allergies.length > 0 && (
+                            <div className="mb-4">
+                                <ClientAllergyBanner allergies={allergies} />
+                            </div>
+                        )}
+                        {interactions && interactions.length > 0 && (
+                            <div className="mb-4">
+                                <DrugInteractionAlert interactions={interactions} />
+                            </div>
+                        )}
 
                         {/* Scheduled Medications */}
                         <Card className="mb-6">
@@ -302,20 +342,27 @@ export default function MarCharts({ clients, selectedClient, marData, date, staf
                                                         </div>
                                                     </td>
                                                     <td className="p-3">
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {med.administrations.length > 0 ? med.administrations.map((a) => (
-                                                                <TooltipProvider key={a.id}>
+                                                        <div className="flex flex-wrap gap-1.5">
+                                                            {med.administrations.length > 0 ? med.administrations.map((a, idx) => (
+                                                                <TooltipProvider key={a.id ?? `slot-${idx}`}>
                                                                     <Tooltip>
                                                                         <TooltipTrigger>
-                                                                            <div className="flex items-center gap-1">
+                                                                            <div className={`flex items-center gap-1 rounded-md border px-2 py-1 ${
+                                                                                a.status === 'given' ? 'border-green-200 bg-green-50 dark:border-green-800 dark:bg-green-950/30' :
+                                                                                a.status === 'missed' ? 'border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30' :
+                                                                                a.status === 'refused' ? 'border-orange-200 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30' :
+                                                                                a.status === 'withheld' ? 'border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30' :
+                                                                                'border-muted bg-muted/30'
+                                                                            }`}>
                                                                                 {statusIcon(a.status)}
-                                                                                <span className="text-xs">
+                                                                                <span className="text-xs font-mono">
                                                                                     {a.scheduled_for ? new Date(a.scheduled_for).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' }) : '—'}
                                                                                 </span>
                                                                             </div>
                                                                         </TooltipTrigger>
                                                                         <TooltipContent>
-                                                                            <p>{a.status} by {a.administered_by ?? 'Unknown'}</p>
+                                                                            <p className="font-medium capitalize">{a.status}</p>
+                                                                            {a.administered_by && <p>By: {a.administered_by}</p>}
                                                                             {a.witnessed_by && <p>Witnessed: {a.witnessed_by}</p>}
                                                                             {a.reason && <p>Reason: {a.reason}</p>}
                                                                             {a.notes && <p>Notes: {a.notes}</p>}
@@ -323,7 +370,16 @@ export default function MarCharts({ clients, selectedClient, marData, date, staf
                                                                     </Tooltip>
                                                                 </TooltipProvider>
                                                             )) : (
-                                                                <span className="text-xs text-muted-foreground">No records</span>
+                                                                med.dose_times.length > 0 ? (
+                                                                    med.dose_times.map((t) => (
+                                                                        <div key={t} className="flex items-center gap-1 rounded-md border border-muted bg-muted/30 px-2 py-1">
+                                                                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                                                                            <span className="text-xs font-mono text-muted-foreground">{t}</span>
+                                                                        </div>
+                                                                    ))
+                                                                ) : (
+                                                                    <span className="text-xs text-muted-foreground">No schedule</span>
+                                                                )
                                                             )}
                                                         </div>
                                                     </td>

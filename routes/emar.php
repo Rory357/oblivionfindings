@@ -1,6 +1,12 @@
 <?php
 
+use App\Http\Controllers\Emar\AuditLogController;
+use App\Http\Controllers\Emar\CDLossReportController;
 use App\Http\Controllers\Emar\EmarController;
+use App\Http\Controllers\Emar\EmarPdfController;
+use App\Http\Controllers\Emar\EmarReportController;
+use App\Http\Controllers\Emar\MedicationErrorController;
+use App\Http\Controllers\Emar\RefusalFollowUpController;
 use App\Http\Controllers\EmergencyAccessController;
 use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsController;
@@ -125,6 +131,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // Medications CRUD
     Route::post('/medications', [EmarController::class, 'storeMedication'])->name('emar.medications.store');
+    Route::post('/medications/import', [EmarController::class, 'importMedications'])->name('emar.medications.import');
     Route::put('/medications/{medication}', [EmarController::class, 'updateMedication'])->name('emar.medications.update');
     Route::post('/medications/{medication}/discontinue', [EmarController::class, 'discontinueMedication'])->name('emar.medications.discontinue');
 
@@ -156,7 +163,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     // ─── End CRUD Routes ────────────────────────────────────
 
     // Audit trail
-    Route::get('/audit', [MedicationAuditController::class, 'index'])
+    Route::get('/audit', [AuditLogController::class, 'index'])
         ->middleware('permission:medications.audit.view')
         ->name('emar.audit');
     Route::get('/audit/export', [MedicationAuditController::class, 'exportCsv'])
@@ -170,11 +177,36 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // Reports
     Route::middleware('permission:reports.viewAny')->group(function () {
-        Route::get('/reports', [MedicationsReportController::class, 'index'])
+        Route::get('/reports', [EmarReportController::class, 'index'])
             ->name('emar.reports');
+        Route::get('/reports/export', [EmarReportController::class, 'export'])
+            ->name('emar.reports.export');
         Route::get('/reports/export-mar', [MedicationsReportController::class, 'exportMarCsv'])
             ->name('emar.reports.export_mar');
         Route::get('/reports/export-controlled-discrepancies', [MedicationsReportController::class, 'exportDiscrepanciesCsv'])
             ->name('emar.reports.export_discrepancies');
     });
+
+    // ─── Refusal & Withholding Follow-Up ────────────────────
+    Route::post('/refusal-followups', [RefusalFollowUpController::class, 'store'])->name('emar.refusal_followups.store');
+    Route::post('/refusal-followups/{followup}/complete', [RefusalFollowUpController::class, 'complete'])->name('emar.refusal_followups.complete');
+    Route::post('/refusal-followups/{followup}/notify-gp', [RefusalFollowUpController::class, 'notifyGp'])->name('emar.refusal_followups.notify_gp');
+
+    // ─── Controlled Drug Loss Reports ─────────────────────
+    Route::get('/controlled/loss-reports', [CDLossReportController::class, 'index'])->name('emar.cd_loss.index');
+    Route::post('/controlled/loss-reports', [CDLossReportController::class, 'store'])->name('emar.cd_loss.store');
+    Route::post('/controlled/loss-reports/{report}/investigate', [CDLossReportController::class, 'investigate'])->name('emar.cd_loss.investigate');
+    Route::post('/controlled/loss-reports/{report}/resolve', [CDLossReportController::class, 'resolve'])->name('emar.cd_loss.resolve');
+
+    // ─── Medication Errors ──────────────────────────────────
+    Route::get('/errors', [MedicationErrorController::class, 'index'])->name('emar.errors');
+    Route::post('/errors', [MedicationErrorController::class, 'store'])->name('emar.errors.store');
+    Route::put('/errors/{error}', [MedicationErrorController::class, 'update'])->name('emar.errors.update');
+    Route::post('/errors/{error}/review', [MedicationErrorController::class, 'review'])->name('emar.errors.review');
+    Route::post('/errors/{error}/resolve', [MedicationErrorController::class, 'resolve'])->name('emar.errors.resolve');
+
+    // ─── PDF Exports ─────────────────────────────────────────
+    Route::get('/pdf/mar-chart', [EmarPdfController::class, 'marChart'])->name('emar.pdf.mar');
+    Route::get('/pdf/controlled-register', [EmarPdfController::class, 'controlledDrugRegister'])->name('emar.pdf.cd_register');
+    Route::get('/pdf/round-sheet', [EmarPdfController::class, 'roundSheet'])->name('emar.pdf.round_sheet');
 });

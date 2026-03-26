@@ -9,6 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Clock, Pencil, Play, Plus, Trash2, Users, Zap } from 'lucide-react';
@@ -41,6 +42,7 @@ type Template = {
     window_minutes: number;
     days_of_week: number[] | null;
     active: boolean;
+    default_assigned_to: { id: number; name: string } | null;
 };
 
 type Props = {
@@ -48,6 +50,7 @@ type Props = {
     templates: Template[];
     date: string;
     staff: { id: number; name: string }[];
+    lastGenerated: string | null;
 };
 
 const statusConfig: Record<string, { color: string; icon: any }> = {
@@ -59,12 +62,13 @@ const statusConfig: Record<string, { color: string; icon: any }> = {
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-function EditTemplateDialog({ template, open, onOpenChange }: { template: Template; open: boolean; onOpenChange: (open: boolean) => void }) {
+function EditTemplateDialog({ template, staff, open, onOpenChange }: { template: Template; staff: { id: number; name: string }[]; open: boolean; onOpenChange: (open: boolean) => void }) {
     const form = useForm({
         name: template.name ?? '',
         scheduled_time: template.scheduled_time ?? '',
         window_minutes: template.window_minutes ?? 60,
         days_of_week: template.days_of_week ?? ([] as number[]),
+        default_assigned_to: template.default_assigned_to?.id?.toString() ?? '',
     });
 
     function toggleDay(day: number) {
@@ -106,6 +110,20 @@ function EditTemplateDialog({ template, open, onOpenChange }: { template: Templa
                         {form.errors.window_minutes && <p className="mt-1 text-xs text-red-500">{form.errors.window_minutes}</p>}
                     </div>
                     <div>
+                        <Label>Default Assigned Staff</Label>
+                        <Select value={form.data.default_assigned_to} onValueChange={(v) => form.setData('default_assigned_to', v)}>
+                            <SelectTrigger className="mt-1">
+                                <SelectValue placeholder="Unassigned" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="">Unassigned</SelectItem>
+                                {staff.map((s) => (
+                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                    <div>
                         <Label>Days of Week</Label>
                         <div className="mt-2 flex flex-wrap gap-3">
                             {DAY_NAMES.map((name, idx) => {
@@ -130,7 +148,7 @@ function EditTemplateDialog({ template, open, onOpenChange }: { template: Templa
     );
 }
 
-export default function Rounds({ rounds, templates, date, staff }: Props) {
+export default function Rounds({ rounds, templates, date, staff, lastGenerated }: Props) {
     const [templateOpen, setTemplateOpen] = useState(false);
     const [editTemplateOpen, setEditTemplateOpen] = useState(false);
     const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
@@ -145,11 +163,16 @@ export default function Rounds({ rounds, templates, date, staff }: Props) {
         router.delete(`/emar/rounds/templates/${id}`);
     }
 
+    function toggleTemplateActive(template: Template) {
+        router.put(`/emar/rounds/templates/${template.id}`, { active: !template.active }, { preserveState: true });
+    }
+
     const templateForm = useForm({
         name: '',
         scheduled_time: '',
         window_minutes: 60,
         days_of_week: [] as number[],
+        default_assigned_to: '' as string,
     });
 
     function navigateDate(offset: number) {
@@ -172,6 +195,10 @@ export default function Rounds({ rounds, templates, date, staff }: Props) {
         router.post('/emar/rounds/generate', { date });
     }
 
+    function generateAllToday() {
+        router.post('/emar/rounds/generate', { date: new Date().toISOString().split('T')[0], generate_all: true });
+    }
+
     function toggleDay(day: number) {
         const current = templateForm.data.days_of_week;
         if (current.includes(day)) {
@@ -192,7 +219,15 @@ export default function Rounds({ rounds, templates, date, staff }: Props) {
                     <Input type="date" value={date} onChange={(e) => router.get('/emar/rounds', { date: e.target.value }, { preserveState: true })} className="w-40" />
                     <Button variant="outline" size="icon" onClick={() => navigateDate(1)}><ChevronRight className="h-4 w-4" /></Button>
                     <Button variant="outline" size="sm" onClick={() => router.get('/emar/rounds', { date: new Date().toISOString().split('T')[0] })}>Today</Button>
-                    <div className="ml-auto flex gap-2">
+                    <div className="ml-auto flex items-center gap-3">
+                        {lastGenerated && (
+                            <span className="text-xs text-muted-foreground">
+                                Last generated: {new Date(lastGenerated).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        )}
+                        <Button variant="outline" size="sm" onClick={generateAllToday}>
+                            <Zap className="mr-1 h-4 w-4" /> Generate All Today
+                        </Button>
                         <Button variant="outline" size="sm" onClick={generateRounds}>
                             <Zap className="mr-1 h-4 w-4" /> Generate Rounds
                         </Button>
@@ -219,6 +254,20 @@ export default function Rounds({ rounds, templates, date, staff }: Props) {
                                         <Label htmlFor="tpl-window">Window (minutes)</Label>
                                         <Input id="tpl-window" type="number" min={0} value={templateForm.data.window_minutes} onChange={(e) => templateForm.setData('window_minutes', parseInt(e.target.value) || 0)} />
                                         {templateForm.errors.window_minutes && <p className="mt-1 text-xs text-red-500">{templateForm.errors.window_minutes}</p>}
+                                    </div>
+                                    <div>
+                                        <Label>Default Assigned Staff</Label>
+                                        <Select value={templateForm.data.default_assigned_to} onValueChange={(v) => templateForm.setData('default_assigned_to', v)}>
+                                            <SelectTrigger className="mt-1">
+                                                <SelectValue placeholder="Unassigned" />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="">Unassigned</SelectItem>
+                                                {staff.map((s) => (
+                                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <div>
                                         <Label>Days of Week</Label>
@@ -342,7 +391,10 @@ export default function Rounds({ rounds, templates, date, staff }: Props) {
                 {/* Round Templates */}
                 <Card>
                     <CardHeader className="pb-3">
-                        <CardTitle className="text-base">Round Templates</CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="text-base">Round Templates</CardTitle>
+                            <p className="text-xs text-muted-foreground">Auto-generation runs daily at 00:05 NZT for active templates</p>
+                        </div>
                     </CardHeader>
                     <CardContent className="p-0">
                         <table className="w-full text-sm">
@@ -352,7 +404,8 @@ export default function Rounds({ rounds, templates, date, staff }: Props) {
                                     <th className="p-3 text-left font-medium">Time</th>
                                     <th className="p-3 text-left font-medium">Window</th>
                                     <th className="p-3 text-left font-medium">Days</th>
-                                    <th className="p-3 text-left font-medium">Status</th>
+                                    <th className="p-3 text-left font-medium">Default Staff</th>
+                                    <th className="p-3 text-center font-medium">Auto-Generate</th>
                                     <th className="p-3 text-right font-medium">Actions</th>
                                 </tr>
                             </thead>
@@ -364,8 +417,15 @@ export default function Rounds({ rounds, templates, date, staff }: Props) {
                                             <td className="p-3 font-medium">{t.name}</td>
                                             <td className="p-3">{t.scheduled_time}</td>
                                             <td className="p-3">&plusmn;{t.window_minutes} min</td>
-                                            <td className="p-3 text-xs">{t.days_of_week ? t.days_of_week.map((d) => dayLabels[d]).join(', ') : 'Every day'}</td>
-                                            <td className="p-3">{t.active ? <Badge className="bg-green-100 text-green-700 text-xs">Active</Badge> : <Badge variant="outline" className="text-xs">Inactive</Badge>}</td>
+                                            <td className="p-3 text-xs">{t.days_of_week && t.days_of_week.length > 0 ? t.days_of_week.map((d) => dayLabels[d]).join(', ') : 'Every day'}</td>
+                                            <td className="p-3 text-xs text-muted-foreground">{t.default_assigned_to?.name ?? 'Unassigned'}</td>
+                                            <td className="p-3 text-center">
+                                                <Switch
+                                                    checked={t.active}
+                                                    onCheckedChange={() => toggleTemplateActive(t)}
+                                                    aria-label={`Toggle auto-generate for ${t.name}`}
+                                                />
+                                            </td>
                                             <td className="p-3 text-right">
                                                 <div className="flex items-center justify-end gap-1">
                                                     <Button variant="ghost" size="icon" onClick={() => openEditTemplate(t)}>
@@ -379,7 +439,7 @@ export default function Rounds({ rounds, templates, date, staff }: Props) {
                                         </tr>
                                     );
                                 })}
-                                {templates.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No round templates configured.</td></tr>}
+                                {templates.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No round templates configured.</td></tr>}
                             </tbody>
                         </table>
                     </CardContent>
@@ -389,6 +449,7 @@ export default function Rounds({ rounds, templates, date, staff }: Props) {
             {editingTemplate && (
                 <EditTemplateDialog
                     template={editingTemplate}
+                    staff={staff}
                     open={editTemplateOpen}
                     onOpenChange={(open) => { setEditTemplateOpen(open); if (!open) setEditingTemplate(null); }}
                 />

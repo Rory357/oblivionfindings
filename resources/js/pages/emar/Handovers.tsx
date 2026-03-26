@@ -5,13 +5,28 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { AlertTriangle, ArrowRight, CheckCircle, Pencil, Plus, Shield, Trash2 } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle, ClipboardCheck, Pencil, Plus, Shield, Trash2, Users, X } from 'lucide-react';
 import { useState } from 'react';
+
+const DEFAULT_CHECKLIST_ITEMS = [
+    { label: 'All scheduled medications administered', checked: false, notes: '' },
+    { label: 'PRN medications documented with effectiveness', checked: false, notes: '' },
+    { label: 'Controlled drugs counted and verified', checked: false, notes: '' },
+    { label: 'Stock levels checked for low items', checked: false, notes: '' },
+    { label: 'Medication errors reported and documented', checked: false, notes: '' },
+    { label: 'GP follow-ups documented', checked: false, notes: '' },
+    { label: 'Client refusals followed up', checked: false, notes: '' },
+    { label: 'New prescriptions actioned', checked: false, notes: '' },
+];
+
+type ChecklistItem = { label: string; checked: boolean; notes: string };
+type ClientAttention = { client_id: string; client_name: string; reason: string };
 
 type Handover = {
     id: number;
@@ -30,6 +45,14 @@ type Handover = {
     general_notes: string | null;
     acknowledged: boolean;
     acknowledged_at: string | null;
+    checklist_items: ChecklistItem[] | null;
+    safety_concerns: string | null;
+    medication_errors_count: number;
+    pending_gp_followups: number;
+    clients_requiring_attention: ClientAttention[] | null;
+    previous_shift_notes_read: boolean;
+    stock_issues_identified: string | null;
+    prescriber_changes_summary: string | null;
 };
 
 type Props = {
@@ -37,22 +60,279 @@ type Props = {
     staff: { id: number; name: string }[];
 };
 
+type HandoverFormData = {
+    incoming_user_id: string;
+    controlled_drugs_verified: boolean;
+    general_notes: string;
+    checklist_items: ChecklistItem[];
+    safety_concerns: string;
+    clients_requiring_attention: ClientAttention[];
+    stock_issues_identified: string;
+    prescriber_changes_summary: string;
+    previous_shift_notes_read: boolean;
+};
+
+function getChecklistCompletion(items: ChecklistItem[] | null): string {
+    if (!items || items.length === 0) return '0/0';
+    const checked = items.filter((i) => i.checked).length;
+    return `${checked}/${items.length}`;
+}
+
+function ChecklistSection({
+    items,
+    onChange,
+}: {
+    items: ChecklistItem[];
+    onChange: (items: ChecklistItem[]) => void;
+}) {
+    function toggleItem(index: number, checked: boolean) {
+        const updated = [...items];
+        updated[index] = { ...updated[index], checked };
+        onChange(updated);
+    }
+
+    function updateNotes(index: number, notes: string) {
+        const updated = [...items];
+        updated[index] = { ...updated[index], notes };
+        onChange(updated);
+    }
+
+    return (
+        <div className="space-y-3">
+            <Label className="text-sm font-semibold flex items-center gap-1.5">
+                <ClipboardCheck className="h-4 w-4" /> Handover Checklist
+            </Label>
+            <div className="space-y-2 rounded-md border p-3">
+                {items.map((item, index) => (
+                    <div key={index} className="space-y-1">
+                        <div className="flex items-center gap-2">
+                            <Checkbox
+                                id={`checklist-${index}`}
+                                checked={item.checked}
+                                onCheckedChange={(checked) => toggleItem(index, !!checked)}
+                            />
+                            <Label htmlFor={`checklist-${index}`} className="text-sm font-normal cursor-pointer">
+                                {item.label}
+                            </Label>
+                        </div>
+                        {item.checked && (
+                            <div className="ml-6">
+                                <Input
+                                    placeholder="Optional notes..."
+                                    value={item.notes}
+                                    onChange={(e) => updateNotes(index, e.target.value)}
+                                    className="h-8 text-xs"
+                                />
+                            </div>
+                        )}
+                    </div>
+                ))}
+            </div>
+        </div>
+    );
+}
+
+function ClientsAttentionSection({
+    clients,
+    onChange,
+}: {
+    clients: ClientAttention[];
+    onChange: (clients: ClientAttention[]) => void;
+}) {
+    function addClient() {
+        onChange([...clients, { client_id: '', client_name: '', reason: '' }]);
+    }
+
+    function removeClient(index: number) {
+        onChange(clients.filter((_, i) => i !== index));
+    }
+
+    function updateClient(index: number, field: keyof ClientAttention, value: string) {
+        const updated = [...clients];
+        updated[index] = { ...updated[index], [field]: value };
+        onChange(updated);
+    }
+
+    return (
+        <div className="space-y-3">
+            <Label className="text-sm font-semibold flex items-center gap-1.5">
+                <Users className="h-4 w-4" /> Clients Requiring Attention
+            </Label>
+            <div className="space-y-2">
+                {clients.map((client, index) => (
+                    <div key={index} className="flex items-start gap-2 rounded-md border p-2">
+                        <div className="flex-1 space-y-1">
+                            <Input
+                                placeholder="Client name"
+                                value={client.client_name}
+                                onChange={(e) => updateClient(index, 'client_name', e.target.value)}
+                                className="h-8 text-xs"
+                            />
+                            <Input
+                                placeholder="Reason for attention"
+                                value={client.reason}
+                                onChange={(e) => updateClient(index, 'reason', e.target.value)}
+                                className="h-8 text-xs"
+                            />
+                        </div>
+                        <Button type="button" size="icon" variant="ghost" className="h-8 w-8 shrink-0" onClick={() => removeClient(index)}>
+                            <X className="h-3.5 w-3.5 text-red-500" />
+                        </Button>
+                    </div>
+                ))}
+                <Button type="button" variant="outline" size="sm" onClick={addClient}>
+                    <Plus className="mr-1 h-3.5 w-3.5" /> Add Client
+                </Button>
+            </div>
+        </div>
+    );
+}
+
+function HandoverFormFields({
+    formData,
+    setField,
+    errors,
+    staff,
+    idPrefix,
+}: {
+    formData: HandoverFormData;
+    setField: (key: keyof HandoverFormData, value: any) => void;
+    errors: Partial<Record<keyof HandoverFormData, string>>;
+    staff: { id: number; name: string }[];
+    idPrefix: string;
+}) {
+    return (
+        <div className="max-h-[70vh] space-y-4 overflow-y-auto py-4 pr-1">
+            {/* Incoming Staff */}
+            <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}_incoming_user_id`}>Incoming Staff Member</Label>
+                <Select value={formData.incoming_user_id} onValueChange={(v) => setField('incoming_user_id', v)}>
+                    <SelectTrigger>
+                        <SelectValue placeholder="Select incoming staff..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        {staff.map((s) => (
+                            <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                        ))}
+                    </SelectContent>
+                </Select>
+                {errors.incoming_user_id && <p className="text-sm text-red-600">{errors.incoming_user_id}</p>}
+            </div>
+
+            {/* Controlled Drugs Verified */}
+            <div className="flex items-center gap-2">
+                <Checkbox
+                    id={`${idPrefix}_controlled_drugs_verified`}
+                    checked={formData.controlled_drugs_verified}
+                    onCheckedChange={(checked) => setField('controlled_drugs_verified', !!checked)}
+                />
+                <Label htmlFor={`${idPrefix}_controlled_drugs_verified`}>Controlled drugs verified</Label>
+            </div>
+
+            {/* Checklist */}
+            <ChecklistSection
+                items={formData.checklist_items}
+                onChange={(items) => setField('checklist_items', items)}
+            />
+
+            {/* Safety Concerns */}
+            <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}_safety_concerns`} className="flex items-center gap-1.5 text-sm font-semibold">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" /> Safety Concerns
+                </Label>
+                <Textarea
+                    id={`${idPrefix}_safety_concerns`}
+                    value={formData.safety_concerns}
+                    onChange={(e) => setField('safety_concerns', e.target.value)}
+                    rows={3}
+                    placeholder="Any safety issues for the incoming shift..."
+                />
+            </div>
+
+            {/* Clients Requiring Attention */}
+            <ClientsAttentionSection
+                clients={formData.clients_requiring_attention}
+                onChange={(clients) => setField('clients_requiring_attention', clients)}
+            />
+
+            {/* Stock Issues */}
+            <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}_stock_issues`}>Stock Issues</Label>
+                <Textarea
+                    id={`${idPrefix}_stock_issues`}
+                    value={formData.stock_issues_identified}
+                    onChange={(e) => setField('stock_issues_identified', e.target.value)}
+                    rows={2}
+                    placeholder="Any stock level concerns or shortages..."
+                />
+            </div>
+
+            {/* Prescriber Changes Summary */}
+            <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}_prescriber_changes`}>Prescriber Changes Summary</Label>
+                <Textarea
+                    id={`${idPrefix}_prescriber_changes`}
+                    value={formData.prescriber_changes_summary}
+                    onChange={(e) => setField('prescriber_changes_summary', e.target.value)}
+                    rows={2}
+                    placeholder="Summary of any prescriber or prescription changes..."
+                />
+            </div>
+
+            {/* Previous Shift Notes Read */}
+            <div className="flex items-center gap-2">
+                <Checkbox
+                    id={`${idPrefix}_previous_shift_notes_read`}
+                    checked={formData.previous_shift_notes_read}
+                    onCheckedChange={(checked) => setField('previous_shift_notes_read', !!checked)}
+                />
+                <Label htmlFor={`${idPrefix}_previous_shift_notes_read`}>Previous shift notes read</Label>
+            </div>
+
+            {/* General Notes */}
+            <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}_general_notes`}>General Notes</Label>
+                <Textarea
+                    id={`${idPrefix}_general_notes`}
+                    value={formData.general_notes}
+                    onChange={(e) => setField('general_notes', e.target.value)}
+                    rows={4}
+                    placeholder="Any relevant notes for the incoming staff member..."
+                />
+                {errors.general_notes && <p className="text-sm text-red-600">{errors.general_notes}</p>}
+            </div>
+        </div>
+    );
+}
+
 export default function Handovers({ handovers, staff }: Props) {
     const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
     const [open, setOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
     const [editingHandover, setEditingHandover] = useState<Handover | null>(null);
 
-    const form = useForm({
+    const form = useForm<HandoverFormData>({
         incoming_user_id: '',
         controlled_drugs_verified: false,
         general_notes: '',
+        checklist_items: DEFAULT_CHECKLIST_ITEMS.map((i) => ({ ...i })),
+        safety_concerns: '',
+        clients_requiring_attention: [],
+        stock_issues_identified: '',
+        prescriber_changes_summary: '',
+        previous_shift_notes_read: false,
     });
 
-    const editForm = useForm({
+    const editForm = useForm<HandoverFormData>({
         incoming_user_id: '',
         controlled_drugs_verified: false,
         general_notes: '',
+        checklist_items: DEFAULT_CHECKLIST_ITEMS.map((i) => ({ ...i })),
+        safety_concerns: '',
+        clients_requiring_attention: [],
+        stock_issues_identified: '',
+        prescriber_changes_summary: '',
+        previous_shift_notes_read: false,
     });
 
     function submit(e: React.FormEvent) {
@@ -71,6 +351,12 @@ export default function Handovers({ handovers, staff }: Props) {
             incoming_user_id: h.incoming_user?.id?.toString() ?? '',
             controlled_drugs_verified: h.controlled_drugs_verified,
             general_notes: h.general_notes ?? '',
+            checklist_items: h.checklist_items ?? DEFAULT_CHECKLIST_ITEMS.map((i) => ({ ...i })),
+            safety_concerns: h.safety_concerns ?? '',
+            clients_requiring_attention: h.clients_requiring_attention ?? [],
+            stock_issues_identified: h.stock_issues_identified ?? '',
+            prescriber_changes_summary: h.prescriber_changes_summary ?? '',
+            previous_shift_notes_read: h.previous_shift_notes_read,
         });
         setEditOpen(true);
     }
@@ -97,47 +383,19 @@ export default function Handovers({ handovers, staff }: Props) {
                         <DialogTrigger asChild>
                             <Button><Plus className="mr-2 h-4 w-4" /> New Handover</Button>
                         </DialogTrigger>
-                        <DialogContent>
+                        <DialogContent className="max-w-2xl">
                             <form onSubmit={submit}>
                                 <DialogHeader>
                                     <DialogTitle>New Handover</DialogTitle>
                                     <DialogDescription>Create a new medication shift handover record.</DialogDescription>
                                 </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="incoming_user_id">Incoming Staff Member</Label>
-                                        <Select value={form.data.incoming_user_id} onValueChange={(v) => form.setData('incoming_user_id', v)}>
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select incoming staff..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {staff.map((s) => (
-                                                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {form.errors.incoming_user_id && <p className="text-sm text-red-600">{form.errors.incoming_user_id}</p>}
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Checkbox
-                                            id="controlled_drugs_verified"
-                                            checked={form.data.controlled_drugs_verified}
-                                            onCheckedChange={(checked) => form.setData('controlled_drugs_verified', !!checked)}
-                                        />
-                                        <Label htmlFor="controlled_drugs_verified">Controlled drugs verified</Label>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="general_notes">General Notes</Label>
-                                        <Textarea
-                                            id="general_notes"
-                                            value={form.data.general_notes}
-                                            onChange={(e) => form.setData('general_notes', e.target.value)}
-                                            rows={4}
-                                            placeholder="Any relevant notes for the incoming staff member..."
-                                        />
-                                        {form.errors.general_notes && <p className="text-sm text-red-600">{form.errors.general_notes}</p>}
-                                    </div>
-                                </div>
+                                <HandoverFormFields
+                                    formData={form.data}
+                                    setField={(key, value) => form.setData(key, value)}
+                                    errors={form.errors}
+                                    staff={staff}
+                                    idPrefix="new"
+                                />
                                 <DialogFooter>
                                     <Button type="submit" disabled={form.processing}>
                                         {form.processing ? 'Creating...' : 'Create Handover'}
@@ -152,6 +410,10 @@ export default function Handovers({ handovers, staff }: Props) {
                     {handovers.data.map((h) => {
                         const hasDiscrepancies = h.controlled_drug_counts?.some((c) => c.discrepancy !== 0);
                         const isIncomingUser = h.incoming_user?.id === auth.user.id;
+                        const checklistCompletion = getChecklistCompletion(h.checklist_items);
+                        const hasSafetyConcerns = !!h.safety_concerns && h.safety_concerns.trim().length > 0;
+                        const clientsCount = h.clients_requiring_attention?.length ?? 0;
+
                         return (
                             <Card key={h.id} className={hasDiscrepancies ? 'border-red-200 dark:border-red-800' : ''}>
                                 <CardHeader className="pb-3">
@@ -204,6 +466,22 @@ export default function Handovers({ handovers, staff }: Props) {
                                         </div>
                                     </div>
                                     {h.site && <p className="text-xs text-muted-foreground">{h.site.name}</p>}
+                                    {/* Checklist + Safety + Clients indicators */}
+                                    <div className="mt-2 flex items-center gap-3">
+                                        <Badge variant="outline" className="text-xs gap-1">
+                                            <ClipboardCheck className="h-3 w-3" /> {checklistCompletion} items checked
+                                        </Badge>
+                                        {hasSafetyConcerns && (
+                                            <Badge variant="destructive" className="text-xs gap-1">
+                                                <AlertTriangle className="h-3 w-3" /> Safety concerns
+                                            </Badge>
+                                        )}
+                                        {clientsCount > 0 && (
+                                            <Badge className="bg-amber-100 text-amber-700 text-xs gap-1">
+                                                <Users className="h-3 w-3" /> {clientsCount} client{clientsCount !== 1 ? 's' : ''} need attention
+                                            </Badge>
+                                        )}
+                                    </div>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -267,8 +545,60 @@ export default function Handovers({ handovers, staff }: Props) {
                                                 </div>
                                             )}
                                             <p className="text-xs text-muted-foreground">{h.general_notes ?? 'No notes.'}</p>
+                                            {hasSafetyConcerns && (
+                                                <div className="mt-2 rounded-md bg-red-50 p-2 dark:bg-red-950">
+                                                    <p className="text-xs font-medium text-red-700 dark:text-red-300 flex items-center gap-1">
+                                                        <AlertTriangle className="h-3 w-3" /> Safety Concerns
+                                                    </p>
+                                                    <p className="text-xs text-red-600 dark:text-red-400 mt-0.5">{h.safety_concerns}</p>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
+
+                                    {/* Clients Requiring Attention detail */}
+                                    {h.clients_requiring_attention && h.clients_requiring_attention.length > 0 && (
+                                        <div className="mt-3 rounded-md border border-amber-200 bg-amber-50 p-2 dark:border-amber-800 dark:bg-amber-950">
+                                            <h4 className="mb-1 text-xs font-semibold text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                                                <Users className="h-3 w-3" /> Clients Requiring Attention
+                                            </h4>
+                                            <div className="space-y-1">
+                                                {h.clients_requiring_attention.map((c, i) => (
+                                                    <div key={i} className="flex items-center gap-2 text-xs">
+                                                        <span className="font-medium">{c.client_name}</span>
+                                                        <span className="text-muted-foreground">—</span>
+                                                        <span>{c.reason}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Checklist summary */}
+                                    {h.checklist_items && h.checklist_items.length > 0 && (
+                                        <div className="mt-3">
+                                            <h4 className="mb-1 text-xs font-semibold flex items-center gap-1">
+                                                <ClipboardCheck className="h-3 w-3" /> Checklist ({checklistCompletion})
+                                            </h4>
+                                            <div className="grid gap-1 sm:grid-cols-2 text-xs">
+                                                {h.checklist_items.map((item, i) => (
+                                                    <div key={i} className="flex items-start gap-1.5">
+                                                        {item.checked ? (
+                                                            <CheckCircle className="mt-0.5 h-3 w-3 shrink-0 text-green-600" />
+                                                        ) : (
+                                                            <X className="mt-0.5 h-3 w-3 shrink-0 text-muted-foreground" />
+                                                        )}
+                                                        <span className={item.checked ? '' : 'text-muted-foreground'}>
+                                                            {item.label}
+                                                            {item.checked && item.notes && (
+                                                                <span className="ml-1 text-muted-foreground">({item.notes})</span>
+                                                            )}
+                                                        </span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         );
@@ -286,47 +616,19 @@ export default function Handovers({ handovers, staff }: Props) {
 
                 {/* Edit Handover Dialog */}
                 <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                    <DialogContent>
+                    <DialogContent className="max-w-2xl">
                         <form onSubmit={submitEdit}>
                             <DialogHeader>
                                 <DialogTitle>Edit Handover</DialogTitle>
                                 <DialogDescription>Update the handover record details.</DialogDescription>
                             </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label htmlFor="edit_incoming_user_id">Incoming Staff Member</Label>
-                                    <Select value={editForm.data.incoming_user_id} onValueChange={(v) => editForm.setData('incoming_user_id', v)}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select incoming staff..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {staff.map((s) => (
-                                                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {editForm.errors.incoming_user_id && <p className="text-sm text-red-600">{editForm.errors.incoming_user_id}</p>}
-                                </div>
-                                <div className="flex items-center gap-2">
-                                    <Checkbox
-                                        id="edit_controlled_drugs_verified"
-                                        checked={editForm.data.controlled_drugs_verified}
-                                        onCheckedChange={(checked) => editForm.setData('controlled_drugs_verified', !!checked)}
-                                    />
-                                    <Label htmlFor="edit_controlled_drugs_verified">Controlled drugs verified</Label>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label htmlFor="edit_general_notes">General Notes</Label>
-                                    <Textarea
-                                        id="edit_general_notes"
-                                        value={editForm.data.general_notes}
-                                        onChange={(e) => editForm.setData('general_notes', e.target.value)}
-                                        rows={4}
-                                        placeholder="Any relevant notes for the incoming staff member..."
-                                    />
-                                    {editForm.errors.general_notes && <p className="text-sm text-red-600">{editForm.errors.general_notes}</p>}
-                                </div>
-                            </div>
+                            <HandoverFormFields
+                                formData={editForm.data}
+                                setField={(key, value) => editForm.setData(key, value)}
+                                errors={editForm.errors}
+                                staff={staff}
+                                idPrefix="edit"
+                            />
                             <DialogFooter>
                                 <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
                                 <Button type="submit" disabled={editForm.processing}>

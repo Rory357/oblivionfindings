@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge';
 import SafetyCheckPanel, { type SafetyCheck } from './SafetyCheckPanel';
 import PrnHistoryPanel from './PrnHistoryPanel';
+import SpecialistAdminFields from './SpecialistAdminFields';
 
 interface Witness {
   id: number;
@@ -84,6 +85,7 @@ export default function RecordAdministrationDialog({
   const [outcome, setOutcome] = useState('');
   const [site, setSite] = useState('');
   const [showOverride, setShowOverride] = useState(false);
+  const [specialistFields, setSpecialistFields] = useState<Record<string, unknown>>({});
 
   // Reset form when dialog opens
   useEffect(() => {
@@ -97,6 +99,7 @@ export default function RecordAdministrationDialog({
       setOutcome('');
       setSite('');
       setShowOverride(false);
+      setSpecialistFields({});
     }
   }, [isOpen, medication]);
 
@@ -136,6 +139,7 @@ export default function RecordAdministrationDialog({
       scheduled_for: scheduledTime || null,
       outcome: outcome || null,
       site: site || null,
+      ...specialistFields,
     };
 
     if (showOverride) {
@@ -318,6 +322,18 @@ export default function RecordAdministrationDialog({
                 className="min-h-[60px]"
               />
             </div>
+
+            {/* Specialist Administration Fields */}
+            {status === 'given' && (
+              <SpecialistAdminFields
+                medication={medication}
+                form={specialistFields}
+                errors={{}}
+                onChange={(field, value) =>
+                  setSpecialistFields((prev) => ({ ...prev, [field]: value }))
+                }
+              />
+            )}
           </div>
         </div>
 

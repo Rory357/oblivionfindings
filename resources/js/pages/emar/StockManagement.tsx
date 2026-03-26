@@ -11,7 +11,7 @@ import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/componen
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
-import { AlertTriangle, ArrowRightLeft, Package, Plus, ShoppingCart, Truck } from 'lucide-react';
+import { AlertTriangle, ArrowRightLeft, Calendar, Clock, Package, Pencil, Plus, ShoppingCart, Truck } from 'lucide-react';
 import { useState } from 'react';
 
 type StockItem = {
@@ -23,22 +23,52 @@ type StockItem = {
     on_hand: number;
     unit: string;
     reorder_level: number | null;
+    reorder_quantity: number | null;
     last_counted_at: string | null;
     is_low: boolean;
     controlled: boolean;
+    expiry_date: string | null;
+    batch_number: string | null;
+    supplier_name: string | null;
+    is_expired: boolean;
+    is_expiring_soon: boolean;
+    is_expiring_90: boolean;
 };
 
 type Props = {
     stockItems: StockItem[];
     lowStockCount: number;
+    expiringCount: number;
+    expiredCount: number;
     pharmacyOrders: any[];
     clients: { id: number; first_name: string; last_name: string }[];
     activeMedications: { id: number; name: string; client_id: number; client?: { first_name: string; last_name: string } }[];
 };
 
-export default function StockManagement({ stockItems, lowStockCount, pharmacyOrders, clients, activeMedications }: Props) {
+function ExpiryBadge({ item }: { item: StockItem }) {
+    if (!item.expiry_date) return null;
+    if (item.is_expired) {
+        return <Badge variant="destructive" className="text-[10px]">Expired</Badge>;
+    }
+    if (item.is_expiring_soon) {
+        return <Badge className="bg-amber-500 text-white text-[10px]">Expires &lt;30d</Badge>;
+    }
+    if (item.is_expiring_90) {
+        return <Badge className="bg-yellow-400 text-yellow-900 text-[10px]">Expires &lt;90d</Badge>;
+    }
+    return null;
+}
+
+function formatDate(dateStr: string | null) {
+    if (!dateStr) return '—';
+    return new Date(dateStr).toLocaleDateString('en-NZ');
+}
+
+export default function StockManagement({ stockItems, lowStockCount, expiringCount, expiredCount, pharmacyOrders, clients, activeMedications }: Props) {
+    const [activeTab, setActiveTab] = useState<string>('all');
     const lowStock = stockItems.filter((s) => s.is_low);
-    const normalStock = stockItems.filter((s) => !s.is_low);
+    const expiringSoon = stockItems.filter((s) => s.is_expiring_soon);
+    const expiredItems = stockItems.filter((s) => s.is_expired);
 
     // New Pharmacy Order dialog
     const [orderOpen, setOrderOpen] = useState(false);
@@ -50,6 +80,8 @@ export default function StockManagement({ stockItems, lowStockCount, pharmacyOrd
         order_type: '',
         quantity_ordered: '',
         order_notes: '',
+        batch_number: '',
+        expiry_date: '',
     });
 
     const filteredMedications = activeMedications.filter(
@@ -99,6 +131,8 @@ export default function StockManagement({ stockItems, lowStockCount, pharmacyOrd
         client_medication_id: '',
         quantity: '',
         notes: '',
+        batch_number: '',
+        expiry_date: '',
     });
 
     function submitReceive(e: React.FormEvent) {
@@ -129,13 +163,64 @@ export default function StockManagement({ stockItems, lowStockCount, pharmacyOrd
         });
     }
 
+    // Edit Stock dialog
+    const [editOpen, setEditOpen] = useState(false);
+    const [editingItem, setEditingItem] = useState<StockItem | null>(null);
+    const editForm = useForm({
+        reorder_level: '',
+        reorder_quantity: '',
+        expiry_date: '',
+        batch_number: '',
+        supplier_name: '',
+    });
+
+    function openEdit(item: StockItem) {
+        setEditingItem(item);
+        editForm.setData({
+            reorder_level: item.reorder_level !== null ? String(item.reorder_level) : '',
+            reorder_quantity: item.reorder_quantity !== null ? String(item.reorder_quantity) : '',
+            expiry_date: item.expiry_date ?? '',
+            batch_number: item.batch_number ?? '',
+            supplier_name: item.supplier_name ?? '',
+        });
+        setEditOpen(true);
+    }
+
+    function submitEdit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!editingItem) return;
+        editForm.patch(`/emar/stock/${editingItem.id}`, {
+            onSuccess: () => {
+                setEditOpen(false);
+                setEditingItem(null);
+                editForm.reset();
+            },
+        });
+    }
+
+    // Filtered items for tabs
+    function getFilteredItems() {
+        switch (activeTab) {
+            case 'low':
+                return lowStock;
+            case 'expiring':
+                return expiringSoon;
+            case 'expired':
+                return expiredItems;
+            default:
+                return stockItems;
+        }
+    }
+
+    const displayItems = getFilteredItems();
+
     return (
         <AppLayout>
             <Head title="eMAR - Stock Management" />
             <PageHeader title="Stock Management" description="Medication stock levels, reorder alerts, and pharmacy orders." backHref="/emar" />
             <PageShell>
-                {/* Stats */}
-                <div className="mb-6 grid gap-4 sm:grid-cols-3">
+                {/* Alert Summary Cards */}
+                <div className="mb-6 grid gap-4 sm:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
                             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/40"><Package className="h-5 w-5" /></div>
@@ -144,14 +229,20 @@ export default function StockManagement({ stockItems, lowStockCount, pharmacyOrd
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-700 dark:bg-red-900/40"><AlertTriangle className="h-5 w-5" /></div>
-                            <div><p className="text-2xl font-bold">{lowStockCount}</p><p className="text-xs text-muted-foreground">Low Stock Alerts</p></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-orange-100 text-orange-700 dark:bg-orange-900/40"><AlertTriangle className="h-5 w-5" /></div>
+                            <div><p className="text-2xl font-bold">{lowStockCount}</p><p className="text-xs text-muted-foreground">Low Stock Items</p></div>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40"><Truck className="h-5 w-5" /></div>
-                            <div><p className="text-2xl font-bold">{pharmacyOrders.length}</p><p className="text-xs text-muted-foreground">Pending Orders</p></div>
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40"><Clock className="h-5 w-5" /></div>
+                            <div><p className="text-2xl font-bold">{expiringCount}</p><p className="text-xs text-muted-foreground">Expiring in 30 Days</p></div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center gap-3 p-4">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-100 text-red-700 dark:bg-red-900/40"><Calendar className="h-5 w-5" /></div>
+                            <div><p className="text-2xl font-bold">{expiredCount}</p><p className="text-xs text-muted-foreground">Expired Items</p></div>
                         </CardContent>
                     </Card>
                 </div>
@@ -226,6 +317,18 @@ export default function StockManagement({ stockItems, lowStockCount, pharmacyOrd
                                             {orderForm.errors.quantity_ordered && <p className="text-sm text-red-600">{orderForm.errors.quantity_ordered}</p>}
                                         </div>
                                     </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Batch Number</Label>
+                                            <Input value={orderForm.data.batch_number} onChange={(e) => orderForm.setData('batch_number', e.target.value)} placeholder="Batch number" />
+                                            {orderForm.errors.batch_number && <p className="text-sm text-red-600">{orderForm.errors.batch_number}</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Expiry Date</Label>
+                                            <Input type="date" value={orderForm.data.expiry_date} onChange={(e) => orderForm.setData('expiry_date', e.target.value)} />
+                                            {orderForm.errors.expiry_date && <p className="text-sm text-red-600">{orderForm.errors.expiry_date}</p>}
+                                        </div>
+                                    </div>
                                     <div className="space-y-2">
                                         <Label>Order Notes</Label>
                                         <Textarea value={orderForm.data.order_notes} onChange={(e) => orderForm.setData('order_notes', e.target.value)} rows={3} placeholder="Any special instructions..." />
@@ -267,6 +370,18 @@ export default function StockManagement({ stockItems, lowStockCount, pharmacyOrd
                                         <Label>Quantity</Label>
                                         <Input type="number" min={1} value={receiveForm.data.quantity} onChange={(e) => receiveForm.setData('quantity', e.target.value)} placeholder="Quantity received" />
                                         {receiveForm.errors.quantity && <p className="text-sm text-red-600">{receiveForm.errors.quantity}</p>}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div className="space-y-2">
+                                            <Label>Batch Number</Label>
+                                            <Input value={receiveForm.data.batch_number} onChange={(e) => receiveForm.setData('batch_number', e.target.value)} placeholder="Batch number" />
+                                            {receiveForm.errors.batch_number && <p className="text-sm text-red-600">{receiveForm.errors.batch_number}</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Expiry Date</Label>
+                                            <Input type="date" value={receiveForm.data.expiry_date} onChange={(e) => receiveForm.setData('expiry_date', e.target.value)} />
+                                            {receiveForm.errors.expiry_date && <p className="text-sm text-red-600">{receiveForm.errors.expiry_date}</p>}
+                                        </div>
                                     </div>
                                     <div className="space-y-2">
                                         <Label>Notes</Label>
@@ -356,75 +471,125 @@ export default function StockManagement({ stockItems, lowStockCount, pharmacyOrd
                     </DialogContent>
                 </Dialog>
 
-                <Tabs defaultValue={lowStock.length > 0 ? 'low' : 'all'}>
+                {/* Edit Stock Dialog */}
+                <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                    <DialogContent>
+                        <form onSubmit={submitEdit}>
+                            <DialogHeader>
+                                <DialogTitle>Edit Stock Details</DialogTitle>
+                                <DialogDescription>Update reorder level, expiry date, batch number, and supplier for {editingItem?.medication_name}.</DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Reorder Level</Label>
+                                        <Input type="number" min={0} value={editForm.data.reorder_level} onChange={(e) => editForm.setData('reorder_level', e.target.value)} placeholder="Reorder when at or below" />
+                                        {editForm.errors.reorder_level && <p className="text-sm text-red-600">{editForm.errors.reorder_level}</p>}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Reorder Quantity</Label>
+                                        <Input type="number" min={1} value={editForm.data.reorder_quantity} onChange={(e) => editForm.setData('reorder_quantity', e.target.value)} placeholder="Suggested qty to order" />
+                                        {editForm.errors.reorder_quantity && <p className="text-sm text-red-600">{editForm.errors.reorder_quantity}</p>}
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="space-y-2">
+                                        <Label>Expiry Date</Label>
+                                        <Input type="date" value={editForm.data.expiry_date} onChange={(e) => editForm.setData('expiry_date', e.target.value)} />
+                                        {editForm.errors.expiry_date && <p className="text-sm text-red-600">{editForm.errors.expiry_date}</p>}
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Batch Number</Label>
+                                        <Input value={editForm.data.batch_number} onChange={(e) => editForm.setData('batch_number', e.target.value)} placeholder="Batch number" />
+                                        {editForm.errors.batch_number && <p className="text-sm text-red-600">{editForm.errors.batch_number}</p>}
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Supplier Name</Label>
+                                    <Input value={editForm.data.supplier_name} onChange={(e) => editForm.setData('supplier_name', e.target.value)} placeholder="Supplier / pharmacy name" />
+                                    {editForm.errors.supplier_name && <p className="text-sm text-red-600">{editForm.errors.supplier_name}</p>}
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button type="submit" disabled={editForm.processing}>{editForm.processing ? 'Saving...' : 'Save Changes'}</Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
+
+                <Tabs value={activeTab} onValueChange={setActiveTab}>
                     <TabsList className="mb-4">
-                        {lowStock.length > 0 && <TabsTrigger value="low"><AlertTriangle className="mr-1 h-3.5 w-3.5" /> Low Stock ({lowStock.length})</TabsTrigger>}
                         <TabsTrigger value="all"><Package className="mr-1 h-3.5 w-3.5" /> All Stock</TabsTrigger>
+                        {lowStock.length > 0 && <TabsTrigger value="low"><AlertTriangle className="mr-1 h-3.5 w-3.5" /> Low Stock ({lowStock.length})</TabsTrigger>}
+                        {expiringSoon.length > 0 && <TabsTrigger value="expiring"><Clock className="mr-1 h-3.5 w-3.5" /> Expiring Soon ({expiringSoon.length})</TabsTrigger>}
+                        {expiredItems.length > 0 && <TabsTrigger value="expired"><Calendar className="mr-1 h-3.5 w-3.5" /> Expired ({expiredItems.length})</TabsTrigger>}
                         <TabsTrigger value="orders"><ShoppingCart className="mr-1 h-3.5 w-3.5" /> Pharmacy Orders</TabsTrigger>
                     </TabsList>
 
-                    {lowStock.length > 0 && (
-                        <TabsContent value="low">
-                            <Card className="border-red-200 dark:border-red-800">
+                    {/* Stock Table (shared by all/low/expiring/expired tabs) */}
+                    {['all', 'low', 'expiring', 'expired'].map((tab) => (
+                        <TabsContent key={tab} value={tab}>
+                            <Card className={tab === 'low' ? 'border-orange-200 dark:border-orange-800' : tab === 'expired' ? 'border-red-200 dark:border-red-800' : ''}>
                                 <CardContent className="p-0">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b bg-red-50 dark:bg-red-900/10">
-                                                <th className="p-3 text-left font-medium">Medication</th>
-                                                <th className="p-3 text-left font-medium">Client</th>
-                                                <th className="p-3 text-left font-medium">On Hand</th>
-                                                <th className="p-3 text-left font-medium">Reorder Level</th>
-                                                <th className="p-3 text-left font-medium">Last Counted</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {lowStock.map((s) => (
-                                                <tr key={s.id} className="border-b last:border-0">
-                                                    <td className="p-3 font-medium">{s.medication_name} {s.controlled && <Badge variant="destructive" className="ml-1 text-[10px]">CD</Badge>}</td>
-                                                    <td className="p-3">{s.client_name}</td>
-                                                    <td className="p-3 font-mono text-red-600">{s.on_hand} {s.unit}</td>
-                                                    <td className="p-3 font-mono">{s.reorder_level} {s.unit}</td>
-                                                    <td className="p-3 text-xs">{s.last_counted_at ? new Date(s.last_counted_at).toLocaleDateString('en-NZ') : 'Never'}</td>
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-sm">
+                                            <thead>
+                                                <tr className={`border-b ${tab === 'low' ? 'bg-orange-50 dark:bg-orange-900/10' : tab === 'expired' ? 'bg-red-50 dark:bg-red-900/10' : 'bg-muted/50'}`}>
+                                                    <th className="p-3 text-left font-medium">Medication</th>
+                                                    <th className="p-3 text-left font-medium">Client</th>
+                                                    <th className="p-3 text-left font-medium">Batch #</th>
+                                                    <th className="p-3 text-left font-medium">Expiry Date</th>
+                                                    <th className="p-3 text-left font-medium">On Hand</th>
+                                                    <th className="p-3 text-left font-medium">Reorder Level</th>
+                                                    <th className="p-3 text-left font-medium">Status</th>
+                                                    <th className="p-3 text-left font-medium">Last Counted</th>
+                                                    <th className="p-3 text-left font-medium">Actions</th>
                                                 </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
+                                            </thead>
+                                            <tbody>
+                                                {displayItems.map((s) => (
+                                                    <tr key={s.id} className="border-b last:border-0">
+                                                        <td className="p-3 font-medium">
+                                                            {s.medication_name}
+                                                            {s.controlled && <Badge variant="destructive" className="ml-1 text-[10px]">CD</Badge>}
+                                                        </td>
+                                                        <td className="p-3">{s.client_name}</td>
+                                                        <td className="p-3 font-mono text-xs">{s.batch_number ?? '—'}</td>
+                                                        <td className="p-3">
+                                                            <span className="text-xs">{formatDate(s.expiry_date)}</span>
+                                                            {s.expiry_date && (
+                                                                <span className="ml-1"><ExpiryBadge item={s} /></span>
+                                                            )}
+                                                        </td>
+                                                        <td className={`p-3 font-mono ${s.is_low ? 'text-red-600 font-semibold' : ''}`}>
+                                                            {s.on_hand} {s.unit}
+                                                        </td>
+                                                        <td className="p-3 font-mono">{s.reorder_level ?? '—'}</td>
+                                                        <td className="p-3 space-x-1">
+                                                            {s.is_low && <Badge className="bg-orange-500 text-white text-[10px]">Low Stock</Badge>}
+                                                            {s.is_expired && <Badge variant="destructive" className="text-[10px]">Expired</Badge>}
+                                                            {!s.is_low && !s.is_expired && !s.is_expiring_soon && (
+                                                                <Badge variant="outline" className="text-[10px]">OK</Badge>
+                                                            )}
+                                                        </td>
+                                                        <td className="p-3 text-xs">{s.last_counted_at ? new Date(s.last_counted_at).toLocaleDateString('en-NZ') : 'Never'}</td>
+                                                        <td className="p-3">
+                                                            <Button size="sm" variant="ghost" onClick={() => openEdit(s)}>
+                                                                <Pencil className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {displayItems.length === 0 && (
+                                                    <tr><td colSpan={9} className="p-6 text-center text-muted-foreground">No stock records found.</td></tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </CardContent>
                             </Card>
                         </TabsContent>
-                    )}
-
-                    <TabsContent value="all">
-                        <Card>
-                            <CardContent className="p-0">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-muted/50">
-                                            <th className="p-3 text-left font-medium">Medication</th>
-                                            <th className="p-3 text-left font-medium">Client</th>
-                                            <th className="p-3 text-left font-medium">On Hand</th>
-                                            <th className="p-3 text-left font-medium">Reorder</th>
-                                            <th className="p-3 text-left font-medium">Status</th>
-                                            <th className="p-3 text-left font-medium">Last Counted</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {stockItems.map((s) => (
-                                            <tr key={s.id} className="border-b last:border-0">
-                                                <td className="p-3 font-medium">{s.medication_name} {s.controlled && <Badge variant="destructive" className="ml-1 text-[10px]">CD</Badge>}</td>
-                                                <td className="p-3">{s.client_name}</td>
-                                                <td className="p-3 font-mono">{s.on_hand} {s.unit}</td>
-                                                <td className="p-3 font-mono">{s.reorder_level ?? '—'}</td>
-                                                <td className="p-3">{s.is_low ? <Badge variant="destructive" className="text-xs">Low</Badge> : <Badge variant="outline" className="text-xs">OK</Badge>}</td>
-                                                <td className="p-3 text-xs">{s.last_counted_at ? new Date(s.last_counted_at).toLocaleDateString('en-NZ') : 'Never'}</td>
-                                            </tr>
-                                        ))}
-                                        {stockItems.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No stock records.</td></tr>}
-                                    </tbody>
-                                </table>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
+                    ))}
 
                     <TabsContent value="orders">
                         <Card>

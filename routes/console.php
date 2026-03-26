@@ -168,6 +168,18 @@ app(Schedule::class)
 
 // Medical Module Scheduled Jobs
 
+// Generate daily medication rounds from active templates: 00:05 NZ time
+app(Schedule::class)
+    ->command('emar:generate-rounds')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('00:05');
+
+// Check medication stock levels and expiry dates: daily at 06:00
+app(Schedule::class)
+    ->command('emar:check-medication-stock')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('06:00');
+
 // Clear stale medication alerts: hourly
 app(Schedule::class)
     ->call(fn () => app(\App\Services\MedicationAlertService::class)->clearStaleAlerts())

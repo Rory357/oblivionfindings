@@ -28,6 +28,14 @@ class MedicationHandover extends Model
         'general_notes',
         'acknowledged',
         'acknowledged_at',
+        'checklist_items',
+        'safety_concerns',
+        'medication_errors_count',
+        'pending_gp_followups',
+        'clients_requiring_attention',
+        'previous_shift_notes_read',
+        'stock_issues_identified',
+        'prescriber_changes_summary',
     ];
 
     protected $casts = [
@@ -42,6 +50,11 @@ class MedicationHandover extends Model
         'prn_given' => 'array',
         'flagged_clients' => 'array',
         'acknowledged' => 'boolean',
+        'checklist_items' => 'array',
+        'clients_requiring_attention' => 'array',
+        'previous_shift_notes_read' => 'boolean',
+        'medication_errors_count' => 'integer',
+        'pending_gp_followups' => 'integer',
     ];
 
     public function site()
