@@ -3,10 +3,16 @@ import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle, Clock, TrendingUp } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { AlertTriangle, CheckCircle, Clock, ClipboardCheck, TrendingUp } from 'lucide-react';
+import { useState } from 'react';
 
 type PrnAdmin = {
     id: number;
@@ -39,6 +45,42 @@ type Props = {
 };
 
 export default function PrnRecords({ administrations, pendingReviews, stats, dateFrom, dateTo }: Props) {
+    const [effectivenessOpen, setEffectivenessOpen] = useState(false);
+    const [selectedReview, setSelectedReview] = useState<PendingReview | null>(null);
+
+    const effectivenessForm = useForm({
+        client_medication_administration_id: '',
+        effectiveness: '',
+        review_minutes_after: '',
+        observations: '',
+        escalation_needed: false,
+        escalation_action: '',
+    });
+
+    function openEffectiveness(review: PendingReview) {
+        setSelectedReview(review);
+        effectivenessForm.setData({
+            client_medication_administration_id: String(review.id),
+            effectiveness: '',
+            review_minutes_after: '',
+            observations: '',
+            escalation_needed: false,
+            escalation_action: '',
+        });
+        setEffectivenessOpen(true);
+    }
+
+    function submitEffectiveness(e: React.FormEvent) {
+        e.preventDefault();
+        effectivenessForm.post('/emar/prn/effectiveness', {
+            onSuccess: () => {
+                setEffectivenessOpen(false);
+                effectivenessForm.reset();
+                setSelectedReview(null);
+            },
+        });
+    }
+
     return (
         <AppLayout>
             <Head title="eMAR - PRN Records" />
@@ -105,8 +147,13 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                                             <span className="mx-2 text-muted-foreground">—</span>
                                             <span className="text-sm">{r.medication?.name}</span>
                                         </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            Given: {r.administered_at ? new Date(r.administered_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-xs text-muted-foreground">
+                                                Given: {r.administered_at ? new Date(r.administered_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                            </span>
+                                            <Button size="sm" variant="outline" onClick={() => openEffectiveness(r)}>
+                                                <ClipboardCheck className="mr-1 h-3.5 w-3.5" /> Record Effectiveness
+                                            </Button>
                                         </div>
                                     </div>
                                 ))}
@@ -114,6 +161,84 @@ export default function PrnRecords({ administrations, pendingReviews, stats, dat
                         </CardContent>
                     </Card>
                 )}
+
+                {/* Effectiveness Review Dialog */}
+                <Dialog open={effectivenessOpen} onOpenChange={setEffectivenessOpen}>
+                    <DialogContent>
+                        <form onSubmit={submitEffectiveness}>
+                            <DialogHeader>
+                                <DialogTitle>Record Effectiveness</DialogTitle>
+                                <DialogDescription>
+                                    {selectedReview && (
+                                        <>Review effectiveness for {selectedReview.client?.first_name} {selectedReview.client?.last_name} — {selectedReview.medication?.name}</>
+                                    )}
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                                <input type="hidden" value={effectivenessForm.data.client_medication_administration_id} />
+                                <div className="space-y-2">
+                                    <Label>Effectiveness</Label>
+                                    <Select value={effectivenessForm.data.effectiveness} onValueChange={(v) => effectivenessForm.setData('effectiveness', v)}>
+                                        <SelectTrigger><SelectValue placeholder="Select effectiveness..." /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="effective">Effective</SelectItem>
+                                            <SelectItem value="partially_effective">Partially Effective</SelectItem>
+                                            <SelectItem value="not_effective">Not Effective</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    {effectivenessForm.errors.effectiveness && <p className="text-sm text-red-600">{effectivenessForm.errors.effectiveness}</p>}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Review Minutes After Administration (optional)</Label>
+                                    <Input
+                                        type="number"
+                                        min={0}
+                                        value={effectivenessForm.data.review_minutes_after}
+                                        onChange={(e) => effectivenessForm.setData('review_minutes_after', e.target.value)}
+                                        placeholder="e.g. 30"
+                                    />
+                                    {effectivenessForm.errors.review_minutes_after && <p className="text-sm text-red-600">{effectivenessForm.errors.review_minutes_after}</p>}
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Observations</Label>
+                                    <Textarea
+                                        value={effectivenessForm.data.observations}
+                                        onChange={(e) => effectivenessForm.setData('observations', e.target.value)}
+                                        rows={3}
+                                        placeholder="Describe the client's response to the medication..."
+                                    />
+                                    {effectivenessForm.errors.observations && <p className="text-sm text-red-600">{effectivenessForm.errors.observations}</p>}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id="escalation_needed"
+                                        checked={effectivenessForm.data.escalation_needed}
+                                        onCheckedChange={(checked) => effectivenessForm.setData('escalation_needed', !!checked)}
+                                    />
+                                    <Label htmlFor="escalation_needed">Escalation needed</Label>
+                                </div>
+                                {effectivenessForm.data.escalation_needed && (
+                                    <div className="space-y-2">
+                                        <Label>Escalation Action <span className="text-red-500">*</span></Label>
+                                        <Textarea
+                                            value={effectivenessForm.data.escalation_action}
+                                            onChange={(e) => effectivenessForm.setData('escalation_action', e.target.value)}
+                                            rows={3}
+                                            placeholder="Describe the escalation action taken or required..."
+                                            required
+                                        />
+                                        {effectivenessForm.errors.escalation_action && <p className="text-sm text-red-600">{effectivenessForm.errors.escalation_action}</p>}
+                                    </div>
+                                )}
+                            </div>
+                            <DialogFooter>
+                                <Button type="submit" disabled={effectivenessForm.processing}>
+                                    {effectivenessForm.processing ? 'Saving...' : 'Save Review'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
 
                 {/* PRN Administration Records */}
                 <Card>

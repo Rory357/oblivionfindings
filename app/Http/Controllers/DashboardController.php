@@ -447,8 +447,29 @@ class DashboardController extends Controller
             ];
         }
 
+        // eMAR widget
+        $emarWidgets = null;
+        if ($user->canDo('medications.view')) {
+            $todayAdmins = \App\Models\ClientMedicationAdministration::whereDate('scheduled_for', $today)
+                ->orWhereDate('administered_at', $today)
+                ->selectRaw("COUNT(*) as total, SUM(CASE WHEN status='given' THEN 1 ELSE 0 END) as given")
+                ->first();
+            $emarTotal = (int) ($todayAdmins->total ?? 0);
+            $emarGiven = (int) ($todayAdmins->given ?? 0);
+            $emarWidgets = [
+                'adminRate' => $emarTotal > 0 ? round(($emarGiven / $emarTotal) * 100, 1) : 0,
+                'pending' => $emarTotal - $emarGiven,
+                'activeAlerts' => \App\Models\MedicationDashboardAlert::where('status', 'active')->count(),
+                'overdueReviews' => \App\Models\MedicationReview::where('status', 'scheduled')
+                    ->where('scheduled_date', '<', $today->toDateString())->count(),
+                'lowStock' => \App\Models\ClientMedicationStock::whereHas('medication', fn ($q) => $q->where('state', 'active')->where('active', true))
+                    ->whereNotNull('reorder_level')->whereColumn('on_hand', '<=', 'reorder_level')->count(),
+            ];
+        }
+
         return inertia('dashboard', [
             'mode' => $mode,
+            'emarWidgets' => $emarWidgets,
             'hrWidgets' => $hrWidgets,
             'hrAdmin' => $hrAdmin,
             'staffKpis' => $staffKpis,

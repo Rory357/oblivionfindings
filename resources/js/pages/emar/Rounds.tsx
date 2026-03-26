@@ -3,11 +3,16 @@ import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Clock, CheckCircle, AlertTriangle, Play, Users } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Clock, Play, Plus, Trash2, Users, Zap } from 'lucide-react';
+import { useState } from 'react';
 
 type MedRound = {
     id: number;
@@ -42,6 +47,7 @@ type Props = {
     rounds: MedRound[];
     templates: Template[];
     date: string;
+    staff: { id: number; name: string }[];
 };
 
 const statusConfig: Record<string, { color: string; icon: any }> = {
@@ -51,11 +57,45 @@ const statusConfig: Record<string, { color: string; icon: any }> = {
     partial: { color: 'bg-amber-100 text-amber-700', icon: AlertTriangle },
 };
 
-export default function Rounds({ rounds, templates, date }: Props) {
+const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
+export default function Rounds({ rounds, templates, date, staff }: Props) {
+    const [templateOpen, setTemplateOpen] = useState(false);
+
+    const templateForm = useForm({
+        name: '',
+        scheduled_time: '',
+        window_minutes: 60,
+        days_of_week: [] as number[],
+    });
+
     function navigateDate(offset: number) {
         const d = new Date(date);
         d.setDate(d.getDate() + offset);
         router.get('/emar/rounds', { date: d.toISOString().split('T')[0] }, { preserveState: true });
+    }
+
+    function submitTemplate(e: React.FormEvent) {
+        e.preventDefault();
+        templateForm.post('/emar/rounds/templates', {
+            onSuccess: () => {
+                setTemplateOpen(false);
+                templateForm.reset();
+            },
+        });
+    }
+
+    function generateRounds() {
+        router.post('/emar/rounds/generate', { date });
+    }
+
+    function toggleDay(day: number) {
+        const current = templateForm.data.days_of_week;
+        if (current.includes(day)) {
+            templateForm.setData('days_of_week', current.filter((d) => d !== day));
+        } else {
+            templateForm.setData('days_of_week', [...current, day].sort());
+        }
     }
 
     return (
@@ -63,12 +103,63 @@ export default function Rounds({ rounds, templates, date }: Props) {
             <Head title="eMAR - Medication Rounds" />
             <PageHeader title="Medication Rounds" description="Manage daily medication administration rounds, assignments, and completion tracking." backHref="/emar" />
             <PageShell>
-                {/* Date Navigation */}
-                <div className="mb-6 flex items-center gap-3">
+                {/* Date Navigation & Actions */}
+                <div className="mb-6 flex flex-wrap items-center gap-3">
                     <Button variant="outline" size="icon" onClick={() => navigateDate(-1)}><ChevronLeft className="h-4 w-4" /></Button>
                     <Input type="date" value={date} onChange={(e) => router.get('/emar/rounds', { date: e.target.value }, { preserveState: true })} className="w-40" />
                     <Button variant="outline" size="icon" onClick={() => navigateDate(1)}><ChevronRight className="h-4 w-4" /></Button>
                     <Button variant="outline" size="sm" onClick={() => router.get('/emar/rounds', { date: new Date().toISOString().split('T')[0] })}>Today</Button>
+                    <div className="ml-auto flex gap-2">
+                        <Button variant="outline" size="sm" onClick={generateRounds}>
+                            <Zap className="mr-1 h-4 w-4" /> Generate Rounds
+                        </Button>
+                        <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="sm"><Plus className="mr-1 h-4 w-4" /> New Template</Button>
+                            </DialogTrigger>
+                            <DialogContent>
+                                <DialogHeader>
+                                    <DialogTitle>New Round Template</DialogTitle>
+                                </DialogHeader>
+                                <form onSubmit={submitTemplate} className="space-y-4">
+                                    <div>
+                                        <Label htmlFor="tpl-name">Name</Label>
+                                        <Input id="tpl-name" value={templateForm.data.name} onChange={(e) => templateForm.setData('name', e.target.value)} placeholder="e.g. Morning Round" />
+                                        {templateForm.errors.name && <p className="mt-1 text-xs text-red-500">{templateForm.errors.name}</p>}
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="tpl-time">Scheduled Time</Label>
+                                        <Input id="tpl-time" type="time" value={templateForm.data.scheduled_time} onChange={(e) => templateForm.setData('scheduled_time', e.target.value)} />
+                                        {templateForm.errors.scheduled_time && <p className="mt-1 text-xs text-red-500">{templateForm.errors.scheduled_time}</p>}
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="tpl-window">Window (minutes)</Label>
+                                        <Input id="tpl-window" type="number" min={0} value={templateForm.data.window_minutes} onChange={(e) => templateForm.setData('window_minutes', parseInt(e.target.value) || 0)} />
+                                        {templateForm.errors.window_minutes && <p className="mt-1 text-xs text-red-500">{templateForm.errors.window_minutes}</p>}
+                                    </div>
+                                    <div>
+                                        <Label>Days of Week</Label>
+                                        <div className="mt-2 flex flex-wrap gap-3">
+                                            {DAY_NAMES.map((name, idx) => {
+                                                const day = idx + 1;
+                                                return (
+                                                    <label key={day} className="flex items-center gap-1.5 text-sm">
+                                                        <Checkbox checked={templateForm.data.days_of_week.includes(day)} onCheckedChange={() => toggleDay(day)} />
+                                                        {name}
+                                                    </label>
+                                                );
+                                            })}
+                                        </div>
+                                        <p className="mt-1 text-xs text-muted-foreground">Leave unchecked for every day.</p>
+                                    </div>
+                                    <div className="flex justify-end gap-2">
+                                        <Button type="button" variant="outline" onClick={() => setTemplateOpen(false)}>Cancel</Button>
+                                        <Button type="submit" disabled={templateForm.processing}>Create Template</Button>
+                                    </div>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
                 </div>
 
                 {/* Rounds Grid */}
@@ -125,6 +216,32 @@ export default function Rounds({ rounds, templates, date }: Props) {
                                             {round.completed_at && ` — Completed: ${new Date(round.completed_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}`}
                                         </p>
                                     )}
+                                    {/* Round Actions */}
+                                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
+                                        {round.status === 'pending' && (
+                                            <Button size="sm" variant="outline" onClick={() => router.post(`/emar/rounds/${round.id}/start`)}>
+                                                <Play className="mr-1 h-3 w-3" /> Start
+                                            </Button>
+                                        )}
+                                        {round.status === 'in_progress' && (
+                                            <Button size="sm" variant="outline" onClick={() => router.post(`/emar/rounds/${round.id}/complete`)}>
+                                                <CheckCircle className="mr-1 h-3 w-3" /> Complete
+                                            </Button>
+                                        )}
+                                        <Select
+                                            value={round.assigned_to?.id?.toString() ?? ''}
+                                            onValueChange={(v) => router.put(`/emar/rounds/${round.id}/assign`, { assigned_to: parseInt(v) })}
+                                        >
+                                            <SelectTrigger className="h-8 w-36 text-xs">
+                                                <SelectValue placeholder="Assign to..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {staff.map((s) => (
+                                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 </CardContent>
                             </Card>
                         );
@@ -153,22 +270,28 @@ export default function Rounds({ rounds, templates, date }: Props) {
                                     <th className="p-3 text-left font-medium">Window</th>
                                     <th className="p-3 text-left font-medium">Days</th>
                                     <th className="p-3 text-left font-medium">Status</th>
+                                    <th className="p-3 text-right font-medium">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {templates.map((t) => {
-                                    const dayNames = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+                                    const dayLabels = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
                                     return (
                                         <tr key={t.id} className="border-b last:border-0">
                                             <td className="p-3 font-medium">{t.name}</td>
                                             <td className="p-3">{t.scheduled_time}</td>
-                                            <td className="p-3">±{t.window_minutes} min</td>
-                                            <td className="p-3 text-xs">{t.days_of_week ? t.days_of_week.map((d) => dayNames[d]).join(', ') : 'Every day'}</td>
+                                            <td className="p-3">&plusmn;{t.window_minutes} min</td>
+                                            <td className="p-3 text-xs">{t.days_of_week ? t.days_of_week.map((d) => dayLabels[d]).join(', ') : 'Every day'}</td>
                                             <td className="p-3">{t.active ? <Badge className="bg-green-100 text-green-700 text-xs">Active</Badge> : <Badge variant="outline" className="text-xs">Inactive</Badge>}</td>
+                                            <td className="p-3 text-right">
+                                                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => router.delete(`/emar/rounds/templates/${t.id}`)}>
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </td>
                                         </tr>
                                     );
                                 })}
-                                {templates.length === 0 && <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No round templates configured.</td></tr>}
+                                {templates.length === 0 && <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No round templates configured.</td></tr>}
                             </tbody>
                         </table>
                     </CardContent>

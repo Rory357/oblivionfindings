@@ -1,10 +1,17 @@
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { Head } from '@inertiajs/react';
-import { AlertTriangle, ArrowRight, CheckCircle, Shield } from 'lucide-react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
+import { AlertTriangle, ArrowRight, CheckCircle, Plus, Shield } from 'lucide-react';
+import { useState } from 'react';
 
 type Handover = {
     id: number;
@@ -27,17 +34,94 @@ type Handover = {
 
 type Props = {
     handovers: { data: Handover[]; links: any };
+    staff: { id: number; name: string }[];
 };
 
-export default function Handovers({ handovers }: Props) {
+export default function Handovers({ handovers, staff }: Props) {
+    const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
+    const [open, setOpen] = useState(false);
+
+    const form = useForm({
+        incoming_user_id: '',
+        controlled_drugs_verified: false,
+        general_notes: '',
+    });
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        form.post('/emar/handovers', {
+            onSuccess: () => {
+                setOpen(false);
+                form.reset();
+            },
+        });
+    }
+
     return (
         <AppLayout>
             <Head title="eMAR - Medication Handovers" />
             <PageHeader title="Medication Handovers" description="Shift handover records for medication, including controlled drug counts and outstanding items." backHref="/emar" />
             <PageShell>
+                <div className="mb-4 flex justify-end">
+                    <Dialog open={open} onOpenChange={setOpen}>
+                        <DialogTrigger asChild>
+                            <Button><Plus className="mr-2 h-4 w-4" /> New Handover</Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <form onSubmit={submit}>
+                                <DialogHeader>
+                                    <DialogTitle>New Handover</DialogTitle>
+                                    <DialogDescription>Create a new medication shift handover record.</DialogDescription>
+                                </DialogHeader>
+                                <div className="space-y-4 py-4">
+                                    <div className="space-y-2">
+                                        <Label htmlFor="incoming_user_id">Incoming Staff Member</Label>
+                                        <Select value={form.data.incoming_user_id} onValueChange={(v) => form.setData('incoming_user_id', v)}>
+                                            <SelectTrigger>
+                                                <SelectValue placeholder="Select incoming staff..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {staff.map((s) => (
+                                                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                        {form.errors.incoming_user_id && <p className="text-sm text-red-600">{form.errors.incoming_user_id}</p>}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Checkbox
+                                            id="controlled_drugs_verified"
+                                            checked={form.data.controlled_drugs_verified}
+                                            onCheckedChange={(checked) => form.setData('controlled_drugs_verified', !!checked)}
+                                        />
+                                        <Label htmlFor="controlled_drugs_verified">Controlled drugs verified</Label>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label htmlFor="general_notes">General Notes</Label>
+                                        <Textarea
+                                            id="general_notes"
+                                            value={form.data.general_notes}
+                                            onChange={(e) => form.setData('general_notes', e.target.value)}
+                                            rows={4}
+                                            placeholder="Any relevant notes for the incoming staff member..."
+                                        />
+                                        {form.errors.general_notes && <p className="text-sm text-red-600">{form.errors.general_notes}</p>}
+                                    </div>
+                                </div>
+                                <DialogFooter>
+                                    <Button type="submit" disabled={form.processing}>
+                                        {form.processing ? 'Creating...' : 'Create Handover'}
+                                    </Button>
+                                </DialogFooter>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+
                 <div className="space-y-4">
                     {handovers.data.map((h) => {
                         const hasDiscrepancies = h.controlled_drug_counts?.some((c) => c.discrepancy !== 0);
+                        const isIncomingUser = h.incoming_user?.id === auth.user.id;
                         return (
                             <Card key={h.id} className={hasDiscrepancies ? 'border-red-200 dark:border-red-800' : ''}>
                                 <CardHeader className="pb-3">
@@ -55,6 +139,15 @@ export default function Handovers({ handovers }: Props) {
                                                 <Badge className="bg-green-100 text-green-700 text-xs"><CheckCircle className="mr-1 h-3 w-3" /> Acknowledged</Badge>
                                             ) : (
                                                 <Badge variant="outline" className="text-xs">Pending</Badge>
+                                            )}
+                                            {!h.acknowledged && isIncomingUser && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={() => router.post(`/emar/handovers/${h.id}/acknowledge`)}
+                                                >
+                                                    <CheckCircle className="mr-1 h-3.5 w-3.5" /> Acknowledge
+                                                </Button>
                                             )}
                                         </div>
                                     </div>

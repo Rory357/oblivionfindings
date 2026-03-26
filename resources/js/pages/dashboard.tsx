@@ -44,6 +44,7 @@ import {
     Briefcase,
     FileWarning,
     Activity,
+    Pill,
 } from 'lucide-react';
 
 /* -------------------------------------------------------------------------- */
@@ -174,6 +175,14 @@ type Props = {
         leaveBalance: number;
         compliancePercent: number;
         pendingTasks: number;
+    } | null;
+    /* eMAR */
+    emarWidgets?: {
+        adminRate: number;
+        pending: number;
+        activeAlerts: number;
+        overdueReviews: number;
+        lowStock: number;
     } | null;
 };
 
@@ -326,6 +335,44 @@ function ManagerDashboard({ props }: { props: Props }) {
                         href="/hr/my/policies"
                     />
                 </div>
+            )}
+
+            {/* eMAR widget */}
+            {props.emarWidgets && (
+                <Link href="/emar" className="block">
+                    <Card className="transition-all hover:border-primary/30 hover:shadow-md hover:-translate-y-0.5">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="flex items-center gap-2 text-sm">
+                                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-100 dark:bg-indigo-900/40">
+                                    <Pill className="h-3.5 w-3.5 text-indigo-600 dark:text-indigo-400" />
+                                </div>
+                                Medications (eMAR)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="grid grid-cols-3 gap-4 text-center">
+                                <div>
+                                    <p className="text-2xl font-bold text-emerald-600">{props.emarWidgets.adminRate}%</p>
+                                    <p className="text-[10px] text-muted-foreground">Admin Rate</p>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold">{props.emarWidgets.pending}</p>
+                                    <p className="text-[10px] text-muted-foreground">Pending</p>
+                                </div>
+                                <div>
+                                    <p className={`text-2xl font-bold ${props.emarWidgets.activeAlerts > 0 ? 'text-amber-600' : ''}`}>{props.emarWidgets.activeAlerts}</p>
+                                    <p className="text-[10px] text-muted-foreground">Alerts</p>
+                                </div>
+                            </div>
+                            {(props.emarWidgets.overdueReviews > 0 || props.emarWidgets.lowStock > 0) && (
+                                <div className="mt-3 flex flex-wrap gap-1.5">
+                                    {props.emarWidgets.overdueReviews > 0 && <Badge variant="destructive" className="text-[10px]">{props.emarWidgets.overdueReviews} overdue reviews</Badge>}
+                                    {props.emarWidgets.lowStock > 0 && <Badge variant="outline" className="text-[10px]">{props.emarWidgets.lowStock} low stock</Badge>}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </Link>
             )}
 
             {/* Row 2: Charts */}

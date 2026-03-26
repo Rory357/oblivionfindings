@@ -86,6 +86,62 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->middleware('permission:medications.view')
         ->name('emar.handovers');
 
+    // ─── CRUD Routes ──────────────────────────────────────
+
+    // Prescriber Orders
+    Route::post('/prescriptions', [EmarController::class, 'storePrescription'])->name('emar.prescriptions.store');
+    Route::put('/prescriptions/{order}', [EmarController::class, 'updatePrescription'])->name('emar.prescriptions.update');
+    Route::post('/prescriptions/{order}/countersign', [EmarController::class, 'countersignPrescription'])->name('emar.prescriptions.countersign');
+    Route::delete('/prescriptions/{order}', [EmarController::class, 'destroyPrescription'])->name('emar.prescriptions.destroy');
+
+    // Covert Authorisations
+    Route::post('/prescriptions/covert', [EmarController::class, 'storeCovert'])->name('emar.covert.store');
+    Route::post('/prescriptions/covert/{authorisation}/revoke', [EmarController::class, 'revokeCovert'])->name('emar.covert.revoke');
+
+    // Reviews
+    Route::post('/reviews', [EmarController::class, 'storeReview'])->name('emar.reviews.store');
+    Route::put('/reviews/{review}', [EmarController::class, 'updateReview'])->name('emar.reviews.update');
+    Route::post('/reviews/{review}/complete', [EmarController::class, 'completeReview'])->name('emar.reviews.complete');
+    Route::delete('/reviews/{review}', [EmarController::class, 'destroyReview'])->name('emar.reviews.destroy');
+
+    // Competency Assessments
+    Route::post('/competency', [EmarController::class, 'storeCompetency'])->name('emar.competency.store');
+    Route::put('/competency/{assessment}', [EmarController::class, 'updateCompetency'])->name('emar.competency.update');
+    Route::delete('/competency/{assessment}', [EmarController::class, 'destroyCompetency'])->name('emar.competency.destroy');
+
+    // Round Templates + Workflow
+    Route::post('/rounds/templates', [EmarController::class, 'storeRoundTemplate'])->name('emar.rounds.templates.store');
+    Route::put('/rounds/templates/{template}', [EmarController::class, 'updateRoundTemplate'])->name('emar.rounds.templates.update');
+    Route::delete('/rounds/templates/{template}', [EmarController::class, 'destroyRoundTemplate'])->name('emar.rounds.templates.destroy');
+    Route::post('/rounds/generate', [EmarController::class, 'generateRounds'])->name('emar.rounds.generate');
+    Route::post('/rounds/{round}/start', [EmarController::class, 'startRound'])->name('emar.rounds.start');
+    Route::post('/rounds/{round}/complete', [EmarController::class, 'completeRound'])->name('emar.rounds.complete');
+    Route::put('/rounds/{round}/assign', [EmarController::class, 'assignRound'])->name('emar.rounds.assign');
+
+    // Self-Admin Assessments
+    Route::post('/self-admin', [EmarController::class, 'storeSelfAdmin'])->name('emar.self_admin.store');
+    Route::put('/self-admin/{assessment}', [EmarController::class, 'updateSelfAdmin'])->name('emar.self_admin.update');
+    Route::delete('/self-admin/{assessment}', [EmarController::class, 'destroySelfAdmin'])->name('emar.self_admin.destroy');
+
+    // Destructions
+    Route::post('/destructions', [EmarController::class, 'storeDestruction'])->name('emar.destructions.store');
+
+    // Handovers
+    Route::post('/handovers', [EmarController::class, 'storeHandover'])->name('emar.handovers.store');
+    Route::post('/handovers/{handover}/acknowledge', [EmarController::class, 'acknowledgeHandover'])->name('emar.handovers.acknowledge');
+
+    // Pharmacy Orders + Stock
+    Route::post('/stock/pharmacy-orders', [EmarController::class, 'storePharmacyOrder'])->name('emar.pharmacy_orders.store');
+    Route::put('/stock/pharmacy-orders/{order}', [EmarController::class, 'updatePharmacyOrder'])->name('emar.pharmacy_orders.update');
+    Route::post('/stock/pharmacy-orders/{order}/advance', [EmarController::class, 'advancePharmacyOrder'])->name('emar.pharmacy_orders.advance');
+    Route::post('/stock/receive', [EmarController::class, 'receiveStock'])->name('emar.stock.receive');
+    Route::post('/stock/adjust', [EmarController::class, 'adjustStock'])->name('emar.stock.adjust');
+
+    // PRN Effectiveness
+    Route::post('/prn/effectiveness', [EmarController::class, 'storePrnEffectiveness'])->name('emar.prn_effectiveness.store');
+
+    // ─── End CRUD Routes ────────────────────────────────────
+
     // Audit trail
     Route::get('/audit', [MedicationAuditController::class, 'index'])
         ->middleware('permission:medications.audit.view')
