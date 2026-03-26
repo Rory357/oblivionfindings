@@ -137,6 +137,25 @@ Route::middleware('auth')->group(function () {
     Route::post('settings/templates/{template}/send-test', [NotificationTemplateController::class, 'sendTest'])->name('settings.templates.send-test');
     Route::post('settings/templates/{template}/reset', [NotificationTemplateController::class, 'reset'])->name('settings.templates.reset');
 
+    // Email Settings
+    Route::get('settings/email', fn () => Inertia::render('settings/email-settings'))->name('settings.email');
+
+    // Security Settings
+    Route::get('settings/security', fn () => Inertia::render('settings/security', [
+        'settings' => \App\Models\AppSetting::where('group', 'security')->pluck('value', 'key'),
+    ]))->name('settings.security');
+    Route::put('settings/security', function (\Illuminate\Http\Request $request) {
+        collect($request->only([
+            'password_min_length', 'password_require_uppercase', 'password_require_numbers',
+            'password_require_symbols', 'password_expiry_days', 'session_timeout_minutes',
+            'max_login_attempts', 'lockout_duration_minutes', 'force_2fa',
+        ]))->each(fn ($value, $key) => \App\Models\AppSetting::updateOrCreate(
+            ['key' => $key, 'group' => 'security'],
+            ['value' => $value]
+        ));
+        return back()->with('success', 'Security settings updated.');
+    })->name('settings.security.update');
+
     // API & Webhooks (UI-first, no backend yet)
     Route::get('settings/api', fn () => Inertia::render('settings/api'))->name('settings.api');
 
