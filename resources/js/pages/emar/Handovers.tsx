@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { AlertTriangle, ArrowRight, CheckCircle, Plus, Shield } from 'lucide-react';
+import { AlertTriangle, ArrowRight, CheckCircle, Pencil, Plus, Shield, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type Handover = {
@@ -40,8 +40,16 @@ type Props = {
 export default function Handovers({ handovers, staff }: Props) {
     const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
     const [open, setOpen] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
+    const [editingHandover, setEditingHandover] = useState<Handover | null>(null);
 
     const form = useForm({
+        incoming_user_id: '',
+        controlled_drugs_verified: false,
+        general_notes: '',
+    });
+
+    const editForm = useForm({
         incoming_user_id: '',
         controlled_drugs_verified: false,
         general_notes: '',
@@ -53,6 +61,28 @@ export default function Handovers({ handovers, staff }: Props) {
             onSuccess: () => {
                 setOpen(false);
                 form.reset();
+            },
+        });
+    }
+
+    function openEdit(h: Handover) {
+        setEditingHandover(h);
+        editForm.setData({
+            incoming_user_id: h.incoming_user?.id?.toString() ?? '',
+            controlled_drugs_verified: h.controlled_drugs_verified,
+            general_notes: h.general_notes ?? '',
+        });
+        setEditOpen(true);
+    }
+
+    function submitEdit(e: React.FormEvent) {
+        e.preventDefault();
+        if (!editingHandover) return;
+        editForm.put(`/emar/handovers/${editingHandover.id}`, {
+            onSuccess: () => {
+                setEditOpen(false);
+                setEditingHandover(null);
+                editForm.reset();
             },
         });
     }
@@ -149,6 +179,28 @@ export default function Handovers({ handovers, staff }: Props) {
                                                     <CheckCircle className="mr-1 h-3.5 w-3.5" /> Acknowledge
                                                 </Button>
                                             )}
+                                            {!h.acknowledged && (
+                                                <>
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        onClick={() => openEdit(h)}
+                                                    >
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button
+                                                        size="icon"
+                                                        variant="ghost"
+                                                        onClick={() => {
+                                                            if (confirm('Are you sure you want to delete this handover?')) {
+                                                                router.delete(`/emar/handovers/${h.id}`);
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Trash2 className="h-4 w-4 text-red-500" />
+                                                    </Button>
+                                                </>
+                                            )}
                                         </div>
                                     </div>
                                     {h.site && <p className="text-xs text-muted-foreground">{h.site.name}</p>}
@@ -231,6 +283,59 @@ export default function Handovers({ handovers, staff }: Props) {
                         </Card>
                     )}
                 </div>
+
+                {/* Edit Handover Dialog */}
+                <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                    <DialogContent>
+                        <form onSubmit={submitEdit}>
+                            <DialogHeader>
+                                <DialogTitle>Edit Handover</DialogTitle>
+                                <DialogDescription>Update the handover record details.</DialogDescription>
+                            </DialogHeader>
+                            <div className="space-y-4 py-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit_incoming_user_id">Incoming Staff Member</Label>
+                                    <Select value={editForm.data.incoming_user_id} onValueChange={(v) => editForm.setData('incoming_user_id', v)}>
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select incoming staff..." />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {staff.map((s) => (
+                                                <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {editForm.errors.incoming_user_id && <p className="text-sm text-red-600">{editForm.errors.incoming_user_id}</p>}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id="edit_controlled_drugs_verified"
+                                        checked={editForm.data.controlled_drugs_verified}
+                                        onCheckedChange={(checked) => editForm.setData('controlled_drugs_verified', !!checked)}
+                                    />
+                                    <Label htmlFor="edit_controlled_drugs_verified">Controlled drugs verified</Label>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="edit_general_notes">General Notes</Label>
+                                    <Textarea
+                                        id="edit_general_notes"
+                                        value={editForm.data.general_notes}
+                                        onChange={(e) => editForm.setData('general_notes', e.target.value)}
+                                        rows={4}
+                                        placeholder="Any relevant notes for the incoming staff member..."
+                                    />
+                                    {editForm.errors.general_notes && <p className="text-sm text-red-600">{editForm.errors.general_notes}</p>}
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button type="button" variant="outline" onClick={() => setEditOpen(false)}>Cancel</Button>
+                                <Button type="submit" disabled={editForm.processing}>
+                                    {editForm.processing ? 'Saving...' : 'Save Changes'}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    </DialogContent>
+                </Dialog>
             </PageShell>
         </AppLayout>
     );

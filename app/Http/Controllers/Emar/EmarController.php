@@ -179,6 +179,7 @@ class EmarController extends Controller
             'selectedClient' => $selectedClient,
             'marData' => $marData,
             'date' => $request->input('date', today()->toDateString()),
+            'staff' => $this->getStaffList(),
         ]);
     }
 
@@ -327,6 +328,8 @@ class EmarController extends Controller
             'recentEntries' => $recentEntries,
             'discrepancies' => $discrepancies,
             'destructions' => $destructions,
+            'staff' => $this->getStaffList(),
+            'clients' => $this->getClientsList(),
         ]);
     }
 
@@ -351,6 +354,7 @@ class EmarController extends Controller
         return Inertia::render('emar/Medications', [
             'medications' => $medications,
             'clients' => $clients,
+            'staff' => $this->getStaffList(),
             'filters' => $request->only(['search', 'status', 'type', 'client_id']),
         ]);
     }
@@ -1273,6 +1277,260 @@ class EmarController extends Controller
         $validated['reviewed_at'] = now();
 
         MedicationPrnEffectiveness::create($validated);
+
+        return redirect()->back();
+    }
+
+    // ─── Medications CRUD ─────────────────────────────────
+
+    public function storeMedication(Request $request)
+    {
+        $validated = $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'medication_name' => 'required|string|max:255',
+            'brand_name' => 'nullable|string|max:255',
+            'dose' => 'required|string|max:100',
+            'dose_unit' => 'nullable|string|max:50',
+            'frequency' => 'required|string|max:100',
+            'route' => 'nullable|string|max:50',
+            'form' => 'nullable|string|max:50',
+            'instructions' => 'nullable|string|max:2000',
+            'indication' => 'nullable|string|max:500',
+            'is_prn' => 'nullable|boolean',
+            'prn_reason' => 'nullable|string|max:500',
+            'max_doses_per_day' => 'nullable|integer|min:1',
+            'min_hours_between_doses' => 'nullable|numeric|min:0',
+            'is_controlled_drug' => 'nullable|boolean',
+            'is_high_risk' => 'nullable|boolean',
+            'witness_required' => 'nullable|boolean',
+            'start_date' => 'nullable|date',
+            'prescriber_name' => 'nullable|string|max:255',
+        ]);
+
+        ClientMedication::create([
+            'client_id' => $validated['client_id'],
+            'name' => $validated['medication_name'],
+            'brand_name' => $validated['brand_name'] ?? null,
+            'dosage' => $validated['dose'],
+            'dose_unit' => $validated['dose_unit'] ?? null,
+            'frequency' => $validated['frequency'],
+            'route' => $validated['route'] ?? null,
+            'form' => $validated['form'] ?? null,
+            'instructions' => $validated['instructions'] ?? null,
+            'indication' => $validated['indication'] ?? null,
+            'is_prn' => $validated['is_prn'] ?? false,
+            'prn_reason' => $validated['prn_reason'] ?? null,
+            'max_doses_per_day' => $validated['max_doses_per_day'] ?? null,
+            'min_hours_between_doses' => $validated['min_hours_between_doses'] ?? null,
+            'is_controlled_drug' => $validated['is_controlled_drug'] ?? false,
+            'is_high_risk' => $validated['is_high_risk'] ?? false,
+            'witness_required' => $validated['witness_required'] ?? false,
+            'start_date' => $validated['start_date'] ?? now()->toDateString(),
+            'prescriber_name' => $validated['prescriber_name'] ?? null,
+            'state' => 'active',
+        ]);
+
+        return redirect()->back();
+    }
+
+    public function updateMedication(Request $request, ClientMedication $medication)
+    {
+        $validated = $request->validate([
+            'medication_name' => 'sometimes|string|max:255',
+            'brand_name' => 'nullable|string|max:255',
+            'dose' => 'sometimes|string|max:100',
+            'dose_unit' => 'nullable|string|max:50',
+            'frequency' => 'sometimes|string|max:100',
+            'route' => 'nullable|string|max:50',
+            'form' => 'nullable|string|max:50',
+            'instructions' => 'nullable|string|max:2000',
+            'indication' => 'nullable|string|max:500',
+            'is_prn' => 'nullable|boolean',
+            'prn_reason' => 'nullable|string|max:500',
+            'max_doses_per_day' => 'nullable|integer|min:1',
+            'min_hours_between_doses' => 'nullable|numeric|min:0',
+            'is_controlled_drug' => 'nullable|boolean',
+            'is_high_risk' => 'nullable|boolean',
+            'witness_required' => 'nullable|boolean',
+            'prescriber_name' => 'nullable|string|max:255',
+        ]);
+
+        $updateData = [];
+        if (isset($validated['medication_name'])) $updateData['name'] = $validated['medication_name'];
+        if (isset($validated['dose'])) $updateData['dosage'] = $validated['dose'];
+        unset($validated['medication_name'], $validated['dose']);
+        $updateData = array_merge($updateData, $validated);
+
+        $medication->update($updateData);
+
+        return redirect()->back();
+    }
+
+    public function discontinueMedication(Request $request, ClientMedication $medication)
+    {
+        $request->validate([
+            'reason' => 'nullable|string|max:500',
+        ]);
+
+        $medication->update([
+            'state' => 'ceased',
+            'end_date' => now()->toDateString(),
+            'discontinued_reason' => $request->reason,
+            'discontinued_by' => auth()->id(),
+            'discontinued_at' => now(),
+        ]);
+
+        return redirect()->back();
+    }
+
+    // ─── Controlled Drug Entry CRUD ──────────────────────
+
+    public function storeCDEntry(Request $request)
+    {
+        $validated = $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'medication_name' => 'required|string|max:255',
+            'entry_type' => 'required|in:receipt,administration,disposal,transfer_in,transfer_out,balance_check,adjustment',
+            'quantity' => 'required|numeric|min:0',
+            'unit' => 'nullable|string|max:50',
+            'balance_before' => 'nullable|numeric|min:0',
+            'balance_after' => 'nullable|numeric|min:0',
+            'witnessed_by' => 'required|exists:users,id|different:' . auth()->id(),
+            'batch_number' => 'nullable|string|max:100',
+            'notes' => 'nullable|string|max:2000',
+        ]);
+
+        // Try to find matching controlled medication
+        $medication = ClientMedication::where('client_id', $validated['client_id'])
+            ->where('name', 'like', '%' . $validated['medication_name'] . '%')
+            ->controlled()
+            ->first();
+
+        ClientControlledDrugEntry::create([
+            'client_id' => $validated['client_id'],
+            'client_medication_id' => $medication?->id,
+            'medication_name' => $validated['medication_name'],
+            'entry_type' => $validated['entry_type'],
+            'quantity' => $validated['quantity'],
+            'unit' => $validated['unit'] ?? 'tablets',
+            'balance_before' => $validated['balance_before'],
+            'balance_after' => $validated['balance_after'],
+            'recorded_by' => auth()->id(),
+            'witnessed_by' => $validated['witnessed_by'],
+            'batch_number' => $validated['batch_number'],
+            'notes' => $validated['notes'],
+            'recorded_at' => now(),
+        ]);
+
+        // Update stock if medication found and balance_after is provided
+        if ($medication && isset($validated['balance_after'])) {
+            $stock = $medication->stock ?? $medication->stock()->create([
+                'client_id' => $validated['client_id'],
+            ]);
+            $stock->update(['on_hand' => $validated['balance_after']]);
+        }
+
+        return redirect()->back();
+    }
+
+    public function storeBalanceCheck(Request $request)
+    {
+        $validated = $request->validate([
+            'client_id' => 'required|exists:clients,id',
+            'medication_name' => 'required|string|max:255',
+            'expected_balance' => 'required|numeric|min:0',
+            'actual_balance' => 'required|numeric|min:0',
+            'witnessed_by' => 'required|exists:users,id',
+            'discrepancy_notes' => 'nullable|string|max:2000',
+        ]);
+
+        $medication = ClientMedication::where('client_id', $validated['client_id'])
+            ->where('name', 'like', '%' . $validated['medication_name'] . '%')
+            ->controlled()
+            ->first();
+
+        DB::transaction(function () use ($validated, $medication) {
+            // Record the balance check entry
+            ClientControlledDrugEntry::create([
+                'client_id' => $validated['client_id'],
+                'client_medication_id' => $medication?->id,
+                'medication_name' => $validated['medication_name'],
+                'entry_type' => 'balance_check',
+                'quantity' => $validated['actual_balance'],
+                'balance_before' => $validated['expected_balance'],
+                'balance_after' => $validated['actual_balance'],
+                'recorded_by' => auth()->id(),
+                'witnessed_by' => $validated['witnessed_by'],
+                'notes' => $validated['discrepancy_notes'],
+                'recorded_at' => now(),
+            ]);
+
+            // Create discrepancy if amounts don't match
+            if ($validated['expected_balance'] != $validated['actual_balance']) {
+                ClientControlledDrugDiscrepancy::create([
+                    'client_id' => $validated['client_id'],
+                    'client_medication_id' => $medication?->id,
+                    'medication_name' => $validated['medication_name'],
+                    'expected_quantity' => $validated['expected_balance'],
+                    'actual_quantity' => $validated['actual_balance'],
+                    'discrepancy' => $validated['actual_balance'] - $validated['expected_balance'],
+                    'reported_by' => auth()->id(),
+                    'witnessed_by' => $validated['witnessed_by'],
+                    'notes' => $validated['discrepancy_notes'],
+                    'status' => 'reported',
+                    'reported_at' => now(),
+                ]);
+            }
+        });
+
+        return redirect()->back();
+    }
+
+    public function resolveDiscrepancy(Request $request, ClientControlledDrugDiscrepancy $discrepancy)
+    {
+        $validated = $request->validate([
+            'resolution_notes' => 'required|string|max:2000',
+            'resolution_action' => 'required|string|max:255',
+        ]);
+
+        $discrepancy->update([
+            'status' => 'resolved',
+            'resolution_notes' => $validated['resolution_notes'],
+            'resolution_action' => $validated['resolution_action'],
+            'resolved_by' => auth()->id(),
+            'resolved_at' => now(),
+        ]);
+
+        return redirect()->back();
+    }
+
+    // ─── Handover Update/Delete ──────────────────────────
+
+    public function updateHandover(Request $request, MedicationHandover $handover)
+    {
+        $validated = $request->validate([
+            'incoming_user_id' => 'sometimes|exists:users,id',
+            'controlled_drugs_verified' => 'nullable|boolean',
+            'general_notes' => 'nullable|string|max:5000',
+        ]);
+
+        $handover->update($validated);
+
+        return redirect()->back();
+    }
+
+    public function destroyHandover(MedicationHandover $handover)
+    {
+        $handover->delete();
+
+        return redirect()->back();
+    }
+
+    // ─── Destruction Delete ──────────────────────────────
+
+    public function destroyDestruction(MedicationDestruction $destruction)
+    {
+        $destruction->delete();
 
         return redirect()->back();
     }

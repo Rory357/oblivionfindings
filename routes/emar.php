@@ -123,11 +123,24 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::put('/self-admin/{assessment}', [EmarController::class, 'updateSelfAdmin'])->name('emar.self_admin.update');
     Route::delete('/self-admin/{assessment}', [EmarController::class, 'destroySelfAdmin'])->name('emar.self_admin.destroy');
 
+    // Medications CRUD
+    Route::post('/medications', [EmarController::class, 'storeMedication'])->name('emar.medications.store');
+    Route::put('/medications/{medication}', [EmarController::class, 'updateMedication'])->name('emar.medications.update');
+    Route::post('/medications/{medication}/discontinue', [EmarController::class, 'discontinueMedication'])->name('emar.medications.discontinue');
+
+    // Controlled Drug Entries
+    Route::post('/controlled/entries', [EmarController::class, 'storeCDEntry'])->name('emar.controlled.entries.store');
+    Route::post('/controlled/balance-check', [EmarController::class, 'storeBalanceCheck'])->name('emar.controlled.balance_check.store');
+    Route::post('/controlled/discrepancies/{discrepancy}/resolve', [EmarController::class, 'resolveDiscrepancy'])->name('emar.controlled.discrepancies.resolve');
+
     // Destructions
     Route::post('/destructions', [EmarController::class, 'storeDestruction'])->name('emar.destructions.store');
+    Route::delete('/destructions/{destruction}', [EmarController::class, 'destroyDestruction'])->name('emar.destructions.destroy');
 
     // Handovers
     Route::post('/handovers', [EmarController::class, 'storeHandover'])->name('emar.handovers.store');
+    Route::put('/handovers/{handover}', [EmarController::class, 'updateHandover'])->name('emar.handovers.update');
+    Route::delete('/handovers/{handover}', [EmarController::class, 'destroyHandover'])->name('emar.handovers.destroy');
     Route::post('/handovers/{handover}/acknowledge', [EmarController::class, 'acknowledgeHandover'])->name('emar.handovers.acknowledge');
 
     // Pharmacy Orders + Stock

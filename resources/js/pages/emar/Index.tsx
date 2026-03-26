@@ -4,18 +4,23 @@ import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Button } from '@/components/ui/button';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
+    ArrowRightLeft,
     ArrowRight,
     Award,
     CheckCircle,
+    ClipboardCheck,
     Clock,
+    FileText,
     Lock,
     Package,
     Pill,
     Shield,
+    Syringe,
     TrendingUp,
     Users,
     XCircle,
@@ -252,6 +257,47 @@ export default function EmarDashboard({ stats, trend }: Props) {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* ── Quick Actions ─────────────────────────────────── */}
+                <Card className="mb-6">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Quick Actions</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                            <Button
+                                className="flex h-auto items-center gap-3 rounded-lg border bg-primary/5 p-3 text-left font-medium text-primary shadow-none hover:bg-primary/10"
+                                onClick={() => router.post('/emar/rounds/generate', { date: new Date().toISOString().split('T')[0] })}
+                            >
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                    <Clock className="h-4 w-4" />
+                                </div>
+                                <span className="text-sm">Start Round</span>
+                            </Button>
+                            {[
+                                { label: 'Record Administration', href: '/emar/mar', icon: Syringe, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },
+                                { label: 'PRN Review', href: '/emar/prn', icon: ClipboardCheck, color: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300' },
+                                { label: 'Stock Check', href: '/emar/stock', icon: Package, color: 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300' },
+                                { label: 'New Prescription', href: '/emar/prescriptions', icon: FileText, color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
+                                { label: 'Handover', href: '/emar/handovers', icon: ArrowRightLeft, color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
+                            ].map((item) => {
+                                const Icon = item.icon;
+                                return (
+                                    <Link
+                                        key={item.href}
+                                        href={item.href}
+                                        className="group flex items-center gap-3 rounded-lg border p-3 transition-all hover:bg-muted/50 hover:shadow-sm"
+                                    >
+                                        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${item.color}`}>
+                                            <Icon className="h-4 w-4" />
+                                        </div>
+                                        <span className="text-sm font-medium">{item.label}</span>
+                                    </Link>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* ── Quick Access ───────────────────────────────────── */}
                 <Card>

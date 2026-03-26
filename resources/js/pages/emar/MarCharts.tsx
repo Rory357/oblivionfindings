@@ -1,5 +1,7 @@
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
+import RecordAdministrationDialog from '@/components/medications/RecordAdministrationDialog';
+import { type SafetyCheck } from '@/components/medications/SafetyCheckPanel';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
+import axios from 'axios';
 import {
     AlertTriangle,
     Check,
@@ -18,7 +21,9 @@ import {
     Eye,
     MinusCircle,
     Pill,
+    Plus,
     Shield,
+    Syringe,
     XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
@@ -89,6 +94,7 @@ type Props = {
     selectedClient: Client | null;
     marData: MarData;
     date: string;
+    staff: { id: number; name: string }[];
 };
 
 function statusIcon(status: string) {
@@ -119,8 +125,15 @@ function statusBadge(status: string) {
     return <Badge variant={variant} className="text-xs">{status}</Badge>;
 }
 
-export default function MarCharts({ clients, selectedClient, marData, date }: Props) {
+export default function MarCharts({ clients, selectedClient, marData, date, staff }: Props) {
+    const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
     const [selectedClientId, setSelectedClientId] = useState<string>(selectedClient?.id?.toString() ?? '');
+    const [selectedMed, setSelectedMed] = useState<(ScheduledMed | PrnMed) | null>(null);
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [safetyCheck, setSafetyCheck] = useState<SafetyCheck | null>(null);
+    const [prnHistoryData, setPrnHistoryData] = useState<{ history: Array<{ id: number; administered_at: string; dose_given?: string; reason?: string; administered_by?: string }>; count: number; max_per_day?: string; remaining_today?: number } | null>(null);
+    const [loadingSafety, setLoadingSafety] = useState(false);
+    const [selectedIsPrn, setSelectedIsPrn] = useState(false);
 
     function navigateDate(offset: number) {
         const d = new Date(date);
@@ -132,6 +145,66 @@ export default function MarCharts({ clients, selectedClient, marData, date }: Pr
         setSelectedClientId(id);
         router.get('/emar/mar', { client_id: id, date }, { preserveState: true });
     }
+
+    async function openRecordDialog(med: ScheduledMed | PrnMed, isPrn: boolean) {
+        if (!selectedClient) return;
+        setLoadingSafety(true);
+        setSelectedMed(med);
+        setSelectedIsPrn(isPrn);
+        setPrnHistoryData(null);
+        setSafetyCheck(null);
+        setDialogOpen(true);
+
+        try {
+            const response = await axios.get(`/api/medications/clients/${selectedClient.id}/medications/${med.id}/safety-check`);
+            setSafetyCheck(response.data.safety_check ?? response.data);
+            if (isPrn && response.data.prn_data) {
+                setPrnHistoryData(response.data.prn_data);
+            }
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : 'Failed to load safety check data';
+            alert(message);
+        } finally {
+            setLoadingSafety(false);
+        }
+    }
+
+    async function handleSubmit(data: Record<string, unknown>) {
+        if (!selectedClient || !selectedMed) return;
+
+        try {
+            await axios.post(`/api/medications/clients/${selectedClient.id}/medications/${selectedMed.id}/administrations`, data);
+            setDialogOpen(false);
+            setSelectedMed(null);
+            router.reload();
+        } catch (error: unknown) {
+            const err = error as { response?: { data?: { message?: string } } };
+            const message = err?.response?.data?.message ?? 'Failed to record administration';
+            alert(message);
+        }
+    }
+
+    function hasPendingDoses(med: ScheduledMed): boolean {
+        const recordedTimes = med.administrations
+            .filter((a) => a.status !== 'pending')
+            .map((a) => a.scheduled_for);
+        return med.dose_times.some((t) => !recordedTimes.includes(t));
+    }
+
+    const mappedMedication = selectedMed
+        ? {
+              id: selectedMed.id,
+              name: selectedMed.name,
+              dosage: selectedMed.dosage,
+              route: 'route' in selectedMed ? selectedMed.route ?? undefined : undefined,
+              form: 'form' in selectedMed ? selectedMed.form ?? undefined : undefined,
+              is_prn: selectedIsPrn,
+              controlled_drug: selectedMed.controlled_drug,
+              high_risk: 'high_risk' in selectedMed ? selectedMed.high_risk : false,
+              witness_required: 'witness_required' in selectedMed ? selectedMed.witness_required : false,
+              instructions: 'instructions' in selectedMed ? selectedMed.instructions ?? undefined : undefined,
+          }
+        : null;
 
     return (
         <AppLayout>
@@ -202,6 +275,7 @@ export default function MarCharts({ clients, selectedClient, marData, date }: Pr
                                                 <th className="p-3 text-left font-medium">Frequency</th>
                                                 <th className="p-3 text-left font-medium">Flags</th>
                                                 <th className="p-3 text-left font-medium">Administrations</th>
+                                                <th className="p-3 text-left font-medium">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -253,10 +327,21 @@ export default function MarCharts({ clients, selectedClient, marData, date }: Pr
                                                             )}
                                                         </div>
                                                     </td>
+                                                    <td className="p-3">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={!hasPendingDoses(med)}
+                                                            onClick={() => openRecordDialog(med, false)}
+                                                        >
+                                                            <Syringe className="mr-1 h-3 w-3" />
+                                                            Record
+                                                        </Button>
+                                                    </td>
                                                 </tr>
                                             ))}
                                             {(marData?.scheduled ?? []).length === 0 && (
-                                                <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No scheduled medications.</td></tr>
+                                                <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No scheduled medications.</td></tr>
                                             )}
                                         </tbody>
                                     </table>
@@ -279,6 +364,7 @@ export default function MarCharts({ clients, selectedClient, marData, date }: Pr
                                                 <th className="p-3 text-left font-medium">Indication</th>
                                                 <th className="p-3 text-left font-medium">24h Usage</th>
                                                 <th className="p-3 text-left font-medium">Administrations</th>
+                                                <th className="p-3 text-left font-medium">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -313,16 +399,39 @@ export default function MarCharts({ clients, selectedClient, marData, date }: Pr
                                                             {med.administrations.length === 0 && <span className="text-xs text-muted-foreground">None today</span>}
                                                         </div>
                                                     </td>
+                                                    <td className="p-3">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={med.prn_remaining === 0}
+                                                            onClick={() => openRecordDialog(med, true)}
+                                                        >
+                                                            <Plus className="mr-1 h-3 w-3" />
+                                                            Give
+                                                        </Button>
+                                                    </td>
                                                 </tr>
                                             ))}
                                             {(marData?.prn ?? []).length === 0 && (
-                                                <tr><td colSpan={5} className="p-6 text-center text-muted-foreground">No PRN medications.</td></tr>
+                                                <tr><td colSpan={6} className="p-6 text-center text-muted-foreground">No PRN medications.</td></tr>
                                             )}
                                         </tbody>
                                     </table>
                                 </div>
                             </CardContent>
                         </Card>
+
+                        <RecordAdministrationDialog
+                            isOpen={dialogOpen}
+                            onClose={() => { setDialogOpen(false); setSelectedMed(null); }}
+                            onSubmit={handleSubmit}
+                            medication={mappedMedication}
+                            witnesses={staff.filter((s) => s.id !== auth.user.id)}
+                            currentUserId={auth.user.id}
+                            safetyCheck={safetyCheck}
+                            prnData={prnHistoryData}
+                            isLoading={loadingSafety}
+                        />
                     </>
                 )}
             </PageShell>

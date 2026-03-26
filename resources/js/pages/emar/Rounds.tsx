@@ -11,7 +11,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Clock, Play, Plus, Trash2, Users, Zap } from 'lucide-react';
+import { AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Clock, Pencil, Play, Plus, Trash2, Users, Zap } from 'lucide-react';
 import { useState } from 'react';
 
 type MedRound = {
@@ -59,8 +59,91 @@ const statusConfig: Record<string, { color: string; icon: any }> = {
 
 const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
+function EditTemplateDialog({ template, open, onOpenChange }: { template: Template; open: boolean; onOpenChange: (open: boolean) => void }) {
+    const form = useForm({
+        name: template.name ?? '',
+        scheduled_time: template.scheduled_time ?? '',
+        window_minutes: template.window_minutes ?? 60,
+        days_of_week: template.days_of_week ?? ([] as number[]),
+    });
+
+    function toggleDay(day: number) {
+        const current = form.data.days_of_week;
+        if (current.includes(day)) {
+            form.setData('days_of_week', current.filter((d) => d !== day));
+        } else {
+            form.setData('days_of_week', [...current, day].sort());
+        }
+    }
+
+    function submit(e: React.FormEvent) {
+        e.preventDefault();
+        form.put(`/emar/rounds/templates/${template.id}`, {
+            onSuccess: () => { onOpenChange(false); form.reset(); },
+        });
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Edit Round Template</DialogTitle>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div>
+                        <Label htmlFor="edit-tpl-name">Name</Label>
+                        <Input id="edit-tpl-name" value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} placeholder="e.g. Morning Round" />
+                        {form.errors.name && <p className="mt-1 text-xs text-red-500">{form.errors.name}</p>}
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-tpl-time">Scheduled Time</Label>
+                        <Input id="edit-tpl-time" type="time" value={form.data.scheduled_time} onChange={(e) => form.setData('scheduled_time', e.target.value)} />
+                        {form.errors.scheduled_time && <p className="mt-1 text-xs text-red-500">{form.errors.scheduled_time}</p>}
+                    </div>
+                    <div>
+                        <Label htmlFor="edit-tpl-window">Window (minutes)</Label>
+                        <Input id="edit-tpl-window" type="number" min={0} value={form.data.window_minutes} onChange={(e) => form.setData('window_minutes', parseInt(e.target.value) || 0)} />
+                        {form.errors.window_minutes && <p className="mt-1 text-xs text-red-500">{form.errors.window_minutes}</p>}
+                    </div>
+                    <div>
+                        <Label>Days of Week</Label>
+                        <div className="mt-2 flex flex-wrap gap-3">
+                            {DAY_NAMES.map((name, idx) => {
+                                const day = idx + 1;
+                                return (
+                                    <label key={day} className="flex items-center gap-1.5 text-sm">
+                                        <Checkbox checked={form.data.days_of_week.includes(day)} onCheckedChange={() => toggleDay(day)} />
+                                        {name}
+                                    </label>
+                                );
+                            })}
+                        </div>
+                        <p className="mt-1 text-xs text-muted-foreground">Leave unchecked for every day.</p>
+                    </div>
+                    <div className="flex justify-end gap-2">
+                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                        <Button type="submit" disabled={form.processing}>Save Changes</Button>
+                    </div>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 export default function Rounds({ rounds, templates, date, staff }: Props) {
     const [templateOpen, setTemplateOpen] = useState(false);
+    const [editTemplateOpen, setEditTemplateOpen] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
+
+    function openEditTemplate(template: Template) {
+        setEditingTemplate(template);
+        setEditTemplateOpen(true);
+    }
+
+    function deleteTemplate(id: number) {
+        if (!confirm('Are you sure you want to delete this template?')) return;
+        router.delete(`/emar/rounds/templates/${id}`);
+    }
 
     const templateForm = useForm({
         name: '',
@@ -284,9 +367,14 @@ export default function Rounds({ rounds, templates, date, staff }: Props) {
                                             <td className="p-3 text-xs">{t.days_of_week ? t.days_of_week.map((d) => dayLabels[d]).join(', ') : 'Every day'}</td>
                                             <td className="p-3">{t.active ? <Badge className="bg-green-100 text-green-700 text-xs">Active</Badge> : <Badge variant="outline" className="text-xs">Inactive</Badge>}</td>
                                             <td className="p-3 text-right">
-                                                <Button variant="ghost" size="sm" className="text-red-600 hover:text-red-700" onClick={() => router.delete(`/emar/rounds/templates/${t.id}`)}>
-                                                    <Trash2 className="h-4 w-4" />
-                                                </Button>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button variant="ghost" size="icon" onClick={() => openEditTemplate(t)}>
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                    <Button variant="ghost" size="icon" className="text-red-600 hover:text-red-700" onClick={() => deleteTemplate(t.id)}>
+                                                        <Trash2 className="h-4 w-4" />
+                                                    </Button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
@@ -297,6 +385,14 @@ export default function Rounds({ rounds, templates, date, staff }: Props) {
                     </CardContent>
                 </Card>
             </PageShell>
+
+            {editingTemplate && (
+                <EditTemplateDialog
+                    template={editingTemplate}
+                    open={editTemplateOpen}
+                    onOpenChange={(open) => { setEditTemplateOpen(open); if (!open) setEditingTemplate(null); }}
+                />
+            )}
         </AppLayout>
     );
 }
