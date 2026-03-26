@@ -364,13 +364,12 @@ export default function NotificationPreferences({
                                                             </div>
                                                             {/* Email: placeholder */}
                                                             <div className="flex w-14 justify-center">
-                                                                <button
-                                                                    type="button"
+                                                                <a
+                                                                    href="/settings/email"
                                                                     className="text-[10px] font-medium text-violet-600 hover:underline dark:text-violet-400"
-                                                                    onClick={() => {/* Future: configure email */}}
                                                                 >
                                                                     Configure
-                                                                </button>
+                                                                </a>
                                                             </div>
                                                             {/* Push: coming soon */}
                                                             <div className="flex w-14 justify-center">
