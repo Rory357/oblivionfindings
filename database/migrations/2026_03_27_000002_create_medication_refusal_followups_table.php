@@ -11,7 +11,8 @@ return new class extends Migration
         Schema::create('medication_refusal_followups', function (Blueprint $table) {
             $table->id();
             $table->foreignId('client_id')->constrained('clients')->cascadeOnDelete();
-            $table->foreignId('client_medication_administration_id')->constrained('client_medication_administrations')->cascadeOnDelete();
+            $table->unsignedBigInteger('client_medication_administration_id');
+            $table->foreign('client_medication_administration_id', 'med_refusal_admin_id_fk')->references('id')->on('client_medication_administrations')->cascadeOnDelete();
 
             $table->enum('reason_category', [
                 'personal_choice',

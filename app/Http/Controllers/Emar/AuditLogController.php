@@ -131,7 +131,7 @@ class AuditLogController extends Controller
                 $events->push([
                     'id' => 'admin_' . $admin->id,
                     'event_type' => $eventType,
-                    'timestamp' => $admin->administered_at?->toIso8601String() ?? $admin->created_at->toIso8601String(),
+                    'timestamp' => ($admin->administered_at ?? $admin->scheduled_for ?? $admin->created_at ?? now())->toIso8601String(),
                     'description' => $descMap[$eventType],
                     'performed_by' => $performedBy,
                     'client_id' => $admin->client_id,
