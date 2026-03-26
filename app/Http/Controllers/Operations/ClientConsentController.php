@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\ClientConsent;
 use App\Models\Client;
 use App\Models\ConsentType;
+use App\Services\Operations\OpsNotificationService;
 use Illuminate\Http\Request;
 
 class ClientConsentController extends Controller
@@ -106,8 +107,7 @@ class ClientConsentController extends Controller
             $consent->update(['signed_document_path' => $path]);
         }
 
-        // TODO: Dispatch notification here — notify managers when consent is recorded/refused
-        // app(NotificationService::class)->notifyCrud($auth, 'created', 'consent', $consent, $client);
+        app(OpsNotificationService::class)->notifyCrud($auth, $data['status'] === 'refused' ? 'refused' : 'recorded', 'consent', $consent, $client);
 
         return redirect()->back()->with('success', 'Consent recorded successfully.');
     }
@@ -131,8 +131,7 @@ class ClientConsentController extends Controller
             'updated_by' => $auth->id,
         ]);
 
-        // TODO: Dispatch notification here — notify managers/coordinators when consent is withdrawn
-        // app(NotificationService::class)->notifyCrud($auth, 'withdrawn', 'consent', $consent);
+        app(OpsNotificationService::class)->notifyCrud($auth, 'withdrawn', 'consent', $consent, Client::find($client));
 
         return redirect()->back()->with('success', 'Consent withdrawn.');
     }
