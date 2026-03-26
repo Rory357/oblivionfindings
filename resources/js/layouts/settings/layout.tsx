@@ -71,14 +71,8 @@ const navSections: NavSection[] = [
         permission: 'settings.manageAccess',
         items: [
             { icon: Users, title: 'Users', href: '/settings/users' },
-            { icon: UserCog, title: 'Access Control', href: '/settings/access' },
-        ],
-    },
-    {
-        label: 'Roles & Permissions',
-        permission: 'settings.manageAccess',
-        items: [
             { icon: Shield, title: 'Roles', href: '/settings/roles' },
+            { icon: UserCog, title: 'Access Control', href: '/settings/access' },
         ],
     },
     {
