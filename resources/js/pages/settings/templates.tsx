@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
 import { Head, router } from '@inertiajs/react';
 import {
@@ -778,9 +779,12 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
     const isEmail = editingTemplate?.type === 'email';
     const editMergeFields = editingTemplate?.merge_fields?.map((f) => `{${f}}`) ?? [];
 
+    const breadcrumbs = [{ title: 'Settings', href: '/settings' }, { title: 'Templates', href: '/settings/templates' }];
+
     return (
-        <SettingsLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Email & SMS Templates" />
+            <SettingsLayout>
 
             {/* Flash toast */}
             {flash && (
@@ -1012,6 +1016,7 @@ export default function Templates({ templates: rawTemplates, mergeFieldRegistry,
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
-        </SettingsLayout>
+            </SettingsLayout>
+        </AppLayout>
     );
 }

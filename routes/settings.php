@@ -12,7 +12,9 @@ use App\Http\Controllers\Settings\NotificationPreferencesController;
 use App\Http\Controllers\Settings\NotificationEscalationsController;
 use App\Http\Controllers\Settings\IntegrationHubController;
 use App\Http\Controllers\Settings\NotificationTemplateController;
+use App\Http\Controllers\Settings\SsoGroupController;
 use App\Http\Controllers\Settings\UnifiSettingsController;
+use App\Http\Controllers\System\UsersController;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -164,6 +166,46 @@ Route::middleware('auth')->group(function () {
 
     // Modules & Features (UI-first, no backend yet)
     Route::get('settings/modules', fn () => Inertia::render('settings/modules'))->name('settings.modules');
+
+    // User Management
+    Route::get('settings/users', [UsersController::class, 'index'])->name('settings.users.index');
+    Route::get('settings/users/{target}', [UsersController::class, 'show'])->name('settings.users.show');
+    Route::put('settings/users/{target}', [UsersController::class, 'update'])->name('settings.users.update');
+    Route::post('settings/users/{target}/approve', [UsersController::class, 'approve'])->name('settings.users.approve');
+    Route::post('settings/users/{target}/suspend', [UsersController::class, 'suspend'])->name('settings.users.suspend');
+    Route::delete('settings/users/{target}/sessions/{session}', [UsersController::class, 'terminateSession'])->name('settings.users.terminate-session');
+    Route::delete('settings/users/{target}/sessions', [UsersController::class, 'terminateAllSessions'])->name('settings.users.terminate-all-sessions');
+
+    // SSO Configuration
+    Route::get('settings/sso', fn () => Inertia::render('settings/sso-groups', [
+        'mappings' => \App\Models\SsoGroupMapping::with('role:id,name,label')->orderBy('provider')->get(),
+        'roles' => \App\Models\Role::select('id', 'name', 'label')->orderBy('label')->get(),
+    ]))->name('settings.sso');
+    Route::get('settings/sso-groups', [SsoGroupController::class, 'index'])->name('settings.sso_groups.index');
+    Route::post('settings/sso-groups', [SsoGroupController::class, 'store'])->name('settings.sso_groups.store');
+    Route::put('settings/sso-groups/{mapping}', [SsoGroupController::class, 'update'])->name('settings.sso_groups.update');
+    Route::delete('settings/sso-groups/{mapping}', [SsoGroupController::class, 'destroy'])->name('settings.sso_groups.destroy');
+    Route::post('settings/sso-groups/fetch', [SsoGroupController::class, 'fetchGroups'])->name('settings.sso_groups.fetch');
+
+    // Audit Logs
+    Route::get('settings/audit-logs', function () {
+        $query = \App\Models\AuditLog::query()
+            ->with('user:id,name,email')
+            ->orderByDesc('created_at');
+        if (request('q')) {
+            $query->where(function ($q) {
+                $q->where('action', 'like', '%' . request('q') . '%')
+                  ->orWhere('auditable_type', 'like', '%' . request('q') . '%');
+            });
+        }
+        if (request('user_id')) { $query->where('user_id', request('user_id')); }
+        if (request('type')) { $query->where('event', request('type')); }
+        return Inertia::render('settings/audit-logs', [
+            'events' => $query->paginate(50),
+            'users' => \App\Models\User::select('id', 'name')->orderBy('name')->get(),
+            'filters' => request()->only('q', 'user_id', 'type', 'from', 'to'),
+        ]);
+    })->name('settings.audit_logs');
 
     // Integrations hub
     Route::get('settings/integrations', [IntegrationHubController::class, 'index'])
