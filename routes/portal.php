@@ -55,6 +55,41 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/inbox/announcements/read-all', [AnnouncementInboxController::class, 'markAllRead'])
         ->name('inbox.announcements.readAll');
 
+    // Notification Centre (full page)
+    Route::get('/notifications', function (\Illuminate\Http\Request $request) {
+        $user = $request->user();
+        $query = $user->notifications();
+
+        $filter = $request->query('filter', 'all');
+        if ($filter === 'unread') $query->whereNull('read_at');
+        if ($filter === 'read') $query->whereNotNull('read_at');
+
+        $type = $request->query('type', 'all');
+        if ($type !== 'all') {
+            $query->where('data->module', $type);
+        }
+
+        return inertia('notifications/index', [
+            'notifications' => $query->orderByDesc('created_at')->paginate(50)->through(fn ($n) => [
+                'id' => $n->id,
+                'type' => class_basename($n->type),
+                'data' => $n->data,
+                'read_at' => $n->read_at,
+                'acknowledged_at' => $n->acknowledged_at,
+                'created_at' => $n->created_at,
+            ]),
+            'unread_count' => $user->unreadNotifications()->count(),
+            'filters' => ['filter' => $filter, 'type' => $type],
+            'announcements' => \App\Models\Announcement::query()
+                ->where('is_active', true)
+                ->where(fn ($q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', now()))
+                ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>=', now()))
+                ->orderByDesc('created_at')
+                ->limit(20)
+                ->get(),
+        ]);
+    })->name('notifications.index');
+
     // Global RAG endpoints (header query bar)
     Route::middleware(['throttle:ai-queries'])->group(function () {
         Route::get('/rag/clients', [RagController::class, 'clients'])->name('rag.clients');
