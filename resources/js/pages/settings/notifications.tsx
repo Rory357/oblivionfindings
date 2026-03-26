@@ -2,6 +2,7 @@ import HeadingSmall from '@/components/heading-small';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
@@ -11,7 +12,6 @@ import { Head, useForm } from '@inertiajs/react';
 import {
     Bell,
     BellOff,
-    Check,
     CheckCircle2,
     ChevronDown,
     ChevronRight,
@@ -26,10 +26,12 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+type ChannelPref = { enabled: boolean; inapp: boolean; email: boolean; push: boolean };
+
 type Props = {
     groups: Record<string, string[]>;
-    userPrefs: Record<string, boolean>;
-    roleDefaults: Record<string, boolean>;
+    userPrefs: Record<string, ChannelPref>;
+    roleDefaults: Record<string, ChannelPref>;
     canManageRoleDefaults: boolean;
 };
 
@@ -40,6 +42,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 /** Critical notification keys that cannot be disabled */
 const CRITICAL_KEYS = new Set(['incidents.high_severity_alert', 'breakglass.daily_report']);
+
+const DEFAULT_PREF: ChannelPref = { enabled: true, inapp: true, email: false, push: false };
 
 /** Map of notification key -> friendly name and description */
 const NOTIFICATION_META: Record<string, { name: string; description: string }> = {
@@ -131,8 +135,20 @@ export default function NotificationPreferences({
     roleDefaults,
     canManageRoleDefaults,
 }: Props) {
+    // Build initial prefs: merge role defaults with user prefs, with channel data
+    const buildInitialPrefs = (): Record<string, ChannelPref> => {
+        const allKeys = Object.values(groups).flat();
+        const prefs: Record<string, ChannelPref> = {};
+        allKeys.forEach((k) => {
+            const roleDef = roleDefaults[k];
+            const userPref = userPrefs[k];
+            prefs[k] = userPref ?? roleDef ?? { ...DEFAULT_PREF };
+        });
+        return prefs;
+    };
+
     const { data, setData, put, processing } = useForm({
-        prefs: { ...Object.fromEntries(Object.entries(roleDefaults).map(([k, v]) => [k, v])), ...userPrefs },
+        prefs: buildInitialPrefs(),
     });
 
     const allKeys = Object.values(groups).flat();
@@ -147,7 +163,17 @@ export default function NotificationPreferences({
     const [doNotDisturb, setDoNotDisturb] = useState(false);
     const [saveSuccess, setSaveSuccess] = useState(false);
 
-    const enabledCount = (keys: string[]) => keys.filter((k) => Boolean((data.prefs as any)[k])).length;
+    const enabledCount = (keys: string[]) => keys.filter((k) => data.prefs[k]?.enabled).length;
+
+    const setPref = (key: string, field: keyof ChannelPref, value: boolean) => {
+        setData('prefs', {
+            ...data.prefs,
+            [key]: {
+                ...(data.prefs[key] ?? DEFAULT_PREF),
+                [field]: value,
+            },
+        });
+    };
 
     const handleSave = () => {
         put('/settings/notifications', {
@@ -188,7 +214,8 @@ export default function NotificationPreferences({
                                 </p>
                                 <p className="mt-0.5 text-xs text-blue-700/80 dark:text-blue-300/70">
                                     Notifications marked as critical (incidents, emergencies) cannot be disabled to ensure safety compliance.
-                                    Use the toggles below to customise your notification preferences per module.
+                                    Use the toggles below to customise your notification preferences per module. Each notification can be
+                                    delivered via In-App, Email, or Push channels independently.
                                 </p>
                             </div>
                         </CardContent>
@@ -226,8 +253,10 @@ export default function NotificationPreferences({
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                                const next: Record<string, boolean> = {};
-                                allKeys.forEach((k) => (next[k] = true));
+                                const next: Record<string, ChannelPref> = {};
+                                allKeys.forEach((k) => {
+                                    next[k] = { enabled: true, inapp: true, email: true, push: true };
+                                });
                                 setData('prefs', next);
                             }}
                         >
@@ -238,10 +267,14 @@ export default function NotificationPreferences({
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                                const next: Record<string, boolean> = {};
+                                const next: Record<string, ChannelPref> = {};
                                 allKeys.forEach((k) => {
                                     // Critical keys stay enabled
-                                    next[k] = CRITICAL_KEYS.has(k) ? true : false;
+                                    if (CRITICAL_KEYS.has(k)) {
+                                        next[k] = { enabled: true, inapp: true, email: false, push: false };
+                                    } else {
+                                        next[k] = { enabled: false, inapp: true, email: false, push: false };
+                                    }
                                 });
                                 setData('prefs', next);
                             }}
@@ -251,7 +284,7 @@ export default function NotificationPreferences({
                     </div>
 
                     {/* Module Groups */}
-                    {modules.map((mod, modIdx) => {
+                    {modules.map((mod) => {
                         const Icon = mod.icon;
                         const enabled = enabledCount(mod.keys);
                         const isOpen = openModules[mod.moduleKey] ?? true;
@@ -302,28 +335,29 @@ export default function NotificationPreferences({
                                                 <div className="min-w-0 flex-1">
                                                     <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Notification</span>
                                                 </div>
-                                                <div className="flex shrink-0 items-center gap-6">
-                                                    <div className="flex w-14 flex-col items-center gap-0.5">
+                                                <div className="flex shrink-0 items-center gap-4">
+                                                    <div className="flex w-16 flex-col items-center gap-0.5">
                                                         <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
                                                         <span className="text-[10px] font-medium text-muted-foreground">In-App</span>
                                                     </div>
-                                                    <div className="flex w-14 flex-col items-center gap-0.5">
+                                                    <div className="flex w-16 flex-col items-center gap-0.5">
                                                         <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                                                         <span className="text-[10px] font-medium text-muted-foreground">Email</span>
                                                     </div>
-                                                    <div className="flex w-14 flex-col items-center gap-0.5">
-                                                        <Smartphone className="h-3.5 w-3.5 text-muted-foreground" />
-                                                        <span className="text-[10px] font-medium text-muted-foreground">Push</span>
+                                                    <div className="flex w-16 flex-col items-center gap-0.5">
+                                                        <Smartphone className="h-3.5 w-3.5 text-muted-foreground/60" />
+                                                        <span className="text-[10px] font-medium text-muted-foreground/60">Push</span>
                                                     </div>
-                                                    <div className="w-12">
+                                                    <div className="w-14 text-center">
                                                         <span className="text-[10px] font-medium text-muted-foreground">Enable</span>
                                                     </div>
                                                 </div>
                                             </div>
                                             {mod.keys.map((key, idx) => {
-                                                const checked = Boolean((data.prefs as any)[key]);
-                                                const roleDefault = roleDefaults[key];
+                                                const pref = data.prefs[key] ?? DEFAULT_PREF;
                                                 const isCritical = CRITICAL_KEYS.has(key);
+                                                const masterEnabled = isCritical ? true : pref.enabled;
+                                                const roleDefault = roleDefaults[key];
 
                                                 return (
                                                     <div
@@ -334,7 +368,7 @@ export default function NotificationPreferences({
                                                     >
                                                         <div className="min-w-0 flex-1">
                                                             <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-medium">
+                                                                <span className={`text-sm font-medium ${!masterEnabled ? 'text-muted-foreground' : ''}`}>
                                                                     {friendlyName(key)}
                                                                 </span>
                                                                 {isCritical && (
@@ -345,47 +379,47 @@ export default function NotificationPreferences({
                                                                 )}
                                                             </div>
                                                             {friendlyDescription(key) && (
-                                                                <div className="text-xs text-muted-foreground">
+                                                                <div className={`text-xs ${!masterEnabled ? 'text-muted-foreground/50' : 'text-muted-foreground'}`}>
                                                                     {friendlyDescription(key)}
                                                                 </div>
                                                             )}
                                                             {roleDefault !== undefined && (
                                                                 <div className="mt-0.5 text-[11px] text-muted-foreground/70">
-                                                                    (Role default: {roleDefault ? 'enabled' : 'disabled'})
+                                                                    (Role default: {roleDefault.enabled ? 'enabled' : 'disabled'})
                                                                 </div>
                                                             )}
                                                         </div>
-                                                        <div className="flex shrink-0 items-center gap-6">
-                                                            {/* In-App: always on */}
-                                                            <div className="flex w-14 justify-center">
-                                                                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
-                                                                    <Check className="h-3.5 w-3.5 text-slate-500" />
-                                                                </div>
+                                                        <div className="flex shrink-0 items-center gap-4">
+                                                            {/* In-App checkbox */}
+                                                            <div className="flex w-16 justify-center">
+                                                                <Checkbox
+                                                                    checked={pref.inapp}
+                                                                    disabled={!masterEnabled}
+                                                                    onCheckedChange={(v) => setPref(key, 'inapp', Boolean(v))}
+                                                                />
                                                             </div>
-                                                            {/* Email: placeholder */}
-                                                            <div className="flex w-14 justify-center">
-                                                                <a
-                                                                    href="/settings/email"
-                                                                    className="text-[10px] font-medium text-violet-600 hover:underline dark:text-violet-400"
-                                                                >
-                                                                    Configure
-                                                                </a>
+                                                            {/* Email checkbox */}
+                                                            <div className="flex w-16 justify-center">
+                                                                <Checkbox
+                                                                    checked={pref.email}
+                                                                    disabled={!masterEnabled}
+                                                                    onCheckedChange={(v) => setPref(key, 'email', Boolean(v))}
+                                                                />
                                                             </div>
-                                                            {/* Push: coming soon */}
-                                                            <div className="flex w-14 justify-center">
-                                                                <span className="text-[10px] text-muted-foreground/60">Soon</span>
+                                                            {/* Push checkbox (slightly muted) */}
+                                                            <div className="flex w-16 justify-center opacity-60">
+                                                                <Checkbox
+                                                                    checked={pref.push}
+                                                                    disabled={!masterEnabled}
+                                                                    onCheckedChange={(v) => setPref(key, 'push', Boolean(v))}
+                                                                />
                                                             </div>
-                                                            {/* Main toggle */}
-                                                            <div className="w-12 flex justify-center">
+                                                            {/* Master toggle */}
+                                                            <div className="w-14 flex justify-center">
                                                                 <Switch
-                                                                    checked={isCritical ? true : checked}
+                                                                    checked={masterEnabled}
                                                                     disabled={isCritical}
-                                                                    onCheckedChange={(v) =>
-                                                                        setData('prefs', {
-                                                                            ...(data.prefs as any),
-                                                                            [key]: Boolean(v),
-                                                                        })
-                                                                    }
+                                                                    onCheckedChange={(v) => setPref(key, 'enabled', Boolean(v))}
                                                                 />
                                                             </div>
                                                         </div>

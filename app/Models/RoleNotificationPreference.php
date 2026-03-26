@@ -11,10 +11,16 @@ class RoleNotificationPreference extends Model
         'role_id',
         'key',
         'enabled',
+        'channel_inapp',
+        'channel_email',
+        'channel_push',
     ];
 
     protected $casts = [
         'enabled' => 'boolean',
+        'channel_inapp' => 'boolean',
+        'channel_email' => 'boolean',
+        'channel_push' => 'boolean',
     ];
 
     public function role(): BelongsTo

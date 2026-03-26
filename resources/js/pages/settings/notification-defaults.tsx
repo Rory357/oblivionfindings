@@ -2,8 +2,10 @@ import HeadingSmall from '@/components/heading-small';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
@@ -16,23 +18,29 @@ import {
     ChevronRight,
     ClipboardList,
     Clock,
+    Mail,
+    Monitor,
     Search,
     Shield,
+    Smartphone,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
+type ChannelPref = { enabled: boolean; inapp: boolean; email: boolean; push: boolean };
 type RoleRow = { id: number; name: string; label: string };
 
 type Props = {
     groups: Record<string, string[]>;
     roles: RoleRow[];
-    matrix: Record<number, Record<string, boolean>>;
+    matrix: Record<number, Record<string, ChannelPref>>;
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Settings', href: '/settings/profile' },
     { title: 'Notification Defaults', href: '/settings/notification-defaults' },
 ];
+
+const DEFAULT_PREF: ChannelPref = { enabled: true, inapp: true, email: false, push: false };
 
 /** Friendly name map */
 const NOTIFICATION_META: Record<string, { name: string }> = {
@@ -120,6 +128,18 @@ function groupByModule(allKeys: string[]): { moduleKey: string; label: string; i
     return result;
 }
 
+/** Channel dot indicator: green if on, grey if off */
+function ChannelDot({ active, channel }: { active: boolean; channel: 'inapp' | 'email' | 'push' }) {
+    const colors = active
+        ? channel === 'inapp'
+            ? 'bg-emerald-500'
+            : channel === 'email'
+                ? 'bg-blue-500'
+                : 'bg-amber-500'
+        : 'bg-muted-foreground/30';
+    return <div className={`h-2 w-2 rounded-full ${colors}`} />;
+}
+
 export default function NotificationDefaults({ groups, roles, matrix }: Props) {
     const allKeys = Object.values(groups).flat();
     const { data, setData, put, processing } = useForm({
@@ -154,17 +174,47 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
 
     const matchCount = filteredModules.reduce((sum, m) => sum + m.keys.length, 0);
 
+    const getCellPref = (roleId: number, key: string): ChannelPref => {
+        return (data.matrix as any)?.[roleId]?.[key] ?? DEFAULT_PREF;
+    };
+
+    const setCellPref = (roleId: number, key: string, field: keyof ChannelPref, value: boolean) => {
+        const next: any = { ...(data.matrix as any) };
+        next[roleId] = { ...(next[roleId] || {}) };
+        next[roleId][key] = {
+            ...(next[roleId][key] ?? DEFAULT_PREF),
+            [field]: value,
+        };
+        setData('matrix', next);
+    };
+
+    const setCellAllChannels = (roleId: number, key: string, value: boolean) => {
+        const next: any = { ...(data.matrix as any) };
+        next[roleId] = { ...(next[roleId] || {}) };
+        next[roleId][key] = {
+            enabled: value,
+            inapp: value,
+            email: value,
+            push: value,
+        };
+        setData('matrix', next);
+    };
+
     const enableAllForRole = (roleId: number) => {
         const next: any = { ...data.matrix };
         next[roleId] = { ...(next[roleId] || {}) };
-        allKeys.forEach((k) => (next[roleId][k] = true));
+        allKeys.forEach((k) => {
+            next[roleId][k] = { enabled: true, inapp: true, email: true, push: true };
+        });
         setData('matrix', next);
     };
 
     const disableAllForRole = (roleId: number) => {
         const next: any = { ...data.matrix };
         next[roleId] = { ...(next[roleId] || {}) };
-        allKeys.forEach((k) => (next[roleId][k] = false));
+        allKeys.forEach((k) => {
+            next[roleId][k] = { enabled: false, inapp: false, email: false, push: false };
+        });
         setData('matrix', next);
     };
 
@@ -188,7 +238,7 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                     {/* Header */}
                     <HeadingSmall
                         title="Role Notification Defaults"
-                        description="Set default notification preferences for each role. Users can still override these in their own settings."
+                        description="Set default notification preferences and channels for each role. Users can still override these in their own settings."
                     />
 
                     {/* Quick Actions */}
@@ -198,7 +248,9 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                 const next: any = { ...data.matrix };
                                 roles.forEach((r) => {
                                     next[r.id] = next[r.id] || {};
-                                    allKeys.forEach((k) => (next[r.id][k] = true));
+                                    allKeys.forEach((k) => {
+                                        next[r.id][k] = { enabled: true, inapp: true, email: true, push: true };
+                                    });
                                 });
                                 setData('matrix', next);
                             }}>
@@ -208,7 +260,9 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                 const next: any = { ...data.matrix };
                                 roles.forEach((r) => {
                                     next[r.id] = next[r.id] || {};
-                                    allKeys.forEach((k) => (next[r.id][k] = false));
+                                    allKeys.forEach((k) => {
+                                        next[r.id][k] = { enabled: false, inapp: false, email: false, push: false };
+                                    });
                                 });
                                 setData('matrix', next);
                             }}>
@@ -223,6 +277,24 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                             </Button>
                         </CardContent>
                     </Card>
+
+                    {/* Legend */}
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                        <span className="font-medium">Channel dots:</span>
+                        <div className="flex items-center gap-1.5">
+                            <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                            <span>In-App</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <div className="h-2 w-2 rounded-full bg-blue-500" />
+                            <span>Email</span>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                            <div className="h-2 w-2 rounded-full bg-amber-500" />
+                            <span>Push</span>
+                        </div>
+                        <span className="text-muted-foreground/50">Click a cell to configure channels</span>
+                    </div>
 
                     {/* Search */}
                     <div>
@@ -286,7 +358,6 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                     </CollapsibleTrigger>
                                     <CollapsibleContent>
                                         <CardContent className="space-y-4 pt-0">
-                                            {/* Role column headers with per-role actions */}
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-sm">
                                                     <thead>
@@ -333,22 +404,92 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                                                     <div className="text-[11px] text-muted-foreground">{key}</div>
                                                                 </td>
                                                                 {roles.map((role) => {
-                                                                    const checked = Boolean(
-                                                                        (data.matrix as any)?.[role.id]?.[key],
-                                                                    );
+                                                                    const pref = getCellPref(role.id, key);
+
                                                                     return (
                                                                         <td key={role.id} className="px-2 py-3 text-center">
-                                                                            <div className="flex justify-center">
-                                                                                <Switch
-                                                                                    checked={checked}
-                                                                                    onCheckedChange={(v) => {
-                                                                                        const next: any = { ...(data.matrix as any) };
-                                                                                        next[role.id] = { ...(next[role.id] || {}) };
-                                                                                        next[role.id][key] = Boolean(v);
-                                                                                        setData('matrix', next);
-                                                                                    }}
-                                                                                />
-                                                                            </div>
+                                                                            <Popover>
+                                                                                <PopoverTrigger asChild>
+                                                                                    <button
+                                                                                        type="button"
+                                                                                        className="mx-auto flex items-center gap-1 rounded-md border px-2 py-1.5 transition-colors hover:bg-muted/80"
+                                                                                    >
+                                                                                        <ChannelDot active={pref.enabled && pref.inapp} channel="inapp" />
+                                                                                        <ChannelDot active={pref.enabled && pref.email} channel="email" />
+                                                                                        <ChannelDot active={pref.enabled && pref.push} channel="push" />
+                                                                                    </button>
+                                                                                </PopoverTrigger>
+                                                                                <PopoverContent className="w-56 p-3" align="center">
+                                                                                    <div className="space-y-3">
+                                                                                        <div className="flex items-center justify-between">
+                                                                                            <span className="text-xs font-semibold">
+                                                                                                {humanize(key)}
+                                                                                            </span>
+                                                                                            <Switch
+                                                                                                checked={pref.enabled}
+                                                                                                onCheckedChange={(v) =>
+                                                                                                    setCellPref(role.id, key, 'enabled', Boolean(v))
+                                                                                                }
+                                                                                            />
+                                                                                        </div>
+                                                                                        <div className="space-y-2">
+                                                                                            <label className="flex items-center gap-2 text-xs">
+                                                                                                <Checkbox
+                                                                                                    checked={pref.inapp}
+                                                                                                    disabled={!pref.enabled}
+                                                                                                    onCheckedChange={(v) =>
+                                                                                                        setCellPref(role.id, key, 'inapp', Boolean(v))
+                                                                                                    }
+                                                                                                />
+                                                                                                <Monitor className="h-3 w-3" />
+                                                                                                In-App
+                                                                                            </label>
+                                                                                            <label className="flex items-center gap-2 text-xs">
+                                                                                                <Checkbox
+                                                                                                    checked={pref.email}
+                                                                                                    disabled={!pref.enabled}
+                                                                                                    onCheckedChange={(v) =>
+                                                                                                        setCellPref(role.id, key, 'email', Boolean(v))
+                                                                                                    }
+                                                                                                />
+                                                                                                <Mail className="h-3 w-3" />
+                                                                                                Email
+                                                                                            </label>
+                                                                                            <label className="flex items-center gap-2 text-xs opacity-60">
+                                                                                                <Checkbox
+                                                                                                    checked={pref.push}
+                                                                                                    disabled={!pref.enabled}
+                                                                                                    onCheckedChange={(v) =>
+                                                                                                        setCellPref(role.id, key, 'push', Boolean(v))
+                                                                                                    }
+                                                                                                />
+                                                                                                <Smartphone className="h-3 w-3" />
+                                                                                                Push
+                                                                                            </label>
+                                                                                        </div>
+                                                                                        <div className="flex gap-1 border-t pt-2">
+                                                                                            <Button
+                                                                                                type="button"
+                                                                                                variant="ghost"
+                                                                                                size="sm"
+                                                                                                className="h-6 text-[10px]"
+                                                                                                onClick={() => setCellAllChannels(role.id, key, true)}
+                                                                                            >
+                                                                                                All On
+                                                                                            </Button>
+                                                                                            <Button
+                                                                                                type="button"
+                                                                                                variant="ghost"
+                                                                                                size="sm"
+                                                                                                className="h-6 text-[10px]"
+                                                                                                onClick={() => setCellAllChannels(role.id, key, false)}
+                                                                                            >
+                                                                                                All Off
+                                                                                            </Button>
+                                                                                        </div>
+                                                                                    </div>
+                                                                                </PopoverContent>
+                                                                            </Popover>
                                                                         </td>
                                                                     );
                                                                 })}
