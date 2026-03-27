@@ -178,7 +178,7 @@ class AccountsPayableService
             // CR Accounts Payable for the total amount
             $journalLines[] = [
                 'account_id' => $apAccount->id,
-                'description' => "Bill {$bill->bill_number} — {$bill->vendor->name ?? 'Unknown vendor'}",
+                'description' => 'Bill ' . $bill->bill_number . ' — ' . ($bill->vendor?->name ?? 'Unknown vendor'),
                 'debit' => 0,
                 'credit' => $bill->total_amount,
             ];
