@@ -83,7 +83,10 @@ const calendarStyles = `
     padding-right: 0.5rem;
 }
 .fc .fc-timegrid-slot { height: 3.5em; }
-.fc .fc-timegrid-slot-lane { border-top: 1px solid hsl(var(--border) / 0.15) !important; }
+.fc .fc-timegrid-slot-lane { border-top: 1px solid hsl(var(--border) / 0.15) !important; border-top-style: solid !important; }
+.fc .fc-timegrid-slot-minor { border-top-style: none !important; }
+.fc td, .fc th { border-style: solid !important; }
+.fc .fc-scrollgrid td { border-bottom-style: solid !important; }
 
 /* ── Events: large rounded pastel blocks ───────────────────────────────── */
 .fc .fc-event, .fc .fc-event-mirror {
