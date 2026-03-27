@@ -22,14 +22,15 @@ class MyCalendarController extends Controller
     {
         abort_unless($request->user(), 403);
 
-        $request->validate([
-            'start' => ['required', 'date'],
-            'end' => ['required', 'date'],
-        ]);
-
         $userId = $request->user()->id;
-        $start = Carbon::parse($request->input('start'));
-        $end = Carbon::parse($request->input('end'));
+
+        try {
+            $start = Carbon::parse($request->input('start', now()->startOfWeek()));
+            $end = Carbon::parse($request->input('end', now()->endOfWeek()));
+        } catch (\Exception $e) {
+            $start = now()->startOfWeek();
+            $end = now()->endOfWeek();
+        }
 
         $events = [];
 
