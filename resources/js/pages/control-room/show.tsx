@@ -254,6 +254,10 @@ interface Props {
     location: { lat: number; lng: number; description: string | null } | null;
     can: { manage: boolean; assign: boolean; escalate: boolean };
     staff: { id: number; name: string; email: string }[];
+    config_options: {
+        categories: { value: string; label: string; color: string | null }[];
+        resolution_codes: { value: string; label: string; color: string | null }[];
+    };
 }
 
 // ---------------------------------------------------------------------------
@@ -527,6 +531,7 @@ export default function ControlRoomAlertShow({
     sla,
     client,
     location,
+    config_options,
 }: Props) {
     // ----- State -----
     const [processing, setProcessing] = useState(false);
@@ -1540,28 +1545,28 @@ export default function ControlRoomAlertShow({
                                 {/* Category */}
                                 <div className="flex items-center justify-between">
                                     <span className="text-muted-foreground">Category</span>
-                                    {editingCategory ? (
-                                        <div className="flex items-center gap-1">
-                                            <Input
-                                                value={categoryVal}
-                                                onChange={(e) => setCategoryVal(e.target.value)}
-                                                className="h-7 w-32 text-xs"
-                                                autoFocus
-                                                onKeyDown={(e) => { if (e.key === 'Enter') saveCategory(); if (e.key === 'Escape') setEditingCategory(false); }}
-                                            />
-                                            <Button size="icon" variant="ghost" className="h-6 w-6" onClick={saveCategory}>
-                                                <Check className="h-3 w-3" />
-                                            </Button>
-                                        </div>
-                                    ) : (
-                                        <button
-                                            className="flex items-center gap-1 text-sm hover:text-primary"
-                                            onClick={() => { setCategoryVal(alert.category ?? ''); setEditingCategory(true); }}
-                                            disabled={!can.manage}
+                                    {can.manage && config_options.categories.length > 0 ? (
+                                        <Select
+                                            value={alert.category || 'none'}
+                                            onValueChange={(v) => router.post(`/control-room/alerts/${alert.id}/meta`, { category: v === 'none' ? null : v }, { preserveScroll: true })}
                                         >
-                                            <span>{alert.category || '\u2014'}</span>
-                                            {can.manage && <Pencil className="h-3 w-3 text-muted-foreground" />}
-                                        </button>
+                                            <SelectTrigger className="h-7 w-36 text-xs">
+                                                <SelectValue placeholder="Select..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">None</SelectItem>
+                                                {config_options.categories.map((cat) => (
+                                                    <SelectItem key={cat.value} value={cat.value}>
+                                                        <span className="flex items-center gap-1.5">
+                                                            {cat.color && <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: cat.color }} />}
+                                                            {cat.label}
+                                                        </span>
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    ) : (
+                                        <span className="text-sm">{alert.category || '\u2014'}</span>
                                     )}
                                 </div>
 

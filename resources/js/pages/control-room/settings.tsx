@@ -136,6 +136,11 @@ interface Props {
     maintenanceWindows: MaintenanceWindowData[];
     playbooks: PlaybookOption[];
     sites: SiteOption[];
+    configOptions: Record<string, Array<{
+        id: number; group: string; value: string; label: string;
+        color: string | null; description: string | null;
+        sort_order: number; is_active: boolean;
+    }>>;
 }
 
 // --- Helpers ---
@@ -925,8 +930,18 @@ export default function ControlRoomSettings({
     maintenanceWindows,
     playbooks,
     sites,
+    configOptions,
 }: Props) {
     const [tab, setTab] = useState(activeTab);
+
+    // Config options state
+    const [optionDialogOpen, setOptionDialogOpen] = useState(false);
+    const [optionGroup, setOptionGroup] = useState('category');
+    const [optionValue, setOptionValue] = useState('');
+    const [optionLabel, setOptionLabel] = useState('');
+    const [optionColor, setOptionColor] = useState('');
+    const [optionDesc, setOptionDesc] = useState('');
+    const [deleteOptionId, setDeleteOptionId] = useState<number | null>(null);
 
     // Signal Rules state
     const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
@@ -993,6 +1008,7 @@ export default function ControlRoomSettings({
                         <TabsTrigger value="queues">Triage Queues</TabsTrigger>
                         <TabsTrigger value="sources">Signal Sources</TabsTrigger>
                         <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+                        <TabsTrigger value="ticket-options">Ticket Options</TabsTrigger>
                     </TabsList>
 
                     {/* --- Tab 1: Signal Rules --- */}
@@ -1436,7 +1452,131 @@ export default function ControlRoomSettings({
                             </CardContent>
                         </Card>
                     </TabsContent>
+                    {/* --- Tab 5: Ticket Options --- */}
+                    <TabsContent value="ticket-options" className="mt-4 space-y-6">
+                        {(['category', 'resolution_code', 'task_category'] as const).map((group) => {
+                            const groupLabels: Record<string, string> = {
+                                category: 'Alert Categories',
+                                resolution_code: 'Resolution Codes',
+                                task_category: 'Task Categories',
+                            };
+                            const items = configOptions?.[group] ?? [];
+                            return (
+                                <Card key={group}>
+                                    <CardHeader className="flex flex-row items-center justify-between">
+                                        <CardTitle className="text-base">{groupLabels[group] ?? group}</CardTitle>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => {
+                                                setOptionGroup(group);
+                                                setOptionValue('');
+                                                setOptionLabel('');
+                                                setOptionColor('');
+                                                setOptionDesc('');
+                                                setOptionDialogOpen(true);
+                                            }}
+                                        >
+                                            <Plus className="mr-1 h-4 w-4" /> Add
+                                        </Button>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {items.length === 0 ? (
+                                            <p className="py-4 text-center text-sm text-muted-foreground">No options configured. Click Add to create one.</p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {items.map((opt) => (
+                                                    <div key={opt.id} className="flex items-center justify-between rounded-lg border px-4 py-2.5">
+                                                        <div className="flex items-center gap-3">
+                                                            {opt.color && (
+                                                                <span className="inline-block h-3 w-3 rounded-full" style={{ backgroundColor: opt.color }} />
+                                                            )}
+                                                            <div>
+                                                                <span className="text-sm font-medium">{opt.label}</span>
+                                                                <span className="ml-2 text-xs text-muted-foreground">({opt.value})</span>
+                                                                {opt.description && (
+                                                                    <p className="text-xs text-muted-foreground">{opt.description}</p>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => router.put(`/control-room/settings/options/${opt.id}`, { is_active: !opt.is_active }, { preserveScroll: true })}
+                                                                className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${opt.is_active ? 'bg-primary' : 'bg-muted'}`}
+                                                            >
+                                                                <span className={`inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform ${opt.is_active ? 'translate-x-4' : 'translate-x-1'}`} />
+                                                            </button>
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="h-7 w-7 text-red-500 hover:text-red-700"
+                                                                onClick={() => {
+                                                                    if (confirm('Delete this option?')) {
+                                                                        router.delete(`/control-room/settings/options/${opt.id}`, { preserveScroll: true });
+                                                                    }
+                                                                }}
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </TabsContent>
                 </Tabs>
+
+                {/* Add Option Dialog */}
+                {optionDialogOpen && (
+                    <Dialog open={optionDialogOpen} onOpenChange={setOptionDialogOpen}>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Add Option</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-3 py-2">
+                                <div>
+                                    <Label>Value (slug)</Label>
+                                    <Input value={optionValue} onChange={(e) => setOptionValue(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_'))} placeholder="e.g. incident" />
+                                </div>
+                                <div>
+                                    <Label>Display Label</Label>
+                                    <Input value={optionLabel} onChange={(e) => setOptionLabel(e.target.value)} placeholder="e.g. Incident" />
+                                </div>
+                                <div>
+                                    <Label>Color (hex)</Label>
+                                    <div className="flex items-center gap-2">
+                                        <Input value={optionColor} onChange={(e) => setOptionColor(e.target.value)} placeholder="#ef4444" className="flex-1" />
+                                        {optionColor && <span className="inline-block h-6 w-6 rounded-full border" style={{ backgroundColor: optionColor }} />}
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label>Description (optional)</Label>
+                                    <Input value={optionDesc} onChange={(e) => setOptionDesc(e.target.value)} placeholder="Brief description..." />
+                                </div>
+                            </div>
+                            <DialogFooter>
+                                <Button variant="ghost" onClick={() => setOptionDialogOpen(false)}>Cancel</Button>
+                                <Button
+                                    disabled={!optionValue.trim() || !optionLabel.trim()}
+                                    onClick={() => {
+                                        router.post('/control-room/settings/options', {
+                                            group: optionGroup,
+                                            value: optionValue.trim(),
+                                            label: optionLabel.trim(),
+                                            color: optionColor.trim() || null,
+                                            description: optionDesc.trim() || null,
+                                        }, { preserveScroll: true, onSuccess: () => setOptionDialogOpen(false) });
+                                    }}
+                                >
+                                    Create
+                                </Button>
+                            </DialogFooter>
+                        </DialogContent>
+                    </Dialog>
+                )}
 
                 {/* Dialogs */}
                 {ruleDialogOpen && (

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\ControlRoom;
 
 use App\Http\Controllers\Controller;
+use App\Models\ControlRoom\ConfigOption;
 use App\Models\ControlRoom\MaintenanceWindow;
 use App\Models\ControlRoom\Playbook;
 use App\Models\ControlRoom\SignalRule;
@@ -10,6 +11,7 @@ use App\Models\ControlRoom\SignalSource;
 use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\Site;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -138,6 +140,20 @@ class ControlRoomSettingsController extends Controller
                 'name' => $site->name,
             ]);
 
+        // Config options grouped
+        $configOptions = ConfigOption::orderBy('group')->orderBy('sort_order')->get()
+            ->groupBy('group')
+            ->map(fn ($items) => $items->map(fn ($o) => [
+                'id' => $o->id,
+                'group' => $o->group,
+                'value' => $o->value,
+                'label' => $o->label,
+                'color' => $o->color,
+                'description' => $o->description,
+                'sort_order' => $o->sort_order,
+                'is_active' => $o->is_active,
+            ])->values());
+
         return Inertia::render('control-room/settings', [
             'activeTab' => $activeTab,
             'signalRules' => $signalRules,
@@ -147,6 +163,7 @@ class ControlRoomSettingsController extends Controller
             'maintenanceWindows' => $maintenanceWindows,
             'playbooks' => $playbooks,
             'sites' => $sites,
+            'configOptions' => $configOptions,
         ]);
     }
 
@@ -363,5 +380,78 @@ class ControlRoomSettingsController extends Controller
 
         return redirect()->route('control-room.settings.index', ['tab' => 'maintenance'])
             ->with('success', 'Maintenance window cancelled.');
+    }
+
+    // ── Config Options (Ticket Settings) ────────────────────────────────
+
+    /**
+     * Create a new config option.
+     */
+    public function storeConfigOption(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+
+        $validated = $request->validate([
+            'group' => 'required|string|max:50',
+            'value' => 'required|string|max:100',
+            'label' => 'required|string|max:200',
+            'color' => 'nullable|string|max:20',
+            'description' => 'nullable|string|max:500',
+            'sort_order' => 'nullable|integer|min:0',
+        ]);
+
+        $validated['is_active'] = true;
+        $validated['sort_order'] = $validated['sort_order'] ?? (ConfigOption::where('group', $validated['group'])->max('sort_order') + 1);
+
+        ConfigOption::create($validated);
+
+        AuditLogger::log('controlRoom.settings.configOption.create', null, $validated);
+
+        return redirect()->route('control-room.settings.index', ['tab' => 'ticket-options'])
+            ->with('success', 'Option created.');
+    }
+
+    /**
+     * Update a config option.
+     */
+    public function updateConfigOption(Request $request, ConfigOption $option)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+
+        $validated = $request->validate([
+            'label' => 'sometimes|string|max:200',
+            'color' => 'nullable|string|max:20',
+            'description' => 'nullable|string|max:500',
+            'sort_order' => 'nullable|integer|min:0',
+            'is_active' => 'sometimes|boolean',
+        ]);
+
+        $option->update($validated);
+
+        AuditLogger::log('controlRoom.settings.configOption.update', null, ['option_id' => $option->id]);
+
+        return redirect()->route('control-room.settings.index', ['tab' => 'ticket-options'])
+            ->with('success', 'Option updated.');
+    }
+
+    /**
+     * Delete a config option.
+     */
+    public function deleteConfigOption(Request $request, ConfigOption $option)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+
+        AuditLogger::log('controlRoom.settings.configOption.delete', null, [
+            'group' => $option->group,
+            'value' => $option->value,
+        ]);
+
+        $option->delete();
+
+        return redirect()->route('control-room.settings.index', ['tab' => 'ticket-options'])
+            ->with('success', 'Option deleted.');
     }
 }

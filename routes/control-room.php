@@ -282,6 +282,13 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.settings.maintenance.update');
         Route::post('/control-room/settings/maintenance/{window}/cancel', [ControlRoomSettingsController::class, 'cancelMaintenanceWindow'])
             ->name('control-room.settings.maintenance.cancel');
+        // Config options (ticket settings)
+        Route::post('/control-room/settings/options', [ControlRoomSettingsController::class, 'storeConfigOption'])
+            ->name('control-room.settings.options.store');
+        Route::put('/control-room/settings/options/{option}', [ControlRoomSettingsController::class, 'updateConfigOption'])
+            ->name('control-room.settings.options.update');
+        Route::delete('/control-room/settings/options/{option}', [ControlRoomSettingsController::class, 'deleteConfigOption'])
+            ->name('control-room.settings.options.delete');
     });
 
     // SLA management

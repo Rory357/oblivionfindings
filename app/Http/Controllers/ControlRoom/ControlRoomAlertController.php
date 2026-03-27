@@ -511,6 +511,10 @@ class ControlRoomAlertController extends Controller
             ])->values(),
             'time_spent_minutes' => $alert->time_spent_minutes ?? 0,
             'is_watching' => $alert->watchers->contains('user_id', $user->id),
+            'config_options' => [
+                'categories' => \App\Models\ControlRoom\ConfigOption::forGroup('category'),
+                'resolution_codes' => \App\Models\ControlRoom\ConfigOption::forGroup('resolution_code'),
+            ],
         ]);
     }
 
