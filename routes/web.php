@@ -101,6 +101,14 @@ Route::get('/my-tasks', \App\Http\Controllers\MyTasksController::class)
     ->middleware(['auth'])
     ->name('my-tasks');
 
+// My Day quick actions
+Route::middleware(['auth'])->group(function () {
+    Route::post('/my-tasks/clock-in/{shift}', [\App\Http\Controllers\MyDayActionsController::class, 'clockIn'])->name('my-tasks.clock-in');
+    Route::post('/my-tasks/clock-out/{shift}', [\App\Http\Controllers\MyDayActionsController::class, 'clockOut'])->name('my-tasks.clock-out');
+    Route::post('/my-tasks/shift-task/{task}/complete', [\App\Http\Controllers\MyDayActionsController::class, 'completeShiftTask'])->name('my-tasks.shift-task.complete');
+    Route::post('/my-tasks/timesheet/{timesheet}/submit', [\App\Http\Controllers\MyDayActionsController::class, 'submitTimesheet'])->name('my-tasks.timesheet.submit');
+});
+
 // ── Backward-compatible redirects (old → new Operations URLs) ────────
 Route::middleware(['auth'])->group(function () {
     Route::redirect('/clients', '/operations/clients');

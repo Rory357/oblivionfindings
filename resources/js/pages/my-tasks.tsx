@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -13,20 +15,92 @@ import {
     Bell,
     Calendar,
     CheckCircle2,
+    ChevronDown,
     ChevronRight,
+    ChevronUp,
     Clock,
     ClipboardList,
     ExternalLink,
     FileText,
     Flame,
+    ListChecks,
     ListTodo,
+    LogIn,
+    LogOut,
+    MapPin,
+    MessageSquarePlus,
     OctagonAlert,
+    Pill,
     RefreshCw,
     Shield,
+    StickyNote,
+    Sun,
     Timer,
     User,
+    Users,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface ShiftClient {
+    id: number;
+    name: string;
+    photo_url: string | null;
+}
+
+interface ShiftTaskItem {
+    id: number;
+    label: string;
+    is_completed: boolean;
+    completed_at: string | null;
+}
+
+interface MyShift {
+    id: number;
+    starts_at: string;
+    ends_at: string;
+    actual_starts_at: string | null;
+    actual_ends_at: string | null;
+    status: string;
+    location: string | null;
+    service_type: string | null;
+    client: ShiftClient;
+    tasks: ShiftTaskItem[];
+    task_progress: number;
+    is_today: boolean;
+}
+
+interface MedDue {
+    client_name: string;
+    medication_name: string;
+    dose: string;
+    scheduled_for: string;
+    status: 'overdue' | 'due' | 'upcoming';
+    emar_url: string;
+}
+
+interface MyTimesheet {
+    id: number;
+    work_date: string;
+    client_name: string;
+    hours: number;
+    status: string;
+    return_notes: string | null;
+}
+
+interface MyIncident {
+    id: number;
+    title: string;
+    client_name: string;
+    severity: string;
+    status: string;
+    occurred_at: string;
+    url: string;
+    requires_followup: boolean;
+}
 
 interface Task {
     id: string;
@@ -46,17 +120,40 @@ interface Task {
 }
 
 interface Props {
+    today: string;
+    shifts: MyShift[];
+    medications_due: MedDue[];
+    timesheets: MyTimesheet[];
+    incidents: MyIncident[];
     tasks: Task[];
     stats: {
-        total_tasks: number;
-        critical_count: number;
-        due_today: number;
-        overdue: number;
+        shifts_today: number;
+        meds_due: number;
+        meds_overdue: number;
+        tasks_open: number;
+        timesheets_pending: number;
+        incidents_open: number;
+        cr_alerts: number;
+        notifications_unread: number;
+    };
+    leave: {
+        balances: Array<{ type: string; remaining_hours: number; total_hours: number }>;
+        pending_requests: number;
+    };
+    is_manager: boolean;
+    manager_data?: {
+        team_shifts_today: number;
+        unassigned_shifts: number;
+        timesheets_pending_approval: number;
+        staff_on_today: number;
     };
 }
 
-type FilterTab = 'all' | 'alert' | 'followup' | 'note_followup';
-type SortKey = 'priority' | 'due_at' | 'created_at';
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+type OpenItemFilter = 'all' | 'alert' | 'incident' | 'followup';
 
 const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
@@ -73,6 +170,10 @@ const typeConfig: Record<string, { badge: string; icon: typeof Bell; label: stri
     note_followup: { badge: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300', icon: FileText, label: 'Note' },
 };
 
+function formatTime(iso: string): string {
+    return new Date(iso).toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit', hour12: true });
+}
+
 function formatRelative(iso: string): string {
     const d = new Date(iso);
     const now = new Date();
@@ -87,318 +188,677 @@ function formatRelative(iso: string): string {
     return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
 }
 
-function formatDue(dueAt: string | null): { text: string; urgency: 'overdue' | 'today' | 'upcoming' | 'none' } {
-    if (!dueAt) return { text: '', urgency: 'none' };
-    const due = new Date(dueAt);
-    const now = new Date();
-    const diffMs = due.getTime() - now.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHrs = Math.floor(diffMins / 60);
-
-    if (diffMs < 0) {
-        const overMins = Math.abs(diffMins);
-        if (overMins < 60) return { text: `${overMins}m overdue`, urgency: 'overdue' };
-        const overHrs = Math.floor(overMins / 60);
-        if (overHrs < 24) return { text: `${overHrs}h overdue`, urgency: 'overdue' };
-        return { text: `${Math.floor(overHrs / 24)}d overdue`, urgency: 'overdue' };
-    }
-    if (diffHrs < 1) return { text: `${diffMins}m left`, urgency: 'today' };
-    if (diffHrs < 24) return { text: `${diffHrs}h left`, urgency: 'today' };
-    return { text: due.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }), urgency: 'upcoming' };
+function shiftBorderColor(shift: MyShift): string {
+    if (shift.status === 'in_progress') return 'border-l-green-500';
+    if (shift.status === 'completed') return 'border-l-yellow-500';
+    if (shift.is_today) return 'border-l-blue-500';
+    return 'border-l-gray-300 dark:border-l-gray-600';
 }
 
-const urgencyColors = {
-    overdue: 'text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400',
-    today: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400',
-    upcoming: 'text-muted-foreground bg-muted/50',
-    none: '',
-};
+function shiftStatusBadge(status: string): { variant: 'default' | 'secondary' | 'outline' | 'destructive'; label: string } {
+    switch (status) {
+        case 'in_progress': return { variant: 'default', label: 'In Progress' };
+        case 'completed': return { variant: 'secondary', label: 'Completed' };
+        case 'scheduled': return { variant: 'outline', label: 'Scheduled' };
+        case 'cancelled': return { variant: 'destructive', label: 'Cancelled' };
+        default: return { variant: 'outline', label: status };
+    }
+}
 
-export default function MyTasks({ tasks, stats }: Props) {
-    const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
-    const [sortBy, setSortBy] = useState<SortKey>('priority');
+function timesheetStatusBadge(status: string): string {
+    switch (status) {
+        case 'draft': return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+        case 'submitted': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300';
+        case 'approved': return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300';
+        case 'returned': return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300';
+        default: return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300';
+    }
+}
+
+function medStatusStyle(status: 'overdue' | 'due' | 'upcoming'): string {
+    switch (status) {
+        case 'overdue': return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300';
+        case 'due': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300';
+        case 'upcoming': return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400';
+    }
+}
+
+function ClientAvatar({ client }: { client: ShiftClient }) {
+    if (client.photo_url) {
+        return <img src={client.photo_url} alt={client.name} className="h-10 w-10 rounded-full object-cover" />;
+    }
+    const initials = client.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    return (
+        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+            {initials}
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+export default function MyDay({
+    today,
+    shifts,
+    medications_due,
+    timesheets,
+    incidents,
+    tasks,
+    stats,
+    leave,
+    is_manager,
+    manager_data,
+}: Props) {
     const [isRefreshing, setIsRefreshing] = useState(false);
+    const [shiftsOpen, setShiftsOpen] = useState(true);
+    const [openItemFilter, setOpenItemFilter] = useState<OpenItemFilter>('all');
 
     // Auto-refresh every 60s
     useEffect(() => {
         const interval = setInterval(() => {
-            if (!document.hidden) router.reload();
+            if (!document.hidden) router.reload({ preserveScroll: true });
         }, 60000);
         return () => clearInterval(interval);
     }, []);
 
     const handleRefresh = () => {
         setIsRefreshing(true);
-        router.reload({ onFinish: () => setIsRefreshing(false) });
+        router.reload({ preserveScroll: true, onFinish: () => setIsRefreshing(false) });
     };
 
-    const filtered = (activeFilter === 'all' ? tasks : tasks.filter((t) => t.type === activeFilter));
+    const handleClockIn = (shiftId: number) => {
+        router.post(`/my-tasks/clock-in/${shiftId}`, {}, { preserveScroll: true });
+    };
 
-    const sorted = [...filtered].sort((a, b) => {
-        if (sortBy === 'priority') {
-            const diff = (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3);
-            if (diff !== 0) return diff;
-            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-        }
-        if (sortBy === 'due_at') {
-            if (!a.due_at && !b.due_at) return 0;
-            if (!a.due_at) return 1;
-            if (!b.due_at) return -1;
-            return new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
-        }
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    const handleClockOut = (shiftId: number) => {
+        router.post(`/my-tasks/clock-out/${shiftId}`, {}, { preserveScroll: true });
+    };
+
+    const handleTaskComplete = (taskId: number) => {
+        router.post(`/my-tasks/shift-task/${taskId}/complete`, {}, { preserveScroll: true });
+    };
+
+    const handleTimesheetSubmit = (tsId: number) => {
+        router.post(`/my-tasks/timesheet/${tsId}/submit`, {}, { preserveScroll: true });
+    };
+
+    // Build unified open-items list
+    const openItems: Array<{
+        id: string;
+        type: 'alert' | 'followup' | 'note_followup' | 'incident';
+        title: string;
+        priority: string;
+        client_name?: string;
+        url: string;
+        time: string;
+    }> = [];
+
+    tasks.forEach((t) => {
+        openItems.push({
+            id: `task-${t.id}`,
+            type: t.type,
+            title: t.title,
+            priority: t.priority,
+            client_name: t.meta.client_name,
+            url: t.source_url,
+            time: t.created_at,
+        });
     });
 
-    const counts: Record<FilterTab, number> = {
-        all: tasks.length,
-        alert: tasks.filter((t) => t.type === 'alert').length,
-        followup: tasks.filter((t) => t.type === 'followup').length,
-        note_followup: tasks.filter((t) => t.type === 'note_followup').length,
+    incidents.forEach((inc) => {
+        openItems.push({
+            id: `inc-${inc.id}`,
+            type: 'incident',
+            title: inc.title,
+            priority: inc.severity,
+            client_name: inc.client_name,
+            url: inc.url,
+            time: inc.occurred_at,
+        });
+    });
+
+    const filteredOpenItems = openItemFilter === 'all'
+        ? openItems
+        : openItemFilter === 'incident'
+            ? openItems.filter((i) => i.type === 'incident')
+            : openItemFilter === 'alert'
+                ? openItems.filter((i) => i.type === 'alert')
+                : openItems.filter((i) => i.type === 'followup' || i.type === 'note_followup');
+
+    const sortedOpenItems = [...filteredOpenItems].sort((a, b) => {
+        const pa = priorityOrder[a.priority] ?? 3;
+        const pb = priorityOrder[b.priority] ?? 3;
+        if (pa !== pb) return pa - pb;
+        return new Date(b.time).getTime() - new Date(a.time).getTime();
+    });
+
+    const openItemCounts = {
+        all: openItems.length,
+        alert: openItems.filter((i) => i.type === 'alert').length,
+        incident: openItems.filter((i) => i.type === 'incident').length,
+        followup: openItems.filter((i) => i.type === 'followup' || i.type === 'note_followup').length,
     };
 
-    const completionRate = stats.total_tasks > 0
-        ? Math.round(((stats.total_tasks - stats.overdue) / stats.total_tasks) * 100)
-        : 100;
+    // Sort meds: overdue first, then by scheduled_for
+    const sortedMeds = [...medications_due].sort((a, b) => {
+        const statusOrder = { overdue: 0, due: 1, upcoming: 2 };
+        const sd = statusOrder[a.status] - statusOrder[b.status];
+        if (sd !== 0) return sd;
+        return new Date(a.scheduled_for).getTime() - new Date(b.scheduled_for).getTime();
+    });
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'My Tasks', href: '/my-tasks' }]}>
-            <Head title="My Tasks" />
+        <AppLayout breadcrumbs={[{ title: 'My Day', href: '/my-tasks' }]}>
+            <Head title="My Day" />
             <PageShell>
+                {/* ── Header ────────────────────────────────────────────── */}
                 <PageHeader
-                    title="My Tasks"
-                    description="Your assigned tasks across all modules."
+                    title="My Day"
+                    description={today}
                     actions={
                         <div className="flex items-center gap-2">
                             <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
                                 <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
                                 Refresh
                             </Button>
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href="/control-room/my-tasks">
-                                    <Shield className="mr-2 h-4 w-4" />
-                                    Control Room Tasks
+                            <Button variant="outline" size="sm" asChild className="relative">
+                                <Link href="/notifications">
+                                    <Bell className="h-4 w-4" />
+                                    {stats.notifications_unread > 0 && (
+                                        <span className="absolute -right-1 -top-1 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                                            {stats.notifications_unread}
+                                        </span>
+                                    )}
                                 </Link>
                             </Button>
                         </div>
                     }
                 />
 
-                {/* Urgent Banner */}
-                {(stats.overdue > 0 || stats.critical_count > 0) && (
-                    <div className={`flex items-center gap-3 rounded-lg border px-4 py-3 ${
-                        stats.overdue > 0
-                            ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
-                            : 'border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30'
-                    }`}>
-                        <div className="relative flex h-3 w-3 shrink-0">
-                            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${stats.overdue > 0 ? 'bg-red-500' : 'bg-orange-500'}`} />
-                            <span className={`relative inline-flex h-3 w-3 rounded-full ${stats.overdue > 0 ? 'bg-red-600' : 'bg-orange-600'}`} />
-                        </div>
-                        <span className={`text-sm font-semibold ${stats.overdue > 0 ? 'text-red-800 dark:text-red-200' : 'text-orange-800 dark:text-orange-200'}`}>
-                            {stats.overdue > 0
-                                ? `${stats.overdue} overdue task${stats.overdue !== 1 ? 's' : ''} need${stats.overdue === 1 ? 's' : ''} attention`
-                                : `${stats.critical_count} critical task${stats.critical_count !== 1 ? 's' : ''} assigned to you`}
-                        </span>
-                    </div>
-                )}
-
-                {/* KPI Row */}
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
-                    <KpiCard label="Total Tasks" value={stats.total_tasks} icon={ListTodo} />
+                {/* ── Stats Row ─────────────────────────────────────────── */}
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-6">
                     <KpiCard
-                        label="Critical"
-                        value={stats.critical_count}
-                        icon={Flame}
-                        className={stats.critical_count > 0 ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20' : undefined}
+                        label="Shifts Today"
+                        value={stats.shifts_today}
+                        icon={Calendar}
+                        className="border-blue-200 dark:border-blue-800"
                     />
-                    <KpiCard label="Due Today" value={stats.due_today} icon={Calendar} />
                     <KpiCard
-                        label="Overdue"
-                        value={stats.overdue}
-                        icon={Timer}
-                        className={stats.overdue > 0 ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20' : undefined}
+                        label="Meds Due"
+                        value={stats.meds_due}
+                        icon={Pill}
+                        className={stats.meds_overdue > 0 ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20' : undefined}
                     />
-                    <div className="relative overflow-hidden rounded-xl border bg-card p-5 shadow-sm">
-                        <div className="text-3xl font-bold tracking-tight">{completionRate}%</div>
-                        <div className="mt-1 text-sm text-muted-foreground">On Track</div>
-                        <Progress value={completionRate} className="mt-3 h-2" />
-                    </div>
+                    <KpiCard
+                        label="Open Tasks"
+                        value={stats.tasks_open}
+                        icon={ListChecks}
+                    />
+                    <KpiCard
+                        label="Timesheets"
+                        value={stats.timesheets_pending}
+                        icon={Clock}
+                        className={stats.timesheets_pending > 0 ? 'border-yellow-300 bg-yellow-50/50 dark:border-yellow-800 dark:bg-yellow-950/20' : undefined}
+                    />
+                    <KpiCard
+                        label="Incidents"
+                        value={stats.incidents_open}
+                        icon={AlertTriangle}
+                        className={stats.incidents_open > 0 ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20' : undefined}
+                    />
+                    <KpiCard
+                        label="CR Alerts"
+                        value={stats.cr_alerts}
+                        icon={Bell}
+                        className={stats.cr_alerts > 0 ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20' : undefined}
+                    />
                 </div>
 
-                {/* Filter + Sort Bar */}
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    {/* Filter Tabs */}
-                    <div className="flex gap-1 rounded-lg border bg-muted/50 p-1">
-                        {([
-                            { key: 'all' as FilterTab, label: 'All', icon: ListTodo },
-                            { key: 'alert' as FilterTab, label: 'Alerts', icon: Bell },
-                            { key: 'followup' as FilterTab, label: 'Follow-ups', icon: ClipboardList },
-                            { key: 'note_followup' as FilterTab, label: 'Notes', icon: FileText },
-                        ]).map((tab) => (
-                            <button
-                                key={tab.key}
-                                onClick={() => setActiveFilter(tab.key)}
-                                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                                    activeFilter === tab.key
-                                        ? 'bg-background text-foreground shadow-sm'
-                                        : 'text-muted-foreground hover:text-foreground'
-                                }`}
-                            >
-                                <tab.icon className="h-3.5 w-3.5" />
-                                {tab.label}
-                                <span className={`ml-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
-                                    activeFilter === tab.key
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'bg-muted-foreground/15 text-muted-foreground'
-                                }`}>
-                                    {counts[tab.key]}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-
-                    {/* Sort */}
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <span>Sort:</span>
-                        {([
-                            { key: 'priority' as SortKey, label: 'Priority' },
-                            { key: 'due_at' as SortKey, label: 'Due Date' },
-                            { key: 'created_at' as SortKey, label: 'Newest' },
-                        ]).map((s) => (
-                            <button
-                                key={s.key}
-                                onClick={() => setSortBy(s.key)}
-                                className={`rounded-md px-2 py-1 text-xs transition-colors ${
-                                    sortBy === s.key
-                                        ? 'bg-primary/10 font-medium text-primary'
-                                        : 'hover:bg-muted'
-                                }`}
-                            >
-                                {s.label}
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Task List */}
-                {sorted.length === 0 ? (
-                    <Card>
-                        <CardContent className="flex flex-col items-center justify-center py-20 text-center">
-                            <div className="rounded-full bg-green-100 p-4 dark:bg-green-900/30">
-                                <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
+                {/* ── Manager Banner ────────────────────────────────────── */}
+                {is_manager && manager_data && (
+                    <Card className="border-blue-200 bg-blue-50/60 dark:border-blue-800 dark:bg-blue-950/20">
+                        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                                <div className="flex items-center gap-2">
+                                    <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                    <span className="font-semibold">{manager_data.staff_on_today}</span>
+                                    <span className="text-muted-foreground">staff on today</span>
+                                </div>
+                                <div className="hidden h-4 w-px bg-blue-300 dark:bg-blue-700 sm:block" />
+                                <div>
+                                    <span className="font-semibold">{manager_data.unassigned_shifts}</span>{' '}
+                                    <span className="text-muted-foreground">unassigned shifts</span>
+                                </div>
+                                <div className="hidden h-4 w-px bg-blue-300 dark:bg-blue-700 sm:block" />
+                                <div>
+                                    <span className="font-semibold">{manager_data.timesheets_pending_approval}</span>{' '}
+                                    <span className="text-muted-foreground">timesheets to approve</span>
+                                </div>
+                                <div className="hidden h-4 w-px bg-blue-300 dark:bg-blue-700 sm:block" />
+                                <div>
+                                    <span className="font-semibold">{manager_data.team_shifts_today}</span>{' '}
+                                    <span className="text-muted-foreground">total shifts</span>
+                                </div>
                             </div>
-                            <h3 className="mt-4 text-lg font-semibold">All clear</h3>
-                            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                                {activeFilter === 'all'
-                                    ? "You have no outstanding tasks. Great work!"
-                                    : `No ${typeConfig[activeFilter]?.label.toLowerCase()} tasks right now.`}
-                            </p>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href="/operations">
+                                    View Operations Dashboard
+                                    <ArrowRight className="ml-2 h-4 w-4" />
+                                </Link>
+                            </Button>
                         </CardContent>
                     </Card>
-                ) : (
-                    <div className="space-y-2">
-                        {sorted.map((task) => {
-                            const pConfig = priorityConfig[task.priority] ?? priorityConfig.medium;
-                            const tConfig = typeConfig[task.type] ?? typeConfig.alert;
-                            const TypeIcon = tConfig.icon;
-                            const PriorityIcon = pConfig.icon;
-                            const due = formatDue(task.due_at);
+                )}
 
-                            return (
-                                <Link
-                                    key={task.id}
-                                    href={task.source_url}
-                                    className={`group flex items-stretch rounded-lg border border-l-4 ${pConfig.border} ${pConfig.bg} transition-all hover:shadow-md hover:border-primary/30`}
-                                >
-                                    {/* Main content */}
-                                    <div className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3.5">
-                                        {/* Type icon circle */}
-                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${tConfig.badge}`}>
-                                            <TypeIcon className="h-4.5 w-4.5" />
-                                        </div>
-
-                                        {/* Content */}
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="truncate font-semibold text-foreground group-hover:text-primary transition-colors">
-                                                    {task.title}
-                                                </span>
-                                                {PriorityIcon && (
-                                                    <PriorityIcon className={`h-4 w-4 shrink-0 ${task.priority === 'critical' ? 'text-red-500' : 'text-orange-500'}`} />
-                                                )}
+                {/* ── Section 1: My Shifts ──────────────────────────────── */}
+                <Card>
+                    <CardHeader className="cursor-pointer select-none" onClick={() => setShiftsOpen(!shiftsOpen)}>
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <Calendar className="h-5 w-5" />
+                                My Shifts
+                                <Badge variant="secondary" className="ml-1">{shifts.length}</Badge>
+                            </CardTitle>
+                            {shiftsOpen ? <ChevronUp className="h-5 w-5 text-muted-foreground" /> : <ChevronDown className="h-5 w-5 text-muted-foreground" />}
+                        </div>
+                    </CardHeader>
+                    {shiftsOpen && (
+                        <CardContent className="space-y-4 pt-0">
+                            {shifts.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-12 text-center">
+                                    <div className="rounded-full bg-green-100 p-3 dark:bg-green-900/30">
+                                        <Sun className="h-8 w-8 text-green-600 dark:text-green-400" />
+                                    </div>
+                                    <p className="mt-3 text-sm text-muted-foreground">No shifts scheduled. Enjoy your day!</p>
+                                </div>
+                            ) : (
+                                shifts.map((shift) => {
+                                    const statusBadge = shiftStatusBadge(shift.status);
+                                    const completedTasks = shift.tasks.filter((t) => t.is_completed).length;
+                                    return (
+                                        <div
+                                            key={shift.id}
+                                            className={`rounded-lg border border-l-4 ${shiftBorderColor(shift)} bg-card p-4 shadow-sm`}
+                                        >
+                                            {/* Top row */}
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <ClientAvatar client={shift.client} />
+                                                <div className="min-w-0 flex-1">
+                                                    <Link
+                                                        href={`/clients/${shift.client.id}`}
+                                                        className="font-semibold text-foreground hover:text-primary hover:underline"
+                                                    >
+                                                        {shift.client.name}
+                                                    </Link>
+                                                    <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                                        <span className="flex items-center gap-1">
+                                                            <Clock className="h-3 w-3" />
+                                                            {formatTime(shift.starts_at)} - {formatTime(shift.ends_at)}
+                                                        </span>
+                                                        {shift.location && (
+                                                            <span className="flex items-center gap-1">
+                                                                <MapPin className="h-3 w-3" />
+                                                                {shift.location}
+                                                            </span>
+                                                        )}
+                                                        {shift.service_type && (
+                                                            <Badge variant="outline" className="text-[10px]">{shift.service_type}</Badge>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <Badge variant={statusBadge.variant}>{statusBadge.label}</Badge>
                                             </div>
-                                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                                                <Badge variant="outline" className={`${pConfig.badge} px-1.5 py-0 text-[10px]`}>
-                                                    {task.priority}
-                                                </Badge>
-                                                <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
-                                                    {task.status}
-                                                </Badge>
-                                                {task.meta.client_name && (
-                                                    <span className="flex items-center gap-1">
-                                                        <User className="h-3 w-3" />
-                                                        {task.meta.client_name}
+
+                                            {/* Task checklist */}
+                                            {shift.tasks.length > 0 && (
+                                                <div className="mt-4 space-y-2">
+                                                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                                        <Progress value={shift.task_progress} className="h-2 flex-1" />
+                                                        <span>{completedTasks} of {shift.tasks.length} complete</span>
+                                                    </div>
+                                                    <div className="space-y-1.5">
+                                                        {shift.tasks.map((task) => (
+                                                            <label
+                                                                key={task.id}
+                                                                className="flex items-center gap-2.5 rounded-md px-2 py-1 text-sm hover:bg-muted/50"
+                                                            >
+                                                                <Checkbox
+                                                                    checked={task.is_completed}
+                                                                    onCheckedChange={() => {
+                                                                        if (!task.is_completed) handleTaskComplete(task.id);
+                                                                    }}
+                                                                    disabled={task.is_completed}
+                                                                />
+                                                                <span className={task.is_completed ? 'text-muted-foreground line-through' : ''}>
+                                                                    {task.label}
+                                                                </span>
+                                                            </label>
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            {/* Action buttons */}
+                                            <div className="mt-4 flex flex-wrap gap-2">
+                                                {shift.status === 'scheduled' && !shift.actual_starts_at && (
+                                                    <Button size="sm" onClick={() => handleClockIn(shift.id)}>
+                                                        <LogIn className="mr-2 h-4 w-4" />
+                                                        Clock In
+                                                    </Button>
+                                                )}
+                                                {shift.status === 'in_progress' && (
+                                                    <Button size="sm" variant="secondary" onClick={() => handleClockOut(shift.id)}>
+                                                        <LogOut className="mr-2 h-4 w-4" />
+                                                        Clock Out
+                                                    </Button>
+                                                )}
+                                                <Button size="sm" variant="outline" asChild>
+                                                    <Link href={`/clients/${shift.client.id}/notes/create`}>
+                                                        <MessageSquarePlus className="mr-2 h-4 w-4" />
+                                                        Add Note
+                                                    </Link>
+                                                </Button>
+                                                <Button size="sm" variant="ghost" asChild>
+                                                    <Link href={`/clients/${shift.client.id}`}>
+                                                        <User className="mr-2 h-4 w-4" />
+                                                        View Client
+                                                    </Link>
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </CardContent>
+                    )}
+                </Card>
+
+                {/* ── Section 2: Medications Due ────────────────────────── */}
+                {medications_due.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <Pill className="h-5 w-5" />
+                                Medications Due
+                                {stats.meds_overdue > 0 && (
+                                    <Badge variant="destructive" className="ml-1">{stats.meds_overdue} overdue</Badge>
+                                )}
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b text-left text-xs font-medium text-muted-foreground">
+                                            <th className="pb-2 pr-4">Client</th>
+                                            <th className="pb-2 pr-4">Medication</th>
+                                            <th className="pb-2 pr-4">Dose</th>
+                                            <th className="pb-2 pr-4">Time</th>
+                                            <th className="pb-2">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {sortedMeds.map((med, idx) => (
+                                            <tr key={idx} className="border-b last:border-0 hover:bg-muted/50">
+                                                <td className="py-2.5 pr-4 font-medium">{med.client_name}</td>
+                                                <td className="py-2.5 pr-4">
+                                                    <Link href={med.emar_url} className="text-primary hover:underline">
+                                                        {med.medication_name}
+                                                    </Link>
+                                                </td>
+                                                <td className="py-2.5 pr-4 text-muted-foreground">{med.dose}</td>
+                                                <td className="py-2.5 pr-4 text-muted-foreground">{formatTime(med.scheduled_for)}</td>
+                                                <td className="py-2.5">
+                                                    <span className={`relative inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium ${medStatusStyle(med.status)}`}>
+                                                        {med.status === 'overdue' && (
+                                                            <span className="absolute -left-0.5 -top-0.5 flex h-2 w-2">
+                                                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+                                                                <span className="relative inline-flex h-2 w-2 rounded-full bg-red-500" />
+                                                            </span>
+                                                        )}
+                                                        <span className={med.status === 'overdue' ? 'ml-2' : ''}>{med.status}</span>
                                                     </span>
-                                                )}
-                                                {task.meta.source && (
-                                                    <span>{task.meta.source}</span>
-                                                )}
-                                                {task.meta.asset_name && (
-                                                    <span>{task.meta.asset_name}</span>
-                                                )}
-                                                <span className="flex items-center gap-1">
-                                                    <Clock className="h-3 w-3" />
-                                                    {formatRelative(task.created_at)}
-                                                </span>
-                                            </div>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* ── Section 3: My Timesheets ──────────────────────────── */}
+                {timesheets.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <Clock className="h-5 w-5" />
+                                My Timesheets
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b text-left text-xs font-medium text-muted-foreground">
+                                            <th className="pb-2 pr-4">Date</th>
+                                            <th className="pb-2 pr-4">Client</th>
+                                            <th className="pb-2 pr-4">Hours</th>
+                                            <th className="pb-2 pr-4">Status</th>
+                                            <th className="pb-2">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {timesheets.map((ts) => (
+                                            <tr key={ts.id} className="border-b last:border-0 hover:bg-muted/50">
+                                                <td className="py-2.5 pr-4 text-muted-foreground">
+                                                    {new Date(ts.work_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}
+                                                </td>
+                                                <td className="py-2.5 pr-4 font-medium">{ts.client_name}</td>
+                                                <td className="py-2.5 pr-4">{ts.hours}h</td>
+                                                <td className="py-2.5 pr-4">
+                                                    <TooltipProvider>
+                                                        <Tooltip>
+                                                            <TooltipTrigger asChild>
+                                                                <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${timesheetStatusBadge(ts.status)}`}>
+                                                                    {ts.status}
+                                                                </span>
+                                                            </TooltipTrigger>
+                                                            {ts.return_notes && (
+                                                                <TooltipContent>
+                                                                    <p className="max-w-xs text-xs">{ts.return_notes}</p>
+                                                                </TooltipContent>
+                                                            )}
+                                                        </Tooltip>
+                                                    </TooltipProvider>
+                                                </td>
+                                                <td className="py-2.5">
+                                                    {ts.status === 'draft' && (
+                                                        <Button size="sm" variant="outline" onClick={() => handleTimesheetSubmit(ts.id)}>
+                                                            Submit
+                                                        </Button>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* ── Section 4: Open Items ─────────────────────────────── */}
+                {openItems.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-lg">
+                                <OctagonAlert className="h-5 w-5" />
+                                Open Items
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-4 pt-0">
+                            {/* Filter tabs */}
+                            <div className="flex gap-1 rounded-lg border bg-muted/50 p-1">
+                                {([
+                                    { key: 'all' as OpenItemFilter, label: 'All' },
+                                    { key: 'alert' as OpenItemFilter, label: 'Alerts' },
+                                    { key: 'incident' as OpenItemFilter, label: 'Incidents' },
+                                    { key: 'followup' as OpenItemFilter, label: 'Follow-ups' },
+                                ] as const).map((tab) => (
+                                    <button
+                                        key={tab.key}
+                                        onClick={() => setOpenItemFilter(tab.key)}
+                                        className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                                            openItemFilter === tab.key
+                                                ? 'bg-background text-foreground shadow-sm'
+                                                : 'text-muted-foreground hover:text-foreground'
+                                        }`}
+                                    >
+                                        {tab.label}
+                                        <span className={`ml-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
+                                            openItemFilter === tab.key
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'bg-muted-foreground/15 text-muted-foreground'
+                                        }`}>
+                                            {openItemCounts[tab.key]}
+                                        </span>
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* Item list */}
+                            {sortedOpenItems.length === 0 ? (
+                                <div className="flex flex-col items-center py-8 text-center">
+                                    <CheckCircle2 className="h-8 w-8 text-green-500" />
+                                    <p className="mt-2 text-sm text-muted-foreground">No items in this category.</p>
+                                </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {sortedOpenItems.map((item) => {
+                                        const isIncident = item.type === 'incident';
+                                        const tConfig = isIncident
+                                            ? { badge: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300', icon: AlertTriangle, label: 'Incident' }
+                                            : typeConfig[item.type] ?? typeConfig.alert;
+                                        const pConfig = priorityConfig[item.priority] ?? priorityConfig.medium;
+                                        const TypeIcon = tConfig.icon;
+                                        const PriorityIcon = pConfig.icon;
+
+                                        return (
+                                            <Link
+                                                key={item.id}
+                                                href={item.url}
+                                                className={`group flex items-stretch rounded-lg border border-l-4 ${pConfig.border} ${pConfig.bg} transition-all hover:shadow-md hover:border-primary/30`}
+                                            >
+                                                <div className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3">
+                                                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tConfig.badge}`}>
+                                                        <TypeIcon className="h-4 w-4" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="truncate font-semibold text-foreground group-hover:text-primary transition-colors">
+                                                                {item.title}
+                                                            </span>
+                                                            {PriorityIcon && (
+                                                                <PriorityIcon className={`h-4 w-4 shrink-0 ${item.priority === 'critical' ? 'text-red-500' : 'text-orange-500'}`} />
+                                                            )}
+                                                        </div>
+                                                        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                                            <Badge variant="outline" className={`${pConfig.badge} px-1.5 py-0 text-[10px]`}>
+                                                                {item.priority}
+                                                            </Badge>
+                                                            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                                                                {tConfig.label}
+                                                            </Badge>
+                                                            {item.client_name && (
+                                                                <span className="flex items-center gap-1">
+                                                                    <User className="h-3 w-3" />
+                                                                    {item.client_name}
+                                                                </span>
+                                                            )}
+                                                            <span className="flex items-center gap-1">
+                                                                <Clock className="h-3 w-3" />
+                                                                {formatRelative(item.time)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex shrink-0 items-center px-4">
+                                                    <ChevronRight className="h-4 w-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
+                                                </div>
+                                            </Link>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* ── Section 5: Leave Balance ──────────────────────────── */}
+                {leave && leave.balances.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-lg">Leave Balances</CardTitle>
+                                {leave.pending_requests > 0 && (
+                                    <Badge variant="secondary">{leave.pending_requests} pending</Badge>
+                                )}
+                            </div>
+                        </CardHeader>
+                        <CardContent className="space-y-3 pt-0">
+                            {leave.balances.map((bal) => {
+                                const pct = bal.total_hours > 0 ? Math.round((bal.remaining_hours / bal.total_hours) * 100) : 0;
+                                return (
+                                    <div key={bal.type} className="space-y-1">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <span className="font-medium">{bal.type}</span>
+                                            <span className="text-muted-foreground">{bal.remaining_hours}h / {bal.total_hours}h</span>
                                         </div>
+                                        <Progress value={pct} className="h-2" />
                                     </div>
-
-                                    {/* Right section: SLA + Due + Arrow */}
-                                    <div className="flex shrink-0 items-center gap-3 px-4">
-                                        {task.meta.sla_status && (
-                                            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${
-                                                task.meta.sla_status === 'breached' ? 'bg-red-500' :
-                                                task.meta.sla_status === 'at_risk' ? 'bg-yellow-500' : 'bg-green-500'
-                                            }`} title={`SLA: ${task.meta.sla_status}`} />
-                                        )}
-                                        {due.urgency !== 'none' && (
-                                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${urgencyColors[due.urgency]}`}>
-                                                <Timer className="h-3 w-3" />
-                                                {due.text}
-                                            </span>
-                                        )}
-                                        <ChevronRight className="h-4 w-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
-                                    </div>
+                                );
+                            })}
+                            <Button variant="outline" size="sm" asChild className="mt-2">
+                                <Link href="/hr/leave">
+                                    Request Leave
+                                    <ArrowRight className="ml-2 h-4 w-4" />
                                 </Link>
-                            );
-                        })}
-                    </div>
+                            </Button>
+                        </CardContent>
+                    </Card>
                 )}
 
-                {/* Quick Links */}
-                {tasks.length > 0 && (
-                    <div className="flex flex-wrap gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href="/control-room">
-                                <Bell className="mr-2 h-4 w-4" />
-                                Control Room Dashboard
-                            </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href="/control-room/alerts">
-                                <ListTodo className="mr-2 h-4 w-4" />
-                                All Alerts
-                            </Link>
-                        </Button>
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href="/control-room/escalations">
-                                <ArrowRight className="mr-2 h-4 w-4" />
-                                Escalation Queue
-                            </Link>
-                        </Button>
-                    </div>
-                )}
+                {/* ── Footer Quick Links ────────────────────────────────── */}
+                <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/operations">
+                            <Shield className="mr-2 h-4 w-4" />
+                            Operations Dashboard
+                        </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/control-room">
+                            <Bell className="mr-2 h-4 w-4" />
+                            Control Room
+                        </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/control-room/alerts">
+                            <ListTodo className="mr-2 h-4 w-4" />
+                            All Alerts
+                        </Link>
+                    </Button>
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/emar">
+                            <Pill className="mr-2 h-4 w-4" />
+                            eMAR
+                        </Link>
+                    </Button>
+                </div>
             </PageShell>
         </AppLayout>
     );

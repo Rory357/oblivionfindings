@@ -2,9 +2,13 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\ClientIncident;
+use App\Models\ClientMedication;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
 use App\Models\IncidentFollowup;
+use App\Models\Shift;
+use App\Models\Timesheet;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -24,17 +28,246 @@ class MyTasksController extends Controller
     {
         abort_unless($request->user(), 403);
 
-        $userId = $request->user()->id;
+        $user = $request->user();
+        $userId = $user->id;
         $now = Carbon::now();
-        $todayEnd = $now->copy()->endOfDay();
+        $today = $now->copy()->startOfDay();
+        $tomorrowEnd = $now->copy()->addDay()->endOfDay();
 
+        // 1. Today formatted
+        $todayFormatted = $now->format('l, j F Y');
+
+        // 2. Shifts today + tomorrow
+        $shifts = $this->getShifts($userId, $today, $tomorrowEnd, $now);
+
+        // 3. Medications due
+        $clientIds = $shifts->pluck('client.id')->filter()->unique()->values()->all();
+        $medicationsDue = $this->getMedicationsDue($clientIds, $now);
+
+        // 4. Timesheets
+        $timesheets = $this->getTimesheets($userId);
+
+        // 5. Incidents
+        $incidents = $this->getIncidents($userId, $now);
+
+        // 6. Tasks (CR alerts + followups + notes - existing aggregation)
+        $tasks = $this->getCrTasks($userId);
+
+        // 7. Leave
+        $leave = $this->getLeave($userId, $now);
+
+        // 8. Stats
+        $todayShifts = $shifts->filter(fn ($s) => $s['is_today']);
+        $stats = [
+            'shifts_today' => $todayShifts->count(),
+            'meds_due' => count($medicationsDue),
+            'meds_overdue' => collect($medicationsDue)->where('status', 'overdue')->count(),
+            'tasks_open' => $todayShifts->sum(fn ($s) => collect($s['tasks'])->where('is_completed', false)->count()),
+            'timesheets_pending' => collect($timesheets)->count(),
+            'incidents_open' => count($incidents),
+            'cr_alerts' => collect($tasks)->where('type', 'alert')->count(),
+            'notifications_unread' => $user->unreadNotifications()->count(),
+        ];
+
+        // 9. Manager check
+        $isManager = $user->canDo('shifts.manageAny');
+
+        // 10. Manager data
+        $managerData = $isManager ? $this->getManagerData($user, $today, $tomorrowEnd) : null;
+
+        return Inertia::render('my-tasks', [
+            'today' => $todayFormatted,
+            'shifts' => $shifts->values()->all(),
+            'medications_due' => $medicationsDue,
+            'timesheets' => $timesheets,
+            'incidents' => $incidents,
+            'tasks' => $tasks,
+            'stats' => $stats,
+            'leave' => $leave,
+            'is_manager' => $isManager,
+            'manager_data' => $managerData,
+        ]);
+    }
+
+    private function getShifts(int $userId, Carbon $today, Carbon $tomorrowEnd, Carbon $now): \Illuminate\Support\Collection
+    {
+        try {
+            return Shift::where('user_id', $userId)
+                ->whereBetween('starts_at', [$today, $tomorrowEnd])
+                ->with(['client:id,first_name,last_name,profile_photo_path', 'serviceContext:id,name', 'tasks'])
+                ->orderBy('starts_at')
+                ->get()
+                ->map(function (Shift $shift) use ($now, $today) {
+                    $totalTasks = $shift->tasks->count();
+                    $completedTasks = $shift->tasks->where('is_completed', true)->count();
+
+                    return [
+                        'id' => $shift->id,
+                        'starts_at' => $shift->starts_at->toIso8601String(),
+                        'ends_at' => $shift->ends_at?->toIso8601String(),
+                        'actual_starts_at' => $shift->actual_starts_at?->toIso8601String(),
+                        'actual_ends_at' => $shift->actual_ends_at?->toIso8601String(),
+                        'status' => $shift->status,
+                        'location' => $shift->location,
+                        'client' => $shift->client ? [
+                            'id' => $shift->client->id,
+                            'name' => trim($shift->client->first_name . ' ' . $shift->client->last_name),
+                            'photo_url' => $shift->client->profile_photo_url ?? null,
+                        ] : null,
+                        'service_type' => $shift->serviceContext?->name,
+                        'tasks' => $shift->tasks->map(fn ($task) => [
+                            'id' => $task->id,
+                            'label' => $task->label,
+                            'is_completed' => (bool) $task->is_completed,
+                            'completed_at' => $task->completed_at?->toIso8601String(),
+                        ])->all(),
+                        'task_progress' => $totalTasks > 0
+                            ? round(($completedTasks / $totalTasks) * 100)
+                            : 100,
+                        'is_today' => $shift->starts_at->isSameDay($today),
+                    ];
+                });
+        } catch (\Throwable) {
+            return collect();
+        }
+    }
+
+    private function getMedicationsDue(array $clientIds, Carbon $now): array
+    {
+        if (empty($clientIds)) {
+            return [];
+        }
+
+        try {
+            $windowStart = $now->copy()->subHours(2);
+            $windowEnd = $now->copy()->addHours(4);
+
+            $medications = ClientMedication::whereIn('client_id', $clientIds)
+                ->active()
+                ->where('is_prn', false)
+                ->whereNotNull('dose_times')
+                ->with('client:id,first_name,last_name')
+                ->get();
+
+            $result = [];
+
+            foreach ($medications as $med) {
+                $doseTimes = $med->dose_times;
+                if (empty($doseTimes) || ! is_array($doseTimes)) {
+                    continue;
+                }
+
+                foreach ($doseTimes as $doseTime) {
+                    $scheduled = $now->copy()->startOfDay()->setTimeFromTimeString($doseTime);
+
+                    if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
+                        continue;
+                    }
+
+                    if ($scheduled->lt($now)) {
+                        $status = 'overdue';
+                    } elseif ($scheduled->lte($now->copy()->addHour())) {
+                        $status = 'due';
+                    } else {
+                        $status = 'upcoming';
+                    }
+
+                    $clientName = $med->client
+                        ? trim($med->client->first_name . ' ' . $med->client->last_name)
+                        : 'Unknown';
+
+                    $result[] = [
+                        'client_name' => $clientName,
+                        'medication_name' => $med->name,
+                        'dose' => $med->dosage,
+                        'scheduled_for' => $scheduled->toIso8601String(),
+                        'status' => $status,
+                        'emar_url' => '/emar?client=' . $med->client_id,
+                    ];
+                }
+            }
+
+            // Sort: overdue first, then due, then upcoming
+            usort($result, function ($a, $b) {
+                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2];
+
+                return ($order[$a['status']] ?? 3) <=> ($order[$b['status']] ?? 3);
+            });
+
+            return $result;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function getTimesheets(int $userId): array
+    {
+        try {
+            return Timesheet::where('user_id', $userId)
+                ->whereIn('status', ['draft', 'submitted', 'returned'])
+                ->with('client:id,first_name,last_name')
+                ->orderByDesc('work_date')
+                ->limit(10)
+                ->get()
+                ->map(function (Timesheet $ts) {
+                    $clientName = $ts->client
+                        ? trim($ts->client->first_name . ' ' . $ts->client->last_name)
+                        : null;
+
+                    return [
+                        'id' => $ts->id,
+                        'work_date' => Carbon::parse($ts->work_date)->format('D, j M Y'),
+                        'client_name' => $clientName,
+                        'hours' => $ts->total_hours,
+                        'status' => $ts->status,
+                        'return_notes' => $ts->returned_notes,
+                    ];
+                })
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function getIncidents(int $userId, Carbon $now): array
+    {
+        try {
+            return ClientIncident::where('reported_by', $userId)
+                ->whereNotIn('status', ['closed'])
+                ->where('occurred_at', '>=', $now->copy()->subDays(14))
+                ->with('client:id,first_name,last_name')
+                ->orderByDesc('occurred_at')
+                ->get()
+                ->map(function (ClientIncident $incident) {
+                    $clientName = $incident->client
+                        ? trim($incident->client->first_name . ' ' . $incident->client->last_name)
+                        : null;
+
+                    return [
+                        'id' => $incident->id,
+                        'title' => $incident->title,
+                        'client_name' => $clientName,
+                        'severity' => $incident->severity,
+                        'status' => $incident->status,
+                        'occurred_at' => $incident->occurred_at?->toIso8601String(),
+                        'url' => '/incidents/' . $incident->id,
+                        'requires_followup' => (bool) $incident->requires_followup,
+                    ];
+                })
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    private function getCrTasks(int $userId): array
+    {
         $tasks = collect()
             ->merge($this->getAlertTasks($userId))
             ->merge($this->getFollowupTasks($userId))
             ->merge($this->getNoteFollowupTasks($userId));
 
-        // Sort by priority (critical first), then due_at ascending (nulls last)
-        $tasks = $tasks->sort(function ($a, $b) {
+        return $tasks->sort(function ($a, $b) {
             $aPriority = self::PRIORITY_ORDER[$a['priority']] ?? 3;
             $bPriority = self::PRIORITY_ORDER[$b['priority']] ?? 3;
 
@@ -42,7 +275,6 @@ class MyTasksController extends Controller
                 return $aPriority - $bPriority;
             }
 
-            // Nulls last for due_at
             if ($a['due_at'] === null && $b['due_at'] === null) {
                 return 0;
             }
@@ -54,124 +286,189 @@ class MyTasksController extends Controller
             }
 
             return Carbon::parse($a['due_at'])->timestamp - Carbon::parse($b['due_at'])->timestamp;
-        })->values();
+        })->values()->all();
+    }
 
-        $stats = [
-            'total_tasks' => $tasks->count(),
-            'critical_count' => $tasks->where('priority', 'critical')->count(),
-            'due_today' => $tasks->filter(function ($task) use ($now, $todayEnd) {
-                if (! $task['due_at']) {
-                    return false;
-                }
-                $due = Carbon::parse($task['due_at']);
+    private function getLeave(int $userId, Carbon $now): array
+    {
+        try {
+            $balances = \App\Domain\Hr\Models\HrLeaveBalance::where('user_id', $userId)
+                ->where('year', $now->year)
+                ->get()
+                ->map(fn ($b) => [
+                    'type' => $b->leave_type,
+                    'remaining_hours' => round($b->balance_hours - $b->used_hours - $b->pending_hours, 1),
+                    'total_hours' => $b->balance_hours,
+                ])
+                ->all();
 
-                return $due->gte($now) && $due->lte($todayEnd);
-            })->count(),
-            'overdue' => $tasks->filter(function ($task) use ($now) {
-                return $task['due_at'] && Carbon::parse($task['due_at'])->lt($now);
-            })->count(),
-        ];
+            $pendingRequests = \App\Domain\Hr\Models\HrLeaveRequest::where('user_id', $userId)
+                ->where('status', 'pending')
+                ->count();
 
-        return Inertia::render('my-tasks', [
-            'tasks' => $tasks->all(),
-            'stats' => $stats,
-        ]);
+            return [
+                'balances' => $balances,
+                'pending_requests' => $pendingRequests,
+            ];
+        } catch (\Throwable) {
+            return [
+                'balances' => [],
+                'pending_requests' => 0,
+            ];
+        }
+    }
+
+    private function getManagerData($user, Carbon $today, Carbon $tomorrowEnd): array
+    {
+        try {
+            $orgId = $user->organisation_id ?? $user->org_id ?? null;
+
+            $todayEnd = $today->copy()->endOfDay();
+
+            $teamShiftsToday = Shift::whereBetween('starts_at', [$today, $todayEnd]);
+            if ($orgId) {
+                $teamShiftsToday = $teamShiftsToday->whereHas('client', fn ($q) => $q->where('organisation_id', $orgId));
+            }
+            $teamShiftsTodayCount = $teamShiftsToday->count();
+
+            $unassignedShifts = Shift::whereNull('user_id')
+                ->whereBetween('starts_at', [$today, $tomorrowEnd]);
+            if ($orgId) {
+                $unassignedShifts = $unassignedShifts->whereHas('client', fn ($q) => $q->where('organisation_id', $orgId));
+            }
+            $unassignedShiftsCount = $unassignedShifts->count();
+
+            $timesheetsPendingApproval = Timesheet::where('status', 'submitted')->count();
+
+            $staffOnToday = Shift::whereBetween('starts_at', [$today, $todayEnd])
+                ->whereNotNull('user_id');
+            if ($orgId) {
+                $staffOnToday = $staffOnToday->whereHas('client', fn ($q) => $q->where('organisation_id', $orgId));
+            }
+            $staffOnTodayCount = $staffOnToday->distinct('user_id')->count('user_id');
+
+            return [
+                'team_shifts_today' => $teamShiftsTodayCount,
+                'unassigned_shifts' => $unassignedShiftsCount,
+                'timesheets_pending_approval' => $timesheetsPendingApproval,
+                'staff_on_today' => $staffOnTodayCount,
+            ];
+        } catch (\Throwable) {
+            return [
+                'team_shifts_today' => 0,
+                'unassigned_shifts' => 0,
+                'timesheets_pending_approval' => 0,
+                'staff_on_today' => 0,
+            ];
+        }
     }
 
     private function getAlertTasks(int $userId): array
     {
-        return ControlRoomAlert::where('assigned_to_user_id', $userId)
-            ->unresolved()
-            ->with(['asset:id,name', 'client:id,first_name,last_name', 'sla'])
-            ->get()
-            ->map(function (ControlRoomAlert $alert) {
-                $clientName = $alert->client
-                    ? trim($alert->client->first_name.' '.$alert->client->last_name)
-                    : null;
+        try {
+            return ControlRoomAlert::where('assigned_to_user_id', $userId)
+                ->unresolved()
+                ->with(['asset:id,name', 'client:id,first_name,last_name', 'sla'])
+                ->get()
+                ->map(function (ControlRoomAlert $alert) {
+                    $clientName = $alert->client
+                        ? trim($alert->client->first_name . ' ' . $alert->client->last_name)
+                        : null;
 
-                $slaStatus = null;
-                if ($alert->sla) {
-                    if ($alert->sla->response_breached) {
-                        $slaStatus = 'breached';
-                    } elseif ($alert->sla->response_deadline && $alert->sla->response_deadline->lt(now()->addMinutes(15))) {
-                        $slaStatus = 'at_risk';
-                    } else {
-                        $slaStatus = 'on_track';
+                    $slaStatus = null;
+                    if ($alert->sla) {
+                        if ($alert->sla->response_breached) {
+                            $slaStatus = 'breached';
+                        } elseif ($alert->sla->response_deadline && $alert->sla->response_deadline->lt(now()->addMinutes(15))) {
+                            $slaStatus = 'at_risk';
+                        } else {
+                            $slaStatus = 'on_track';
+                        }
                     }
-                }
 
-                return [
-                    'id' => 'alert-'.$alert->id,
-                    'type' => 'alert',
-                    'title' => $alert->alert_type,
-                    'priority' => $alert->severity ?? 'medium',
-                    'status' => $alert->status,
-                    'source_url' => '/control-room/alerts/'.$alert->id,
-                    'due_at' => $alert->sla?->response_deadline?->toIso8601String(),
-                    'created_at' => $alert->triggered_at?->toIso8601String() ?? $alert->created_at->toIso8601String(),
-                    'meta' => [
-                        'source' => $alert->source,
-                        'client_name' => $clientName,
-                        'sla_status' => $slaStatus,
-                        'asset_name' => $alert->asset?->name,
-                    ],
-                ];
-            })
-            ->all();
+                    return [
+                        'id' => 'alert-' . $alert->id,
+                        'type' => 'alert',
+                        'title' => $alert->alert_type,
+                        'priority' => $alert->severity ?? 'medium',
+                        'status' => $alert->status,
+                        'source_url' => '/control-room/alerts/' . $alert->id,
+                        'due_at' => $alert->sla?->response_deadline?->toIso8601String(),
+                        'created_at' => $alert->triggered_at?->toIso8601String() ?? $alert->created_at->toIso8601String(),
+                        'meta' => [
+                            'source' => $alert->source,
+                            'client_name' => $clientName,
+                            'sla_status' => $slaStatus,
+                            'asset_name' => $alert->asset?->name,
+                        ],
+                    ];
+                })
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     private function getFollowupTasks(int $userId): array
     {
-        return IncidentFollowup::where('assigned_to_user_id', $userId)
-            ->whereNull('completed_at')
-            ->with(['incident.client:id,first_name,last_name'])
-            ->get()
-            ->map(function (IncidentFollowup $followup) {
-                $incident = $followup->incident;
-                $clientName = $incident?->client
-                    ? trim($incident->client->first_name.' '.$incident->client->last_name)
-                    : null;
+        try {
+            return IncidentFollowup::where('assigned_to_user_id', $userId)
+                ->whereNull('completed_at')
+                ->with(['incident.client:id,first_name,last_name'])
+                ->get()
+                ->map(function (IncidentFollowup $followup) {
+                    $incident = $followup->incident;
+                    $clientName = $incident?->client
+                        ? trim($incident->client->first_name . ' ' . $incident->client->last_name)
+                        : null;
 
-                return [
-                    'id' => 'followup-'.$followup->id,
-                    'type' => 'followup',
-                    'title' => 'Incident follow-up: '.($incident?->title ?? 'Unknown incident'),
-                    'priority' => $incident?->severity ?? 'medium',
-                    'status' => 'pending',
-                    'source_url' => '/incidents/'.($followup->client_incident_id),
-                    'due_at' => $followup->due_at?->toIso8601String(),
-                    'created_at' => $followup->created_at->toIso8601String(),
-                    'meta' => [
-                        'client_name' => $clientName,
-                    ],
-                ];
-            })
-            ->all();
+                    return [
+                        'id' => 'followup-' . $followup->id,
+                        'type' => 'followup',
+                        'title' => 'Incident follow-up: ' . ($incident?->title ?? 'Unknown incident'),
+                        'priority' => $incident?->severity ?? 'medium',
+                        'status' => 'pending',
+                        'source_url' => '/incidents/' . ($followup->client_incident_id),
+                        'due_at' => $followup->due_at?->toIso8601String(),
+                        'created_at' => $followup->created_at->toIso8601String(),
+                        'meta' => [
+                            'client_name' => $clientName,
+                        ],
+                    ];
+                })
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     private function getNoteFollowupTasks(int $userId): array
     {
-        return OperatorNote::where('user_id', $userId)
-            ->where('requires_followup', true)
-            ->get()
-            ->map(function (OperatorNote $note) {
-                $sourceUrl = $note->alert_id
-                    ? '/control-room/alerts/'.$note->alert_id
-                    : '/control-room/shifts';
+        try {
+            return OperatorNote::where('user_id', $userId)
+                ->where('requires_followup', true)
+                ->get()
+                ->map(function (OperatorNote $note) {
+                    $sourceUrl = $note->alert_id
+                        ? '/control-room/alerts/' . $note->alert_id
+                        : '/control-room/shifts';
 
-                return [
-                    'id' => 'note-'.$note->id,
-                    'type' => 'note_followup',
-                    'title' => 'Follow-up: '.Str::limit($note->content, 60),
-                    'priority' => 'medium',
-                    'status' => 'pending',
-                    'source_url' => $sourceUrl,
-                    'due_at' => $note->followup_at?->toIso8601String(),
-                    'created_at' => $note->created_at->toIso8601String(),
-                    'meta' => [],
-                ];
-            })
-            ->values()
-            ->all();
+                    return [
+                        'id' => 'note-' . $note->id,
+                        'type' => 'note_followup',
+                        'title' => 'Follow-up: ' . Str::limit($note->content, 60),
+                        'priority' => 'medium',
+                        'status' => 'pending',
+                        'source_url' => $sourceUrl,
+                        'due_at' => $note->followup_at?->toIso8601String(),
+                        'created_at' => $note->created_at->toIso8601String(),
+                        'meta' => [],
+                    ];
+                })
+                ->values()
+                ->all();
+        } catch (\Throwable) {
+            return [];
+        }
     }
 }

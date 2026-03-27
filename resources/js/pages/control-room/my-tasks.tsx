@@ -19,6 +19,7 @@ import {
     AlertTriangle,
     ArrowRight,
     Bell,
+    Calendar,
     CheckCircle,
     Clock,
     ExternalLink,
@@ -217,7 +218,14 @@ export default function MyTasks({ my_alerts, my_followups, my_shift, stats, can 
             <Head title="My Tasks - Control Room" />
 
             <PageShell>
-                <PageHeader title="My Tasks" subtitle="Your personal control room dashboard" />
+                <PageHeader title="My Tasks" subtitle="Your personal control room dashboard" actions={
+                    <Button variant="outline" size="sm" asChild>
+                        <Link href="/my-tasks">
+                            <Calendar className="mr-2 h-4 w-4" />
+                            View Full My Day
+                        </Link>
+                    </Button>
+                } />
 
                 {/* KPI Row */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
