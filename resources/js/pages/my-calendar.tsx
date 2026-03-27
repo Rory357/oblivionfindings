@@ -294,13 +294,19 @@ export default function MyCalendar() {
     }, []);
 
     const fetchEvents = useCallback(
-        (info: { startStr: string; endStr: string }, successCb: (events: unknown[]) => void, failureCb: (error: unknown) => void) => {
-            fetch(`/my-calendar/events?start=${info.startStr}&end=${info.endStr}`, {
-                credentials: 'same-origin',
-                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-            })
-                .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-                .then(successCb).catch(failureCb);
+        async (info: any, successCallback: any, failureCallback: any) => {
+            try {
+                const res = await fetch(`/my-calendar/events?start=${info.startStr}&end=${info.endStr}`, {
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' },
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                successCallback(data);
+            } catch (e) {
+                console.error('Calendar fetch error:', e);
+                failureCallback(e);
+            }
         }, [],
     );
 
@@ -411,8 +417,9 @@ export default function MyCalendar() {
                                 eventDrop={handleEventDrop}
                                 eventResize={handleEventResize}
                                 height="auto"
-                                slotMinTime="06:00:00"
-                                slotMaxTime="22:00:00"
+                                timeZone="local"
+                                slotMinTime="05:00:00"
+                                slotMaxTime="23:00:00"
                                 allDaySlot={true}
                                 nowIndicator={true}
                                 eventContent={renderEventContent}
