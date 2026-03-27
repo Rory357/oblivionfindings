@@ -52,10 +52,20 @@ class ProgressNoteController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $statsBase = ProgressNote::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
+
+        $stats = [
+            'total' => (clone $statsBase)->count(),
+            'this_week' => (clone $statsBase)->where('created_at', '>=', now()->startOfWeek())->count(),
+            'flagged' => (clone $statsBase)->where('is_flagged', true)->count(),
+        ];
+
         return inertia('operations/progress-notes/Index', [
             'notes' => $notes,
             'clients' => $clients,
             'authors' => $authors,
+            'stats' => $stats,
             'filters' => $request->only(['client_id', 'note_type', 'author_id', 'date_from', 'date_to', 'flagged']),
         ]);
     }

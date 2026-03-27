@@ -8,6 +8,7 @@ use App\Models\Client;
 use App\Models\Shift;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Services\Operations\ReportingService;
 use Illuminate\Http\Request;
 
 class ReportController extends Controller
@@ -129,11 +130,7 @@ class ReportController extends Controller
 
     private function shiftAnalytics(int $orgId, string $dateFrom, string $dateTo, array $filters): array
     {
-        // Placeholder - Shift model queries
-        return [
-            'period' => ['from' => $dateFrom, 'to' => $dateTo],
-            'summary' => 'Shift analytics report placeholder. Full implementation pending Shift model integration.',
-        ];
+        return app(ReportingService::class)->shiftAnalytics($orgId, $dateFrom, $dateTo, $filters);
     }
 
     private function billingReport(int $orgId, string $dateFrom, string $dateTo, array $filters): array
@@ -158,10 +155,7 @@ class ReportController extends Controller
 
     private function complianceReport(int $orgId, array $filters): array
     {
-        // Placeholder - requires credential/training models
-        return [
-            'summary' => 'Compliance report placeholder. Full implementation pending credential tracking integration.',
-        ];
+        return app(ReportingService::class)->complianceReport($orgId, $filters);
     }
 
     private function serviceHours(int $orgId, string $dateFrom, string $dateTo, array $filters): array

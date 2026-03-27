@@ -258,11 +258,11 @@ export default function TimesheetsIndex({ timesheets, filters, approvalMode, cli
                                         </td>
                                     ) : null}
                                     <td className="p-3">
-                                        <div className="font-medium">{t.work_date}</div>
+                                        <div className="font-medium">{new Date(t.work_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</div>
                                         <div className="text-xs text-muted-foreground">
-                                            {new Date(t.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {new Date(t.starts_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
                                             {' – '}
-                                            {new Date(t.ends_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                            {new Date(t.ends_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
                                             {t.break_minutes ? ` • break ${t.break_minutes}m` : ''}
                                         </div>
                                     </td>

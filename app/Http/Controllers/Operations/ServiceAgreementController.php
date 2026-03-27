@@ -8,6 +8,7 @@ use App\Models\ServiceAgreement;
 use App\Models\ServiceAgreementLineItem;
 use App\Models\ServiceAgreementRate;
 use App\Models\ServiceAgreementStatusChange;
+use App\Services\Operations\OpsNotificationService;
 use Illuminate\Http\Request;
 
 class ServiceAgreementController extends Controller
@@ -186,8 +187,7 @@ class ServiceAgreementController extends Controller
             'funder_contact_phone' => $data['funder_contact_phone'] ?? null,
         ]);
 
-        // TODO: Dispatch notification here — notify managers when service agreement is created
-        // app(NotificationService::class)->notifyCrud($auth, 'created', 'service agreement', $agreement, Client::find($data['client_id']));
+        app(OpsNotificationService::class)->notifyCrud($auth, 'created', 'service agreement', $agreement, Client::find($data['client_id']));
 
         return redirect()->route('operations.service_agreements.show', $agreement)
             ->with('success', 'Service agreement created.');
@@ -372,8 +372,7 @@ class ServiceAgreementController extends Controller
 
         $agreement->update($updates);
 
-        // TODO: Dispatch notification here — notify relevant parties when agreement status changes
-        // app(NotificationService::class)->notifyCrud($auth, $data['status'], 'service agreement', $agreement);
+        app(OpsNotificationService::class)->notifyCrud($auth, $data['status'], 'service agreement', $agreement);
 
         return redirect()->back()->with('success', "Agreement status changed to {$data['status']}.");
     }
@@ -437,8 +436,7 @@ class ServiceAgreementController extends Controller
             'approved_by' => $auth->id,
         ]);
 
-        // TODO: Dispatch notification here — notify creator/coordinators when agreement is approved
-        // app(NotificationService::class)->notifyCrud($auth, 'approved', 'service agreement', $agreement);
+        app(OpsNotificationService::class)->notifyCrud($auth, 'approved', 'service agreement', $agreement);
 
         return redirect()->back()->with('success', 'Agreement approved and now active.');
     }
