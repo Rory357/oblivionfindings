@@ -62,7 +62,7 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
     const applyFilters = useCallback(
         (newFilters: Partial<Filters>) => {
             router.get(
-                route('finance.bank-reconciliation.index'),
+                '/finance/bank-reconciliation',
                 { ...filters, ...newFilters, page: 1 },
                 { preserveState: true, preserveScroll: true },
             );
@@ -71,8 +71,8 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
     );
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Bank Reconciliation', href: route('finance.bank-reconciliation.index') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Bank Reconciliation', href: '/finance/bank-reconciliation' },
     ];
 
     return (
@@ -88,7 +88,7 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                         </p>
                     </div>
                     <Button asChild>
-                        <Link href={route('finance.bank-reconciliation.create')}>
+                        <Link href={'/finance/bank-reconciliation/create'}>
                             <Plus className="w-4 h-4 mr-2" />
                             New Reconciliation
                         </Link>
@@ -147,7 +147,7 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                                     Start your first bank reconciliation.
                                 </p>
                                 <Button asChild>
-                                    <Link href={route('finance.bank-reconciliation.create')}>
+                                    <Link href={'/finance/bank-reconciliation/create'}>
                                         <Plus className="w-4 h-4 mr-2" />
                                         New Reconciliation
                                     </Link>
@@ -184,7 +184,7 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                                                 {recon.completed_at || '-'}
                                             </TableCell>
                                             <TableCell>
-                                                <Link href={route('finance.bank-reconciliation.show', recon.id)}>
+                                                <Link href={`/finance/bank-reconciliation/${recon.id}`}>
                                                     <Button variant="ghost" size="sm">
                                                         {recon.status === 'in_progress' ? 'Continue' : 'View'}
                                                     </Button>

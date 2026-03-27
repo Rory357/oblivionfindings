@@ -60,14 +60,14 @@ export default function FixedAssetCreate({ assetAccounts, expenseAccounts }: Pro
     });
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Fixed Assets', href: route('finance.fixed-assets.index') },
-        { title: 'Add Asset', href: route('finance.fixed-assets.create') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Fixed Assets', href: '/finance/fixed-assets' },
+        { title: 'Add Asset', href: '/finance/fixed-assets/create' },
     ];
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
-        post(route('finance.fixed-assets.store'));
+        post('/finance/fixed-assets');
     }
 
     // Preview monthly depreciation calculation
@@ -96,7 +96,7 @@ export default function FixedAssetCreate({ assetAccounts, expenseAccounts }: Pro
 
             <div className="mx-auto max-w-3xl space-y-6 p-6">
                 <div className="flex items-center gap-4">
-                    <Link href={route('finance.fixed-assets.index')}>
+                    <Link href={'/finance/fixed-assets'}>
                         <Button variant="ghost" size="icon">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
@@ -379,7 +379,7 @@ export default function FixedAssetCreate({ assetAccounts, expenseAccounts }: Pro
 
                     {/* Actions */}
                     <div className="flex justify-end gap-3">
-                        <Link href={route('finance.fixed-assets.index')}>
+                        <Link href={'/finance/fixed-assets'}>
                             <Button type="button" variant="outline">Cancel</Button>
                         </Link>
                         <Button type="submit" disabled={processing}>

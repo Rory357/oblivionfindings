@@ -39,9 +39,9 @@ const formatNZD = (amount: number) =>
 
 export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Payment Runs', href: route('finance.payment-runs.index') },
-        { title: 'New Payment Run', href: route('finance.payment-runs.create') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Payment Runs', href: '/finance/payment-runs' },
+        { title: 'New Payment Run', href: '/finance/payment-runs/create' },
     ];
 
     const { data, setData, post, processing, errors } = useForm({
@@ -76,7 +76,7 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(route('finance.payment-runs.store'));
+        post('/finance/payment-runs');
     };
 
     const isOverdue = (dueDate: string) => {

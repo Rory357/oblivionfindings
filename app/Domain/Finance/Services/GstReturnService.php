@@ -17,7 +17,7 @@ class GstReturnService
      * Prepare a GST return by querying posted journal lines within the period
      * that have a non-null tax_rate_id, grouping by revenue vs expense/asset.
      */
-    public function prepareReturn(int $orgId, array $data): FinGstReturn
+    public function prepareReturn(?int $orgId, array $data): FinGstReturn
     {
         return DB::transaction(function () use ($orgId, $data) {
             $periodStart = Carbon::parse($data['period_start']);

@@ -85,7 +85,7 @@ export default function CashFlow({ report, filters }: Props) {
 
     const applyFilter = () => {
         router.get(
-            route('finance.reports.cash-flow'),
+            '/finance/reports/cash-flow',
             { start_date: startDate, end_date: endDate },
             { preserveState: true },
         );

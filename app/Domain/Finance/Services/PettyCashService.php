@@ -16,7 +16,7 @@ class PettyCashService
     /**
      * Create a new petty cash fund.
      */
-    public function createFund(int $orgId, array $data): FinPettyCashFund
+    public function createFund(?int $orgId, array $data): FinPettyCashFund
     {
         return FinPettyCashFund::create([
             'organization_id' => $orgId,

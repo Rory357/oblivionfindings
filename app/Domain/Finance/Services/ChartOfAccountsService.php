@@ -12,7 +12,7 @@ class ChartOfAccountsService
      * Returns hierarchical account tree grouped by type.
      * Each node has children array and calculated balance.
      */
-    public function getAccountTree(int $orgId): array
+    public function getAccountTree(?int $orgId): array
     {
         $accounts = FinAccount::forOrganization($orgId)
             ->with('children')
@@ -65,7 +65,7 @@ class ChartOfAccountsService
     /**
      * Calculate balances for all accounts in an org in bulk.
      */
-    private function calculateBulkBalances(int $orgId): array
+    private function calculateBulkBalances(?int $orgId): array
     {
         $accounts = FinAccount::forOrganization($orgId)->get(['id', 'type', 'opening_balance']);
 
@@ -173,7 +173,7 @@ class ChartOfAccountsService
     /**
      * Create a new account. Validates code uniqueness per org.
      */
-    public function createAccount(int $orgId, array $data): FinAccount
+    public function createAccount(?int $orgId, array $data): FinAccount
     {
         $exists = FinAccount::forOrganization($orgId)
             ->where('code', $data['code'])
@@ -241,7 +241,7 @@ class ChartOfAccountsService
     /**
      * Returns array of accounts with debit/credit balances for trial balance.
      */
-    public function getTrialBalanceData(int $orgId, ?string $asOfDate): array
+    public function getTrialBalanceData(?int $orgId, ?string $asOfDate): array
     {
         $accounts = FinAccount::forOrganization($orgId)
             ->active()

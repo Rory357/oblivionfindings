@@ -57,14 +57,14 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
     const [processingRun, setProcessingRun] = useState(false);
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Payment Runs', href: route('finance.payment-runs.index') },
-        { title: paymentRun.run_number, href: route('finance.payment-runs.show', paymentRun.id) },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Payment Runs', href: '/finance/payment-runs' },
+        { title: paymentRun.run_number, href: `/finance/payment-runs/${paymentRun.id}` },
     ];
 
     const handleApprove = () => {
         setApproving(true);
-        router.post(route('finance.payment-runs.approve', paymentRun.id), {}, {
+        router.post(`/finance/payment-runs/${paymentRun.id}/approve`, {}, {
             preserveScroll: true,
             onFinish: () => setApproving(false),
         });
@@ -72,7 +72,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
 
     const handleProcess = () => {
         setProcessingRun(true);
-        router.post(route('finance.payment-runs.process', paymentRun.id), {}, {
+        router.post(`/finance/payment-runs/${paymentRun.id}/process`, {}, {
             preserveScroll: true,
             onFinish: () => setProcessingRun(false),
         });
@@ -105,7 +105,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                             </Button>
                         )}
                         {paymentRun.status === 'completed' && paymentRun.file_path && (
-                            <a href={route('finance.payment-runs.download', paymentRun.id)}>
+                            <a href={`/finance/payment-runs/${paymentRun.id}/download`}>
                                 <Button variant="outline">
                                     <Download className="mr-2 h-4 w-4" />
                                     Download Bank File
@@ -186,7 +186,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                             <div className="mt-4 border-t pt-4">
                                 <p className="text-sm text-muted-foreground">GL Journal</p>
                                 <Link
-                                    href={route('finance.journals.show', paymentRun.journal.id)}
+                                    href={`/finance/journals/${paymentRun.journal.id}`}
                                     className="text-sm font-mono text-primary hover:underline"
                                 >
                                     {paymentRun.journal.journal_number}
@@ -226,7 +226,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                                             <TableCell className="font-mono">
                                                 {item.bill ? (
                                                     <Link
-                                                        href={route('finance.bills.show', item.bill.id)}
+                                                        href={`/finance/bills/${item.bill.id}`}
                                                         className="text-primary hover:underline"
                                                     >
                                                         {item.bill.bill_number}

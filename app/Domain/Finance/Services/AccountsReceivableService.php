@@ -22,7 +22,7 @@ class AccountsReceivableService
      *
      * @return array{clients: array, totals: array}
      */
-    public function getAgedReceivables(int $orgId): array
+    public function getAgedReceivables(?int $orgId): array
     {
         $today = Carbon::today();
 
@@ -111,7 +111,7 @@ class AccountsReceivableService
     /**
      * Allocate a payment against an invoice and create the GL journal.
      */
-    public function allocatePayment(int $orgId, array $data): FinPaymentAllocation
+    public function allocatePayment(?int $orgId, array $data): FinPaymentAllocation
     {
         return DB::transaction(function () use ($orgId, $data) {
             $invoice = Invoice::where('organization_id', $orgId)
@@ -188,7 +188,7 @@ class AccountsReceivableService
      *
      * @return array{client: array, invoices: array, total_outstanding: float}
      */
-    public function generateStatement(int $orgId, int $clientId, string $asOfDate): array
+    public function generateStatement(?int $orgId, int $clientId, string $asOfDate): array
     {
         $client = Client::findOrFail($clientId);
         $asOf = Carbon::parse($asOfDate);
@@ -247,7 +247,7 @@ class AccountsReceivableService
     /**
      * Get outstanding (unpaid) invoices, optionally filtered by client.
      */
-    public function getOutstandingInvoices(int $orgId, ?int $clientId = null): Collection
+    public function getOutstandingInvoices(?int $orgId, ?int $clientId = null): Collection
     {
         $query = Invoice::where('organization_id', $orgId)
             ->where('status', 'sent')
@@ -280,7 +280,7 @@ class AccountsReceivableService
     /**
      * Find the Accounts Receivable account (code 1100) for the organisation.
      */
-    public function findArAccount(int $orgId): FinAccount
+    public function findArAccount(?int $orgId): FinAccount
     {
         return FinAccount::where('organization_id', $orgId)
             ->where('code', '1100')
@@ -291,7 +291,7 @@ class AccountsReceivableService
     /**
      * Find the Bank - Operating account (code 1000) for the organisation.
      */
-    public function findBankAccount(int $orgId): FinAccount
+    public function findBankAccount(?int $orgId): FinAccount
     {
         return FinAccount::where('organization_id', $orgId)
             ->where('code', '1000')

@@ -188,11 +188,11 @@ function IrdFormBox({
 
 export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageProps) {
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'GST Returns', href: route('finance.gst-returns.index') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'GST Returns', href: '/finance/gst-returns' },
         {
             title: `Period ending ${formatDate(gstReturn.period_end)}`,
-            href: route('finance.gst-returns.show', gstReturn.id),
+            href: `/finance/gst-returns/${gstReturn.id}`,
         },
     ];
 
@@ -201,7 +201,7 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
 
     function handleFile() {
         if (confirm('Are you sure you want to mark this return as filed? This action cannot be undone.')) {
-            router.post(route('finance.gst-returns.file', gstReturn.id));
+            router.post(`/finance/gst-returns/${gstReturn.id}/file`);
         }
     }
 

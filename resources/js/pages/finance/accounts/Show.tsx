@@ -79,14 +79,14 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
     const [endDate, setEndDate] = useState(filters.end_date);
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Chart of Accounts', href: route('finance.accounts.index') },
-        { title: `${account.code} - ${account.name}`, href: route('finance.accounts.show', account.id) },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Chart of Accounts', href: '/finance/accounts' },
+        { title: `${account.code} - ${account.name}`, href: `/finance/accounts/${account.id}` },
     ];
 
     function handleFilter(e: FormEvent) {
         e.preventDefault();
-        router.get(route('finance.accounts.show', account.id), {
+        router.get(`/finance/accounts/${account.id}`, {
             start_date: startDate,
             end_date: endDate,
         }, { preserveState: true });
@@ -99,7 +99,7 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
             <div className="mx-auto max-w-6xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href={route('finance.accounts.index')}>
+                        <Link href={'/finance/accounts'}>
                             <Button variant="ghost" size="icon">
                                 <ArrowLeft className="h-4 w-4" />
                             </Button>
@@ -200,7 +200,7 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
                                             <TableCell className="text-sm">{line.date}</TableCell>
                                             <TableCell>
                                                 <Link
-                                                    href={route('finance.journals.show', line.journal_id)}
+                                                    href={`/finance/journals/${line.journal_id}`}
                                                     className="text-sm font-mono text-primary hover:underline"
                                                 >
                                                     {line.journal_number}

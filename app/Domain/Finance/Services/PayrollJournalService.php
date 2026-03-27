@@ -196,7 +196,7 @@ class PayrollJournalService
      |  Helper: find a GL account by code (cached per request)
      | ------------------------------------------------------------------ */
 
-    public function findAccountByCode(int $orgId, string $code): FinAccount
+    public function findAccountByCode(?int $orgId, string $code): FinAccount
     {
         $cacheKey = "{$orgId}:{$code}";
 

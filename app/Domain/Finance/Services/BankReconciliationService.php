@@ -17,7 +17,7 @@ class BankReconciliationService
      * Parse CSV file and create FinBankTransaction records.
      * CSV format: Date,Amount,Description,Reference (first row headers).
      */
-    public function importTransactions(int $orgId, int $bankAccountId, string $filePath, string $format = 'csv'): array
+    public function importTransactions(?int $orgId, int $bankAccountId, string $filePath, string $format = 'csv'): array
     {
         $handle = fopen($filePath, 'r');
         if ($handle === false) {
@@ -83,7 +83,7 @@ class BankReconciliationService
     /**
      * Start a new bank reconciliation.
      */
-    public function startReconciliation(int $orgId, int $bankAccountId, array $data): FinBankReconciliation
+    public function startReconciliation(?int $orgId, int $bankAccountId, array $data): FinBankReconciliation
     {
         return FinBankReconciliation::create([
             'organization_id' => $orgId,

@@ -114,7 +114,7 @@ export default function Reconcile({
 
         setProcessing(true);
         router.post(
-            route('finance.bank-reconciliation.match', reconciliation.id),
+            `/finance/bank-reconciliation/${reconciliation.id}/match`,
             {
                 bank_transaction_id: selectedTransaction,
                 journal_line_id: selectedJournalLine,
@@ -135,7 +135,7 @@ export default function Reconcile({
 
         setProcessing(true);
         router.post(
-            route('finance.bank-reconciliation.match', reconciliation.id),
+            `/finance/bank-reconciliation/${reconciliation.id}/match`,
             {
                 bank_transaction_id: match.bank_transaction_id,
                 journal_line_id: match.journal_line_id,
@@ -152,7 +152,7 @@ export default function Reconcile({
 
         setProcessing(true);
         router.post(
-            route('finance.bank-reconciliation.unmatch', reconciliation.id),
+            `/finance/bank-reconciliation/${reconciliation.id}/unmatch`,
             { line_id: lineId },
             {
                 preserveScroll: true,
@@ -166,7 +166,7 @@ export default function Reconcile({
 
         setProcessing(true);
         router.post(
-            route('finance.bank-reconciliation.complete', reconciliation.id),
+            `/finance/bank-reconciliation/${reconciliation.id}/complete`,
             {},
             { onFinish: () => setProcessing(false) },
         );
@@ -177,7 +177,7 @@ export default function Reconcile({
 
         setProcessing(true);
         router.post(
-            route('finance.bank-reconciliation.match', reconciliation.id),
+            `/finance/bank-reconciliation/${reconciliation.id}/match`,
             {
                 bank_transaction_id: selectedTransaction,
                 journal_line_id: null,
@@ -194,9 +194,9 @@ export default function Reconcile({
     };
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Bank Reconciliation', href: route('finance.bank-reconciliation.index') },
-        { title: `${reconciliation.bank_account_name} - ${reconciliation.statement_date}`, href: route('finance.bank-reconciliation.show', reconciliation.id) },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Bank Reconciliation', href: '/finance/bank-reconciliation' },
+        { title: `${reconciliation.bank_account_name} - ${reconciliation.statement_date}`, href: `/finance/bank-reconciliation/${reconciliation.id}` },
     ];
 
     return (

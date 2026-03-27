@@ -17,7 +17,7 @@ class BudgetActualsService
      *
      * @return array{updated: int, total_budget: float, total_actual: float, variance: float}
      */
-    public function syncActuals(int $orgId): array
+    public function syncActuals(?int $orgId): array
     {
         $budgets = Budget::approved()
             ->with('lineItems')
@@ -66,7 +66,7 @@ class BudgetActualsService
      *
      * @return array{budget: array, categories: array, totals: array}
      */
-    public function getBudgetVsActualsReport(int $orgId, ?int $budgetId = null): array
+    public function getBudgetVsActualsReport(?int $orgId, ?int $budgetId = null): array
     {
         $budget = $budgetId
             ? Budget::with('lineItems')->findOrFail($budgetId)
@@ -204,7 +204,7 @@ class BudgetActualsService
      * For expense accounts: actual = debits - credits
      * For revenue accounts: actual = credits - debits
      */
-    private function sumPostedJournalLines(FinAccount $account, int $orgId, Carbon $startDate, Carbon $endDate): float
+    private function sumPostedJournalLines(FinAccount $account, ?int $orgId, Carbon $startDate, Carbon $endDate): float
     {
         $totals = FinJournalLine::where('account_id', $account->id)
             ->whereHas('journal', function ($q) use ($orgId, $startDate, $endDate) {

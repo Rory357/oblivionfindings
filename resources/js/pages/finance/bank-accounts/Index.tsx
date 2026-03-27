@@ -33,8 +33,8 @@ const accountTypeLabels: Record<string, string> = {
 
 export default function BankAccountsIndex({ bankAccounts }: Props) {
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Bank Accounts', href: route('finance.bank-accounts.index') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Bank Accounts', href: '/finance/bank-accounts' },
     ];
 
     return (
@@ -50,7 +50,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                         </p>
                     </div>
                     <Button asChild>
-                        <Link href={route('finance.bank-accounts.create')}>
+                        <Link href={'/finance/bank-accounts/create'}>
                             <Plus className="w-4 h-4 mr-2" />
                             Add Bank Account
                         </Link>
@@ -66,7 +66,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                                 Get started by adding your first bank account.
                             </p>
                             <Button asChild>
-                                <Link href={route('finance.bank-accounts.create')}>
+                                <Link href={'/finance/bank-accounts/create'}>
                                     <Plus className="w-4 h-4 mr-2" />
                                     Add Bank Account
                                 </Link>
@@ -78,7 +78,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                         {bankAccounts.map((account) => (
                             <Link
                                 key={account.id}
-                                href={route('finance.bank-accounts.show', account.id)}
+                                href={`/finance/bank-accounts/${account.id}`}
                                 className="block"
                             >
                                 <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">

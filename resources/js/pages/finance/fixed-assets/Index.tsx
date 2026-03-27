@@ -118,7 +118,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
     const applyFilters = useCallback(
         (newFilters: Partial<Filters>) => {
             router.get(
-                route('finance.fixed-assets.index'),
+                '/finance/fixed-assets',
                 { ...filters, ...newFilters, page: 1 },
                 { preserveState: true, preserveScroll: true },
             );
@@ -141,14 +141,14 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
 
     function handleRunDepreciation(e: FormEvent) {
         e.preventDefault();
-        depForm.post(route('finance.fixed-assets.run-depreciation'), {
+        depForm.post('/finance/fixed-assets/run-depreciation', {
             onSuccess: () => setDepModalOpen(false),
         });
     }
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Fixed Assets', href: route('finance.fixed-assets.index') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Fixed Assets', href: '/finance/fixed-assets' },
     ];
 
     return (
@@ -204,7 +204,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                 </form>
                             </DialogContent>
                         </Dialog>
-                        <Link href={route('finance.fixed-assets.create')}>
+                        <Link href={'/finance/fixed-assets/create'}>
                             <Button>
                                 <Plus className="mr-2 h-4 w-4" />
                                 Add Asset
@@ -330,7 +330,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                 <p className="text-muted-foreground mb-4">
                                     Get started by adding your first fixed asset.
                                 </p>
-                                <Link href={route('finance.fixed-assets.create')}>
+                                <Link href={'/finance/fixed-assets/create'}>
                                     <Button>
                                         <Plus className="mr-2 h-4 w-4" />
                                         Add Asset
@@ -358,7 +358,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                             <TableRow key={asset.id}>
                                                 <TableCell>
                                                     <Link
-                                                        href={route('finance.fixed-assets.show', asset.id)}
+                                                        href={`/finance/fixed-assets/${asset.id}`}
                                                         className="font-medium text-primary hover:underline"
                                                     >
                                                         {asset.asset_name}

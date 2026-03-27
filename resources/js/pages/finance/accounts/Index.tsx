@@ -62,7 +62,7 @@ function AccountRow({ account, depth = 0 }: { account: Account; depth?: number }
             <div
                 className="flex items-center gap-2 py-2 px-3 hover:bg-muted/50 rounded-md cursor-pointer group"
                 style={{ paddingLeft: `${depth * 24 + 12}px` }}
-                onClick={() => router.visit(route('finance.accounts.show', account.id))}
+                onClick={() => router.visit(`/finance/accounts/${account.id}`)}
             >
                 {hasChildren ? (
                     <button
@@ -152,8 +152,8 @@ function AccountTypeSection({ type, accounts }: { type: string; accounts: Accoun
 
 export default function AccountsIndex({ accountTree, accountTypes }: PageProps) {
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Chart of Accounts', href: route('finance.accounts.index') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Chart of Accounts', href: '/finance/accounts' },
     ];
 
     return (
@@ -166,7 +166,7 @@ export default function AccountsIndex({ accountTree, accountTypes }: PageProps) 
                         <h1 className="text-2xl font-bold tracking-tight">Chart of Accounts</h1>
                         <p className="text-muted-foreground">Manage your organisation's account structure</p>
                     </div>
-                    <Link href={route('finance.accounts.create')}>
+                    <Link href={'/finance/accounts/create'}>
                         <Button>
                             <Plus className="mr-2 h-4 w-4" />
                             Add Account

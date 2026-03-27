@@ -177,7 +177,7 @@ class ExpenseJournalService
      *
      * @throws RuntimeException if the account does not exist or is inactive
      */
-    public function findAccountByCode(int $orgId, string $code): FinAccount
+    public function findAccountByCode(?int $orgId, string $code): FinAccount
     {
         $account = FinAccount::where('organization_id', $orgId)
             ->where('code', $code)

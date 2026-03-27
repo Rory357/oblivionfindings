@@ -74,7 +74,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        post(route('finance.petty-cash.transaction', fund.id), {
+        post(`/finance/petty-cash/${fund.id}/transaction`, {
             onSuccess: () => reset(),
         });
     };
@@ -86,7 +86,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
             <div className="space-y-6">
                 <div className="flex items-center gap-4">
                     <Button asChild variant="ghost" size="sm">
-                        <Link href={route('finance.petty-cash.index')}>
+                        <Link href={'/finance/petty-cash'}>
                             <ArrowLeft className="mr-1 h-4 w-4" />
                             Back
                         </Link>

@@ -70,9 +70,9 @@ class FinJournal extends Model
         return $this->morphTo();
     }
 
-    public function scopeForOrganization($query, int $orgId)
+    public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->where('organization_id', $orgId);
+        return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));
     }
 
     public function scopePosted($query)

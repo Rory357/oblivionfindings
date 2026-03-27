@@ -51,7 +51,7 @@ function CreateCostCentreDialog() {
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
-        post(route('finance.cost-centres.store'), {
+        post('/finance/cost-centres', {
             onSuccess: () => {
                 reset();
                 setOpen(false);
@@ -137,7 +137,7 @@ function EditCostCentreDialog({ costCentre }: { costCentre: CostCentre }) {
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
-        put(route('finance.cost-centres.update', costCentre.id), {
+        put(`/finance/cost-centres/${costCentre.id}`, {
             onSuccess: () => setOpen(false),
         });
     }
@@ -206,13 +206,13 @@ function EditCostCentreDialog({ costCentre }: { costCentre: CostCentre }) {
 
 export default function CostCentresIndex({ costCentres }: PageProps) {
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Cost Centres', href: route('finance.cost-centres.index') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Cost Centres', href: '/finance/cost-centres' },
     ];
 
     function handleDelete(id: number) {
         if (confirm('Are you sure you want to delete this cost centre?')) {
-            router.delete(route('finance.cost-centres.destroy', id));
+            router.delete(`/finance/cost-centres/${id}`);
         }
     }
 

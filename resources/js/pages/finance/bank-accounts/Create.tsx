@@ -31,13 +31,13 @@ export default function BankAccountCreate({ glAccounts }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(route('finance.bank-accounts.store'));
+        post('/finance/bank-accounts');
     };
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Bank Accounts', href: route('finance.bank-accounts.index') },
-        { title: 'Add Bank Account', href: route('finance.bank-accounts.create') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Bank Accounts', href: '/finance/bank-accounts' },
+        { title: 'Add Bank Account', href: '/finance/bank-accounts/create' },
     ];
 
     return (

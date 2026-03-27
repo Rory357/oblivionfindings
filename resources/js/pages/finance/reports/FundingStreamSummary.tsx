@@ -44,13 +44,13 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
     const [end, setEnd] = useState(endDate ?? '');
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Reports', href: route('finance.reports.trial-balance') },
-        { title: 'Funding Stream Summary', href: route('finance.reports.funding-stream-summary') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Reports', href: '/finance/reports/trial-balance' },
+        { title: 'Funding Stream Summary', href: '/finance/reports/funding-stream-summary' },
     ];
 
     const handleGenerate = () => {
-        router.get(route('finance.reports.funding-stream-summary'), {
+        router.get('/finance/reports/funding-stream-summary', {
             start_date: start,
             end_date: end,
         }, { preserveState: true });

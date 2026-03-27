@@ -86,7 +86,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
         formData.append('bank_account_id', String(bankAccount.id));
         formData.append('file', importForm.data.file);
 
-        router.post(route('finance.bank-transactions.import'), formData, {
+        router.post('/finance/bank-transactions/import', formData, {
             onSuccess: () => {
                 setImportOpen(false);
                 importForm.reset();
@@ -95,9 +95,9 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
     };
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Bank Accounts', href: route('finance.bank-accounts.index') },
-        { title: bankAccount.name, href: route('finance.bank-accounts.show', bankAccount.id) },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Bank Accounts', href: '/finance/bank-accounts' },
+        { title: bankAccount.name, href: `/finance/bank-accounts/${bankAccount.id}` },
     ];
 
     return (
@@ -113,7 +113,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" asChild>
-                            <Link href={route('finance.bank-accounts.edit', bankAccount.id)}>
+                            <Link href={`/finance/bank-accounts/${bankAccount.id}/edit`}>
                                 Edit
                             </Link>
                         </Button>
@@ -191,7 +191,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                                         </form>
                                     </DialogContent>
                                 </Dialog>
-                                <Link href={`${route('finance.bank-reconciliation.create')}?bank_account_id=${bankAccount.id}`}>
+                                <Link href={`/finance/bank-reconciliation/create?bank_account_id=${bankAccount.id}`}>
                                     <Button size="sm">
                                         <ArrowRight className="h-4 w-4 mr-2" />
                                         Start Reconciliation
@@ -275,7 +275,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                                             <TableCell>{reconStatusBadge(recon.status)}</TableCell>
                                             <TableCell className="text-muted-foreground">{recon.completed_at || '-'}</TableCell>
                                             <TableCell>
-                                                <Link href={route('finance.bank-reconciliation.show', recon.id)}>
+                                                <Link href={`/finance/bank-reconciliation/${recon.id}`}>
                                                     <Button variant="ghost" size="sm">View</Button>
                                                 </Link>
                                             </TableCell>

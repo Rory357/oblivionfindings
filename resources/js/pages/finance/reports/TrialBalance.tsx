@@ -45,7 +45,7 @@ export default function TrialBalance({ report, filters }: Props) {
     const [asOfDate, setAsOfDate] = useState(filters.as_of_date);
 
     const applyFilter = () => {
-        router.get(route('finance.reports.trial-balance'), { as_of_date: asOfDate }, { preserveState: true });
+        router.get('/finance/reports/trial-balance', { as_of_date: asOfDate }, { preserveState: true });
     };
 
     const grouped = typeOrder

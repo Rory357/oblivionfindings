@@ -31,13 +31,13 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        post(route('finance.bank-reconciliation.store'));
+        post('/finance/bank-reconciliation');
     };
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Bank Reconciliation', href: route('finance.bank-reconciliation.index') },
-        { title: 'New Reconciliation', href: route('finance.bank-reconciliation.create') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Bank Reconciliation', href: '/finance/bank-reconciliation' },
+        { title: 'New Reconciliation', href: '/finance/bank-reconciliation/create' },
     ];
 
     return (

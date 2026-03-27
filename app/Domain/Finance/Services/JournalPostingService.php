@@ -17,7 +17,7 @@ class JournalPostingService
     /**
      * Create a journal in draft status.
      */
-    public function createDraftJournal(int $orgId, array $data): FinJournal
+    public function createDraftJournal(?int $orgId, array $data): FinJournal
     {
         return DB::transaction(function () use ($orgId, $data) {
             $journal = FinJournal::create([
@@ -218,7 +218,7 @@ class JournalPostingService
      * Convenience method: create a draft journal and post it immediately.
      * Used by integration bridges (payroll, billing, etc.).
      */
-    public function createAndPost(int $orgId, array $data): FinJournal
+    public function createAndPost(?int $orgId, array $data): FinJournal
     {
         $journal = $this->createDraftJournal($orgId, $data);
 
@@ -229,7 +229,7 @@ class JournalPostingService
      * Generate the next sequential journal number for an organisation.
      * Format: JNL-000001, JNL-000002, etc.
      */
-    public function generateJournalNumber(int $orgId): string
+    public function generateJournalNumber(?int $orgId): string
     {
         $maxNumber = FinJournal::where('organization_id', $orgId)
             ->selectRaw("MAX(CAST(SUBSTRING(journal_number, 5) AS UNSIGNED)) as max_num")

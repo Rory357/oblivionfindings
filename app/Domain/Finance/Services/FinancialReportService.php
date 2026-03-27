@@ -19,7 +19,7 @@ class FinancialReportService
      * Assets/Expenses = debit balance (debits - credits)
      * Liabilities/Equity/Revenue = credit balance (credits - debits)
      */
-    public function getTrialBalance(int $orgId, string $asOfDate): array
+    public function getTrialBalance(?int $orgId, string $asOfDate): array
     {
         $accounts = FinAccount::forOrganization($orgId)
             ->active()
@@ -97,7 +97,7 @@ class FinancialReportService
     /**
      * Generate a Profit & Loss statement for a date range.
      */
-    public function getProfitAndLoss(int $orgId, string $startDate, string $endDate): array
+    public function getProfitAndLoss(?int $orgId, string $startDate, string $endDate): array
     {
         $revenueAccounts = $this->getAccountBalancesForPeriod($orgId, 'revenue', $startDate, $endDate);
         $expenseAccounts = $this->getAccountBalancesForPeriod($orgId, 'expense', $startDate, $endDate);
@@ -148,7 +148,7 @@ class FinancialReportService
     /**
      * Generate a Balance Sheet as of a given date.
      */
-    public function getBalanceSheet(int $orgId, string $asOfDate): array
+    public function getBalanceSheet(?int $orgId, string $asOfDate): array
     {
         $accounts = FinAccount::forOrganization($orgId)
             ->active()
@@ -252,7 +252,7 @@ class FinancialReportService
     /**
      * Generate a simplified cash flow statement.
      */
-    public function getCashFlow(int $orgId, string $startDate, string $endDate): array
+    public function getCashFlow(?int $orgId, string $startDate, string $endDate): array
     {
         // Get bank account GL account IDs
         $bankGlAccountIds = FinBankAccount::forOrganization($orgId)
@@ -367,7 +367,7 @@ class FinancialReportService
     /**
      * Aged Payables report — unpaid bills grouped by vendor with aging buckets.
      */
-    public function getAgedPayables(int $orgId): array
+    public function getAgedPayables(?int $orgId): array
     {
         $today = now()->startOfDay();
 
@@ -434,7 +434,7 @@ class FinancialReportService
     /**
      * Aged Receivables report — unpaid invoices grouped by client with aging buckets.
      */
-    public function getAgedReceivables(int $orgId): array
+    public function getAgedReceivables(?int $orgId): array
     {
         $today = now()->startOfDay();
 
@@ -502,7 +502,7 @@ class FinancialReportService
     /**
      * Funding stream summary — revenue and expenses grouped by funding stream.
      */
-    public function getFundingStreamSummary(int $orgId, string $startDate, string $endDate): array
+    public function getFundingStreamSummary(?int $orgId, string $startDate, string $endDate): array
     {
         $fundingStreams = FinFundingStream::forOrganization($orgId)
             ->active()
@@ -579,7 +579,7 @@ class FinancialReportService
     /**
      * Helper: get account balances for a type within a period.
      */
-    private function getAccountBalancesForPeriod(int $orgId, string $accountType, string $startDate, string $endDate)
+    private function getAccountBalancesForPeriod(?int $orgId, string $accountType, string $startDate, string $endDate)
     {
         return FinAccount::forOrganization($orgId)
             ->active()
@@ -607,7 +607,7 @@ class FinancialReportService
     /**
      * Helper: calculate retained earnings (cumulative P&L) up to a date.
      */
-    private function calculateRetainedEarnings(int $orgId, string $asOfDate): float
+    private function calculateRetainedEarnings(?int $orgId, string $asOfDate): float
     {
         $result = FinJournalLine::query()
             ->join('fin_journals', 'fin_journal_lines.journal_id', '=', 'fin_journals.id')
@@ -637,7 +637,7 @@ class FinancialReportService
     /**
      * Helper: calculate cash balance from bank GL accounts up to (but not including) a date.
      */
-    private function calculateCashBalance(int $orgId, array $bankGlAccountIds, string $beforeDate): float
+    private function calculateCashBalance(?int $orgId, array $bankGlAccountIds, string $beforeDate): float
     {
         $result = FinJournalLine::query()
             ->join('fin_journals', 'fin_journal_lines.journal_id', '=', 'fin_journals.id')

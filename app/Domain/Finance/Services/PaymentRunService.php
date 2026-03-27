@@ -21,7 +21,7 @@ class PaymentRunService
     /**
      * Create a new payment run from a set of approved/partially-paid bills.
      */
-    public function createPaymentRun(int $orgId, array $data): FinPaymentRun
+    public function createPaymentRun(?int $orgId, array $data): FinPaymentRun
     {
         return DB::transaction(function () use ($orgId, $data) {
             $runNumber = $this->generateRunNumber($orgId);
@@ -191,7 +191,7 @@ class PaymentRunService
     /**
      * Get all approved or partially-paid bills for an organisation.
      */
-    public function getApprovedUnpaidBills(int $orgId): Collection
+    public function getApprovedUnpaidBills(?int $orgId): Collection
     {
         return FinBill::forOrganization($orgId)
             ->whereIn('status', ['approved', 'partially_paid'])
@@ -205,7 +205,7 @@ class PaymentRunService
      * Generate the next sequential payment run number.
      * Format: PAY-YYYYMM-001, PAY-YYYYMM-002, etc.
      */
-    private function generateRunNumber(int $orgId): string
+    private function generateRunNumber(?int $orgId): string
     {
         $prefix = 'PAY-' . now()->format('Ym') . '-';
 
@@ -222,7 +222,7 @@ class PaymentRunService
     /**
      * Resolve the Accounts Payable GL account (code 2000) for an organisation.
      */
-    private function getAccountsPayableAccountId(int $orgId): int
+    private function getAccountsPayableAccountId(?int $orgId): int
     {
         $account = \App\Domain\Finance\Models\FinAccount::where('organization_id', $orgId)
             ->where('code', '2000')

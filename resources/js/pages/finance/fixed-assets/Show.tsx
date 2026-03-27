@@ -129,14 +129,14 @@ export default function FixedAssetShow({ asset, depreciationSchedule }: Props) {
     const bookValue = Number(asset.purchase_cost) - Number(asset.accumulated_depreciation);
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Fixed Assets', href: route('finance.fixed-assets.index') },
-        { title: asset.asset_name, href: route('finance.fixed-assets.show', asset.id) },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Fixed Assets', href: '/finance/fixed-assets' },
+        { title: asset.asset_name, href: `/finance/fixed-assets/${asset.id}` },
     ];
 
     function handleDispose(e: FormEvent) {
         e.preventDefault();
-        disposeForm.post(route('finance.fixed-assets.dispose', asset.id), {
+        disposeForm.post(`/finance/fixed-assets/${asset.id}/dispose`, {
             onSuccess: () => setDisposeModalOpen(false),
         });
     }
@@ -149,7 +149,7 @@ export default function FixedAssetShow({ asset, depreciationSchedule }: Props) {
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href={route('finance.fixed-assets.index')}>
+                        <Link href={'/finance/fixed-assets'}>
                             <Button variant="ghost" size="icon">
                                 <ArrowLeft className="h-4 w-4" />
                             </Button>
@@ -172,7 +172,7 @@ export default function FixedAssetShow({ asset, depreciationSchedule }: Props) {
                     <div className="flex items-center gap-3">
                         {asset.status === 'active' && (
                             <>
-                                <Link href={route('finance.fixed-assets.edit', asset.id)}>
+                                <Link href={`/finance/fixed-assets/${asset.id}/edit`}>
                                     <Button variant="outline">
                                         <Edit className="mr-2 h-4 w-4" />
                                         Edit
@@ -410,7 +410,7 @@ export default function FixedAssetShow({ asset, depreciationSchedule }: Props) {
                                             <TableCell>
                                                 {dep.journal ? (
                                                     <Link
-                                                        href={route('finance.journals.show', dep.journal.id)}
+                                                        href={`/finance/journals/${dep.journal.id}`}
                                                         className="text-sm font-mono text-primary hover:underline"
                                                     >
                                                         {dep.journal.journal_number}

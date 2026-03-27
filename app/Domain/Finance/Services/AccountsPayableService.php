@@ -20,7 +20,7 @@ class AccountsPayableService
     /**
      * Create a bill with lines. Auto-generate bill_number if not provided.
      */
-    public function createBill(int $orgId, array $data): FinBill
+    public function createBill(?int $orgId, array $data): FinBill
     {
         return DB::transaction(function () use ($orgId, $data) {
             $billNumber = ! empty($data['bill_number'])
@@ -243,7 +243,7 @@ class AccountsPayableService
     /**
      * Create a credit note (type='payable' for AP).
      */
-    public function createCreditNote(int $orgId, array $data): FinCreditNote
+    public function createCreditNote(?int $orgId, array $data): FinCreditNote
     {
         return DB::transaction(function () use ($orgId, $data) {
             $creditNoteNumber = $this->generateCreditNoteNumber($orgId);
@@ -387,7 +387,7 @@ class AccountsPayableService
     /**
      * Get aged payables report for an organisation.
      */
-    public function getAgedPayables(int $orgId): array
+    public function getAgedPayables(?int $orgId): array
     {
         $today = Carbon::today();
 
@@ -456,7 +456,7 @@ class AccountsPayableService
     /**
      * Find the Accounts Payable GL account (code '2000') for the org.
      */
-    public function findApAccount(int $orgId): FinAccount
+    public function findApAccount(?int $orgId): FinAccount
     {
         return FinAccount::forOrganization($orgId)
             ->where('code', '2000')
@@ -467,7 +467,7 @@ class AccountsPayableService
      * Generate the next sequential bill number for an organisation.
      * Format: BILL-YYYYMM-001
      */
-    private function generateBillNumber(int $orgId): string
+    private function generateBillNumber(?int $orgId): string
     {
         $prefix = 'BILL-' . now()->format('Ym') . '-';
 
@@ -485,7 +485,7 @@ class AccountsPayableService
      * Generate the next sequential credit note number for an organisation.
      * Format: CN-YYYYMM-001
      */
-    private function generateCreditNoteNumber(int $orgId): string
+    private function generateCreditNoteNumber(?int $orgId): string
     {
         $prefix = 'CN-' . now()->format('Ym') . '-';
 

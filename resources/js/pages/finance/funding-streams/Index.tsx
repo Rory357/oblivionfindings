@@ -81,7 +81,7 @@ function CreateFundingStreamDialog({ revenueAccounts }: { revenueAccounts: Reven
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
-        post(route('finance.funding-streams.store'), {
+        post('/finance/funding-streams', {
             onSuccess: () => {
                 reset();
                 setOpen(false);
@@ -216,7 +216,7 @@ function EditFundingStreamDialog({ fundingStream, revenueAccounts }: { fundingSt
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
-        put(route('finance.funding-streams.update', fundingStream.id), {
+        put(`/finance/funding-streams/${fundingStream.id}`, {
             onSuccess: () => setOpen(false),
         });
     }
@@ -335,13 +335,13 @@ const funderTypeLabels: Record<string, string> = Object.fromEntries(
 
 export default function FundingStreamsIndex({ fundingStreams, revenueAccounts }: PageProps) {
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Funding Streams', href: route('finance.funding-streams.index') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Funding Streams', href: '/finance/funding-streams' },
     ];
 
     function handleDelete(id: number) {
         if (confirm('Are you sure you want to delete this funding stream?')) {
-            router.delete(route('finance.funding-streams.destroy', id));
+            router.delete(`/finance/funding-streams/${id}`);
         }
     }
 

@@ -47,9 +47,9 @@ const agingColumns = [
 
 export default function AgedReceivables({ report }: Props) {
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Reports', href: route('finance.reports.trial-balance') },
-        { title: 'Aged Receivables', href: route('finance.reports.aged-receivables') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Reports', href: '/finance/reports/trial-balance' },
+        { title: 'Aged Receivables', href: '/finance/reports/aged-receivables' },
     ];
 
     return (

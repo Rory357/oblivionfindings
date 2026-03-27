@@ -63,8 +63,8 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'GST Returns', href: route('finance.gst-returns.index') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'GST Returns', href: '/finance/gst-returns' },
     ];
 
     const currentYear = new Date().getFullYear();
@@ -77,7 +77,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
         } else {
             delete params[key];
         }
-        router.get(route('finance.gst-returns.index'), params, { preserveState: true });
+        router.get('/finance/gst-returns', params, { preserveState: true });
     }
 
     return (
@@ -90,7 +90,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                         <h1 className="text-2xl font-bold tracking-tight">GST Returns</h1>
                         <p className="text-muted-foreground">Manage and file GST returns with IRD</p>
                     </div>
-                    <Link href={route('finance.gst-returns.prepare')}>
+                    <Link href={'/finance/gst-returns/prepare'}>
                         <Button>
                             <Plus className="mr-2 h-4 w-4" />
                             Prepare Return
@@ -173,7 +173,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                                     className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
                                                     onClick={() =>
                                                         router.visit(
-                                                            route('finance.gst-returns.show', gstReturn.id),
+                                                            `/finance/gst-returns/${gstReturn.id}`,
                                                         )
                                                     }
                                                 >

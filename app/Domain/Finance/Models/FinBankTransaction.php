@@ -47,9 +47,9 @@ class FinBankTransaction extends Model
         return $this->belongsTo(FinJournalLine::class, 'matched_journal_line_id');
     }
 
-    public function scopeForOrganization($query, int $orgId)
+    public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->where('organization_id', $orgId);
+        return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));
     }
 
     public function scopeUnreconciled($query)

@@ -34,7 +34,7 @@ export default function PettyCashCreate({ accounts, users }: Props) {
 
     const handleSubmit = (e: FormEvent) => {
         e.preventDefault();
-        post(route('finance.petty-cash.store'));
+        post('/finance/petty-cash');
     };
 
     return (
@@ -128,7 +128,7 @@ export default function PettyCashCreate({ accounts, users }: Props) {
                                     {processing ? 'Creating...' : 'Create Fund'}
                                 </Button>
                                 <Button asChild variant="outline">
-                                    <Link href={route('finance.petty-cash.index')}>Cancel</Link>
+                                    <Link href={'/finance/petty-cash'}>Cancel</Link>
                                 </Button>
                             </div>
                         </form>

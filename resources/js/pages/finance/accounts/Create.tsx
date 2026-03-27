@@ -103,14 +103,14 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
     });
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Chart of Accounts', href: route('finance.accounts.index') },
-        { title: 'Create Account', href: route('finance.accounts.create') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Chart of Accounts', href: '/finance/accounts' },
+        { title: 'Create Account', href: '/finance/accounts/create' },
     ];
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
-        post(route('finance.accounts.store'));
+        post('/finance/accounts');
     }
 
     const filteredParents = data.type
@@ -125,7 +125,7 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
 
             <div className="mx-auto max-w-3xl space-y-6 p-6">
                 <div className="flex items-center gap-4">
-                    <Link href={route('finance.accounts.index')}>
+                    <Link href={'/finance/accounts'}>
                         <Button variant="ghost" size="icon">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
@@ -328,7 +328,7 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                             </div>
 
                             <div className="flex justify-end gap-3">
-                                <Link href={route('finance.accounts.index')}>
+                                <Link href={'/finance/accounts'}>
                                     <Button type="button" variant="outline">Cancel</Button>
                                 </Link>
                                 <Button type="submit" disabled={processing}>

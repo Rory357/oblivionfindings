@@ -18,7 +18,7 @@ class RecurringJournalService
      *
      * @return array<\App\Domain\Finance\Models\FinJournal> Created journals.
      */
-    public function processDueRecurringJournals(int $orgId): array
+    public function processDueRecurringJournals(?int $orgId): array
     {
         $dueRecurrings = FinRecurringJournal::forOrganization($orgId)
             ->due()

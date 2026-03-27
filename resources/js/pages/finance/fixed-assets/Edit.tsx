@@ -81,15 +81,15 @@ export default function FixedAssetEdit({ asset, hasDepreciations, assetAccounts,
     });
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Fixed Assets', href: route('finance.fixed-assets.index') },
-        { title: asset.asset_name, href: route('finance.fixed-assets.show', asset.id) },
-        { title: 'Edit', href: route('finance.fixed-assets.edit', asset.id) },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Fixed Assets', href: '/finance/fixed-assets' },
+        { title: asset.asset_name, href: `/finance/fixed-assets/${asset.id}` },
+        { title: 'Edit', href: `/finance/fixed-assets/${asset.id}/edit` },
     ];
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
-        put(route('finance.fixed-assets.update', asset.id));
+        put(`/finance/fixed-assets/${asset.id}`);
     }
 
     // Preview monthly depreciation calculation
@@ -117,7 +117,7 @@ export default function FixedAssetEdit({ asset, hasDepreciations, assetAccounts,
 
             <div className="mx-auto max-w-3xl space-y-6 p-6">
                 <div className="flex items-center gap-4">
-                    <Link href={route('finance.fixed-assets.show', asset.id)}>
+                    <Link href={`/finance/fixed-assets/${asset.id}`}>
                         <Button variant="ghost" size="icon">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
@@ -410,7 +410,7 @@ export default function FixedAssetEdit({ asset, hasDepreciations, assetAccounts,
 
                     {/* Actions */}
                     <div className="flex justify-end gap-3">
-                        <Link href={route('finance.fixed-assets.show', asset.id)}>
+                        <Link href={`/finance/fixed-assets/${asset.id}`}>
                             <Button type="button" variant="outline">Cancel</Button>
                         </Link>
                         <Button type="submit" disabled={processing}>

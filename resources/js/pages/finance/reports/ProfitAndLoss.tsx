@@ -42,7 +42,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
 
     const applyFilter = () => {
         router.get(
-            route('finance.reports.profit-loss'),
+            '/finance/reports/profit-loss',
             { start_date: startDate, end_date: endDate },
             { preserveState: true },
         );

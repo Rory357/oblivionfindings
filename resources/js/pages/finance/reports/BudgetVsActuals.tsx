@@ -181,13 +181,13 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
     const [syncing, setSyncing] = useState(false);
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Budget vs Actuals', href: route('finance.reports.budget-vs-actuals') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Budget vs Actuals', href: '/finance/reports/budget-vs-actuals' },
     ];
 
     const handleBudgetChange = (value: string) => {
         router.get(
-            route('finance.reports.budget-vs-actuals'),
+            '/finance/reports/budget-vs-actuals',
             { budget_id: value },
             { preserveState: true },
         );
@@ -195,7 +195,7 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
 
     const handleSync = () => {
         setSyncing(true);
-        router.post(route('finance.reports.budget-vs-actuals.sync'), {}, {
+        router.post('/finance/reports/budget-vs-actuals/sync', {}, {
             preserveScroll: true,
             onFinish: () => setSyncing(false),
         });

@@ -121,14 +121,14 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
     });
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Chart of Accounts', href: route('finance.accounts.index') },
-        { title: `Edit ${account.code}`, href: route('finance.accounts.edit', account.id) },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Chart of Accounts', href: '/finance/accounts' },
+        { title: `Edit ${account.code}`, href: `/finance/accounts/${account.id}/edit` },
     ];
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
-        put(route('finance.accounts.update', account.id));
+        put(`/finance/accounts/${account.id}`);
     }
 
     const filteredParents = data.type
@@ -146,7 +146,7 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
 
             <div className="mx-auto max-w-3xl space-y-6 p-6">
                 <div className="flex items-center gap-4">
-                    <Link href={route('finance.accounts.index')}>
+                    <Link href={'/finance/accounts'}>
                         <Button variant="ghost" size="icon">
                             <ArrowLeft className="h-4 w-4" />
                         </Button>
@@ -377,7 +377,7 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                             </div>
 
                             <div className="flex justify-end gap-3">
-                                <Link href={route('finance.accounts.index')}>
+                                <Link href={'/finance/accounts'}>
                                     <Button type="button" variant="outline">Cancel</Button>
                                 </Link>
                                 <Button type="submit" disabled={processing}>

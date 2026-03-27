@@ -41,9 +41,9 @@ const basisLabels: Record<string, string> = {
 
 export default function GstReturnPrepare({ filingDates, currentYear }: PageProps) {
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'GST Returns', href: route('finance.gst-returns.index') },
-        { title: 'Prepare Return', href: route('finance.gst-returns.prepare') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'GST Returns', href: '/finance/gst-returns' },
+        { title: 'Prepare Return', href: '/finance/gst-returns/prepare' },
     ];
 
     const { data, setData, post, processing, errors } = useForm({
@@ -70,7 +70,7 @@ export default function GstReturnPrepare({ filingDates, currentYear }: PageProps
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        post(route('finance.gst-returns.store'));
+        post('/finance/gst-returns');
     }
 
     const activePeriods = selectedFrequency

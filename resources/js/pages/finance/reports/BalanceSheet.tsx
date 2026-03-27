@@ -69,7 +69,7 @@ export default function BalanceSheet({ report, filters }: Props) {
     const [asOfDate, setAsOfDate] = useState(filters.as_of_date);
 
     const applyFilter = () => {
-        router.get(route('finance.reports.balance-sheet'), { as_of_date: asOfDate }, { preserveState: true });
+        router.get('/finance/reports/balance-sheet', { as_of_date: asOfDate }, { preserveState: true });
     };
 
     return (

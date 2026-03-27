@@ -45,13 +45,13 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
 
 export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Payment Runs', href: route('finance.payment-runs.index') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Payment Runs', href: '/finance/payment-runs' },
     ];
 
     const handleStatusFilter = (value: string) => {
         router.get(
-            route('finance.payment-runs.index'),
+            '/finance/payment-runs',
             { status: value === 'all' ? '' : value },
             { preserveState: true, replace: true },
         );
@@ -67,7 +67,7 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                         <h1 className="text-2xl font-bold tracking-tight">Payment Runs</h1>
                         <p className="text-muted-foreground">Manage batch payments to vendors</p>
                     </div>
-                    <Link href={route('finance.payment-runs.create')}>
+                    <Link href={'/finance/payment-runs/create'}>
                         <Button>
                             <Plus className="mr-2 h-4 w-4" />
                             New Payment Run
@@ -126,7 +126,7 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                                 <TableRow
                                                     key={run.id}
                                                     className="cursor-pointer"
-                                                    onClick={() => router.visit(route('finance.payment-runs.show', run.id))}
+                                                    onClick={() => router.visit(`/finance/payment-runs/${run.id}`)}
                                                 >
                                                     <TableCell className="font-mono font-medium">
                                                         {run.run_number}

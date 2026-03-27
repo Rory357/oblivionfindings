@@ -20,7 +20,7 @@ class FixedAssetService
     /**
      * Create a new fixed asset, optionally posting a GL journal for the acquisition.
      */
-    public function createAsset(int $orgId, array $data): FinFixedAsset
+    public function createAsset(?int $orgId, array $data): FinFixedAsset
     {
         return DB::transaction(function () use ($orgId, $data) {
             $asset = FinFixedAsset::create([
@@ -86,7 +86,7 @@ class FixedAssetService
     /**
      * Run monthly depreciation for all active assets in an organisation.
      */
-    public function runDepreciation(int $orgId, string $depreciationDate): array
+    public function runDepreciation(?int $orgId, string $depreciationDate): array
     {
         $date = Carbon::parse($depreciationDate);
         $processed = [];
@@ -291,7 +291,7 @@ class FixedAssetService
     /**
      * Get the asset register for an organisation, grouped by category.
      */
-    public function getAssetRegister(int $orgId): Collection
+    public function getAssetRegister(?int $orgId): Collection
     {
         return FinFixedAsset::forOrganization($orgId)
             ->with(['depreciations' => function ($q) {
@@ -393,7 +393,7 @@ class FixedAssetService
     /**
      * Post the acquisition journal for a new asset.
      */
-    protected function postAcquisitionJournal(int $orgId, FinFixedAsset $asset): void
+    protected function postAcquisitionJournal(?int $orgId, FinFixedAsset $asset): void
     {
         $bankAccountId = $this->getDefaultAccountId($orgId, '1000');
 
@@ -428,7 +428,7 @@ class FixedAssetService
     /**
      * Find a default account by code for the organisation.
      */
-    protected function getDefaultAccountId(int $orgId, string $code): ?int
+    protected function getDefaultAccountId(?int $orgId, string $code): ?int
     {
         return FinAccount::forOrganization($orgId)
             ->where('code', $code)

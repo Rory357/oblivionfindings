@@ -55,7 +55,7 @@ function CreatePeriodDialog() {
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
-        post(route('finance.fiscal-periods.store'), {
+        post('/finance/fiscal-periods', {
             onSuccess: () => {
                 reset();
                 setOpen(false);
@@ -131,7 +131,7 @@ function EditPeriodDialog({ period }: { period: FiscalPeriod }) {
 
     function handleSubmit(e: FormEvent) {
         e.preventDefault();
-        put(route('finance.fiscal-periods.update', period.id), {
+        put(`/finance/fiscal-periods/${period.id}`, {
             onSuccess: () => setOpen(false),
         });
     }
@@ -196,13 +196,13 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
     const [closingId, setClosingId] = useState<number | null>(null);
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Fiscal Periods', href: route('finance.fiscal-periods.index') },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Fiscal Periods', href: '/finance/fiscal-periods' },
     ];
 
     function handleClose(periodId: number) {
         setClosingId(periodId);
-        router.post(route('finance.fiscal-periods.close', periodId), {}, {
+        router.post(`/finance/fiscal-periods/${periodId}/close`, {}, {
             onFinish: () => setClosingId(null),
         });
     }

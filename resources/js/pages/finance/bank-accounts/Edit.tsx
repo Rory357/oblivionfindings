@@ -43,14 +43,14 @@ export default function BankAccountEdit({ bankAccount, glAccounts }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(route('finance.bank-accounts.update', bankAccount.id));
+        put(`/finance/bank-accounts/${bankAccount.id}`);
     };
 
     const breadcrumbs = [
-        { title: 'Finance', href: route('finance.dashboard') },
-        { title: 'Bank Accounts', href: route('finance.bank-accounts.index') },
-        { title: bankAccount.name, href: route('finance.bank-accounts.show', bankAccount.id) },
-        { title: 'Edit', href: route('finance.bank-accounts.edit', bankAccount.id) },
+        { title: 'Finance', href: '/finance' },
+        { title: 'Bank Accounts', href: '/finance/bank-accounts' },
+        { title: bankAccount.name, href: `/finance/bank-accounts/${bankAccount.id}` },
+        { title: 'Edit', href: `/finance/bank-accounts/${bankAccount.id}/edit` },
     ];
 
     return (

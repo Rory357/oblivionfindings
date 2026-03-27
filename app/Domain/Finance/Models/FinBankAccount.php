@@ -58,9 +58,9 @@ class FinBankAccount extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
-    public function scopeForOrganization($query, int $orgId)
+    public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->where('organization_id', $orgId);
+        return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));
     }
 
     public function scopeActive($query)

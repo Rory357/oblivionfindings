@@ -32,7 +32,7 @@ export default function PettyCashIndex({ funds }: Props) {
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold">Petty Cash Funds</h1>
                     <Button asChild>
-                        <Link href={route('finance.petty-cash.create')}>
+                        <Link href={'/finance/petty-cash/create'}>
                             <Plus className="mr-1 h-4 w-4" />
                             New Fund
                         </Link>
@@ -52,7 +52,7 @@ export default function PettyCashIndex({ funds }: Props) {
                         {funds.map((fund) => {
                             const variance = fund.current_balance - fund.float_amount;
                             return (
-                                <Link key={fund.id} href={route('finance.petty-cash.show', fund.id)}>
+                                <Link key={fund.id} href={`/finance/petty-cash/${fund.id}`}>
                                     <Card className="transition-shadow hover:shadow-md">
                                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                                             <CardTitle className="text-lg">{fund.name}</CardTitle>
