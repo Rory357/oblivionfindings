@@ -451,6 +451,11 @@ export default function ControlRoomAlertShow({
     const [newNote, setNewNote] = useState('');
     const [assigneeId, setAssigneeId] = useState<string>('');
     const [processing, setProcessing] = useState(false);
+    const [evidencePackOpen, setEvidencePackOpen] = useState(false);
+    const [evidencePackTitle, setEvidencePackTitle] = useState('');
+    const [evidenceNoteOpen, setEvidenceNoteOpen] = useState(false);
+    const [evidenceNoteContent, setEvidenceNoteContent] = useState('');
+    const [evidenceNotePackId, setEvidenceNotePackId] = useState<number | null>(null);
     const notesEndRef = useRef<HTMLDivElement>(null);
 
     const activityLog: Array<{
@@ -1053,12 +1058,7 @@ export default function ControlRoomAlertShow({
                                                     variant="outline"
                                                     size="sm"
                                                     className="mt-3"
-                                                    onClick={() => {
-                                                        const title = prompt('Evidence pack title:');
-                                                        if (title) {
-                                                            router.post(`/control-room/alerts/${alert.id}/evidence`, { title }, { preserveScroll: true });
-                                                        }
-                                                    }}
+                                                    onClick={() => setEvidencePackOpen(true)}
                                                     disabled={processing}
                                                 >
                                                     <Package className="mr-1.5 h-3.5 w-3.5" />
@@ -1157,13 +1157,8 @@ export default function ControlRoomAlertShow({
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => {
-                                                                const note = prompt('Enter evidence note:');
-                                                                if (note) {
-                                                                    router.post(`/control-room/evidence/${pack.id}/items`, {
-                                                                        item_type: 'note',
-                                                                        content: note,
-                                                                    }, { preserveScroll: true });
-                                                                }
+                                                                setEvidenceNotePackId(pack.id);
+                                                                setEvidenceNoteOpen(true);
                                                             }}
                                                             disabled={processing}
                                                         >
@@ -1755,6 +1750,85 @@ export default function ControlRoomAlertShow({
                             >
                                 <ArrowUpRight className="mr-1.5 h-4 w-4" />
                                 Escalate to L{alert.escalation_level + 1}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Create Evidence Pack Dialog */}
+                <Dialog open={evidencePackOpen} onOpenChange={setEvidencePackOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Create Evidence Pack</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3 py-2">
+                            <Label htmlFor="pack-title">Pack Title</Label>
+                            <input
+                                id="pack-title"
+                                type="text"
+                                value={evidencePackTitle}
+                                onChange={(e) => setEvidencePackTitle(e.target.value)}
+                                placeholder="e.g. CCTV Footage, Witness Statements, Photos..."
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                autoFocus
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => { setEvidencePackOpen(false); setEvidencePackTitle(''); }}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    if (!evidencePackTitle.trim()) return;
+                                    router.post(`/control-room/alerts/${alert.id}/evidence`, { title: evidencePackTitle.trim() }, { preserveScroll: true });
+                                    setEvidencePackOpen(false);
+                                    setEvidencePackTitle('');
+                                }}
+                                disabled={!evidencePackTitle.trim() || processing}
+                            >
+                                <Package className="mr-1.5 h-4 w-4" />
+                                Create Pack
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Add Evidence Note Dialog */}
+                <Dialog open={evidenceNoteOpen} onOpenChange={setEvidenceNoteOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Add Evidence Note</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3 py-2">
+                            <Label htmlFor="evidence-note">Note Content</Label>
+                            <Textarea
+                                id="evidence-note"
+                                value={evidenceNoteContent}
+                                onChange={(e) => setEvidenceNoteContent(e.target.value)}
+                                placeholder="Describe the evidence or observation..."
+                                rows={4}
+                                autoFocus
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => { setEvidenceNoteOpen(false); setEvidenceNoteContent(''); setEvidenceNotePackId(null); }}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    if (!evidenceNoteContent.trim() || !evidenceNotePackId) return;
+                                    router.post(`/control-room/evidence/${evidenceNotePackId}/items`, {
+                                        item_type: 'note',
+                                        content: evidenceNoteContent.trim(),
+                                    }, { preserveScroll: true });
+                                    setEvidenceNoteOpen(false);
+                                    setEvidenceNoteContent('');
+                                    setEvidenceNotePackId(null);
+                                }}
+                                disabled={!evidenceNoteContent.trim() || processing}
+                            >
+                                <FileText className="mr-1.5 h-4 w-4" />
+                                Add Note
                             </Button>
                         </DialogFooter>
                     </DialogContent>
