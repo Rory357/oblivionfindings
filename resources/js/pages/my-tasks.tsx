@@ -647,9 +647,14 @@ export default function MyDay({
                             {/* Calendar view */}
                             {openItemFilter === 'calendar' ? (
                                 <div>
-                                    <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
-                                        <Calendar className="h-4 w-4" />
-                                        <span>Next 7 days</span>
+                                    <div className="mb-3 flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                            <Calendar className="h-4 w-4" />
+                                            <span>Next 7 days</span>
+                                        </div>
+                                        <Button variant="outline" size="sm" asChild>
+                                            <Link href="/my-calendar">View Full Calendar</Link>
+                                        </Button>
                                     </div>
                                     <div className="grid grid-cols-7 gap-2">
                                         {calendarDays.map((day) => (

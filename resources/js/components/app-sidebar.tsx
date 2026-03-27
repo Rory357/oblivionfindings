@@ -174,7 +174,8 @@ function buildIconNavItems({
     const items: IconNavItem[] = [
         { id: 'dashboard', icon: LayoutGrid, label: 'Dashboard', href: '/dashboard' },
         { id: 'today', icon: ClipboardList, label: 'Today', href: '/today' },
-        { id: 'my-tasks', icon: CheckCircle2, label: 'My Day', href: '/my-tasks', dividerAfter: true },
+        { id: 'my-tasks', icon: CheckCircle2, label: 'My Day', href: '/my-tasks' },
+        { id: 'my-calendar', icon: CalendarDays, label: 'Calendar', href: '/my-calendar', dividerAfter: true },
     ];
 
     // Sites & Locations
