@@ -177,25 +177,25 @@ export default function FinanceDashboard({
                     <h1 className="text-2xl font-bold">Finance Dashboard</h1>
                     <div className="flex gap-2">
                         <Button asChild size="sm">
-                            <Link href={route('finance.journals.create')}>
+                            <Link href={'/finance/journals/create'}>
                                 <Plus className="mr-1 h-4 w-4" />
                                 New Journal
                             </Link>
                         </Button>
                         <Button asChild size="sm" variant="outline">
-                            <Link href={route('finance.bills.create')}>
+                            <Link href={'/finance/bills/create'}>
                                 <Plus className="mr-1 h-4 w-4" />
                                 New Bill
                             </Link>
                         </Button>
                         <Button asChild size="sm" variant="outline">
-                            <Link href={route('finance.receivables.index')}>
+                            <Link href={'/finance/receivables'}>
                                 <FileText className="mr-1 h-4 w-4" />
                                 Receivables
                             </Link>
                         </Button>
                         <Button asChild size="sm" variant="outline">
-                            <Link href={route('finance.bank-reconciliation.index')}>
+                            <Link href={'/finance/bank-reconciliation'}>
                                 <CreditCard className="mr-1 h-4 w-4" />
                                 Bank Recon
                             </Link>
@@ -283,7 +283,7 @@ export default function FinanceDashboard({
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Upcoming Bills Due (Next 7 Days)</CardTitle>
                             <Button asChild variant="ghost" size="sm">
-                                <Link href={route('finance.bills.index')}>
+                                <Link href={'/finance/bills'}>
                                     View all <ArrowRight className="ml-1 h-4 w-4" />
                                 </Link>
                             </Button>
@@ -306,7 +306,7 @@ export default function FinanceDashboard({
                                             <TableRow key={bill.id}>
                                                 <TableCell>
                                                     <Link
-                                                        href={route('finance.bills.show', bill.id)}
+                                                        href={`/finance/bills/${bill.id}`}
                                                         className="font-medium text-blue-600 hover:underline"
                                                     >
                                                         {bill.bill_number}
@@ -330,7 +330,7 @@ export default function FinanceDashboard({
                         <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle>Recent Journal Entries</CardTitle>
                             <Button asChild variant="ghost" size="sm">
-                                <Link href={route('finance.journals.index')}>
+                                <Link href={'/finance/journals'}>
                                     View all <ArrowRight className="ml-1 h-4 w-4" />
                                 </Link>
                             </Button>
@@ -353,7 +353,7 @@ export default function FinanceDashboard({
                                             <TableRow key={journal.id}>
                                                 <TableCell>
                                                     <Link
-                                                        href={route('finance.journals.show', journal.id)}
+                                                        href={`/finance/journals/${journal.id}`}
                                                         className="font-medium text-blue-600 hover:underline"
                                                     >
                                                         {journal.journal_number}
