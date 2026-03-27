@@ -38,6 +38,12 @@ class ControlRoomAlert extends Model
         'created_by_user_id',
         'context',
         'notes',
+        'priority',
+        'due_at',
+        'category',
+        'resolution_code',
+        'time_spent_minutes',
+        'watchers_count',
     ];
 
     protected $casts = [
@@ -49,6 +55,7 @@ class ControlRoomAlert extends Model
         'assigned_at' => 'datetime',
         'context' => 'array',
         'escalation_level' => 'integer',
+        'due_at' => 'datetime',
     ];
 
     public function client(): BelongsTo
@@ -144,6 +151,26 @@ class ControlRoomAlert extends Model
     public function createdBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by_user_id');
+    }
+
+    public function tasks()
+    {
+        return $this->hasMany(\App\Models\ControlRoom\AlertTask::class, 'alert_id');
+    }
+
+    public function discussions()
+    {
+        return $this->hasMany(\App\Models\ControlRoom\AlertDiscussion::class, 'alert_id');
+    }
+
+    public function watchers()
+    {
+        return $this->hasMany(\App\Models\ControlRoom\AlertWatcher::class, 'alert_id');
+    }
+
+    public function timeEntries()
+    {
+        return $this->hasMany(\App\Models\ControlRoom\TimeEntry::class, 'alert_id');
     }
 
     /**

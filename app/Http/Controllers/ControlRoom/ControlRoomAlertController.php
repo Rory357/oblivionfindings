@@ -292,6 +292,10 @@ class ControlRoomAlertController extends Controller
             'sla.slaDefinition',
             'client:id,first_name,last_name',
             'device:id,type,latitude,longitude,location_description',
+            'tasks' => fn($q) => $q->whereNull('parent_task_id')->orderBy('sort_order')->with(['assignedTo:id,name', 'subtasks.assignedTo:id,name']),
+            'discussions' => fn($q) => $q->whereNull('parent_id')->orderBy('created_at', 'asc')->with(['user:id,name', 'replies' => fn($r) => $r->orderBy('created_at', 'asc')->with('user:id,name')]),
+            'watchers.user:id,name',
+            'timeEntries' => fn($q) => $q->orderBy('created_at', 'desc')->with('user:id,name'),
         ]);
 
         // Fetch audit trail for this alert
@@ -374,6 +378,10 @@ class ControlRoomAlertController extends Controller
                 'escalation_level' => $alert->escalation_level,
                 'context' => $alert->context,
                 'notes' => $alert->notes,
+                'priority' => $alert->priority,
+                'due_at' => optional($alert->due_at)->toISOString(),
+                'category' => $alert->category,
+                'resolution_code' => $alert->resolution_code,
                 'created_at' => optional($alert->created_at)->toISOString(),
                 'updated_at' => optional($alert->updated_at)->toISOString(),
             ],
@@ -447,6 +455,62 @@ class ControlRoomAlertController extends Controller
                 ->whereHas('roles', fn($q) => $q->whereIn('name', ['admin', 'provider_manager', 'coordinator']))
                 ->orderBy('name')
                 ->get(['id', 'name', 'email']),
+            'tasks' => $alert->tasks->map(fn($t) => [
+                'id' => $t->id,
+                'title' => $t->title,
+                'description' => $t->description,
+                'status' => $t->status,
+                'priority' => $t->priority,
+                'due_at' => $t->due_at?->toISOString(),
+                'completed_at' => $t->completed_at?->toISOString(),
+                'estimated_minutes' => $t->estimated_minutes,
+                'actual_minutes' => $t->actual_minutes,
+                'sort_order' => $t->sort_order,
+                'assigned_to' => $t->assignedTo ? ['id' => $t->assignedTo->id, 'name' => $t->assignedTo->name] : null,
+                'created_by_name' => $t->createdBy?->name,
+                'subtasks' => $t->subtasks->map(fn($st) => [
+                    'id' => $st->id, 'title' => $st->title, 'status' => $st->status,
+                    'assigned_to' => $st->assignedTo ? ['id' => $st->assignedTo->id, 'name' => $st->assignedTo->name] : null,
+                ])->values(),
+                'created_at' => $t->created_at->toISOString(),
+            ])->values(),
+            'discussions' => $alert->discussions->map(fn($d) => [
+                'id' => $d->id,
+                'type' => $d->type,
+                'content' => $d->content,
+                'is_internal' => $d->is_internal,
+                'attachments' => $d->attachments ?? [],
+                'mentions' => $d->mentions ?? [],
+                'user' => ['id' => $d->user->id, 'name' => $d->user->name],
+                'edited_at' => $d->edited_at?->toISOString(),
+                'created_at' => $d->created_at->toISOString(),
+                'replies' => $d->replies->map(fn($r) => [
+                    'id' => $r->id, 'type' => $r->type, 'content' => $r->content,
+                    'is_internal' => $r->is_internal, 'attachments' => $r->attachments ?? [],
+                    'user' => ['id' => $r->user->id, 'name' => $r->user->name],
+                    'edited_at' => $r->edited_at?->toISOString(),
+                    'created_at' => $r->created_at->toISOString(),
+                ])->values(),
+            ])->values(),
+            'watchers' => $alert->watchers->map(fn($w) => [
+                'id' => $w->id,
+                'user_id' => $w->user_id,
+                'user_name' => $w->user->name,
+            ])->values(),
+            'time_entries' => $alert->timeEntries->map(fn($te) => [
+                'id' => $te->id,
+                'user_name' => $te->user->name,
+                'user_id' => $te->user_id,
+                'started_at' => $te->started_at?->toISOString(),
+                'ended_at' => $te->ended_at?->toISOString(),
+                'duration_minutes' => $te->duration_minutes,
+                'description' => $te->description,
+                'task_id' => $te->task_id,
+                'is_running' => $te->started_at && !$te->ended_at,
+                'created_at' => $te->created_at->toISOString(),
+            ])->values(),
+            'time_spent_minutes' => $alert->time_spent_minutes ?? 0,
+            'is_watching' => $alert->watchers->contains('user_id', $user->id),
         ]);
     }
 
@@ -743,6 +807,42 @@ class ControlRoomAlertController extends Controller
         ]);
 
         return back()->with('success', 'Note added.');
+    }
+
+    /**
+     * Update alert meta fields (priority, category, due_at, resolution_code).
+     */
+    public function updateMeta(Request $request, ControlRoomAlert $alert)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+
+        $data = $request->validate([
+            'priority' => ['nullable', 'in:critical,high,medium,low'],
+            'category' => ['nullable', 'string', 'max:100'],
+            'due_at' => ['nullable', 'date'],
+            'resolution_code' => ['nullable', 'string', 'max:100'],
+        ]);
+
+        // Update only the fields that were actually provided in the request
+        $fieldsToUpdate = [];
+        foreach (['priority', 'category', 'due_at', 'resolution_code'] as $field) {
+            if ($request->has($field)) {
+                $fieldsToUpdate[$field] = $data[$field];
+            }
+        }
+
+        if (!empty($fieldsToUpdate)) {
+            $alert->update($fieldsToUpdate);
+        }
+
+        AuditLogger::log('controlRoom.alert.updateMeta', $alert, [
+            'alert_id' => $alert->id,
+            'fields' => array_keys($fieldsToUpdate),
+            'updated_by' => $user->id,
+        ]);
+
+        return back();
     }
 
     /**

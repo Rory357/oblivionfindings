@@ -19,6 +19,10 @@ use App\Http\Controllers\ControlRoom\AlertController as IntegrationAlertControll
 use App\Http\Controllers\ControlRoom\ControlRoomHandoverController;
 use App\Http\Controllers\ControlRoom\ControlRoomDeviceController;
 use App\Http\Controllers\ControlRoom\ControlRoomMyTasksController;
+use App\Http\Controllers\ControlRoom\ControlRoomTaskController;
+use App\Http\Controllers\ControlRoom\ControlRoomDiscussionController;
+use App\Http\Controllers\ControlRoom\ControlRoomWatcherController;
+use App\Http\Controllers\ControlRoom\ControlRoomTimeEntryController;
 
 /**
  * Control Room Routes
@@ -98,6 +102,24 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/control-room/alerts/{alert}/note', [ControlRoomAlertController::class, 'addNote'])
             ->whereNumber('alert')
             ->name('control-room.alerts.note');
+
+        Route::post('/control-room/alerts/{alert}/meta', [ControlRoomAlertController::class, 'updateMeta'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.meta');
+
+        // Alert tasks
+        Route::get('/control-room/alerts/{alert}/tasks', [ControlRoomTaskController::class, 'index'])
+            ->name('control-room.tasks.index');
+        Route::post('/control-room/alerts/{alert}/tasks', [ControlRoomTaskController::class, 'store'])
+            ->name('control-room.tasks.store');
+        Route::put('/control-room/tasks/{task}', [ControlRoomTaskController::class, 'update'])
+            ->name('control-room.tasks.update');
+        Route::post('/control-room/tasks/{task}/status', [ControlRoomTaskController::class, 'updateStatus'])
+            ->name('control-room.tasks.status');
+        Route::delete('/control-room/tasks/{task}', [ControlRoomTaskController::class, 'destroy'])
+            ->name('control-room.tasks.destroy');
+        Route::post('/control-room/alerts/{alert}/tasks/reorder', [ControlRoomTaskController::class, 'reorder'])
+            ->name('control-room.tasks.reorder');
     });
 
     // Alert assignment
@@ -307,5 +329,45 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.alerts.playbook.advance');
         Route::post('/control-room/alerts/{alert}/playbook/skip', [ControlRoomPlaybookController::class, 'skipStep'])
             ->name('control-room.alerts.playbook.skip');
+    });
+
+    // Alert discussions
+    Route::get('/control-room/alerts/{alert}/discussions', [ControlRoomDiscussionController::class, 'index'])
+        ->middleware('permission:controlRoom.viewAny')
+        ->name('control-room.discussions.index');
+    Route::post('/control-room/alerts/{alert}/discussions', [ControlRoomDiscussionController::class, 'store'])
+        ->middleware('permission:controlRoom.alerts.manage')
+        ->name('control-room.discussions.store');
+    Route::put('/control-room/discussions/{discussion}', [ControlRoomDiscussionController::class, 'update'])
+        ->middleware('permission:controlRoom.alerts.manage')
+        ->name('control-room.discussions.update');
+    Route::delete('/control-room/discussions/{discussion}', [ControlRoomDiscussionController::class, 'destroy'])
+        ->middleware('permission:controlRoom.alerts.manage')
+        ->name('control-room.discussions.destroy');
+
+    // Watchers
+    Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
+        Route::get('/control-room/alerts/{alert}/watchers', [ControlRoomWatcherController::class, 'index'])
+            ->name('control-room.watchers.index');
+        Route::post('/control-room/alerts/{alert}/watchers', [ControlRoomWatcherController::class, 'store'])
+            ->name('control-room.watchers.store');
+        Route::post('/control-room/alerts/{alert}/watchers/toggle', [ControlRoomWatcherController::class, 'toggle'])
+            ->name('control-room.watchers.toggle');
+        Route::delete('/control-room/alerts/{alert}/watchers/{userId}', [ControlRoomWatcherController::class, 'destroy'])
+            ->name('control-room.watchers.destroy');
+    });
+
+    // Time entries
+    Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
+        Route::get('/control-room/alerts/{alert}/time-entries', [ControlRoomTimeEntryController::class, 'index'])
+            ->name('control-room.time-entries.index');
+        Route::post('/control-room/alerts/{alert}/time-entries/start', [ControlRoomTimeEntryController::class, 'start'])
+            ->name('control-room.time-entries.start');
+        Route::post('/control-room/time-entries/{entry}/stop', [ControlRoomTimeEntryController::class, 'stop'])
+            ->name('control-room.time-entries.stop');
+        Route::post('/control-room/alerts/{alert}/time-entries', [ControlRoomTimeEntryController::class, 'store'])
+            ->name('control-room.time-entries.store');
+        Route::delete('/control-room/time-entries/{entry}', [ControlRoomTimeEntryController::class, 'destroy'])
+            ->name('control-room.time-entries.destroy');
     });
 });
