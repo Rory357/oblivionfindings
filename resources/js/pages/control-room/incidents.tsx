@@ -260,14 +260,14 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                 {/* Filter Bar */}
                 <div className="flex flex-wrap items-center gap-3">
                     <Select
-                        value={filters.source_type ?? ''}
-                        onValueChange={(v) => applyFilter('source_type', v)}
+                        value={filters.source_type || 'all'}
+                        onValueChange={(v) => applyFilter('source_type', v === 'all' ? '' : v)}
                     >
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="All Sources" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All Sources</SelectItem>
+                            <SelectItem value="all">All Sources</SelectItem>
                             <SelectItem value="client_incident">Client Incidents</SelectItem>
                             <SelectItem value="medication_error">Medication Errors</SelectItem>
                             <SelectItem value="safeguarding">Safeguarding</SelectItem>
@@ -275,14 +275,14 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                     </Select>
 
                     <Select
-                        value={filters.severity ?? ''}
-                        onValueChange={(v) => applyFilter('severity', v)}
+                        value={filters.severity || 'all'}
+                        onValueChange={(v) => applyFilter('severity', v === 'all' ? '' : v)}
                     >
                         <SelectTrigger className="w-[150px]">
                             <SelectValue placeholder="All Severity" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All Severity</SelectItem>
+                            <SelectItem value="all">All Severity</SelectItem>
                             <SelectItem value="critical">Critical</SelectItem>
                             <SelectItem value="high">High</SelectItem>
                             <SelectItem value="medium">Medium</SelectItem>
@@ -291,14 +291,14 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                     </Select>
 
                     <Select
-                        value={filters.status ?? ''}
-                        onValueChange={(v) => applyFilter('status', v)}
+                        value={filters.status || 'all'}
+                        onValueChange={(v) => applyFilter('status', v === 'all' ? '' : v)}
                     >
                         <SelectTrigger className="w-[150px]">
                             <SelectValue placeholder="All Statuses" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All Statuses</SelectItem>
+                            <SelectItem value="all">All Statuses</SelectItem>
                             <SelectItem value="submitted">Submitted</SelectItem>
                             <SelectItem value="reported">Reported</SelectItem>
                             <SelectItem value="reviewed">Reviewed</SelectItem>
@@ -309,14 +309,14 @@ export default function IncidentTracker({ incidents, filters, stats, sites, clie
                     </Select>
 
                     <Select
-                        value={filters.site_id ?? ''}
-                        onValueChange={(v) => applyFilter('site_id', v)}
+                        value={filters.site_id || 'all'}
+                        onValueChange={(v) => applyFilter('site_id', v === 'all' ? '' : v)}
                     >
                         <SelectTrigger className="w-[180px]">
                             <SelectValue placeholder="All Sites" />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="">All Sites</SelectItem>
+                            <SelectItem value="all">All Sites</SelectItem>
                             {sites.map((site) => (
                                 <SelectItem key={site.id} value={String(site.id)}>
                                     {site.name}

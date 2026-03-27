@@ -145,27 +145,31 @@ export default function ControlRoomStats({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Live Statistics - Control Room" />
             <PageShell>
-                <PageHeader title="Live Statistics">
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                            <span className="relative flex h-2 w-2">
-                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
-                            </span>
-                            Auto-refreshing
+                <PageHeader
+                    title="Live Statistics"
+                    description="Real-time KPIs and analytics for the control room."
+                    actions={
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                                </span>
+                                Auto-refreshing
+                            </div>
+                            <Select value={period} onValueChange={handlePeriodChange}>
+                                <SelectTrigger className="w-[160px]">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="24h">Last 24 Hours</SelectItem>
+                                    <SelectItem value="7d">Last 7 Days</SelectItem>
+                                    <SelectItem value="30d">Last 30 Days</SelectItem>
+                                </SelectContent>
+                            </Select>
                         </div>
-                        <Select value={period} onValueChange={handlePeriodChange}>
-                            <SelectTrigger className="w-[160px]">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="24h">Last 24 Hours</SelectItem>
-                                <SelectItem value="7d">Last 7 Days</SelectItem>
-                                <SelectItem value="30d">Last 30 Days</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </PageHeader>
+                    }
+                />
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">

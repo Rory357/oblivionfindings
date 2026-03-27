@@ -217,7 +217,7 @@ class ControlRoomIncidentController extends Controller
 
         // ── Supporting data ───────────────────────────────────
         $sites = Site::orderBy('name')->get(['id', 'name']);
-        $clients = Client::orderBy('name')->get(['id', 'name']);
+        $clients = Client::orderBy('first_name')->get(['id', 'first_name', 'last_name'])->map(fn($c) => ['id' => $c->id, 'name' => trim($c->first_name . ' ' . $c->last_name)]);
 
         return Inertia::render('control-room/incidents', [
             'incidents' => $paginated,

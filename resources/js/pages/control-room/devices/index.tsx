@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsRoot as Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
     Activity,
     AlertTriangle,
@@ -318,8 +318,8 @@ export default function DevicesIndex({ devices, stats, filters, sites }: Props) 
 
                 {/* Type Tabs */}
                 <Tabs
-                    value={filters.type || ''}
-                    onValueChange={(v) => applyFilter('type', v)}
+                    defaultValue={filters.type || 'all'}
+                    onValueChange={(v) => applyFilter('type', v === 'all' ? '' : v)}
                     className="w-full"
                 >
                     <TabsList className="flex flex-wrap h-auto gap-1">

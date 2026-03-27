@@ -22,7 +22,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
@@ -985,28 +985,14 @@ export default function ControlRoomSettings({
                 <PageHeader
                     title="Settings"
                     description="Configure signal rules, triage queues, sources, and maintenance windows."
-                    breadcrumbs={breadcrumbs}
-                    icon={Settings2}
                 />
 
-                <Tabs value={tab} onValueChange={handleTabChange} className="mt-6">
+                <Tabs defaultValue={tab} onValueChange={handleTabChange} className="mt-6">
                     <TabsList>
-                        <TabsTrigger value="rules" className="gap-1.5">
-                            <Zap className="h-4 w-4" />
-                            Signal Rules
-                        </TabsTrigger>
-                        <TabsTrigger value="queues" className="gap-1.5">
-                            <Layers className="h-4 w-4" />
-                            Triage Queues
-                        </TabsTrigger>
-                        <TabsTrigger value="sources" className="gap-1.5">
-                            <Radio className="h-4 w-4" />
-                            Signal Sources
-                        </TabsTrigger>
-                        <TabsTrigger value="maintenance" className="gap-1.5">
-                            <Calendar className="h-4 w-4" />
-                            Maintenance
-                        </TabsTrigger>
+                        <TabsTrigger value="rules">Signal Rules</TabsTrigger>
+                        <TabsTrigger value="queues">Triage Queues</TabsTrigger>
+                        <TabsTrigger value="sources">Signal Sources</TabsTrigger>
+                        <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
                     </TabsList>
 
                     {/* --- Tab 1: Signal Rules --- */}

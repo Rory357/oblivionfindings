@@ -51,6 +51,16 @@ class ControlRoomAlert extends Model
         'escalation_level' => 'integer',
     ];
 
+    public function client(): BelongsTo
+    {
+        return $this->belongsTo(Client::class);
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
+    }
+
     public function asset(): BelongsTo
     {
         return $this->belongsTo(Asset::class);
