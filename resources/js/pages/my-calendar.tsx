@@ -295,8 +295,12 @@ export default function MyCalendar() {
 
     const fetchEvents = useCallback(
         (info: { startStr: string; endStr: string }, successCb: (events: unknown[]) => void, failureCb: (error: unknown) => void) => {
-            fetch(`/my-calendar/events?start=${info.startStr}&end=${info.endStr}`)
-                .then((r) => r.json()).then(successCb).catch(failureCb);
+            fetch(`/my-calendar/events?start=${info.startStr}&end=${info.endStr}`, {
+                credentials: 'same-origin',
+                headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+            })
+                .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+                .then(successCb).catch(failureCb);
         }, [],
     );
 
