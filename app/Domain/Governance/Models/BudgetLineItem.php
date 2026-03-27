@@ -17,6 +17,7 @@ class BudgetLineItem extends Model
         'subcategory',
         'description',
         'account_code',
+        'gl_account_id',
         'budget_amount',
         'forecast_amount',
         'actual_amount',

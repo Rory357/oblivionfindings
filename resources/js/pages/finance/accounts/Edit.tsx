@@ -1,0 +1,393 @@
+import AppLayout from '@/layouts/app-layout';
+import { Head, Link, useForm } from '@inertiajs/react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
+import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { FormEvent } from 'react';
+
+type Account = {
+    id: number;
+    code: string;
+    name: string;
+    type: string;
+    sub_type: string | null;
+    parent_id: number | null;
+    is_system: boolean;
+    is_active: boolean;
+    gst_applicable: boolean;
+    description: string | null;
+    default_tax_rate_id: number | null;
+    funding_stream_id: number | null;
+};
+
+type ParentAccount = {
+    id: number;
+    code: string;
+    name: string;
+    type: string;
+};
+
+type TaxRate = {
+    id: number;
+    name: string;
+    code: string;
+    rate: string;
+};
+
+type FundingStream = {
+    id: number;
+    code: string;
+    name: string;
+};
+
+type PageProps = {
+    account: Account;
+    parentAccounts: ParentAccount[];
+    taxRates: TaxRate[];
+    fundingStreams: FundingStream[];
+    hasJournalLines: boolean;
+};
+
+const accountTypes = [
+    { value: 'asset', label: 'Asset' },
+    { value: 'liability', label: 'Liability' },
+    { value: 'equity', label: 'Equity' },
+    { value: 'revenue', label: 'Revenue' },
+    { value: 'expense', label: 'Expense' },
+];
+
+const subTypes: Record<string, { value: string; label: string }[]> = {
+    asset: [
+        { value: 'current_asset', label: 'Current Asset' },
+        { value: 'fixed_asset', label: 'Fixed Asset' },
+        { value: 'bank', label: 'Bank' },
+        { value: 'accounts_receivable', label: 'Accounts Receivable' },
+        { value: 'inventory', label: 'Inventory' },
+        { value: 'other_asset', label: 'Other Asset' },
+    ],
+    liability: [
+        { value: 'current_liability', label: 'Current Liability' },
+        { value: 'long_term_liability', label: 'Long Term Liability' },
+        { value: 'accounts_payable', label: 'Accounts Payable' },
+        { value: 'tax_payable', label: 'Tax Payable' },
+        { value: 'other_liability', label: 'Other Liability' },
+    ],
+    equity: [
+        { value: 'retained_earnings', label: 'Retained Earnings' },
+        { value: 'share_capital', label: 'Share Capital' },
+        { value: 'reserves', label: 'Reserves' },
+        { value: 'other_equity', label: 'Other Equity' },
+    ],
+    revenue: [
+        { value: 'operating_revenue', label: 'Operating Revenue' },
+        { value: 'grant_income', label: 'Grant Income' },
+        { value: 'funding_income', label: 'Funding Income' },
+        { value: 'other_income', label: 'Other Income' },
+    ],
+    expense: [
+        { value: 'operating_expense', label: 'Operating Expense' },
+        { value: 'cost_of_sales', label: 'Cost of Sales' },
+        { value: 'payroll', label: 'Payroll' },
+        { value: 'depreciation', label: 'Depreciation' },
+        { value: 'administration', label: 'Administration' },
+        { value: 'other_expense', label: 'Other Expense' },
+    ],
+};
+
+export default function AccountEdit({ account, parentAccounts, taxRates, fundingStreams, hasJournalLines }: PageProps) {
+    const { data, setData, put, processing, errors } = useForm({
+        code: account.code,
+        name: account.name,
+        type: account.type,
+        sub_type: account.sub_type || '',
+        parent_id: account.parent_id ? String(account.parent_id) : '',
+        description: account.description || '',
+        gst_applicable: account.gst_applicable,
+        is_active: account.is_active,
+        default_tax_rate_id: account.default_tax_rate_id ? String(account.default_tax_rate_id) : '',
+        funding_stream_id: account.funding_stream_id ? String(account.funding_stream_id) : '',
+    });
+
+    const breadcrumbs = [
+        { title: 'Finance', href: route('finance.dashboard') },
+        { title: 'Chart of Accounts', href: route('finance.accounts.index') },
+        { title: `Edit ${account.code}`, href: route('finance.accounts.edit', account.id) },
+    ];
+
+    function handleSubmit(e: FormEvent) {
+        e.preventDefault();
+        put(route('finance.accounts.update', account.id));
+    }
+
+    const filteredParents = data.type
+        ? parentAccounts.filter((a) => a.type === data.type)
+        : parentAccounts;
+
+    const currentSubTypes = data.type ? (subTypes[data.type] || []) : [];
+
+    const isCodeDisabled = account.is_system;
+    const isTypeDisabled = account.is_system || hasJournalLines;
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
+            <Head title={`Edit Account - ${account.code}`} />
+
+            <div className="mx-auto max-w-3xl space-y-6 p-6">
+                <div className="flex items-center gap-4">
+                    <Link href={route('finance.accounts.index')}>
+                        <Button variant="ghost" size="icon">
+                            <ArrowLeft className="h-4 w-4" />
+                        </Button>
+                    </Link>
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Edit Account</h1>
+                        <p className="text-muted-foreground">
+                            Update account {account.code} - {account.name}
+                        </p>
+                    </div>
+                </div>
+
+                {account.is_system && (
+                    <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                        <AlertTriangle className="h-5 w-5 text-amber-500 shrink-0" />
+                        <div>
+                            <p className="text-sm font-medium text-amber-600">System Account</p>
+                            <p className="text-sm text-muted-foreground">
+                                This is a system account. The account code and type cannot be changed.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                {hasJournalLines && !account.is_system && (
+                    <div className="flex items-center gap-3 rounded-lg border border-blue-500/30 bg-blue-500/5 p-4">
+                        <AlertTriangle className="h-5 w-5 text-blue-500 shrink-0" />
+                        <div>
+                            <p className="text-sm font-medium text-blue-600">Has Journal Entries</p>
+                            <p className="text-sm text-muted-foreground">
+                                This account has journal entries. The account type cannot be changed.
+                            </p>
+                        </div>
+                    </div>
+                )}
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Account Details</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit} className="space-y-6">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="code">Account Code *</Label>
+                                    <Input
+                                        id="code"
+                                        value={data.code}
+                                        onChange={(e) => setData('code', e.target.value)}
+                                        placeholder="e.g. 1000"
+                                        maxLength={20}
+                                        disabled={isCodeDisabled}
+                                    />
+                                    {errors.code && (
+                                        <p className="text-sm text-destructive">{errors.code}</p>
+                                    )}
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label htmlFor="name">Account Name *</Label>
+                                    <Input
+                                        id="name"
+                                        value={data.name}
+                                        onChange={(e) => setData('name', e.target.value)}
+                                        placeholder="e.g. Cash at Bank"
+                                        maxLength={255}
+                                    />
+                                    {errors.name && (
+                                        <p className="text-sm text-destructive">{errors.name}</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label>Account Type *</Label>
+                                    <Select
+                                        value={data.type}
+                                        onValueChange={(value) => {
+                                            setData((prev) => ({
+                                                ...prev,
+                                                type: value,
+                                                sub_type: '',
+                                                parent_id: '',
+                                            }));
+                                        }}
+                                        disabled={isTypeDisabled}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {accountTypes.map((t) => (
+                                                <SelectItem key={t.value} value={t.value}>
+                                                    {t.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.type && (
+                                        <p className="text-sm text-destructive">{errors.type}</p>
+                                    )}
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label>Sub Type</Label>
+                                    <Select
+                                        value={data.sub_type}
+                                        onValueChange={(value) => setData('sub_type', value)}
+                                        disabled={!data.type}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select sub type" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {currentSubTypes.map((st) => (
+                                                <SelectItem key={st.value} value={st.value}>
+                                                    {st.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.sub_type && (
+                                        <p className="text-sm text-destructive">{errors.sub_type}</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label>Parent Account</Label>
+                                <Select
+                                    value={data.parent_id}
+                                    onValueChange={(value) => setData('parent_id', value)}
+                                    disabled={!data.type}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="None (top-level account)" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {filteredParents.map((p) => (
+                                            <SelectItem key={p.id} value={String(p.id)}>
+                                                {p.code} - {p.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {errors.parent_id && (
+                                    <p className="text-sm text-destructive">{errors.parent_id}</p>
+                                )}
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-1.5">
+                                    <Label>Default Tax Rate</Label>
+                                    <Select
+                                        value={data.default_tax_rate_id}
+                                        onValueChange={(value) => setData('default_tax_rate_id', value)}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="None" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {taxRates.map((tr) => (
+                                                <SelectItem key={tr.id} value={String(tr.id)}>
+                                                    {tr.name} ({tr.rate}%)
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label>Funding Stream</Label>
+                                    <Select
+                                        value={data.funding_stream_id}
+                                        onValueChange={(value) => setData('funding_stream_id', value)}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="None" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {fundingStreams.map((fs) => (
+                                                <SelectItem key={fs.id} value={String(fs.id)}>
+                                                    {fs.code} - {fs.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label htmlFor="description">Description</Label>
+                                <Textarea
+                                    id="description"
+                                    value={data.description}
+                                    onChange={(e) => setData('description', e.target.value)}
+                                    placeholder="Optional description for this account"
+                                    rows={3}
+                                />
+                                {errors.description && (
+                                    <p className="text-sm text-destructive">{errors.description}</p>
+                                )}
+                            </div>
+
+                            <div className="flex items-center gap-6">
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id="gst_applicable"
+                                        checked={data.gst_applicable}
+                                        onCheckedChange={(checked) =>
+                                            setData('gst_applicable', checked === true)
+                                        }
+                                    />
+                                    <Label htmlFor="gst_applicable" className="font-normal">
+                                        GST Applicable
+                                    </Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <Checkbox
+                                        id="is_active"
+                                        checked={data.is_active}
+                                        onCheckedChange={(checked) =>
+                                            setData('is_active', checked === true)
+                                        }
+                                    />
+                                    <Label htmlFor="is_active" className="font-normal">
+                                        Active
+                                    </Label>
+                                </div>
+                            </div>
+
+                            <div className="flex justify-end gap-3">
+                                <Link href={route('finance.accounts.index')}>
+                                    <Button type="button" variant="outline">Cancel</Button>
+                                </Link>
+                                <Button type="submit" disabled={processing}>
+                                    {processing ? 'Saving...' : 'Save Changes'}
+                                </Button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
+            </div>
+        </AppLayout>
+    );
+}

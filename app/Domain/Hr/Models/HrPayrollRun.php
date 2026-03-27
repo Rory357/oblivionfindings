@@ -31,6 +31,8 @@ class HrPayrollRun extends Model
         'total_staff',
         'notes',
         'validation_errors',
+        'journal_id',
+        'gl_posted_at',
         'created_by',
     ];
 
@@ -44,6 +46,8 @@ class HrPayrollRun extends Model
         'total_staff' => 'integer',
         'validation_errors' => 'array',
         'export_profile_id' => 'integer',
+        'journal_id' => 'integer',
+        'gl_posted_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -53,6 +57,11 @@ class HrPayrollRun extends Model
     public function items(): HasMany
     {
         return $this->hasMany(HrPayrollRunItem::class, 'payroll_run_id');
+    }
+
+    public function payslips(): HasMany
+    {
+        return $this->hasMany(HrPayslip::class, 'payroll_run_id');
     }
 
     public function lockedBy(): BelongsTo

@@ -155,5 +155,8 @@ require __DIR__.'/hr.php';
 // System module (Access Control, Users)
 require __DIR__.'/system.php';
 
+// Finance module
+require __DIR__.'/finance.php';
+
 // API routes
 require __DIR__.'/api_medications.php';

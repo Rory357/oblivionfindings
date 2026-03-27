@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Domain\Finance\Models\FinPaymentAllocation;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Invoice extends Model
@@ -58,6 +60,11 @@ class Invoice extends Model
     public function scopeDraft($query)
     {
         return $query->where('status', 'draft');
+    }
+
+    public function paymentAllocations(): MorphMany
+    {
+        return $this->morphMany(FinPaymentAllocation::class, 'allocatable');
     }
 
     public function scopeOverdue($query)

@@ -265,4 +265,9 @@ class Client extends Model
     {
         return $this->hasMany(\App\Models\ClientOnboardingWorkflow::class, 'client_id');
     }
+
+    public function invoices()
+    {
+        return $this->hasMany(Invoice::class);
+    }
 }
