@@ -3,20 +3,30 @@ import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { Head, Link } from '@inertiajs/react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
+    ArrowRight,
     Bell,
     Calendar,
     CheckCircle2,
+    ChevronRight,
     Clock,
     ClipboardList,
+    ExternalLink,
     FileText,
+    Flame,
     ListTodo,
     OctagonAlert,
+    RefreshCw,
+    Shield,
+    Timer,
+    User,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface Task {
     id: string;
@@ -46,256 +56,349 @@ interface Props {
 }
 
 type FilterTab = 'all' | 'alert' | 'followup' | 'note_followup';
+type SortKey = 'priority' | 'due_at' | 'created_at';
 
-const priorityBorderColors: Record<string, string> = {
-    critical: 'border-l-red-600',
-    high: 'border-l-orange-500',
-    medium: 'border-l-yellow-500',
-    low: 'border-l-blue-400',
+const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+
+const priorityConfig: Record<string, { border: string; badge: string; bg: string; icon: typeof AlertTriangle | null }> = {
+    critical: { border: 'border-l-red-600', badge: 'bg-red-600 text-white', bg: 'bg-red-50/60 dark:bg-red-950/20', icon: Flame },
+    high: { border: 'border-l-orange-500', badge: 'bg-orange-500 text-white', bg: 'bg-orange-50/40 dark:bg-orange-950/10', icon: AlertTriangle },
+    medium: { border: 'border-l-yellow-500', badge: 'bg-yellow-500 text-black', bg: '', icon: null },
+    low: { border: 'border-l-blue-400', badge: 'bg-blue-500 text-white', bg: '', icon: null },
 };
 
-const priorityBadgeColors: Record<string, string> = {
-    critical: 'bg-red-100 text-red-800 border-red-200',
-    high: 'bg-orange-100 text-orange-800 border-orange-200',
-    medium: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    low: 'bg-blue-100 text-blue-800 border-blue-200',
+const typeConfig: Record<string, { badge: string; icon: typeof Bell; label: string }> = {
+    alert: { badge: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300', icon: Bell, label: 'Alert' },
+    followup: { badge: 'bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300', icon: ClipboardList, label: 'Follow-up' },
+    note_followup: { badge: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300', icon: FileText, label: 'Note' },
 };
 
-const typeBadgeColors: Record<string, string> = {
-    alert: 'bg-purple-100 text-purple-800 border-purple-200',
-    followup: 'bg-blue-100 text-blue-800 border-blue-200',
-    note_followup: 'bg-gray-100 text-gray-800 border-gray-200',
-};
+function formatRelative(iso: string): string {
+    const d = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - d.getTime();
+    const mins = Math.floor(diffMs / 60000);
+    const hrs = Math.floor(mins / 60);
+    const days = Math.floor(hrs / 24);
+    if (mins < 1) return 'Just now';
+    if (mins < 60) return `${mins}m ago`;
+    if (hrs < 24) return `${hrs}h ago`;
+    if (days < 7) return `${days}d ago`;
+    return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+}
 
-const typeLabels: Record<string, string> = {
-    alert: 'Alert',
-    followup: 'Follow-up',
-    note_followup: 'Note',
-};
-
-const filterTabs: { key: FilterTab; label: string }[] = [
-    { key: 'all', label: 'All' },
-    { key: 'alert', label: 'Alerts' },
-    { key: 'followup', label: 'Follow-ups' },
-    { key: 'note_followup', label: 'Notes' },
-];
-
-function formatDueDate(dueAt: string | null): { text: string; className: string } | null {
-    if (!dueAt) return null;
-
+function formatDue(dueAt: string | null): { text: string; urgency: 'overdue' | 'today' | 'upcoming' | 'none' } {
+    if (!dueAt) return { text: '', urgency: 'none' };
     const due = new Date(dueAt);
     const now = new Date();
-    const todayEnd = new Date();
-    todayEnd.setHours(23, 59, 59, 999);
+    const diffMs = due.getTime() - now.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHrs = Math.floor(diffMins / 60);
 
-    const isOverdue = due < now;
-    const isToday = due >= now && due <= todayEnd;
-
-    const formatted = due.toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        year: due.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-
-    if (isOverdue) {
-        return { text: `Overdue: ${formatted}`, className: 'text-red-600 font-medium' };
+    if (diffMs < 0) {
+        const overMins = Math.abs(diffMins);
+        if (overMins < 60) return { text: `${overMins}m overdue`, urgency: 'overdue' };
+        const overHrs = Math.floor(overMins / 60);
+        if (overHrs < 24) return { text: `${overHrs}h overdue`, urgency: 'overdue' };
+        return { text: `${Math.floor(overHrs / 24)}d overdue`, urgency: 'overdue' };
     }
-    if (isToday) {
-        return { text: `Due today: ${formatted}`, className: 'text-yellow-600 font-medium' };
-    }
-    return { text: `Due: ${formatted}`, className: 'text-muted-foreground' };
+    if (diffHrs < 1) return { text: `${diffMins}m left`, urgency: 'today' };
+    if (diffHrs < 24) return { text: `${diffHrs}h left`, urgency: 'today' };
+    return { text: due.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }), urgency: 'upcoming' };
 }
 
-function formatCreatedAt(createdAt: string): string {
-    const date = new Date(createdAt);
-    return date.toLocaleDateString('en-NZ', {
-        day: 'numeric',
-        month: 'short',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-}
-
-const breadcrumbs = [{ title: 'My Tasks', href: '/my-tasks' }];
+const urgencyColors = {
+    overdue: 'text-red-600 bg-red-50 dark:bg-red-950/30 dark:text-red-400',
+    today: 'text-amber-600 bg-amber-50 dark:bg-amber-950/30 dark:text-amber-400',
+    upcoming: 'text-muted-foreground bg-muted/50',
+    none: '',
+};
 
 export default function MyTasks({ tasks, stats }: Props) {
     const [activeFilter, setActiveFilter] = useState<FilterTab>('all');
+    const [sortBy, setSortBy] = useState<SortKey>('priority');
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
-    const filteredTasks = activeFilter === 'all'
-        ? tasks
-        : tasks.filter((t) => t.type === activeFilter);
+    // Auto-refresh every 60s
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (!document.hidden) router.reload();
+        }, 60000);
+        return () => clearInterval(interval);
+    }, []);
 
-    const filterCounts: Record<FilterTab, number> = {
+    const handleRefresh = () => {
+        setIsRefreshing(true);
+        router.reload({ onFinish: () => setIsRefreshing(false) });
+    };
+
+    const filtered = (activeFilter === 'all' ? tasks : tasks.filter((t) => t.type === activeFilter));
+
+    const sorted = [...filtered].sort((a, b) => {
+        if (sortBy === 'priority') {
+            const diff = (priorityOrder[a.priority] ?? 3) - (priorityOrder[b.priority] ?? 3);
+            if (diff !== 0) return diff;
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        }
+        if (sortBy === 'due_at') {
+            if (!a.due_at && !b.due_at) return 0;
+            if (!a.due_at) return 1;
+            if (!b.due_at) return -1;
+            return new Date(a.due_at).getTime() - new Date(b.due_at).getTime();
+        }
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
+
+    const counts: Record<FilterTab, number> = {
         all: tasks.length,
         alert: tasks.filter((t) => t.type === 'alert').length,
         followup: tasks.filter((t) => t.type === 'followup').length,
         note_followup: tasks.filter((t) => t.type === 'note_followup').length,
     };
 
+    const completionRate = stats.total_tasks > 0
+        ? Math.round(((stats.total_tasks - stats.overdue) / stats.total_tasks) * 100)
+        : 100;
+
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
+        <AppLayout breadcrumbs={[{ title: 'My Tasks', href: '/my-tasks' }]}>
             <Head title="My Tasks" />
             <PageShell>
                 <PageHeader
                     title="My Tasks"
-                    description="Your assigned tasks across all modules"
+                    description="Your assigned tasks across all modules."
+                    actions={
+                        <div className="flex items-center gap-2">
+                            <Button variant="ghost" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+                                <RefreshCw className={`mr-2 h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                Refresh
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href="/control-room/my-tasks">
+                                    <Shield className="mr-2 h-4 w-4" />
+                                    Control Room Tasks
+                                </Link>
+                            </Button>
+                        </div>
+                    }
                 />
 
+                {/* Urgent Banner */}
+                {(stats.overdue > 0 || stats.critical_count > 0) && (
+                    <div className={`flex items-center gap-3 rounded-lg border px-4 py-3 ${
+                        stats.overdue > 0
+                            ? 'border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/30'
+                            : 'border-orange-300 bg-orange-50 dark:border-orange-800 dark:bg-orange-950/30'
+                    }`}>
+                        <div className="relative flex h-3 w-3 shrink-0">
+                            <span className={`absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 ${stats.overdue > 0 ? 'bg-red-500' : 'bg-orange-500'}`} />
+                            <span className={`relative inline-flex h-3 w-3 rounded-full ${stats.overdue > 0 ? 'bg-red-600' : 'bg-orange-600'}`} />
+                        </div>
+                        <span className={`text-sm font-semibold ${stats.overdue > 0 ? 'text-red-800 dark:text-red-200' : 'text-orange-800 dark:text-orange-200'}`}>
+                            {stats.overdue > 0
+                                ? `${stats.overdue} overdue task${stats.overdue !== 1 ? 's' : ''} need${stats.overdue === 1 ? 's' : ''} attention`
+                                : `${stats.critical_count} critical task${stats.critical_count !== 1 ? 's' : ''} assigned to you`}
+                        </span>
+                    </div>
+                )}
+
                 {/* KPI Row */}
-                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-                    <KpiCard
-                        label="Total Tasks"
-                        value={stats.total_tasks}
-                        icon={ListTodo}
-                    />
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
+                    <KpiCard label="Total Tasks" value={stats.total_tasks} icon={ListTodo} />
                     <KpiCard
                         label="Critical"
                         value={stats.critical_count}
-                        icon={OctagonAlert}
-                        className={stats.critical_count > 0 ? 'border-red-200 bg-red-50/50' : ''}
+                        icon={Flame}
+                        className={stats.critical_count > 0 ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20' : undefined}
                     />
-                    <KpiCard
-                        label="Due Today"
-                        value={stats.due_today}
-                        icon={Calendar}
-                    />
+                    <KpiCard label="Due Today" value={stats.due_today} icon={Calendar} />
                     <KpiCard
                         label="Overdue"
                         value={stats.overdue}
-                        icon={Clock}
-                        className={stats.overdue > 0 ? 'border-red-200 bg-red-50/50' : ''}
+                        icon={Timer}
+                        className={stats.overdue > 0 ? 'border-red-300 bg-red-50/50 dark:border-red-800 dark:bg-red-950/20' : undefined}
                     />
+                    <div className="relative overflow-hidden rounded-xl border bg-card p-5 shadow-sm">
+                        <div className="text-3xl font-bold tracking-tight">{completionRate}%</div>
+                        <div className="mt-1 text-sm text-muted-foreground">On Track</div>
+                        <Progress value={completionRate} className="mt-3 h-2" />
+                    </div>
                 </div>
 
-                {/* Filter Tabs */}
-                <div className="flex gap-1 rounded-lg border bg-muted/50 p-1">
-                    {filterTabs.map((tab) => (
-                        <button
-                            key={tab.key}
-                            onClick={() => setActiveFilter(tab.key)}
-                            className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-colors ${
-                                activeFilter === tab.key
-                                    ? 'bg-background text-foreground shadow-sm'
-                                    : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                        >
-                            {tab.label}
-                            <span
-                                className={`inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-medium ${
+                {/* Filter + Sort Bar */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    {/* Filter Tabs */}
+                    <div className="flex gap-1 rounded-lg border bg-muted/50 p-1">
+                        {([
+                            { key: 'all' as FilterTab, label: 'All', icon: ListTodo },
+                            { key: 'alert' as FilterTab, label: 'Alerts', icon: Bell },
+                            { key: 'followup' as FilterTab, label: 'Follow-ups', icon: ClipboardList },
+                            { key: 'note_followup' as FilterTab, label: 'Notes', icon: FileText },
+                        ]).map((tab) => (
+                            <button
+                                key={tab.key}
+                                onClick={() => setActiveFilter(tab.key)}
+                                className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
                                     activeFilter === tab.key
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'bg-muted-foreground/20'
+                                        ? 'bg-background text-foreground shadow-sm'
+                                        : 'text-muted-foreground hover:text-foreground'
                                 }`}
                             >
-                                {filterCounts[tab.key]}
-                            </span>
-                        </button>
-                    ))}
+                                <tab.icon className="h-3.5 w-3.5" />
+                                {tab.label}
+                                <span className={`ml-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
+                                    activeFilter === tab.key
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-muted-foreground/15 text-muted-foreground'
+                                }`}>
+                                    {counts[tab.key]}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+
+                    {/* Sort */}
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span>Sort:</span>
+                        {([
+                            { key: 'priority' as SortKey, label: 'Priority' },
+                            { key: 'due_at' as SortKey, label: 'Due Date' },
+                            { key: 'created_at' as SortKey, label: 'Newest' },
+                        ]).map((s) => (
+                            <button
+                                key={s.key}
+                                onClick={() => setSortBy(s.key)}
+                                className={`rounded-md px-2 py-1 text-xs transition-colors ${
+                                    sortBy === s.key
+                                        ? 'bg-primary/10 font-medium text-primary'
+                                        : 'hover:bg-muted'
+                                }`}
+                            >
+                                {s.label}
+                            </button>
+                        ))}
+                    </div>
                 </div>
 
                 {/* Task List */}
-                <div className="space-y-3">
-                    {filteredTasks.length === 0 ? (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                                <CheckCircle2 className="mb-3 h-12 w-12 text-muted-foreground/40" />
-                                <h3 className="text-lg font-medium text-muted-foreground">
-                                    {activeFilter === 'all'
-                                        ? 'No tasks assigned'
-                                        : `No ${typeLabels[activeFilter]?.toLowerCase() ?? ''} tasks`}
-                                </h3>
-                                <p className="mt-1 text-sm text-muted-foreground/70">
-                                    {activeFilter === 'all'
-                                        ? 'You have no outstanding tasks across any module.'
-                                        : 'Try selecting a different filter to see your tasks.'}
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        filteredTasks.map((task) => {
-                            const dueInfo = formatDueDate(task.due_at);
+                {sorted.length === 0 ? (
+                    <Card>
+                        <CardContent className="flex flex-col items-center justify-center py-20 text-center">
+                            <div className="rounded-full bg-green-100 p-4 dark:bg-green-900/30">
+                                <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
+                            </div>
+                            <h3 className="mt-4 text-lg font-semibold">All clear</h3>
+                            <p className="mt-1 max-w-sm text-sm text-muted-foreground">
+                                {activeFilter === 'all'
+                                    ? "You have no outstanding tasks. Great work!"
+                                    : `No ${typeConfig[activeFilter]?.label.toLowerCase()} tasks right now.`}
+                            </p>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="space-y-2">
+                        {sorted.map((task) => {
+                            const pConfig = priorityConfig[task.priority] ?? priorityConfig.medium;
+                            const tConfig = typeConfig[task.type] ?? typeConfig.alert;
+                            const TypeIcon = tConfig.icon;
+                            const PriorityIcon = pConfig.icon;
+                            const due = formatDue(task.due_at);
+
                             return (
-                                <Card
+                                <Link
                                     key={task.id}
-                                    className={`border-l-4 ${priorityBorderColors[task.priority] ?? 'border-l-gray-300'} transition-colors hover:bg-accent/50`}
+                                    href={task.source_url}
+                                    className={`group flex items-stretch rounded-lg border border-l-4 ${pConfig.border} ${pConfig.bg} transition-all hover:shadow-md hover:border-primary/30`}
                                 >
-                                    <CardContent className="flex flex-col gap-3 py-4 sm:flex-row sm:items-start sm:justify-between">
-                                        <div className="min-w-0 flex-1 space-y-2">
-                                            {/* Type + Priority badges */}
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <Badge
-                                                    variant="outline"
-                                                    className={typeBadgeColors[task.type]}
-                                                >
-                                                    {task.type === 'alert' && <Bell className="mr-1 h-3 w-3" />}
-                                                    {task.type === 'followup' && <ClipboardList className="mr-1 h-3 w-3" />}
-                                                    {task.type === 'note_followup' && <FileText className="mr-1 h-3 w-3" />}
-                                                    {typeLabels[task.type]}
-                                                </Badge>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={priorityBadgeColors[task.priority]}
-                                                >
-                                                    {task.priority === 'critical' && <AlertTriangle className="mr-1 h-3 w-3" />}
-                                                    {task.priority}
-                                                </Badge>
-                                                <Badge variant="outline">{task.status}</Badge>
-                                            </div>
-
-                                            {/* Title */}
-                                            <div>
-                                                <Link
-                                                    href={task.source_url}
-                                                    className="text-base font-semibold text-foreground hover:text-primary hover:underline"
-                                                >
-                                                    {task.title}
-                                                </Link>
-                                            </div>
-
-                                            {/* Meta info */}
-                                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                                {task.meta.client_name && (
-                                                    <span>Client: {task.meta.client_name}</span>
-                                                )}
-                                                {task.meta.source && (
-                                                    <span>Source: {task.meta.source}</span>
-                                                )}
-                                                {task.meta.asset_name && (
-                                                    <span>Asset: {task.meta.asset_name}</span>
-                                                )}
-                                                {task.meta.sla_status && (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className={
-                                                            task.meta.sla_status === 'breached'
-                                                                ? 'bg-red-100 text-red-700 border-red-200'
-                                                                : task.meta.sla_status === 'at_risk'
-                                                                  ? 'bg-yellow-100 text-yellow-700 border-yellow-200'
-                                                                  : 'bg-green-100 text-green-700 border-green-200'
-                                                        }
-                                                    >
-                                                        SLA: {task.meta.sla_status}
-                                                    </Badge>
-                                                )}
-                                                <span>Created: {formatCreatedAt(task.created_at)}</span>
-                                            </div>
+                                    {/* Main content */}
+                                    <div className="flex min-w-0 flex-1 items-center gap-4 px-4 py-3.5">
+                                        {/* Type icon circle */}
+                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${tConfig.badge}`}>
+                                            <TypeIcon className="h-4.5 w-4.5" />
                                         </div>
 
-                                        {/* Due date */}
-                                        {dueInfo && (
-                                            <div className={`shrink-0 text-sm ${dueInfo.className}`}>
-                                                <Clock className="mr-1 inline-block h-3.5 w-3.5" />
-                                                {dueInfo.text}
+                                        {/* Content */}
+                                        <div className="min-w-0 flex-1">
+                                            <div className="flex items-center gap-2">
+                                                <span className="truncate font-semibold text-foreground group-hover:text-primary transition-colors">
+                                                    {task.title}
+                                                </span>
+                                                {PriorityIcon && (
+                                                    <PriorityIcon className={`h-4 w-4 shrink-0 ${task.priority === 'critical' ? 'text-red-500' : 'text-orange-500'}`} />
+                                                )}
                                             </div>
+                                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                                <Badge variant="outline" className={`${pConfig.badge} px-1.5 py-0 text-[10px]`}>
+                                                    {task.priority}
+                                                </Badge>
+                                                <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                                                    {task.status}
+                                                </Badge>
+                                                {task.meta.client_name && (
+                                                    <span className="flex items-center gap-1">
+                                                        <User className="h-3 w-3" />
+                                                        {task.meta.client_name}
+                                                    </span>
+                                                )}
+                                                {task.meta.source && (
+                                                    <span>{task.meta.source}</span>
+                                                )}
+                                                {task.meta.asset_name && (
+                                                    <span>{task.meta.asset_name}</span>
+                                                )}
+                                                <span className="flex items-center gap-1">
+                                                    <Clock className="h-3 w-3" />
+                                                    {formatRelative(task.created_at)}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Right section: SLA + Due + Arrow */}
+                                    <div className="flex shrink-0 items-center gap-3 px-4">
+                                        {task.meta.sla_status && (
+                                            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${
+                                                task.meta.sla_status === 'breached' ? 'bg-red-500' :
+                                                task.meta.sla_status === 'at_risk' ? 'bg-yellow-500' : 'bg-green-500'
+                                            }`} title={`SLA: ${task.meta.sla_status}`} />
                                         )}
-                                    </CardContent>
-                                </Card>
+                                        {due.urgency !== 'none' && (
+                                            <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-medium ${urgencyColors[due.urgency]}`}>
+                                                <Timer className="h-3 w-3" />
+                                                {due.text}
+                                            </span>
+                                        )}
+                                        <ChevronRight className="h-4 w-4 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5" />
+                                    </div>
+                                </Link>
                             );
-                        })
-                    )}
-                </div>
+                        })}
+                    </div>
+                )}
+
+                {/* Quick Links */}
+                {tasks.length > 0 && (
+                    <div className="flex flex-wrap gap-2">
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/control-room">
+                                <Bell className="mr-2 h-4 w-4" />
+                                Control Room Dashboard
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/control-room/alerts">
+                                <ListTodo className="mr-2 h-4 w-4" />
+                                All Alerts
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" asChild>
+                            <Link href="/control-room/escalations">
+                                <ArrowRight className="mr-2 h-4 w-4" />
+                                Escalation Queue
+                            </Link>
+                        </Button>
+                    </div>
+                )}
             </PageShell>
         </AppLayout>
     );
