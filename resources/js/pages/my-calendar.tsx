@@ -72,9 +72,9 @@ const calendarStyles = `
     font-size: 0.7rem; font-weight: 500; color: hsl(var(--muted-foreground) / 0.45); padding-right: 0.75rem;
 }
 .fc .fc-timegrid-slot { height: 3.5em; }
-.fc .fc-timegrid-slot-lane { border-top: 1px solid hsl(var(--border) / 0.12) !important; }
-.fc .fc-timegrid-slot-minor { border: none !important; }
-.fc .fc-timegrid-col { border-right: 1px solid hsl(var(--border) / 0.08) !important; }
+.fc .fc-timegrid-slot-lane { border-top: 1px dotted rgba(139, 92, 246, 0.12) !important; }
+.fc .fc-timegrid-slot-minor { border-top: 1px dotted rgba(139, 92, 246, 0.06) !important; }
+.fc .fc-timegrid-col { border-right: 1px dotted rgba(139, 92, 246, 0.1) !important; }
 .fc .fc-timegrid-col:last-child { border-right: none !important; }
 .fc .fc-timegrid-divider { display: none; }
 .fc .fc-timegrid-axis { border: none !important; }
@@ -117,7 +117,7 @@ const calendarStyles = `
     background: hsl(var(--primary)); color: white; border-radius: 9999px;
     width: 2rem; height: 2rem; display: inline-flex; align-items: center; justify-content: center; margin: 0.25rem;
 }
-.fc .fc-daygrid-day { border-right: 1px solid hsl(var(--border) / 0.08) !important; border-bottom: 1px solid hsl(var(--border) / 0.08) !important; }
+.fc .fc-daygrid-day { border-right: 1px dotted rgba(139, 92, 246, 0.1) !important; border-bottom: 1px dotted rgba(139, 92, 246, 0.1) !important; }
 
 /* ── More link ─────────────────────────────────────────────────────────── */
 .fc .fc-more-link { font-size: 0.7rem; font-weight: 600; color: hsl(var(--primary)); }
