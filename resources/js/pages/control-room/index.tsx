@@ -1,5 +1,6 @@
 import PageHeader from '@/components/page-header';
 import PageShell from '@/components/page-shell';
+import { KpiCard } from '@/components/dashboard/kpi-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,16 +20,29 @@ import {
     Bell,
     CheckCircle,
     Clock,
-    FileText,
     Info,
     MapPin,
     MinusCircle,
     Search,
+    Shield,
+    ShieldCheck,
     TrendingUp,
     User,
     XCircle,
 } from 'lucide-react';
 import React, { useEffect, useRef, useState } from 'react';
+import {
+    Area,
+    AreaChart,
+    CartesianGrid,
+    Cell,
+    Pie,
+    PieChart,
+    ResponsiveContainer,
+    Tooltip,
+    XAxis,
+    YAxis,
+} from 'recharts';
 
 interface Alert {
     id: number;
@@ -49,10 +63,25 @@ interface Alert {
     notes: string | null;
 }
 
+interface ActiveShift {
+    name: string;
+    lead_name: string | null;
+    started_at: string | null;
+}
+
+interface ActivityEvent {
+    id: number;
+    type: string;
+    occurred_at: string;
+    subject: string;
+    body: string | null;
+    meta: Record<string, unknown> | null;
+}
+
 interface Props {
     alerts: {
         data: Alert[];
-        links: any[];
+        links: { url: string | null; label: string; active: boolean }[];
         meta: {
             current_page: number;
             last_page: number;
@@ -75,6 +104,16 @@ interface Props {
     };
     daily_trend: { date: string; count: number }[];
     by_severity: Record<string, number>;
+    unresolved_by_severity: Record<string, number>;
+    by_source: Record<string, number>;
+    top_alert_types: Record<string, number>;
+    sparkline_data: number[];
+    alerts_today: number;
+    alerts_yesterday: number;
+    avg_response_minutes: number;
+    sla_compliance_pct: number;
+    active_shift: ActiveShift | null;
+    recent_activity: ActivityEvent[];
     staff: { id: number; name: string }[];
     filters: Record<string, string>;
     can: {
@@ -101,11 +140,18 @@ const statusColors: Record<string, string> = {
     closed: 'bg-gray-100 text-gray-800 border-gray-200',
 };
 
-const severityChartColors: Record<string, string> = {
-    critical: 'bg-red-500',
-    high: 'bg-orange-500',
-    medium: 'bg-yellow-500',
-    low: 'bg-blue-500',
+const DONUT_COLORS: Record<string, string> = {
+    critical: '#dc2626',
+    high: '#f97316',
+    medium: '#eab308',
+    low: '#3b82f6',
+};
+
+const severityIcons: Record<string, React.ReactNode> = {
+    critical: <AlertTriangle className="mr-1 h-3 w-3" />,
+    high: <AlertCircle className="mr-1 h-3 w-3" />,
+    medium: <Info className="mr-1 h-3 w-3" />,
+    low: <MinusCircle className="mr-1 h-3 w-3" />,
 };
 
 function formatRelativeTime(isoString: string | null): string {
@@ -123,11 +169,34 @@ function formatRelativeTime(isoString: string | null): string {
     return `${diffDays}d ago`;
 }
 
+function actionLabel(action: string): string {
+    const map: Record<string, string> = {
+        'alert.acknowledge': 'Alert acknowledged',
+        'alert.triage': 'Triage started',
+        'alert.resolve': 'Alert resolved',
+        'alert.close': 'Alert closed',
+        'alert.assign': 'Alert assigned',
+        'alert.escalate': 'Alert escalated',
+        'alert.create': 'Alert created',
+        'alert.addNote': 'Note added',
+    };
+    return map[action] || action.split('.').pop()?.replace(/([A-Z])/g, ' $1').trim() || action;
+}
+
 export default function ControlRoomIndex({
     alerts,
     stats,
     daily_trend,
-    by_severity,
+    unresolved_by_severity,
+    by_source,
+    top_alert_types,
+    sparkline_data,
+    alerts_today,
+    alerts_yesterday,
+    avg_response_minutes,
+    sla_compliance_pct,
+    active_shift,
+    recent_activity,
     staff,
     filters,
     can,
@@ -135,18 +204,18 @@ export default function ControlRoomIndex({
     const [searchValue, setSearchValue] = useState(filters.search || '');
     const prevCriticalRef = useRef(stats.critical);
 
-    const severityIcons: Record<string, React.ReactNode> = {
-        critical: <AlertTriangle className="mr-1 h-3 w-3" />,
-        high: <AlertCircle className="mr-1 h-3 w-3" />,
-        medium: <Info className="mr-1 h-3 w-3" />,
-        low: <MinusCircle className="mr-1 h-3 w-3" />,
-    };
-
     // Auto-refresh every 30 seconds
     useEffect(() => {
         const interval = setInterval(() => {
             if (!document.hidden) {
-                router.reload({ only: ['alerts', 'stats', 'daily_trend', 'by_severity'] });
+                router.reload({
+                    only: [
+                        'alerts', 'stats', 'daily_trend', 'unresolved_by_severity',
+                        'by_source', 'top_alert_types', 'sparkline_data',
+                        'alerts_today', 'alerts_yesterday', 'avg_response_minutes',
+                        'sla_compliance_pct', 'active_shift', 'recent_activity',
+                    ],
+                });
             }
         }, 30000);
         return () => clearInterval(interval);
@@ -159,7 +228,7 @@ export default function ControlRoomIndex({
                 const audio = new Audio('/sounds/alert.mp3');
                 audio.volume = 0.5;
                 audio.play().catch(() => {});
-            } catch {}
+            } catch { /* ignore */ }
         }
         prevCriticalRef.current = stats.critical;
     }, [stats.critical]);
@@ -184,6 +253,44 @@ export default function ControlRoomIndex({
 
     const hasFilters = Object.values(filters).some((v) => v);
 
+    // Prepare donut data
+    const donutData = ['critical', 'high', 'medium', 'low']
+        .map((sev) => ({ name: sev, value: unresolved_by_severity[sev] || 0 }))
+        .filter((d) => d.value > 0);
+    const totalUnresolved = donutData.reduce((sum, d) => sum + d.value, 0);
+
+    // Trend calculation
+    const todayTrend = alerts_yesterday > 0
+        ? Math.round(((alerts_today - alerts_yesterday) / alerts_yesterday) * 100)
+        : 0;
+
+    // Horizontal bar helper
+    function HorizontalBars({ data, maxItems = 5 }: { data: Record<string, number>; maxItems?: number }) {
+        const entries = Object.entries(data).slice(0, maxItems);
+        const max = Math.max(...entries.map(([, v]) => v), 1);
+        return (
+            <div className="space-y-2.5">
+                {entries.map(([label, count]) => (
+                    <div key={label}>
+                        <div className="flex items-center justify-between text-xs">
+                            <span className="truncate capitalize text-muted-foreground">{label.replace(/_/g, ' ')}</span>
+                            <span className="ml-2 font-medium">{count}</span>
+                        </div>
+                        <div className="mt-1 h-2 rounded-full bg-muted">
+                            <div
+                                className="h-full rounded-full bg-primary transition-all"
+                                style={{ width: `${(count / max) * 100}%` }}
+                            />
+                        </div>
+                    </div>
+                ))}
+                {entries.length === 0 && (
+                    <p className="py-4 text-center text-xs text-muted-foreground">No data</p>
+                )}
+            </div>
+        );
+    }
+
     return (
         <AppLayout
             breadcrumbs={[{ title: 'Control Room', href: '/control-room' }]}
@@ -194,7 +301,14 @@ export default function ControlRoomIndex({
                     title="Control Room"
                     description="Centralized alert management and triage system."
                     actions={
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <span className="relative flex h-2 w-2">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                                </span>
+                                Live
+                            </div>
                             <Button variant="outline" size="sm" asChild>
                                 <Link href="/control-room/map"><MapPin className="mr-2 h-4 w-4" />Map</Link>
                             </Button>
@@ -204,171 +318,256 @@ export default function ControlRoomIndex({
                             <Button variant="outline" size="sm" asChild>
                                 <Link href="/control-room/escalations"><TrendingUp className="mr-2 h-4 w-4" />Queues</Link>
                             </Button>
-                            {can.viewReports && (
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href="/control-room/reports"><FileText className="mr-2 h-4 w-4" />Reports</Link>
-                                </Button>
-                            )}
                         </div>
                     }
                 />
 
-                {/* Statistics Cards */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-                    <button
-                        onClick={() => applyFilter('status', 'open')}
-                        className="rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent"
-                    >
-                        <div className="flex items-center gap-2">
-                            <Bell className="h-4 w-4 text-red-500" />
-                            <span className="text-xs text-muted-foreground">
-                                Open
-                            </span>
-                        </div>
-                        <div className="mt-1 text-2xl font-bold">
-                            {stats.open}
-                        </div>
-                    </button>
-                    <button
-                        onClick={() => applyFilter('status', 'ack')}
-                        className="rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent"
-                    >
-                        <div className="flex items-center gap-2">
-                            <CheckCircle className="h-4 w-4 text-yellow-500" />
-                            <span className="text-xs text-muted-foreground">
-                                Acknowledged
-                            </span>
-                        </div>
-                        <div className="mt-1 text-2xl font-bold">
-                            {stats.acknowledged}
-                        </div>
-                    </button>
-                    <button
-                        onClick={() => applyFilter('status', 'triaging')}
-                        className="rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent"
-                    >
-                        <div className="flex items-center gap-2">
-                            <Clock className="h-4 w-4 text-blue-500" />
-                            <span className="text-xs text-muted-foreground">
-                                Triaging
-                            </span>
-                        </div>
-                        <div className="mt-1 text-2xl font-bold">
-                            {stats.triaging}
-                        </div>
-                    </button>
-                    <button
-                        onClick={() => applyFilter('severity', 'critical')}
-                        className="rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent"
-                    >
-                        <div className="flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4 text-red-600" />
-                            <span className="text-xs text-muted-foreground">
-                                Critical
-                            </span>
-                        </div>
-                        <div className="mt-1 text-2xl font-bold text-red-600">
-                            {stats.critical}
-                        </div>
-                    </button>
-                    <button
-                        onClick={() => applyFilter('escalation_level', '1')}
-                        className="rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent"
-                    >
-                        <div className="flex items-center gap-2">
-                            <TrendingUp className="h-4 w-4 text-orange-500" />
-                            <span className="text-xs text-muted-foreground">
-                                Escalated
-                            </span>
-                        </div>
-                        <div className="mt-1 text-2xl font-bold">
-                            {stats.escalated}
-                        </div>
-                    </button>
-                    <button
-                        onClick={() => applyFilter('assigned_to', 'me')}
-                        className="rounded-lg border bg-card p-3 text-left transition-colors hover:bg-accent"
-                    >
-                        <div className="flex items-center gap-2">
-                            <User className="h-4 w-4 text-indigo-500" />
-                            <span className="text-xs text-muted-foreground">
-                                My Alerts
-                            </span>
-                        </div>
-                        <div className="mt-1 text-2xl font-bold">
-                            {stats.my_alerts}
-                        </div>
-                    </button>
+                {/* Row 1: KPI Cards */}
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <KpiCard
+                        label="Open Alerts"
+                        value={stats.open}
+                        icon={Bell}
+                        sparklineData={sparkline_data}
+                        trend={todayTrend !== 0 ? {
+                            value: todayTrend,
+                            label: 'vs yesterday',
+                            direction: todayTrend > 0 ? 'up' : todayTrend < 0 ? 'down' : 'neutral',
+                        } : undefined}
+                        href="/control-room?status=open"
+                    />
+                    <KpiCard
+                        label="Critical"
+                        value={stats.critical}
+                        icon={AlertTriangle}
+                        href="/control-room?severity=critical"
+                        className={stats.critical > 0 ? 'border-red-300 bg-red-50/50 dark:bg-red-950/20' : undefined}
+                    />
+                    <KpiCard
+                        label="Avg Response"
+                        value={`${avg_response_minutes}m`}
+                        icon={Clock}
+                        href="/control-room/sla"
+                    />
+                    <KpiCard
+                        label="SLA Compliance"
+                        value={`${sla_compliance_pct}%`}
+                        icon={ShieldCheck}
+                        href="/control-room/sla"
+                        className={sla_compliance_pct < 90 ? 'border-yellow-300 bg-yellow-50/50 dark:bg-yellow-950/20' : undefined}
+                    />
                 </div>
 
-                {/* Charts Row */}
-                <div className="mt-4 grid gap-4 lg:grid-cols-2">
-                    {/* Daily Alert Trend */}
-                    <Card>
+                {/* Row 2: Critical Banner + Active Shift */}
+                {(stats.critical > 0 || active_shift) && (
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                        {stats.critical > 0 && (
+                            <div className="flex flex-1 items-center gap-3 rounded-lg border border-red-300 bg-red-50 px-4 py-2.5 dark:border-red-800 dark:bg-red-950/30">
+                                <div className="relative flex h-3 w-3">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-500 opacity-75" />
+                                    <span className="relative inline-flex h-3 w-3 rounded-full bg-red-600" />
+                                </div>
+                                <span className="text-sm font-semibold text-red-800 dark:text-red-200">
+                                    {stats.critical} CRITICAL ALERT{stats.critical !== 1 ? 'S' : ''} REQUIRE ATTENTION
+                                </span>
+                                <Button variant="destructive" size="sm" className="ml-auto" asChild>
+                                    <Link href="/control-room?severity=critical">View</Link>
+                                </Button>
+                            </div>
+                        )}
+                        {active_shift && (
+                            <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-2.5">
+                                <span className="relative flex h-2.5 w-2.5">
+                                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-green-500" />
+                                </span>
+                                <span className="text-sm">
+                                    <span className="font-medium">{active_shift.name}</span>
+                                    {active_shift.lead_name && (
+                                        <span className="text-muted-foreground"> | Lead: {active_shift.lead_name}</span>
+                                    )}
+                                </span>
+                                <Button variant="ghost" size="sm" className="ml-auto" asChild>
+                                    <Link href="/control-room/shifts">Manage</Link>
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Row 3: Charts */}
+                <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                    {/* Area Chart - Alert Trend */}
+                    <Card className="lg:col-span-2">
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">Daily Alert Trend</CardTitle>
+                            <CardTitle className="text-sm font-medium">Alert Trend (14 Days)</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="flex h-32 items-end gap-1">
-                                {daily_trend.map((day, i) => {
-                                    const maxCount = Math.max(...daily_trend.map(d => d.count), 1);
-                                    const heightPct = (day.count / maxCount) * 100;
-                                    return (
-                                        <div key={i} className="group relative flex-1">
-                                            <div
-                                                className="w-full rounded-t bg-primary transition-all hover:bg-primary/80"
-                                                style={{
-                                                    height: `${heightPct}%`,
-                                                    minHeight: day.count > 0 ? '4px' : '2px',
-                                                }}
-                                            />
-                                            <div className="absolute bottom-full left-1/2 mb-1 hidden -translate-x-1/2 whitespace-nowrap rounded bg-popover px-2 py-1 text-xs shadow-md group-hover:block z-10">
-                                                {day.date}: {day.count}
-                                            </div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                            <div className="mt-2 flex justify-between text-xs text-muted-foreground">
-                                <span>{daily_trend[0]?.date}</span>
-                                <span>{daily_trend[daily_trend.length - 1]?.date}</span>
+                            <div className="h-52">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <AreaChart data={daily_trend} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                                        <defs>
+                                            <linearGradient id="colorAlerts" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                        <XAxis dataKey="date" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                                        <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" allowDecimals={false} />
+                                        <Tooltip
+                                            contentStyle={{
+                                                backgroundColor: 'hsl(var(--card))',
+                                                border: '1px solid hsl(var(--border))',
+                                                borderRadius: '8px',
+                                                fontSize: '12px',
+                                            }}
+                                        />
+                                        <Area
+                                            type="monotone"
+                                            dataKey="count"
+                                            stroke="hsl(var(--primary))"
+                                            strokeWidth={2}
+                                            fill="url(#colorAlerts)"
+                                        />
+                                    </AreaChart>
+                                </ResponsiveContainer>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* By Severity */}
+                    {/* Donut Chart - Severity Distribution */}
                     <Card>
                         <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium">By Severity</CardTitle>
+                            <CardTitle className="text-sm font-medium">Unresolved by Severity</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <div className="space-y-2">
-                                {['critical', 'high', 'medium', 'low'].map((sev) => {
-                                    const count = by_severity[sev] || 0;
-                                    const pct = stats.total > 0 ? (count / stats.total) * 100 : 0;
-                                    return (
-                                        <div key={sev}>
-                                            <div className="mb-1 flex justify-between text-xs">
-                                                <span className="capitalize">{sev}</span>
-                                                <span className="text-muted-foreground">
-                                                    {count} ({pct.toFixed(0)}%)
-                                                </span>
-                                            </div>
-                                            <div className="h-2 rounded-full bg-muted">
-                                                <div
-                                                    className={`h-full rounded-full ${severityChartColors[sev]}`}
-                                                    style={{ width: `${pct}%` }}
+                            <div className="flex h-52 items-center justify-center">
+                                {totalUnresolved > 0 ? (
+                                    <div className="relative">
+                                        <ResponsiveContainer width={180} height={180}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={donutData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={55}
+                                                    outerRadius={80}
+                                                    paddingAngle={2}
+                                                    dataKey="value"
+                                                >
+                                                    {donutData.map((entry) => (
+                                                        <Cell key={entry.name} fill={DONUT_COLORS[entry.name] || '#94a3b8'} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip
+                                                    formatter={(value: number, name: string) => [value, name]}
+                                                    contentStyle={{
+                                                        backgroundColor: 'hsl(var(--card))',
+                                                        border: '1px solid hsl(var(--border))',
+                                                        borderRadius: '8px',
+                                                        fontSize: '12px',
+                                                    }}
                                                 />
-                                            </div>
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center">
+                                            <span className="text-2xl font-bold">{totalUnresolved}</span>
+                                            <span className="text-[10px] text-muted-foreground">Unresolved</span>
                                         </div>
-                                    );
-                                })}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                                        <Shield className="h-10 w-10" />
+                                        <span className="text-sm">All clear</span>
+                                    </div>
+                                )}
+                            </div>
+                            {/* Legend */}
+                            <div className="mt-2 flex flex-wrap justify-center gap-3">
+                                {donutData.map((d) => (
+                                    <div key={d.name} className="flex items-center gap-1.5 text-xs">
+                                        <span
+                                            className="inline-block h-2.5 w-2.5 rounded-full"
+                                            style={{ backgroundColor: DONUT_COLORS[d.name] }}
+                                        />
+                                        <span className="capitalize">{d.name}: {d.value}</span>
+                                    </div>
+                                ))}
                             </div>
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Filters */}
+                {/* Row 4: Secondary Insights */}
+                <div className="mt-4 grid gap-4 lg:grid-cols-3">
+                    {/* Top Alert Types */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Top Alert Types (7d)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <HorizontalBars data={top_alert_types} />
+                        </CardContent>
+                    </Card>
+
+                    {/* By Source */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">By Source (7d)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <HorizontalBars data={by_source} maxItems={8} />
+                        </CardContent>
+                    </Card>
+
+                    {/* Recent Activity */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium">Recent Activity</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="max-h-48 space-y-2.5 overflow-y-auto">
+                                {recent_activity.length > 0 ? recent_activity.slice(0, 10).map((event) => (
+                                    <div key={event.id} className="flex items-start gap-2 text-xs">
+                                        <div className="mt-1 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
+                                        <div className="min-w-0 flex-1">
+                                            <span className="font-medium">{actionLabel(event.subject)}</span>
+                                            <span className="ml-1.5 text-muted-foreground">
+                                                {formatRelativeTime(event.occurred_at)}
+                                            </span>
+                                        </div>
+                                    </div>
+                                )) : (
+                                    <p className="py-4 text-center text-xs text-muted-foreground">No recent activity</p>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Row 5: Quick Stats Bar */}
+                <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-6">
+                    {[
+                        { label: 'Open', value: stats.open, color: 'text-red-500', filter: () => applyFilter('status', 'open') },
+                        { label: 'Acknowledged', value: stats.acknowledged, color: 'text-yellow-500', filter: () => applyFilter('status', 'ack') },
+                        { label: 'Triaging', value: stats.triaging, color: 'text-blue-500', filter: () => applyFilter('status', 'triaging') },
+                        { label: 'Escalated', value: stats.escalated, color: 'text-orange-500', filter: () => applyFilter('escalation_level', '1') },
+                        { label: 'Unassigned', value: stats.unassigned, color: 'text-purple-500', filter: () => applyFilter('assigned_to', 'unassigned') },
+                        { label: 'My Alerts', value: stats.my_alerts, color: 'text-indigo-500', filter: () => applyFilter('assigned_to', 'me') },
+                    ].map((s) => (
+                        <button
+                            key={s.label}
+                            onClick={s.filter}
+                            className="rounded-lg border bg-card px-3 py-2 text-left transition-colors hover:bg-accent"
+                        >
+                            <div className={`text-lg font-bold ${s.color}`}>{s.value}</div>
+                            <div className="text-[11px] text-muted-foreground">{s.label}</div>
+                        </button>
+                    ))}
+                </div>
+
+                {/* Row 6: Filters */}
                 <div className="mt-4 rounded-lg border bg-card p-4">
                     <div className="flex flex-wrap items-end gap-3">
                         <form onSubmit={handleSearch} className="flex gap-2">
@@ -378,73 +577,43 @@ export default function ControlRoomIndex({
                                     type="text"
                                     placeholder="Search alerts..."
                                     value={searchValue}
-                                    onChange={(e) =>
-                                        setSearchValue(e.target.value)
-                                    }
+                                    onChange={(e) => setSearchValue(e.target.value)}
                                     className="w-48 pl-9"
                                 />
                             </div>
-                            <Button type="submit" variant="secondary" size="sm">
-                                Search
-                            </Button>
+                            <Button type="submit" variant="secondary" size="sm">Search</Button>
                         </form>
 
-                        <Select
-                            value={filters.status || 'all'}
-                            onValueChange={(v) => applyFilter('status', v)}
-                        >
-                            <SelectTrigger className="w-32">
-                                <SelectValue placeholder="Status" />
-                            </SelectTrigger>
+                        <Select value={filters.status || 'all'} onValueChange={(v) => applyFilter('status', v)}>
+                            <SelectTrigger className="w-32"><SelectValue placeholder="Status" /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Status</SelectItem>
                                 <SelectItem value="open">Open</SelectItem>
                                 <SelectItem value="ack">Acknowledged</SelectItem>
-                                <SelectItem value="triaging">
-                                    Triaging
-                                </SelectItem>
-                                <SelectItem value="resolved">
-                                    Resolved
-                                </SelectItem>
+                                <SelectItem value="triaging">Triaging</SelectItem>
+                                <SelectItem value="resolved">Resolved</SelectItem>
                                 <SelectItem value="closed">Closed</SelectItem>
                             </SelectContent>
                         </Select>
 
-                        <Select
-                            value={filters.severity || 'all'}
-                            onValueChange={(v) => applyFilter('severity', v)}
-                        >
-                            <SelectTrigger className="w-32">
-                                <SelectValue placeholder="Severity" />
-                            </SelectTrigger>
+                        <Select value={filters.severity || 'all'} onValueChange={(v) => applyFilter('severity', v)}>
+                            <SelectTrigger className="w-32"><SelectValue placeholder="Severity" /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Severity</SelectItem>
-                                <SelectItem value="critical">
-                                    Critical
-                                </SelectItem>
+                                <SelectItem value="critical">Critical</SelectItem>
                                 <SelectItem value="high">High</SelectItem>
                                 <SelectItem value="medium">Medium</SelectItem>
                                 <SelectItem value="low">Low</SelectItem>
                             </SelectContent>
                         </Select>
 
-                        <Select
-                            value={filters.source || 'all'}
-                            onValueChange={(v) => applyFilter('source', v)}
-                        >
-                            <SelectTrigger className="w-36">
-                                <SelectValue placeholder="Source" />
-                            </SelectTrigger>
+                        <Select value={filters.source || 'all'} onValueChange={(v) => applyFilter('source', v)}>
+                            <SelectTrigger className="w-36"><SelectValue placeholder="Source" /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Sources</SelectItem>
                                 <SelectItem value="fleet">Fleet</SelectItem>
-                                <SelectItem value="personal_tracker">
-                                    Personal Tracker
-                                </SelectItem>
+                                <SelectItem value="personal_tracker">Personal Tracker</SelectItem>
                                 <SelectItem value="manual">Manual</SelectItem>
-                                <SelectItem value="external">
-                                    External
-                                </SelectItem>
                                 <SelectItem value="compliance">Compliance</SelectItem>
                                 <SelectItem value="medication">Medication</SelectItem>
                                 <SelectItem value="safeguarding">Safeguarding</SelectItem>
@@ -452,118 +621,86 @@ export default function ControlRoomIndex({
                             </SelectContent>
                         </Select>
 
-                        <Select
-                            value={filters.assigned_to || 'all'}
-                            onValueChange={(v) => applyFilter('assigned_to', v === 'all' ? '' : v)}
-                        >
-                            <SelectTrigger className="w-40">
-                                <SelectValue placeholder="Assignee" />
-                            </SelectTrigger>
+                        <Select value={filters.assigned_to || 'all'} onValueChange={(v) => applyFilter('assigned_to', v === 'all' ? '' : v)}>
+                            <SelectTrigger className="w-40"><SelectValue placeholder="Assignee" /></SelectTrigger>
                             <SelectContent>
                                 <SelectItem value="all">All Assignees</SelectItem>
                                 <SelectItem value="me">Assigned to Me</SelectItem>
-                                <SelectItem value="unassigned">
-                                    Unassigned
-                                </SelectItem>
+                                <SelectItem value="unassigned">Unassigned</SelectItem>
                                 {staff.map((s) => (
-                                    <SelectItem
-                                        key={s.id}
-                                        value={s.id.toString()}
-                                    >
-                                        {s.name}
-                                    </SelectItem>
+                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
                                 ))}
                             </SelectContent>
                         </Select>
 
                         {hasFilters && (
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={clearFilters}
-                            >
-                                <XCircle className="mr-1 h-4 w-4" />
-                                Clear
+                            <Button variant="ghost" size="sm" onClick={clearFilters}>
+                                <XCircle className="mr-1 h-4 w-4" />Clear
                             </Button>
                         )}
                     </div>
                 </div>
 
-                {/* Alerts List */}
+                {/* Row 7: Alert List */}
                 <div className="mt-4 rounded-lg border">
-                    <div className="border-b bg-muted/50 px-4 py-2">
-                        <div className="flex items-center justify-between">
-                            <span className="text-sm font-medium">
-                                Alerts ({alerts.meta.total})
+                    {/* Table Header */}
+                    <div className="hidden border-b bg-muted/50 px-4 py-2 md:grid md:grid-cols-12 md:gap-2">
+                        <span className="col-span-4 text-xs font-medium text-muted-foreground">Alert</span>
+                        <span className="col-span-2 text-xs font-medium text-muted-foreground">Source</span>
+                        <span className="col-span-1 text-xs font-medium text-muted-foreground">Severity</span>
+                        <span className="col-span-1 text-xs font-medium text-muted-foreground">Status</span>
+                        <span className="col-span-1 text-xs font-medium text-muted-foreground">SLA</span>
+                        <span className="col-span-1 text-xs font-medium text-muted-foreground">Triggered</span>
+                        <span className="col-span-1 text-xs font-medium text-muted-foreground">Assigned</span>
+                        <span className="col-span-1 text-xs font-medium text-muted-foreground">Action</span>
+                    </div>
+
+                    {/* Mobile header */}
+                    <div className="flex items-center justify-between border-b bg-muted/50 px-4 py-2 md:hidden">
+                        <span className="text-sm font-medium">Alerts ({alerts.meta.total})</span>
+                        {alerts.meta.last_page > 1 && (
+                            <span className="text-xs text-muted-foreground">
+                                Page {alerts.meta.current_page} of {alerts.meta.last_page}
                             </span>
-                            {alerts.meta.last_page > 1 && (
-                                <span className="text-xs text-muted-foreground">
-                                    Page {alerts.meta.current_page} of{' '}
-                                    {alerts.meta.last_page}
-                                </span>
-                            )}
-                        </div>
+                        )}
                     </div>
 
                     <div className="divide-y">
                         {alerts.data.length ? (
-                            alerts.data.map((alert) => (
+                            alerts.data.map((alert, idx) => (
                                 <Link
                                     key={alert.id}
                                     href={`/control-room/alerts/${alert.id}`}
-                                    className="flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/50"
+                                    className={`flex items-center justify-between gap-4 px-4 py-3 transition-colors hover:bg-muted/50 ${
+                                        idx % 2 === 1 ? 'bg-muted/20' : ''
+                                    } ${
+                                        alert.severity === 'critical' ? 'border-l-4 border-l-red-500' :
+                                        alert.severity === 'high' ? 'border-l-4 border-l-orange-500' : ''
+                                    }`}
                                 >
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center gap-2">
-                                            <span className="font-medium">
-                                                {alert.alert_type}
-                                            </span>
+                                            <span className="font-medium">{alert.alert_type}</span>
                                             {alert.escalation_level > 0 && (
-                                                <Badge
-                                                    variant="outline"
-                                                    className="border-orange-300 text-orange-600"
-                                                >
+                                                <Badge variant="outline" className="border-orange-300 text-orange-600">
                                                     L{alert.escalation_level}
                                                 </Badge>
                                             )}
                                         </div>
                                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                                            <span>
-                                                {formatRelativeTime(
-                                                    alert.triggered_at,
-                                                )}
-                                            </span>
+                                            <span>{formatRelativeTime(alert.triggered_at)}</span>
                                             <span>|</span>
                                             <span>{alert.source}</span>
                                             {alert.asset && (
-                                                <>
-                                                    <span>|</span>
-                                                    <span>
-                                                        {alert.asset.name}
-                                                    </span>
-                                                </>
+                                                <><span>|</span><span>{alert.asset.name}</span></>
                                             )}
                                             {alert.client_name && (
-                                                <>
-                                                    <span>|</span>
-                                                    <span>{alert.client_name}</span>
-                                                </>
+                                                <><span>|</span><span>{alert.client_name}</span></>
                                             )}
                                             {alert.assigned_to && (
-                                                <>
-                                                    <span>|</span>
-                                                    <span className="flex items-center gap-1">
-                                                        <User className="h-3 w-3" />
-                                                        {alert.assigned_to.name}
-                                                    </span>
-                                                </>
+                                                <><span>|</span><span className="flex items-center gap-1"><User className="h-3 w-3" />{alert.assigned_to.name}</span></>
                                             )}
                                         </div>
-                                        {alert.notes && (
-                                            <div className="mt-1 truncate text-xs text-muted-foreground">
-                                                {alert.notes}
-                                            </div>
-                                        )}
                                     </div>
                                     <div className="flex items-center gap-2">
                                         {can.manage && alert.status === 'open' && (
@@ -580,26 +717,15 @@ export default function ControlRoomIndex({
                                             </Button>
                                         )}
                                         {alert.sla_status && (
-                                            <span className={`inline-block h-2 w-2 rounded-full ${
+                                            <span className={`inline-block h-2.5 w-2.5 rounded-full ${
                                                 alert.sla_status === 'on_track' ? 'bg-green-500' :
                                                 alert.sla_status === 'at_risk' ? 'bg-yellow-500' : 'bg-red-500'
                                             }`} title={`SLA: ${alert.sla_status.replace('_', ' ')}`} />
                                         )}
-                                        <Badge
-                                            className={
-                                                severityColors[alert.severity] ||
-                                                ''
-                                            }
-                                        >
-                                            {severityIcons[alert.severity]}
-                                            {alert.severity}
+                                        <Badge className={severityColors[alert.severity] || ''}>
+                                            {severityIcons[alert.severity]}{alert.severity}
                                         </Badge>
-                                        <Badge
-                                            variant="outline"
-                                            className={
-                                                statusColors[alert.status] || ''
-                                            }
-                                        >
+                                        <Badge variant="outline" className={statusColors[alert.status] || ''}>
                                             {alert.status}
                                         </Badge>
                                     </div>
@@ -616,31 +742,12 @@ export default function ControlRoomIndex({
                     {alerts.meta.last_page > 1 && (
                         <div className="flex items-center justify-center gap-2 border-t px-4 py-3">
                             {alerts.links
-                                .filter(
-                                    (link) =>
-                                        link.url &&
-                                        !link.label.includes('Previous') &&
-                                        !link.label.includes('Next'),
-                                )
+                                .filter((link) => link.url && !link.label.includes('Previous') && !link.label.includes('Next'))
                                 .slice(0, 10)
                                 .map((link, i) => (
-                                    <Button
-                                        key={i}
-                                        variant={
-                                            link.active ? 'default' : 'outline'
-                                        }
-                                        size="sm"
-                                        asChild
-                                        disabled={!link.url}
-                                    >
-                                        <Link
-                                            href={link.url || '#'}
-                                            preserveState
-                                            preserveScroll
-                                        >
-                                            {link.label
-                                                .replace('&laquo;', '«')
-                                                .replace('&raquo;', '»')}
+                                    <Button key={i} variant={link.active ? 'default' : 'outline'} size="sm" asChild disabled={!link.url}>
+                                        <Link href={link.url || '#'} preserveState preserveScroll>
+                                            {link.label.replace('&laquo;', '«').replace('&raquo;', '»')}
                                         </Link>
                                     </Button>
                                 ))}
