@@ -47,8 +47,8 @@ class MyCalendarController extends Controller
                 'title' => trim($shift->client->first_name . ' ' . $shift->client->last_name),
                 'start' => $shift->starts_at->toIso8601String(),
                 'end' => $shift->ends_at->toIso8601String(),
-                'backgroundColor' => $shift->status === 'in_progress' ? '#dcfce7' : ($shift->status === 'completed' ? '#f1f5f9' : '#dbeafe'),
-                'textColor' => $shift->status === 'in_progress' ? '#166534' : ($shift->status === 'completed' ? '#64748b' : '#1e40af'),
+                'backgroundColor' => $shift->status === 'in_progress' ? '#bbf7d0' : ($shift->status === 'completed' ? '#e2e8f0' : '#bfdbfe'),
+                'textColor' => $shift->status === 'in_progress' ? '#14532d' : ($shift->status === 'completed' ? '#475569' : '#1e3a8a'),
                 'borderColor' => 'transparent',
                 'extendedProps' => [
                     'type' => 'shift',
@@ -75,8 +75,8 @@ class MyCalendarController extends Controller
                     'title' => 'Medication Round',
                     'start' => $roundStart->toIso8601String(),
                     'end' => $roundEnd->toIso8601String(),
-                    'backgroundColor' => '#fed7aa',
-                    'textColor' => '#9a3412',
+                    'backgroundColor' => '#fdba74',
+                    'textColor' => '#7c2d12',
                     'borderColor' => 'transparent',
                     'extendedProps' => [
                         'type' => 'medication_round',
@@ -103,8 +103,8 @@ class MyCalendarController extends Controller
                     'start' => Carbon::parse($leave->starts_at)->toIso8601String(),
                     'end' => Carbon::parse($leave->ends_at)->toIso8601String(),
                     'allDay' => true,
-                    'backgroundColor' => '#d1fae5',
-                    'textColor' => '#065f46',
+                    'backgroundColor' => '#6ee7b7',
+                    'textColor' => '#064e3b',
                     'borderColor' => 'transparent',
                     'extendedProps' => [
                         'type' => 'leave',
@@ -131,8 +131,8 @@ class MyCalendarController extends Controller
                     'title' => $task->title ?? 'Alert Task',
                     'start' => Carbon::parse($task->due_at)->toIso8601String(),
                     'allDay' => true,
-                    'backgroundColor' => '#e9d5ff',
-                    'textColor' => '#6b21a8',
+                    'backgroundColor' => '#c4b5fd',
+                    'textColor' => '#4c1d95',
                     'borderColor' => 'transparent',
                     'extendedProps' => [
                         'type' => 'alert_task',
