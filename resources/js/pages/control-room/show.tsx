@@ -1048,6 +1048,23 @@ export default function ControlRoomAlertShow({
                                             <p className="mt-2 text-sm text-muted-foreground">
                                                 No evidence packs attached.
                                             </p>
+                                            {can.manage && (
+                                                <Button
+                                                    variant="outline"
+                                                    size="sm"
+                                                    className="mt-3"
+                                                    onClick={() => {
+                                                        const title = prompt('Evidence pack title:');
+                                                        if (title) {
+                                                            router.post(`/control-room/alerts/${alert.id}/evidence`, { title }, { preserveScroll: true });
+                                                        }
+                                                    }}
+                                                    disabled={processing}
+                                                >
+                                                    <Package className="mr-1.5 h-3.5 w-3.5" />
+                                                    Create Evidence Pack
+                                                </Button>
+                                            )}
                                         </CardContent>
                                     </Card>
                                 ) : (
@@ -1108,20 +1125,63 @@ export default function ControlRoomAlertShow({
                                                     </div>
                                                 )}
                                                 {can.manage && (
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="mt-3"
-                                                        onClick={() =>
-                                                            doAction('evidence-upload', {
-                                                                pack_id: pack.id,
-                                                            })
-                                                        }
-                                                        disabled={processing}
-                                                    >
-                                                        <Upload className="mr-1.5 h-3.5 w-3.5" />
-                                                        Upload Evidence
-                                                    </Button>
+                                                    <div className="mt-3 flex items-center gap-2">
+                                                        <input
+                                                            type="file"
+                                                            id={`evidence-file-${pack.id}`}
+                                                            className="hidden"
+                                                            accept="image/*,.pdf,.doc,.docx"
+                                                            onChange={(e) => {
+                                                                const file = e.target.files?.[0];
+                                                                if (!file) return;
+                                                                const formData = new FormData();
+                                                                formData.append('file', file);
+                                                                formData.append('item_type', 'file');
+                                                                router.post(`/control-room/evidence/${pack.id}/items`, formData, {
+                                                                    preserveScroll: true,
+                                                                    forceFormData: true,
+                                                                });
+                                                                e.target.value = '';
+                                                            }}
+                                                        />
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            onClick={() => document.getElementById(`evidence-file-${pack.id}`)?.click()}
+                                                            disabled={processing}
+                                                        >
+                                                            <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                                            Upload File
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                const note = prompt('Enter evidence note:');
+                                                                if (note) {
+                                                                    router.post(`/control-room/evidence/${pack.id}/items`, {
+                                                                        item_type: 'note',
+                                                                        content: note,
+                                                                    }, { preserveScroll: true });
+                                                                }
+                                                            }}
+                                                            disabled={processing}
+                                                        >
+                                                            <FileText className="mr-1.5 h-3.5 w-3.5" />
+                                                            Add Note
+                                                        </Button>
+                                                        {pack.status === 'collecting' && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="sm"
+                                                                onClick={() => router.post(`/control-room/evidence/${pack.id}/complete`, {}, { preserveScroll: true })}
+                                                                disabled={processing}
+                                                            >
+                                                                <Check className="mr-1.5 h-3.5 w-3.5" />
+                                                                Complete
+                                                            </Button>
+                                                        )}
+                                                    </div>
                                                 )}
                                             </CardContent>
                                         </Card>
@@ -1131,79 +1191,119 @@ export default function ControlRoomAlertShow({
 
                             {/* ====== Tab: Communications ====== */}
                             <TabsContent value="comms" className="space-y-4 pt-4">
+                                {/* Send Message Form */}
+                                {can.manage && (
+                                    <Card>
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-sm flex items-center gap-2">
+                                                <Send className="h-4 w-4" />
+                                                Send Message
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <form onSubmit={(e) => {
+                                                e.preventDefault();
+                                                const form = e.currentTarget;
+                                                const content = (form.elements.namedItem('comm_content') as HTMLTextAreaElement)?.value;
+                                                if (!content?.trim()) return;
+                                                router.post(`/control-room/messaging/send`, {
+                                                    content: content.trim(),
+                                                    alert_id: alert.id,
+                                                    target_user_id: alert.assigned_to?.id || null,
+                                                }, {
+                                                    preserveScroll: true,
+                                                    onSuccess: () => {
+                                                        (form.elements.namedItem('comm_content') as HTMLTextAreaElement).value = '';
+                                                    },
+                                                });
+                                            }}>
+                                                <Textarea
+                                                    name="comm_content"
+                                                    placeholder="Type a message about this alert..."
+                                                    rows={2}
+                                                    className="mb-2"
+                                                />
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {alert.assigned_to ? `Sending to ${alert.assigned_to.name}` : 'No assignee - message logged to alert'}
+                                                    </p>
+                                                    <Button type="submit" size="sm" disabled={processing}>
+                                                        <Send className="mr-1.5 h-3.5 w-3.5" />
+                                                        Send
+                                                    </Button>
+                                                </div>
+                                            </form>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* Communications Timeline */}
                                 {communications.length === 0 ? (
                                     <Card>
                                         <CardContent className="py-12 text-center">
                                             <MessageSquare className="mx-auto h-10 w-10 text-muted-foreground/40" />
                                             <p className="mt-2 text-sm text-muted-foreground">
-                                                No communications logged.
+                                                No communications logged yet.
+                                            </p>
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                Use the form above to send the first message.
                                             </p>
                                         </CardContent>
                                     </Card>
                                 ) : (
                                     <Card>
-                                        <CardContent className="pt-6">
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-sm">
+                                                Message History ({communications.length})
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
                                             <div className="relative space-y-0">
                                                 {communications.map((comm, idx) => (
                                                     <div
                                                         key={comm.id}
                                                         className="relative flex gap-4 pb-6 last:pb-0"
                                                     >
-                                                        {/* Timeline line */}
                                                         {idx < communications.length - 1 && (
                                                             <div className="absolute left-[15px] top-8 bottom-0 w-px bg-border" />
                                                         )}
-                                                        {/* Icon */}
                                                         <div
                                                             className={`relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${
                                                                 comm.direction === 'outbound'
                                                                     ? 'bg-primary/10 text-primary'
-                                                                    : 'bg-muted text-muted-foreground'
+                                                                    : 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400'
                                                             }`}
                                                         >
                                                             {channelIcon(comm.channel)}
                                                         </div>
-                                                        {/* Content */}
                                                         <div className="flex-1 min-w-0">
                                                             <div className="flex items-center gap-2 flex-wrap">
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className="capitalize text-[10px]"
-                                                                >
-                                                                    {comm.channel}
+                                                                <Badge variant="outline" className="capitalize text-[10px]">{comm.channel.replace('_', ' ')}</Badge>
+                                                                <Badge variant={comm.direction === 'outbound' ? 'default' : 'secondary'} className="text-[10px]">
+                                                                    {comm.direction === 'outbound' ? 'Sent' : 'Received'}
                                                                 </Badge>
-                                                                <Badge
-                                                                    variant={
-                                                                        comm.direction ===
-                                                                        'outbound'
-                                                                            ? 'default'
-                                                                            : 'secondary'
-                                                                    }
-                                                                    className="text-[10px]"
-                                                                >
-                                                                    {comm.direction}
-                                                                </Badge>
-                                                                {comm.purpose && (
-                                                                    <span className="text-xs text-muted-foreground">
-                                                                        {comm.purpose}
-                                                                    </span>
+                                                                <Badge variant="outline" className="text-[10px] capitalize">{comm.status}</Badge>
+                                                                {comm.purpose && comm.purpose !== 'update' && (
+                                                                    <span className="text-[10px] text-muted-foreground capitalize">{comm.purpose}</span>
                                                                 )}
                                                             </div>
                                                             {comm.target_user_name && (
-                                                                <p className="text-xs text-muted-foreground mt-0.5">
-                                                                    To: {comm.target_user_name}
+                                                                <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                                                                    <User className="h-3 w-3" />
+                                                                    {comm.direction === 'outbound' ? 'To' : 'From'}: {comm.target_user_name}
                                                                 </p>
                                                             )}
                                                             {comm.content && (
-                                                                <p className="mt-1 text-sm">
+                                                                <div className={`mt-1.5 rounded-lg px-3 py-2 text-sm ${
+                                                                    comm.direction === 'outbound'
+                                                                        ? 'bg-primary/5 border border-primary/10'
+                                                                        : 'bg-muted/50 border border-border'
+                                                                }`}>
                                                                     {comm.content}
-                                                                </p>
+                                                                </div>
                                                             )}
                                                             <p className="mt-1 text-[10px] text-muted-foreground">
-                                                                {fmtDate(
-                                                                    comm.sent_at ??
-                                                                        comm.created_at,
-                                                                )}
+                                                                {fmtDate(comm.sent_at ?? comm.created_at)}
                                                             </p>
                                                         </div>
                                                     </div>
@@ -1227,52 +1327,66 @@ export default function ControlRoomAlertShow({
                                     </Card>
                                 ) : (
                                     <Card>
-                                        <CardContent className="pt-6">
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-sm flex items-center justify-between">
+                                                <span className="flex items-center gap-2">
+                                                    <Shield className="h-4 w-4" />
+                                                    Activity Log ({audit_logs.length})
+                                                </span>
+                                                <Badge variant="outline" className="text-[10px]">
+                                                    Complete audit trail
+                                                </Badge>
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
                                             <div className="relative space-y-0">
-                                                {audit_logs.map((log, idx) => (
-                                                    <div
-                                                        key={log.id}
-                                                        className="relative flex gap-4 pb-5 last:pb-0"
-                                                    >
-                                                        {idx < audit_logs.length - 1 && (
-                                                            <div className="absolute left-[15px] top-8 bottom-0 w-px bg-border" />
-                                                        )}
-                                                        <div className="relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                                                            <Clock className="h-4 w-4" />
-                                                        </div>
-                                                        <div className="flex-1 min-w-0">
-                                                            <p className="text-sm font-medium capitalize">
-                                                                {log.action.replace(/_/g, ' ')}
-                                                            </p>
-                                                            <p className="text-xs text-muted-foreground">
-                                                                {log.user?.name ?? 'System'}{' '}
-                                                                &middot;{' '}
-                                                                {fmtDate(log.created_at)}
-                                                            </p>
-                                                            {log.meta &&
-                                                                Object.keys(log.meta).length >
-                                                                    0 && (
-                                                                    <div className="mt-1 rounded bg-muted/50 px-2 py-1 text-[11px] font-mono text-muted-foreground">
-                                                                        {Object.entries(
-                                                                            log.meta,
-                                                                        ).map(([k, v]) => (
-                                                                            <div key={k}>
-                                                                                <span className="font-semibold">
-                                                                                    {k}:
-                                                                                </span>{' '}
-                                                                                {typeof v ===
-                                                                                'object'
-                                                                                    ? JSON.stringify(
-                                                                                          v,
-                                                                                      )
-                                                                                    : String(v)}
-                                                                            </div>
-                                                                        ))}
-                                                                    </div>
+                                                {audit_logs.filter(l => !l.action.includes('.view')).map((log, idx, arr) => {
+                                                    const actionMap: Record<string, { icon: typeof Check; label: string; color: string }> = {
+                                                        'controlRoom.alert.acknowledge': { icon: Eye, label: 'Acknowledged', color: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400' },
+                                                        'controlRoom.alert.triage': { icon: Search, label: 'Triage started', color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400' },
+                                                        'controlRoom.alert.resolve': { icon: CheckCircle2, label: 'Resolved', color: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400' },
+                                                        'controlRoom.alert.close': { icon: XCircle, label: 'Closed', color: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400' },
+                                                        'controlRoom.alert.assign': { icon: UserCheck, label: 'Assigned', color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400' },
+                                                        'controlRoom.alert.unassign': { icon: UserMinus, label: 'Unassigned', color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400' },
+                                                        'controlRoom.alert.escalate': { icon: ArrowUpRight, label: 'Escalated', color: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400' },
+                                                        'controlRoom.alert.addNote': { icon: MessageSquare, label: 'Note added', color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400' },
+                                                        'controlRoom.alert.create': { icon: Play, label: 'Alert created', color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/30 dark:text-emerald-400' },
+                                                    };
+                                                    const config = actionMap[log.action] || { icon: Clock, label: log.action.split('.').pop()?.replace(/([A-Z])/g, ' $1') || log.action, color: 'bg-muted text-muted-foreground' };
+                                                    const Icon = config.icon;
+
+                                                    return (
+                                                        <div key={log.id} className="relative flex gap-4 pb-5 last:pb-0">
+                                                            {idx < arr.length - 1 && (
+                                                                <div className="absolute left-[15px] top-8 bottom-0 w-px bg-border" />
+                                                            )}
+                                                            <div className={`relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${config.color}`}>
+                                                                <Icon className="h-4 w-4" />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <p className="text-sm font-medium">{config.label}</p>
+                                                                    {log.meta?.escalation_level && (
+                                                                        <Badge variant="outline" className="text-[10px] border-red-200 text-red-600">
+                                                                            L{String(log.meta.escalation_level)}
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                    <User className="h-3 w-3" />
+                                                                    {log.user?.name ?? 'System'}
+                                                                    <span>&middot;</span>
+                                                                    {fmtDate(log.created_at)}
+                                                                </p>
+                                                                {log.meta?.assigned_to && (
+                                                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                                                        Assigned to user #{String(log.meta.assigned_to)}
+                                                                    </p>
                                                                 )}
+                                                            </div>
                                                         </div>
-                                                    </div>
-                                                ))}
+                                                    );
+                                                })}
                                             </div>
                                         </CardContent>
                                     </Card>
