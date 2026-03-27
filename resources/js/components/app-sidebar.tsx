@@ -32,15 +32,19 @@ import {
     ClipboardCheck,
     ClipboardList,
     Clock,
+    Coins,
+    CreditCard,
     DollarSign,
     Download,
     FileText,
     Fuel,
     GitBranch,
+    Heart,
     Home,
     Key,
     Landmark,
     LayoutDashboard,
+    Link2,
     LayoutGrid,
     Map,
     MapPin,
@@ -53,6 +57,7 @@ import {
     Radio,
     Receipt,
     Route,
+    Send,
     Settings,
     Shield,
     ShieldAlert,
@@ -60,6 +65,7 @@ import {
     Smartphone,
     Target,
     Trash2,
+    TrendingUp,
     Truck,
     UserCheck,
     Users,
@@ -517,18 +523,24 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const ar: NavItem[] = [];
     if (can?.finance?.ar?.view) {
         ar.push({ title: 'Receivables', href: '/finance/receivables', icon: DollarSign });
+        ar.push({ title: 'Invoices', href: '/finance/invoices', icon: FileText });
     }
 
     const banking: NavItem[] = [];
     if (can?.finance?.bank?.view) {
         banking.push({ title: 'Bank Accounts', href: '/finance/bank-accounts', icon: Landmark });
         banking.push({ title: 'Reconciliation', href: '/finance/bank-reconciliation', icon: CheckCircle2 });
+        banking.push({ title: 'Payment Matching', href: '/finance/payment-matching', icon: ArrowLeftRight });
+        banking.push({ title: 'Bank Feeds', href: '/finance/bank-feeds', icon: Radio });
+        banking.push({ title: 'EFTPOS', href: '/finance/eftpos/terminals', icon: CreditCard });
     }
 
     const other: NavItem[] = [];
     if (can?.finance?.tax?.view) other.push({ title: 'GST Returns', href: '/finance/gst-returns', icon: Receipt });
+    if (can?.finance?.tax?.manage) other.push({ title: 'IRD E-Filing', href: '/finance/ird-filings', icon: Send });
     if (can?.finance?.assets?.view) other.push({ title: 'Fixed Assets', href: '/finance/fixed-assets', icon: Package });
     if (can?.finance?.pettyCash?.view) other.push({ title: 'Petty Cash', href: '/finance/petty-cash', icon: Banknote });
+    if (can?.finance?.reports?.view) other.push({ title: 'Donor Funds', href: '/finance/donor-funds', icon: Heart });
 
     const reports: NavItem[] = [];
     if (can?.finance?.reports?.view) {
@@ -536,12 +548,18 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         reports.push({ title: 'Profit & Loss', href: '/finance/reports/profit-loss', icon: BarChart3 });
         reports.push({ title: 'Balance Sheet', href: '/finance/reports/balance-sheet', icon: BarChart3 });
         reports.push({ title: 'Budget vs Actuals', href: '/finance/reports/budget-vs-actuals', icon: Target });
+        reports.push({ title: 'Cash Flow Forecast', href: '/finance/cash-flow-forecast', icon: TrendingUp });
+        reports.push({ title: 'FX Revaluations', href: '/finance/fx-revaluations', icon: ArrowLeftRight });
+        reports.push({ title: 'Audit Exports', href: '/finance/audit-exports', icon: Download });
     }
 
     if (can?.finance?.admin) {
         other.push({ title: 'Fiscal Periods', href: '/finance/fiscal-periods', icon: CalendarDays });
         other.push({ title: 'Cost Centres', href: '/finance/cost-centres', icon: Building2 });
         other.push({ title: 'Funding Streams', href: '/finance/funding-streams', icon: GitBranch });
+        other.push({ title: 'Currencies', href: '/finance/currencies', icon: Coins });
+        other.push({ title: 'Consolidation', href: '/finance/consolidation', icon: Building2 });
+        other.push({ title: 'Integrations', href: '/finance/integrations', icon: Link2 });
     }
 
     const groups: SubPanelGroup[] = [{ label: 'Finance', items: overview }];

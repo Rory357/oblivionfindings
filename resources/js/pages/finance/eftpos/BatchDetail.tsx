@@ -1,0 +1,280 @@
+import { Head, Link } from '@inertiajs/react';
+import { PageProps } from '@/types';
+import AppLayout from '@/layouts/app-layout';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react';
+
+interface BatchData {
+    id: number;
+    batch_number: string;
+    batch_date: string;
+    settlement_date: string | null;
+    terminal_name: string | null;
+    terminal_id_code: string | null;
+    provider: string | null;
+    total_transactions: number;
+    total_amount: number;
+    total_refunds: number;
+    net_amount: number;
+    fees: number;
+    settlement_amount: number;
+    status: string;
+    reconciled_at: string | null;
+    reconciled_by_name: string | null;
+    discrepancy_amount: number;
+    discrepancy_notes: string | null;
+    bank_transaction: {
+        id: number;
+        amount: number;
+        transaction_date: string;
+        description: string | null;
+    } | null;
+    created_by_name: string | null;
+}
+
+interface Transaction {
+    id: number;
+    transaction_reference: string;
+    transaction_date: string;
+    card_type: string;
+    transaction_type: string;
+    amount: number;
+    fee_amount: number;
+    auth_code: string | null;
+    card_last_four: string | null;
+    status: string;
+}
+
+interface Props extends PageProps {
+    batch: BatchData;
+    transactions: Transaction[];
+}
+
+const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
+
+const formatDate = (date: string) =>
+    new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+
+const formatDateTime = (date: string) =>
+    new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+const cardTypeLabels: Record<string, string> = {
+    visa: 'Visa',
+    mastercard: 'Mastercard',
+    eftpos: 'EFTPOS',
+    amex: 'Amex',
+    other: 'Other',
+};
+
+const txnTypeConfig: Record<string, { label: string; className: string }> = {
+    purchase: { label: 'Purchase', className: 'bg-green-100 text-green-800' },
+    refund: { label: 'Refund', className: 'bg-red-100 text-red-800' },
+    cash_out: { label: 'Cash Out', className: 'bg-blue-100 text-blue-800' },
+};
+
+const statusBadge: Record<string, { label: string; className: string }> = {
+    open: { label: 'Open', className: 'border-blue-300 text-blue-600' },
+    closed: { label: 'Closed', className: 'border-amber-300 text-amber-600' },
+    reconciled: { label: 'Reconciled', className: 'border-green-300 text-green-600' },
+    discrepancy: { label: 'Discrepancy', className: 'border-red-300 text-red-600' },
+};
+
+export default function EftposBatchDetail({ batch, transactions }: Props) {
+    const badge = statusBadge[batch.status] ?? statusBadge.open;
+
+    return (
+        <AppLayout>
+            <Head title={`EFTPOS Batch ${batch.batch_number}`} />
+
+            <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                    <Button asChild variant="ghost" size="sm">
+                        <Link href="/finance/eftpos/batches">
+                            <ArrowLeft className="mr-1 h-4 w-4" />
+                            Back
+                        </Link>
+                    </Button>
+                    <h1 className="text-2xl font-bold">Batch {batch.batch_number}</h1>
+                    <Badge variant="outline" className={badge.className}>
+                        {badge.label}
+                    </Badge>
+                </div>
+
+                {/* Batch Summary */}
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+                    <Card>
+                        <CardContent className="p-4">
+                            <p className="text-sm text-muted-foreground">Total Amount</p>
+                            <p className="text-xl font-bold">{formatCurrency(batch.total_amount)}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <p className="text-sm text-muted-foreground">Refunds</p>
+                            <p className="text-xl font-bold text-red-600">{formatCurrency(batch.total_refunds)}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <p className="text-sm text-muted-foreground">Net Amount</p>
+                            <p className="text-xl font-bold">{formatCurrency(batch.net_amount)}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <p className="text-sm text-muted-foreground">Fees</p>
+                            <p className="text-xl font-bold text-muted-foreground">{formatCurrency(batch.fees)}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <p className="text-sm text-muted-foreground">Settlement</p>
+                            <p className="text-xl font-bold text-green-600">{formatCurrency(batch.settlement_amount)}</p>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="p-4">
+                            <p className="text-sm text-muted-foreground">Transactions</p>
+                            <p className="text-xl font-bold">{batch.total_transactions}</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Batch Details */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Batch Details</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <dl className="grid grid-cols-2 gap-4 text-sm sm:grid-cols-3 lg:grid-cols-4">
+                            <div>
+                                <dt className="text-muted-foreground">Batch Date</dt>
+                                <dd className="font-medium">{formatDate(batch.batch_date)}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-muted-foreground">Terminal</dt>
+                                <dd className="font-medium">{batch.terminal_name ?? '-'}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-muted-foreground">Terminal ID</dt>
+                                <dd className="font-mono">{batch.terminal_id_code ?? '-'}</dd>
+                            </div>
+                            <div>
+                                <dt className="text-muted-foreground">Provider</dt>
+                                <dd className="font-medium capitalize">{batch.provider ?? '-'}</dd>
+                            </div>
+                            {batch.reconciled_at && (
+                                <>
+                                    <div>
+                                        <dt className="text-muted-foreground">Reconciled At</dt>
+                                        <dd className="font-medium">{formatDateTime(batch.reconciled_at)}</dd>
+                                    </div>
+                                    <div>
+                                        <dt className="text-muted-foreground">Reconciled By</dt>
+                                        <dd className="font-medium">{batch.reconciled_by_name ?? '-'}</dd>
+                                    </div>
+                                </>
+                            )}
+                            {batch.discrepancy_amount !== 0 && (
+                                <div className="col-span-2">
+                                    <dt className="text-muted-foreground">Discrepancy</dt>
+                                    <dd className="font-medium text-red-600">
+                                        {formatCurrency(batch.discrepancy_amount)}
+                                        {batch.discrepancy_notes && (
+                                            <span className="ml-2 text-muted-foreground">- {batch.discrepancy_notes}</span>
+                                        )}
+                                    </dd>
+                                </div>
+                            )}
+                            {batch.bank_transaction && (
+                                <div className="col-span-2">
+                                    <dt className="text-muted-foreground">Matched Bank Transaction</dt>
+                                    <dd className="font-medium">
+                                        {formatCurrency(batch.bank_transaction.amount)} on {formatDate(batch.bank_transaction.transaction_date)}
+                                        {batch.bank_transaction.description && (
+                                            <span className="ml-2 text-muted-foreground">({batch.bank_transaction.description})</span>
+                                        )}
+                                    </dd>
+                                </div>
+                            )}
+                        </dl>
+                    </CardContent>
+                </Card>
+
+                {/* Transactions Table */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Transactions ({transactions.length})</CardTitle>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {transactions.length === 0 ? (
+                            <p className="p-6 text-muted-foreground">No transactions in this batch.</p>
+                        ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Reference</TableHead>
+                                        <TableHead>Date/Time</TableHead>
+                                        <TableHead>Card Type</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead className="text-right">Fee</TableHead>
+                                        <TableHead>Auth Code</TableHead>
+                                        <TableHead>Card</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {transactions.map((txn) => {
+                                        const typeConf = txnTypeConfig[txn.transaction_type] ?? {
+                                            label: txn.transaction_type,
+                                            className: 'bg-gray-100 text-gray-800',
+                                        };
+                                        return (
+                                            <TableRow key={txn.id}>
+                                                <TableCell className="font-mono text-sm">{txn.transaction_reference}</TableCell>
+                                                <TableCell className="text-sm">{formatDateTime(txn.transaction_date)}</TableCell>
+                                                <TableCell>{cardTypeLabels[txn.card_type] ?? txn.card_type}</TableCell>
+                                                <TableCell>
+                                                    <Badge className={typeConf.className} variant="outline">
+                                                        {typeConf.label}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell
+                                                    className={`text-right font-medium ${txn.transaction_type === 'refund' ? 'text-red-600' : ''}`}
+                                                >
+                                                    {txn.transaction_type === 'refund' ? '-' : ''}
+                                                    {formatCurrency(txn.amount)}
+                                                </TableCell>
+                                                <TableCell className="text-right text-sm text-muted-foreground">
+                                                    {txn.fee_amount > 0 ? formatCurrency(txn.fee_amount) : '-'}
+                                                </TableCell>
+                                                <TableCell className="font-mono text-sm">{txn.auth_code ?? '-'}</TableCell>
+                                                <TableCell className="font-mono text-sm">
+                                                    {txn.card_last_four ? `****${txn.card_last_four}` : '-'}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {txn.status === 'approved' ? (
+                                                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                                    ) : txn.status === 'declined' ? (
+                                                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                                                    ) : (
+                                                        <span className="text-muted-foreground">{txn.status}</span>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+        </AppLayout>
+    );
+}

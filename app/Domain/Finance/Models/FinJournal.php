@@ -31,6 +31,9 @@ class FinJournal extends Model
         'posted_by',
         'reversed_by_journal_id',
         'total_amount',
+        'currency_id',
+        'exchange_rate',
+        'base_currency_amount',
         'created_by',
     ];
 
@@ -38,6 +41,8 @@ class FinJournal extends Model
         'journal_date' => 'date',
         'posted_at' => 'datetime',
         'total_amount' => 'decimal:2',
+        'exchange_rate' => 'decimal:6',
+        'base_currency_amount' => 'decimal:2',
     ];
 
     public function lines(): HasMany
@@ -63,6 +68,11 @@ class FinJournal extends Model
     public function reversedByJournal(): BelongsTo
     {
         return $this->belongsTo(self::class, 'reversed_by_journal_id');
+    }
+
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(FinCurrency::class, 'currency_id');
     }
 
     public function source(): MorphTo

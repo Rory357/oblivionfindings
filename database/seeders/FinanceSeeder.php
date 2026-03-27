@@ -22,6 +22,7 @@ class FinanceSeeder extends Seeder
         foreach ($organizationIds as $orgId) {
             $this->seedTaxRates($orgId);
             $this->seedChartOfAccounts($orgId);
+            $this->seedCurrencies($orgId);
         }
     }
 
@@ -166,7 +167,41 @@ class FinanceSeeder extends Seeder
             $this->account('8000', 'Depreciation Expense', 'expense', 'expense'),
             $this->account('8100', 'Bank Fees', 'expense', 'expense'),
             $this->account('8200', 'Bad Debts', 'expense', 'expense'),
+            $this->account('8300', 'Unrealised FX Gain/Loss', 'expense', 'expense'),
+            $this->account('8310', 'Realised FX Gain/Loss', 'expense', 'expense'),
         ];
+    }
+
+    /**
+     * Seed default currencies for an organization.
+     * NZD is the base currency; common trading partners included.
+     */
+    private function seedCurrencies(?int $organizationId): void
+    {
+        $currencies = [
+            ['code' => 'NZD', 'name' => 'New Zealand Dollar', 'symbol' => '$',  'exchange_rate' => 1.000000, 'is_base' => true],
+            ['code' => 'AUD', 'name' => 'Australian Dollar',  'symbol' => 'A$', 'exchange_rate' => 0.920000, 'is_base' => false],
+            ['code' => 'USD', 'name' => 'US Dollar',          'symbol' => 'US$','exchange_rate' => 0.610000, 'is_base' => false],
+            ['code' => 'GBP', 'name' => 'British Pound',      'symbol' => chr(0xC2).chr(0xA3),  'exchange_rate' => 0.480000, 'is_base' => false],
+            ['code' => 'EUR', 'name' => 'Euro',               'symbol' => chr(0xE2).chr(0x82).chr(0xAC),  'exchange_rate' => 0.560000, 'is_base' => false],
+        ];
+
+        foreach ($currencies as $currency) {
+            DB::table('fin_currencies')->updateOrInsert(
+                [
+                    'organization_id' => $organizationId,
+                    'code' => $currency['code'],
+                ],
+                array_merge($currency, [
+                    'organization_id' => $organizationId,
+                    'decimal_places' => 2,
+                    'is_active' => true,
+                    'rate_updated_at' => now(),
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ])
+            );
+        }
     }
 
     /**

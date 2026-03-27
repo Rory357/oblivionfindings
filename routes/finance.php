@@ -1,22 +1,36 @@
 <?php
 
+use App\Domain\Finance\Http\Controllers\AccountingIntegrationController;
 use App\Domain\Finance\Http\Controllers\AccountsReceivableController;
+use App\Domain\Finance\Http\Controllers\AuditExportController;
+use App\Domain\Finance\Http\Controllers\ConsolidationController;
+use App\Domain\Finance\Http\Controllers\IntercompanyController;
 use App\Domain\Finance\Http\Controllers\BankAccountController;
+use App\Domain\Finance\Http\Controllers\BankFeedController;
 use App\Domain\Finance\Http\Controllers\BankReconciliationController;
 use App\Domain\Finance\Http\Controllers\BankTransactionController;
 use App\Domain\Finance\Http\Controllers\BillController;
 use App\Domain\Finance\Http\Controllers\BudgetActualsController;
+use App\Domain\Finance\Http\Controllers\CashFlowForecastController;
 use App\Domain\Finance\Http\Controllers\ChartOfAccountsController;
 use App\Domain\Finance\Http\Controllers\CostCentreController;
 use App\Domain\Finance\Http\Controllers\CreditNoteController;
+use App\Domain\Finance\Http\Controllers\CurrencyController;
 use App\Domain\Finance\Http\Controllers\FinanceDashboardController;
+use App\Domain\Finance\Http\Controllers\DonorFundController;
+use App\Domain\Finance\Http\Controllers\EftposController;
 use App\Domain\Finance\Http\Controllers\FinancialReportController;
 use App\Domain\Finance\Http\Controllers\FiscalPeriodController;
 use App\Domain\Finance\Http\Controllers\FixedAssetController;
 use App\Domain\Finance\Http\Controllers\FundingStreamController;
+use App\Domain\Finance\Http\Controllers\FxRevaluationController;
 use App\Domain\Finance\Http\Controllers\GstReturnController;
+use App\Domain\Finance\Http\Controllers\InvoiceController;
+use App\Domain\Finance\Http\Controllers\IrdFilingController;
 use App\Domain\Finance\Http\Controllers\JournalController;
+use App\Domain\Finance\Http\Controllers\MatchRuleController;
 use App\Domain\Finance\Http\Controllers\PaymentAllocationController;
+use App\Domain\Finance\Http\Controllers\PaymentMatchController;
 use App\Domain\Finance\Http\Controllers\PaymentRunController;
 use App\Domain\Finance\Http\Controllers\PettyCashController;
 use App\Domain\Finance\Http\Controllers\PurchaseOrderController;
@@ -99,6 +113,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         Route::post('/funding-streams', [FundingStreamController::class, 'store'])->name('funding-streams.store');
         Route::put('/funding-streams/{fundingStream}', [FundingStreamController::class, 'update'])->name('funding-streams.update');
         Route::delete('/funding-streams/{fundingStream}', [FundingStreamController::class, 'destroy'])->name('funding-streams.destroy');
+    });
+
+    // ── Currencies ───────────────────────────────────────────────────────
+    Route::middleware('permission:finance.admin')->group(function () {
+        Route::resource('currencies', CurrencyController::class)->except(['show', 'edit']);
     });
 
     // ── Vendors ─────────────────────────────────────────────────────────
@@ -262,6 +281,47 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         Route::post('/bank-transactions/import', [BankTransactionController::class, 'import'])->name('bank-transactions.import');
     });
 
+    // ── Bank Feeds ─────────────────────────────────────────────────────
+    Route::middleware('permission:finance.bank.manage')->group(function () {
+        Route::get('/bank-feeds', [BankFeedController::class, 'index'])->name('bank-feeds.index');
+        Route::post('/bank-feeds', [BankFeedController::class, 'store'])->name('bank-feeds.store');
+        Route::post('/bank-feeds/{feed}/sync', [BankFeedController::class, 'sync'])->name('bank-feeds.sync');
+        Route::post('/bank-feeds/sync-all', [BankFeedController::class, 'syncAll'])->name('bank-feeds.sync-all');
+        Route::delete('/bank-feeds/{feed}', [BankFeedController::class, 'destroy'])->name('bank-feeds.destroy');
+        Route::get('/bank-feeds/{feed}/logs', [BankFeedController::class, 'logs'])->name('bank-feeds.logs');
+    });
+
+    // ── Payment Matching ─────────────────────────────────────────────────
+    Route::get('/payment-matching', [PaymentMatchController::class, 'index'])
+        ->name('payment-matching.index')
+        ->middleware('permission:finance.bank.view');
+    Route::post('/payment-matching/suggest/{transaction}', [PaymentMatchController::class, 'suggest'])
+        ->name('payment-matching.suggest')
+        ->middleware('permission:finance.bank.manage');
+    Route::post('/payment-matching/match-all', [PaymentMatchController::class, 'matchAll'])
+        ->name('payment-matching.match-all')
+        ->middleware('permission:finance.bank.manage');
+    Route::post('/payment-matching/{match}/confirm', [PaymentMatchController::class, 'confirm'])
+        ->name('payment-matching.confirm')
+        ->middleware('permission:finance.bank.manage');
+    Route::post('/payment-matching/{match}/reject', [PaymentMatchController::class, 'reject'])
+        ->name('payment-matching.reject')
+        ->middleware('permission:finance.bank.manage');
+
+    // ── Match Rules ──────────────────────────────────────────────────────
+    Route::get('/match-rules', [MatchRuleController::class, 'index'])
+        ->name('match-rules.index')
+        ->middleware('permission:finance.bank.manage');
+    Route::post('/match-rules', [MatchRuleController::class, 'store'])
+        ->name('match-rules.store')
+        ->middleware('permission:finance.bank.manage');
+    Route::put('/match-rules/{rule}', [MatchRuleController::class, 'update'])
+        ->name('match-rules.update')
+        ->middleware('permission:finance.bank.manage');
+    Route::delete('/match-rules/{rule}', [MatchRuleController::class, 'destroy'])
+        ->name('match-rules.destroy')
+        ->middleware('permission:finance.bank.manage');
+
     // ── Bank Reconciliation ─────────────────────────────────────────────
     Route::get('/bank-reconciliation', [BankReconciliationController::class, 'index'])
         ->name('bank-reconciliation.index')
@@ -345,6 +405,26 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         ->name('petty-cash.transaction')
         ->middleware('permission:finance.petty_cash.manage');
 
+    // ── FX Revaluations ──────────────────────────────────────────────────
+    Route::middleware('permission:finance.ledger.manage')->group(function () {
+        Route::get('/fx-revaluations', [FxRevaluationController::class, 'index'])->name('fx-revaluations.index');
+        Route::get('/fx-revaluations/create', [FxRevaluationController::class, 'create'])->name('fx-revaluations.create');
+        Route::post('/fx-revaluations', [FxRevaluationController::class, 'store'])->name('fx-revaluations.store');
+        Route::post('/fx-revaluations/{revaluation}/post', [FxRevaluationController::class, 'post'])->name('fx-revaluations.post');
+    });
+
+    // ── Accounting Integrations (Xero / MYOB) ─────────────────────────
+    Route::middleware('permission:finance.admin')->group(function () {
+        Route::get('/integrations', [AccountingIntegrationController::class, 'index'])->name('integrations.index');
+        Route::post('/integrations', [AccountingIntegrationController::class, 'store'])->name('integrations.store');
+        Route::put('/integrations/{integration}', [AccountingIntegrationController::class, 'update'])->name('integrations.update');
+        Route::post('/integrations/{integration}/sync', [AccountingIntegrationController::class, 'sync'])->name('integrations.sync');
+        Route::post('/integrations/{integration}/test', [AccountingIntegrationController::class, 'testConnection'])->name('integrations.test');
+        Route::delete('/integrations/{integration}', [AccountingIntegrationController::class, 'destroy'])->name('integrations.destroy');
+        Route::get('/integrations/{integration}/mapping', [AccountingIntegrationController::class, 'mapping'])->name('integrations.mapping');
+        Route::put('/integrations/{integration}/mapping', [AccountingIntegrationController::class, 'updateMapping'])->name('integrations.mapping.update');
+    });
+
     // ── Financial Reports ───────────────────────────────────────────────
     Route::middleware('permission:finance.reports.view')->group(function () {
         Route::get('/reports/trial-balance', [FinancialReportController::class, 'trialBalance'])->name('reports.trial-balance');
@@ -357,4 +437,126 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         Route::get('/reports/budget-vs-actuals', [BudgetActualsController::class, 'index'])->name('reports.budget-vs-actuals');
         Route::post('/reports/budget-vs-actuals/sync', [BudgetActualsController::class, 'sync'])->name('reports.budget-vs-actuals.sync');
     });
+
+    // ── Cash Flow Forecast ───────────────────────────────────────────────
+    Route::middleware('permission:finance.reports.view')->group(function () {
+        Route::get('/cash-flow-forecast', [CashFlowForecastController::class, 'index'])->name('cash-flow-forecast.index');
+        Route::get('/cash-flow-forecast/create', [CashFlowForecastController::class, 'create'])->name('cash-flow-forecast.create');
+        Route::post('/cash-flow-forecast', [CashFlowForecastController::class, 'store'])->name('cash-flow-forecast.store');
+        Route::get('/cash-flow-forecast/{forecast}', [CashFlowForecastController::class, 'show'])->name('cash-flow-forecast.show');
+        Route::delete('/cash-flow-forecast/{forecast}', [CashFlowForecastController::class, 'destroy'])->name('cash-flow-forecast.destroy');
+    });
+
+    // ── IRD E-Filing ─────────────────────────────────────────────────────
+    Route::middleware('permission:finance.tax.manage')->group(function () {
+        Route::get('/ird-filings', [IrdFilingController::class, 'index'])->name('ird-filings.index');
+        Route::post('/ird-filings/from-gst/{gstReturn}', [IrdFilingController::class, 'createFromGst'])->name('ird-filings.from-gst');
+        Route::get('/ird-filings/{filing}', [IrdFilingController::class, 'show'])->name('ird-filings.show');
+        Route::post('/ird-filings/{filing}/validate', [IrdFilingController::class, 'validateFiling'])->name('ird-filings.validate');
+        Route::post('/ird-filings/{filing}/submit', [IrdFilingController::class, 'submit'])->name('ird-filings.submit');
+    });
+
+    // ── Consolidation & Intercompany ─────────────────────────────────────
+    Route::middleware('permission:finance.admin')->group(function () {
+        Route::get('/consolidation', [ConsolidationController::class, 'index'])->name('consolidation.index');
+        Route::post('/consolidation', [ConsolidationController::class, 'store'])->name('consolidation.store');
+        Route::get('/consolidation/{group}', [ConsolidationController::class, 'show'])->name('consolidation.show');
+        Route::post('/consolidation/{group}/entities', [ConsolidationController::class, 'addEntity'])->name('consolidation.add-entity');
+        Route::delete('/consolidation/{group}/entities/{entity}', [ConsolidationController::class, 'removeEntity'])->name('consolidation.remove-entity');
+        Route::get('/consolidation/{group}/runs', [ConsolidationController::class, 'runs'])->name('consolidation.runs');
+        Route::post('/consolidation/{group}/run', [ConsolidationController::class, 'runConsolidation'])->name('consolidation.run');
+        Route::get('/consolidation/{group}/runs/{run}', [ConsolidationController::class, 'showRun'])->name('consolidation.show-run');
+        Route::get('/consolidation/{group}/mapping', [ConsolidationController::class, 'mapping'])->name('consolidation.mapping');
+        Route::put('/consolidation/{group}/mapping', [ConsolidationController::class, 'updateMapping'])->name('consolidation.mapping.update');
+
+        Route::get('/intercompany/{group}', [IntercompanyController::class, 'index'])->name('intercompany.index');
+        Route::post('/intercompany/{group}', [IntercompanyController::class, 'store'])->name('intercompany.store');
+        Route::post('/intercompany/{group}/{transaction}/post', [IntercompanyController::class, 'post'])->name('intercompany.post');
+    });
+
+    // ── Invoices (AR) ─────────────────────────────────────────────────
+    Route::get('/invoices', [InvoiceController::class, 'index'])
+        ->name('invoices.index')
+        ->middleware('permission:finance.ar.view');
+    Route::get('/invoices/create', [InvoiceController::class, 'create'])
+        ->name('invoices.create')
+        ->middleware('permission:finance.ar.manage');
+    Route::post('/invoices', [InvoiceController::class, 'store'])
+        ->name('invoices.store')
+        ->middleware('permission:finance.ar.manage');
+    Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])
+        ->name('invoices.show')
+        ->middleware('permission:finance.ar.view');
+    Route::get('/invoices/{invoice}/edit', [InvoiceController::class, 'edit'])
+        ->name('invoices.edit')
+        ->middleware('permission:finance.ar.manage');
+    Route::put('/invoices/{invoice}', [InvoiceController::class, 'update'])
+        ->name('invoices.update')
+        ->middleware('permission:finance.ar.manage');
+    Route::post('/invoices/{invoice}/send', [InvoiceController::class, 'send'])
+        ->name('invoices.send')
+        ->middleware('permission:finance.ar.manage');
+    Route::get('/invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])
+        ->name('invoices.pdf')
+        ->middleware('permission:finance.ar.view');
+    Route::post('/invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
+        ->name('invoices.mark-paid')
+        ->middleware('permission:finance.ar.manage');
+
+    // ── Audit Exports ─────────────────────────────────────────────────
+    Route::get('/audit-exports', [AuditExportController::class, 'index'])
+        ->name('audit-exports.index')
+        ->middleware('permission:finance.reports.view');
+    Route::get('/audit-exports/create', [AuditExportController::class, 'create'])
+        ->name('audit-exports.create')
+        ->middleware('permission:finance.admin');
+    Route::post('/audit-exports', [AuditExportController::class, 'store'])
+        ->name('audit-exports.store')
+        ->middleware('permission:finance.admin');
+    Route::get('/audit-exports/{export}/download', [AuditExportController::class, 'download'])
+        ->name('audit-exports.download')
+        ->middleware('permission:finance.reports.view');
+    Route::delete('/audit-exports/{export}', [AuditExportController::class, 'destroy'])
+        ->name('audit-exports.destroy')
+        ->middleware('permission:finance.admin');
+
+    // ── EFTPOS ────────────────────────────────────────────────────────────
+    Route::middleware('permission:finance.bank.manage')->group(function () {
+        Route::get('/eftpos/terminals', [EftposController::class, 'terminals'])->name('eftpos.terminals');
+        Route::post('/eftpos/terminals', [EftposController::class, 'storeTerminal'])->name('eftpos.terminals.store');
+        Route::put('/eftpos/terminals/{terminal}', [EftposController::class, 'updateTerminal'])->name('eftpos.terminals.update');
+        Route::get('/eftpos/batches', [EftposController::class, 'batches'])->name('eftpos.batches');
+        Route::post('/eftpos/batches/import', [EftposController::class, 'importBatch'])->name('eftpos.batches.import');
+        Route::post('/eftpos/batches/{batch}/reconcile', [EftposController::class, 'reconcile'])->name('eftpos.batches.reconcile');
+        Route::get('/eftpos/batches/{batch}', [EftposController::class, 'batchDetail'])->name('eftpos.batches.show');
+    });
+
+    // ── Donor Funds ───────────────────────────────────────────────────────
+    Route::get('/donor-funds', [DonorFundController::class, 'index'])
+        ->name('donor-funds.index')
+        ->middleware('permission:finance.reports.view');
+    Route::get('/donor-funds/create', [DonorFundController::class, 'create'])
+        ->name('donor-funds.create')
+        ->middleware('permission:finance.admin');
+    Route::post('/donor-funds', [DonorFundController::class, 'store'])
+        ->name('donor-funds.store')
+        ->middleware('permission:finance.admin');
+    Route::get('/donor-funds/{fund}', [DonorFundController::class, 'show'])
+        ->name('donor-funds.show')
+        ->middleware('permission:finance.reports.view');
+    Route::put('/donor-funds/{fund}', [DonorFundController::class, 'update'])
+        ->name('donor-funds.update')
+        ->middleware('permission:finance.admin');
+    Route::post('/donor-funds/{fund}/receipt', [DonorFundController::class, 'receipt'])
+        ->name('donor-funds.receipt')
+        ->middleware('permission:finance.admin');
+    Route::post('/donor-funds/{fund}/expenditure', [DonorFundController::class, 'expenditure'])
+        ->name('donor-funds.expenditure')
+        ->middleware('permission:finance.admin');
+    Route::post('/donor-funds/{fund}/report', [DonorFundController::class, 'report'])
+        ->name('donor-funds.report')
+        ->middleware('permission:finance.reports.view');
+    Route::get('/donor-funds/{fund}/reports', [DonorFundController::class, 'reports'])
+        ->name('donor-funds.reports')
+        ->middleware('permission:finance.reports.view');
 });

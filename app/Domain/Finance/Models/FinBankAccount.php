@@ -27,6 +27,7 @@ class FinBankAccount extends Model
         'current_balance',
         'is_primary',
         'is_active',
+        'currency_id',
         'created_by',
     ];
 
@@ -48,9 +49,19 @@ class FinBankAccount extends Model
         return $this->hasMany(FinBankTransaction::class, 'bank_account_id');
     }
 
+    public function bankFeeds(): HasMany
+    {
+        return $this->hasMany(FinBankFeed::class, 'bank_account_id');
+    }
+
     public function reconciliations(): HasMany
     {
         return $this->hasMany(FinBankReconciliation::class, 'bank_account_id');
+    }
+
+    public function currency(): BelongsTo
+    {
+        return $this->belongsTo(FinCurrency::class, 'currency_id');
     }
 
     public function createdBy(): BelongsTo

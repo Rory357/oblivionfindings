@@ -61,6 +61,11 @@ class FinGstReturn extends Model
         return $this->belongsTo(User::class, 'created_by');
     }
 
+    public function irdFilings(): HasMany
+    {
+        return $this->hasMany(FinIrdFiling::class, 'gst_return_id');
+    }
+
     public function scopeForOrganization($query, ?int $orgId)
     {
         return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));
