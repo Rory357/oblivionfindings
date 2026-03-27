@@ -18,7 +18,7 @@ return new class extends Migration
             $table->unsignedBigInteger('journal_id')->nullable();
             $table->timestamps();
 
-            $table->index(['fixed_asset_id', 'depreciation_date']);
+            $table->index(['fixed_asset_id', 'depreciation_date'], 'fin_asset_depr_asset_date_idx');
         });
     }
 

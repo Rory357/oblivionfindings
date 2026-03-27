@@ -21,7 +21,7 @@ return new class extends Migration
             $table->foreignId('created_by')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->index(['petty_cash_fund_id', 'transaction_date']);
+            $table->index(['petty_cash_fund_id', 'transaction_date'], 'fin_petty_cash_txn_fund_date_idx');
         });
     }
 
