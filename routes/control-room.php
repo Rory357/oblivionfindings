@@ -3,8 +3,21 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\ControlRoom\ControlRoomDashboardController;
 use App\Http\Controllers\ControlRoom\ControlRoomAlertController;
+use App\Http\Controllers\ControlRoom\ControlRoomMapController;
 use App\Http\Controllers\ControlRoom\ControlRoomReportController;
+use App\Http\Controllers\ControlRoom\ControlRoomEscalationController;
+use App\Http\Controllers\ControlRoom\ControlRoomIncidentController;
+use App\Http\Controllers\ControlRoom\ControlRoomShiftController;
+use App\Http\Controllers\ControlRoom\ControlRoomStatsController;
+use App\Http\Controllers\ControlRoom\ControlRoomBroadcastController;
+use App\Http\Controllers\ControlRoom\ControlRoomMessagingController;
+use App\Http\Controllers\ControlRoom\ControlRoomEvidenceController;
+use App\Http\Controllers\ControlRoom\ControlRoomSettingsController;
+use App\Http\Controllers\ControlRoom\ControlRoomSlaController;
+use App\Http\Controllers\ControlRoom\ControlRoomPlaybookController;
 use App\Http\Controllers\ControlRoom\AlertController as IntegrationAlertController;
+use App\Http\Controllers\ControlRoom\ControlRoomHandoverController;
+use App\Http\Controllers\ControlRoom\ControlRoomDeviceController;
 
 /**
  * Control Room Routes
@@ -99,13 +112,163 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:controlRoom.viewAny')
         ->name('control-room.alerts.index');
 
-    // Placeholder routes for future Control Room features
-    $placeholders = ['map', 'shifts', 'escalations', 'incidents', 'broadcast', 'messaging', 'stats'];
-    foreach ($placeholders as $feature) {
-        Route::get("/control-room/{$feature}", function () use ($feature) {
-            return inertia('control-room/Placeholder', [
-                'feature' => ucfirst(str_replace('-', ' ', $feature)),
-            ]);
-        })->name("control-room.{$feature}");
-    }
+    // Live Map
+    Route::get('/control-room/map', ControlRoomMapController::class)
+        ->middleware('permission:controlRoom.viewAny')
+        ->name('control-room.map');
+
+    // Shift management
+    Route::middleware('permission:controlRoom.viewAny')->group(function () {
+        Route::get('/control-room/shifts', [ControlRoomShiftController::class, 'index'])
+            ->name('control-room.shifts.index');
+    });
+    Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
+        Route::post('/control-room/shifts', [ControlRoomShiftController::class, 'store'])
+            ->name('control-room.shifts.store');
+        Route::get('/control-room/shifts/{shift}/handover', [ControlRoomHandoverController::class, 'show'])
+            ->name('control-room.shifts.handover-form');
+        Route::post('/control-room/shifts/{shift}/handover', [ControlRoomShiftController::class, 'handover'])
+            ->name('control-room.shifts.handover');
+        Route::post('/control-room/shifts/{shift}/acknowledge-handover', [ControlRoomShiftController::class, 'acknowledgeHandover'])
+            ->name('control-room.shifts.acknowledge-handover');
+        Route::post('/control-room/shifts/{shift}/note', [ControlRoomShiftController::class, 'addNote'])
+            ->name('control-room.shifts.note');
+    });
+
+    // Escalation queue management
+    Route::get('/control-room/escalations', [ControlRoomEscalationController::class, 'index'])
+        ->middleware('permission:controlRoom.viewAny')
+        ->name('control-room.escalations.index');
+    Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
+        Route::post('/control-room/escalations/{alert}/move', [ControlRoomEscalationController::class, 'moveToQueue'])
+            ->name('control-room.escalations.move');
+        Route::post('/control-room/escalations/bulk-escalate', [ControlRoomEscalationController::class, 'bulkEscalate'])
+            ->name('control-room.escalations.bulk-escalate');
+    });
+
+    // Incident tracker
+    Route::get('/control-room/incidents', [ControlRoomIncidentController::class, 'index'])
+        ->middleware('permission:controlRoom.viewAny')
+        ->name('control-room.incidents.index');
+    Route::post('/control-room/incidents/create-alert', [ControlRoomIncidentController::class, 'createAlertFromIncident'])
+        ->middleware('permission:controlRoom.alerts.create')
+        ->name('control-room.incidents.create-alert');
+
+    // Live Statistics
+    Route::get('/control-room/stats', ControlRoomStatsController::class)
+        ->middleware('permission:controlRoom.viewAny')
+        ->name('control-room.stats');
+
+    // Broadcast messages
+    Route::middleware('permission:controlRoom.viewAny')->group(function () {
+        Route::get('/control-room/broadcast', [ControlRoomBroadcastController::class, 'index'])
+            ->name('control-room.broadcast.index');
+        Route::get('/control-room/broadcast/{groupId}', [ControlRoomBroadcastController::class, 'show'])
+            ->name('control-room.broadcast.show');
+    });
+    Route::post('/control-room/broadcast', [ControlRoomBroadcastController::class, 'store'])
+        ->middleware('permission:controlRoom.alerts.manage')
+        ->name('control-room.broadcast.store');
+
+    // Quick messaging
+    Route::middleware('permission:controlRoom.viewAny')->group(function () {
+        Route::get('/control-room/messaging', [ControlRoomMessagingController::class, 'index'])
+            ->name('control-room.messaging.index');
+        Route::get('/control-room/messaging/thread', [ControlRoomMessagingController::class, 'thread'])
+            ->name('control-room.messaging.thread');
+    });
+    Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
+        Route::post('/control-room/messaging/send', [ControlRoomMessagingController::class, 'send'])
+            ->name('control-room.messaging.send');
+        Route::post('/control-room/messaging/{communication}/read', [ControlRoomMessagingController::class, 'markRead'])
+            ->name('control-room.messaging.read');
+    });
+
+    // Evidence management
+    Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
+        Route::get('/control-room/alerts/{alert}/evidence', [ControlRoomEvidenceController::class, 'index'])
+            ->name('control-room.evidence.index');
+        Route::post('/control-room/alerts/{alert}/evidence', [ControlRoomEvidenceController::class, 'storePack'])
+            ->name('control-room.evidence.store-pack');
+        Route::post('/control-room/evidence/{pack}/items', [ControlRoomEvidenceController::class, 'storeItem'])
+            ->name('control-room.evidence.store-item');
+        Route::delete('/control-room/evidence/items/{item}', [ControlRoomEvidenceController::class, 'destroyItem'])
+            ->name('control-room.evidence.destroy-item');
+        Route::post('/control-room/evidence/{pack}/complete', [ControlRoomEvidenceController::class, 'completePack'])
+            ->name('control-room.evidence.complete-pack');
+        Route::get('/control-room/evidence/{pack}/export', [ControlRoomEvidenceController::class, 'export'])
+            ->name('control-room.evidence.export');
+    });
+
+    // Settings & configuration
+    Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
+        Route::get('/control-room/settings', [ControlRoomSettingsController::class, 'index'])
+            ->name('control-room.settings.index');
+        // Signal rules
+        Route::post('/control-room/settings/rules', [ControlRoomSettingsController::class, 'storeSignalRule'])
+            ->name('control-room.settings.rules.store');
+        Route::put('/control-room/settings/rules/{rule}', [ControlRoomSettingsController::class, 'updateSignalRule'])
+            ->name('control-room.settings.rules.update');
+        Route::delete('/control-room/settings/rules/{rule}', [ControlRoomSettingsController::class, 'deleteSignalRule'])
+            ->name('control-room.settings.rules.delete');
+        // Triage queues
+        Route::post('/control-room/settings/queues', [ControlRoomSettingsController::class, 'storeQueue'])
+            ->name('control-room.settings.queues.store');
+        Route::put('/control-room/settings/queues/{queue}', [ControlRoomSettingsController::class, 'updateQueue'])
+            ->name('control-room.settings.queues.update');
+        // Maintenance windows
+        Route::post('/control-room/settings/maintenance', [ControlRoomSettingsController::class, 'storeMaintenanceWindow'])
+            ->name('control-room.settings.maintenance.store');
+        Route::put('/control-room/settings/maintenance/{window}', [ControlRoomSettingsController::class, 'updateMaintenanceWindow'])
+            ->name('control-room.settings.maintenance.update');
+        Route::post('/control-room/settings/maintenance/{window}/cancel', [ControlRoomSettingsController::class, 'cancelMaintenanceWindow'])
+            ->name('control-room.settings.maintenance.cancel');
+    });
+
+    // SLA management
+    Route::middleware('permission:controlRoom.viewAny')->group(function () {
+        Route::get('/control-room/sla', [ControlRoomSlaController::class, 'index'])
+            ->name('control-room.sla.index');
+        Route::get('/control-room/sla/breaches', [ControlRoomSlaController::class, 'breachReport'])
+            ->name('control-room.sla.breaches');
+    });
+    Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
+        Route::post('/control-room/sla', [ControlRoomSlaController::class, 'store'])
+            ->name('control-room.sla.store');
+        Route::put('/control-room/sla/{sla}', [ControlRoomSlaController::class, 'update'])
+            ->name('control-room.sla.update');
+        Route::post('/control-room/sla/{sla}/toggle-active', [ControlRoomSlaController::class, 'toggleActive'])
+            ->name('control-room.sla.toggle-active');
+    });
+
+    // Device monitoring
+    Route::middleware('permission:controlRoom.viewAny')->group(function () {
+        Route::get('/control-room/devices', [ControlRoomDeviceController::class, 'index'])
+            ->name('control-room.devices.index');
+        Route::get('/control-room/devices/{device}', [ControlRoomDeviceController::class, 'show'])
+            ->whereNumber('device')
+            ->name('control-room.devices.show');
+    });
+
+    // Playbook management
+    Route::middleware('permission:controlRoom.viewAny')->group(function () {
+        Route::get('/control-room/playbooks', [ControlRoomPlaybookController::class, 'index'])
+            ->name('control-room.playbooks.index');
+        Route::get('/control-room/playbooks/{playbook}', [ControlRoomPlaybookController::class, 'show'])
+            ->name('control-room.playbooks.show');
+    });
+    Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
+        Route::post('/control-room/playbooks', [ControlRoomPlaybookController::class, 'store'])
+            ->name('control-room.playbooks.store');
+        Route::put('/control-room/playbooks/{playbook}', [ControlRoomPlaybookController::class, 'update'])
+            ->name('control-room.playbooks.update');
+        Route::post('/control-room/playbooks/{playbook}/toggle-active', [ControlRoomPlaybookController::class, 'toggleActive'])
+            ->name('control-room.playbooks.toggle-active');
+        Route::post('/control-room/alerts/{alert}/playbook/start', [ControlRoomPlaybookController::class, 'startRun'])
+            ->name('control-room.alerts.playbook.start');
+        Route::post('/control-room/alerts/{alert}/playbook/advance', [ControlRoomPlaybookController::class, 'advanceStep'])
+            ->name('control-room.alerts.playbook.advance');
+        Route::post('/control-room/alerts/{alert}/playbook/skip', [ControlRoomPlaybookController::class, 'skipStep'])
+            ->name('control-room.alerts.playbook.skip');
+    });
 });

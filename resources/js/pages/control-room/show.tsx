@@ -22,15 +22,29 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     ArrowLeft,
+    ArrowDown,
+    ArrowUp,
+    Camera,
     CheckCircle,
+    ChevronDown,
+    ChevronRight,
     Clock,
+    File,
+    FileText,
     History,
+    Mail,
+    MapPin,
     MessageSquare,
+    Phone,
+    Play,
+    SkipForward,
+    Timer,
     TrendingUp,
     User,
+    Video,
     XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 interface FleetSignal {
     id: number;
@@ -51,6 +65,76 @@ interface AuditLogEntry {
     user: UserRef | null;
     meta: Record<string, any> | null;
     created_at: string;
+}
+
+interface PlaybookStep {
+    id: number;
+    title: string;
+    status: 'pending' | 'in_progress' | 'completed' | 'skipped' | 'failed';
+    notes: string | null;
+    completed_at: string | null;
+}
+
+interface PlaybookRun {
+    id: number;
+    status: string;
+    current_step: number;
+    completed_steps: number;
+    total_steps: number;
+    playbook: {
+        id: number;
+        name: string;
+        category: string;
+    };
+    steps: PlaybookStep[];
+}
+
+interface EvidenceItem {
+    id: number;
+    type: string;
+    title: string;
+    file_path: string | null;
+    created_at: string | null;
+}
+
+interface EvidencePack {
+    id: number;
+    title: string;
+    status: string;
+    item_count: number;
+    items: EvidenceItem[];
+}
+
+interface Communication {
+    id: number;
+    channel: 'in_app' | 'sms' | 'email' | 'phone';
+    direction: 'inbound' | 'outbound';
+    purpose: string | null;
+    status: string;
+    content: string | null;
+    target_user_name: string | null;
+    sent_at: string | null;
+    created_at: string | null;
+}
+
+interface SlaData {
+    acknowledge_deadline: string | null;
+    response_deadline: string | null;
+    resolution_deadline: string | null;
+    acknowledge_breached: boolean;
+    response_breached: boolean;
+    resolution_breached: boolean;
+}
+
+interface ClientRef {
+    id: number;
+    name: string;
+}
+
+interface LocationData {
+    lat: number;
+    lng: number;
+    description: string | null;
 }
 
 interface Alert {
@@ -86,6 +170,12 @@ interface Alert {
 
 interface Props {
     alert: Alert;
+    playbook_run: PlaybookRun | null;
+    evidence_packs: EvidencePack[];
+    communications: Communication[];
+    sla: SlaData | null;
+    client: ClientRef | null;
+    location: LocationData | null;
     audit_logs: AuditLogEntry[];
     can: {
         manage: boolean;
@@ -123,6 +213,47 @@ const actionLabels: Record<string, string> = {
     'controlRoom.alert.create': 'Created alert',
 };
 
+const stepStatusColors: Record<string, string> = {
+    pending: 'bg-gray-100 text-gray-700',
+    in_progress: 'bg-blue-100 text-blue-800',
+    completed: 'bg-green-100 text-green-800',
+    skipped: 'bg-yellow-100 text-yellow-800',
+    failed: 'bg-red-100 text-red-800',
+};
+
+const channelColors: Record<string, string> = {
+    in_app: 'bg-blue-100 text-blue-800',
+    sms: 'bg-green-100 text-green-800',
+    email: 'bg-purple-100 text-purple-800',
+    phone: 'bg-orange-100 text-orange-800',
+};
+
+const channelIcons: Record<string, typeof MessageSquare> = {
+    in_app: MessageSquare,
+    sms: Phone,
+    email: Mail,
+    phone: Phone,
+};
+
+const evidenceTypeIcons: Record<string, typeof File> = {
+    photo: Camera,
+    document: File,
+    cctv_bookmark: Video,
+    note: FileText,
+};
+
+function formatCountdown(deadline: string | null): string {
+    if (!deadline) return '-';
+    const diff = new Date(deadline).getTime() - Date.now();
+    if (diff <= 0) return 'EXPIRED';
+    const hrs = Math.floor(diff / 3600000);
+    const mins = Math.floor((diff % 3600000) / 60000);
+    const secs = Math.floor((diff % 60000) / 1000);
+    if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
+    if (mins > 0) return `${mins}m ${secs}s`;
+    return `${secs}s`;
+}
+
 function formatDateTime(isoString: string | null): string {
     if (!isoString) return '-';
     return new Date(isoString).toLocaleString();
@@ -143,13 +274,30 @@ function formatRelativeTime(isoString: string): string {
     return date.toLocaleDateString();
 }
 
-export default function ControlRoomShow({ alert, audit_logs, can, staff }: Props) {
+export default function ControlRoomShow({ alert, playbook_run, evidence_packs, communications, sla, client, location, audit_logs, can, staff }: Props) {
     const [notes, setNotes] = useState('');
     const [assignTo, setAssignTo] = useState(
         alert.assigned_to_user_id?.toString() || '',
     );
     const [escalationReason, setEscalationReason] = useState('');
     const [processing, setProcessing] = useState(false);
+    const [expandedPacks, setExpandedPacks] = useState<Record<number, boolean>>({});
+    const [, setTick] = useState(0);
+
+    // Live SLA countdown ticker
+    useEffect(() => {
+        if (!sla) return;
+        const hasActive = [sla.acknowledge_deadline, sla.response_deadline, sla.resolution_deadline].some(
+            (d) => d && new Date(d).getTime() > Date.now(),
+        );
+        if (!hasActive) return;
+        const interval = setInterval(() => setTick((t) => t + 1), 1000);
+        return () => clearInterval(interval);
+    }, [sla]);
+
+    const togglePack = (id: number) => {
+        setExpandedPacks((prev) => ({ ...prev, [id]: !prev[id] }));
+    };
 
     const handleAction = (
         action: string,
@@ -425,6 +573,214 @@ export default function ControlRoomShow({ alert, audit_logs, can, staff }: Props
                             </Card>
                         )}
 
+                        {/* Playbook Execution */}
+                        {playbook_run && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <Play className="h-5 w-5" />
+                                        Playbook: {playbook_run.playbook.name}
+                                    </CardTitle>
+                                    <CardDescription>
+                                        {playbook_run.playbook.category} &middot; {playbook_run.completed_steps}/{playbook_run.total_steps} steps completed
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {/* Progress bar */}
+                                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                                        <div
+                                            className="h-full rounded-full bg-primary transition-all"
+                                            style={{ width: `${playbook_run.total_steps > 0 ? (playbook_run.completed_steps / playbook_run.total_steps) * 100 : 0}%` }}
+                                        />
+                                    </div>
+                                    {/* Steps list */}
+                                    <div className="space-y-2">
+                                        {playbook_run.steps.map((step) => (
+                                            <div key={step.id} className="flex items-center justify-between rounded-md border p-3">
+                                                <div className="flex items-center gap-3">
+                                                    {step.status === 'completed' ? (
+                                                        <CheckCircle className="h-4 w-4 text-green-500" />
+                                                    ) : step.status === 'in_progress' ? (
+                                                        <Clock className="h-4 w-4 text-blue-500" />
+                                                    ) : step.status === 'failed' ? (
+                                                        <XCircle className="h-4 w-4 text-red-500" />
+                                                    ) : step.status === 'skipped' ? (
+                                                        <SkipForward className="h-4 w-4 text-yellow-500" />
+                                                    ) : (
+                                                        <div className="h-4 w-4 rounded-full border-2 border-gray-300" />
+                                                    )}
+                                                    <div>
+                                                        <p className="text-sm font-medium">{step.title}</p>
+                                                        {step.completed_at && (
+                                                            <p className="text-xs text-muted-foreground">
+                                                                Completed {formatRelativeTime(step.completed_at)}
+                                                            </p>
+                                                        )}
+                                                        {step.notes && (
+                                                            <p className="text-xs text-muted-foreground">{step.notes}</p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <Badge className={stepStatusColors[step.status] || 'bg-gray-100 text-gray-700'}>
+                                                        {step.status.replace('_', ' ')}
+                                                    </Badge>
+                                                    {step.status === 'in_progress' && can.manage && (
+                                                        <div className="flex gap-1">
+                                                            <Button
+                                                                size="sm"
+                                                                variant="outline"
+                                                                onClick={() => handleAction('playbook-step-complete', { step_id: step.id })}
+                                                                disabled={processing}
+                                                            >
+                                                                Complete
+                                                            </Button>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                onClick={() => handleAction('playbook-step-skip', { step_id: step.id })}
+                                                                disabled={processing}
+                                                            >
+                                                                Skip
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Evidence Packs */}
+                        {evidence_packs.length > 0 && (
+                            <Card>
+                                <CardHeader>
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="flex items-center gap-2">
+                                            <File className="h-5 w-5" />
+                                            Evidence
+                                        </CardTitle>
+                                        {can.manage && (
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                onClick={() => handleAction('evidence-pack-create')}
+                                                disabled={processing}
+                                            >
+                                                Create Evidence Pack
+                                            </Button>
+                                        )}
+                                    </div>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    {evidence_packs.map((pack) => (
+                                        <div key={pack.id} className="rounded-md border">
+                                            <button
+                                                type="button"
+                                                className="flex w-full items-center justify-between p-3 text-left hover:bg-muted/50"
+                                                onClick={() => togglePack(pack.id)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    {expandedPacks[pack.id] ? (
+                                                        <ChevronDown className="h-4 w-4" />
+                                                    ) : (
+                                                        <ChevronRight className="h-4 w-4" />
+                                                    )}
+                                                    <span className="text-sm font-medium">{pack.title}</span>
+                                                    <Badge variant="secondary" className="text-xs">
+                                                        {pack.item_count} items
+                                                    </Badge>
+                                                    <Badge variant="outline" className="text-xs">
+                                                        {pack.status}
+                                                    </Badge>
+                                                </div>
+                                            </button>
+                                            {expandedPacks[pack.id] && pack.items.length > 0 && (
+                                                <div className="border-t px-3 pb-3 pt-2">
+                                                    <div className="space-y-1">
+                                                        {pack.items.map((item) => {
+                                                            const IconComponent = evidenceTypeIcons[item.type] || File;
+                                                            return (
+                                                                <div key={item.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
+                                                                    <IconComponent className="h-4 w-4 text-muted-foreground" />
+                                                                    <span>{item.title}</span>
+                                                                    {item.created_at && (
+                                                                        <span className="ml-auto text-xs text-muted-foreground">
+                                                                            {formatRelativeTime(item.created_at)}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Communication Log */}
+                        {communications.length > 0 && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2">
+                                        <MessageSquare className="h-5 w-5" />
+                                        Communications
+                                    </CardTitle>
+                                    <CardDescription>
+                                        {communications.length} message{communications.length !== 1 ? 's' : ''}
+                                    </CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="relative">
+                                        <div className="absolute left-3 top-0 h-full w-px bg-border" />
+                                        <div className="space-y-4">
+                                            {communications.map((comm) => {
+                                                const ChannelIcon = channelIcons[comm.channel] || MessageSquare;
+                                                return (
+                                                    <div key={comm.id} className="relative flex gap-4 pl-8">
+                                                        <div className="absolute left-1.5 top-1 h-3 w-3 rounded-full border-2 border-primary bg-background" />
+                                                        <div className="flex-1 space-y-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge className={channelColors[comm.channel] || 'bg-gray-100 text-gray-700'}>
+                                                                    <ChannelIcon className="mr-1 h-3 w-3" />
+                                                                    {comm.channel.replace('_', ' ')}
+                                                                </Badge>
+                                                                {comm.direction === 'outbound' ? (
+                                                                    <ArrowUp className="h-3 w-3 text-blue-500" />
+                                                                ) : (
+                                                                    <ArrowDown className="h-3 w-3 text-green-500" />
+                                                                )}
+                                                                <span className="text-xs text-muted-foreground">
+                                                                    {comm.direction}
+                                                                </span>
+                                                                {comm.purpose && (
+                                                                    <Badge variant="outline" className="text-xs">
+                                                                        {comm.purpose}
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+                                                            {comm.content && (
+                                                                <p className="text-sm">{comm.content}</p>
+                                                            )}
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {comm.target_user_name && <span>To: {comm.target_user_name} &middot; </span>}
+                                                                {formatDateTime(comm.sent_at || comm.created_at)}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
                         {/* Activity Log (Notes) */}
                         {(alert.context?.activity_log?.length ?? 0) > 0 && (
                             <Card>
@@ -515,6 +871,98 @@ export default function ControlRoomShow({ alert, audit_logs, can, staff }: Props
 
                     {/* Actions Sidebar */}
                     <div className="space-y-4">
+                        {/* SLA Status */}
+                        {sla && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Timer className="h-4 w-4" />
+                                        SLA Status
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                    {[
+                                        { label: 'Acknowledge', deadline: sla.acknowledge_deadline, breached: sla.acknowledge_breached, met: !!alert.acknowledged_at },
+                                        { label: 'Response', deadline: sla.response_deadline, breached: sla.response_breached, met: alert.status === 'triaging' || alert.status === 'resolved' || alert.status === 'closed' },
+                                        { label: 'Resolution', deadline: sla.resolution_deadline, breached: sla.resolution_breached, met: alert.status === 'resolved' || alert.status === 'closed' },
+                                    ].map((row) => (
+                                        <div key={row.label} className="flex items-center justify-between">
+                                            <span className="text-sm font-medium">{row.label}</span>
+                                            <div className="text-right">
+                                                {row.breached ? (
+                                                    <span className="text-sm font-bold text-red-600">BREACHED</span>
+                                                ) : row.met ? (
+                                                    <span className="text-sm font-bold text-green-600">MET</span>
+                                                ) : row.deadline ? (
+                                                    <div>
+                                                        <span className="text-sm font-mono font-medium">
+                                                            {formatCountdown(row.deadline)}
+                                                        </span>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {new Date(row.deadline).toLocaleTimeString()}
+                                                        </p>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-xs text-muted-foreground">N/A</span>
+                                                )}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Related Client */}
+                        {client && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="text-base">Related Client</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <Link
+                                        href={`/clients/${client.id}`}
+                                        className="flex items-center gap-2 font-medium text-primary hover:underline"
+                                    >
+                                        <User className="h-4 w-4" />
+                                        {client.name}
+                                    </Link>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Location */}
+                        {location && (
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <MapPin className="h-4 w-4" />
+                                        Location
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-2">
+                                    <div className="flex aspect-video items-center justify-center rounded-md bg-muted text-sm text-muted-foreground">
+                                        <div className="text-center">
+                                            <MapPin className="mx-auto h-8 w-8 mb-1" />
+                                            <p className="font-mono text-xs">{location.lat.toFixed(6)}, {location.lng.toFixed(6)}</p>
+                                        </div>
+                                    </div>
+                                    {location.description && (
+                                        <p className="text-sm text-muted-foreground">{location.description}</p>
+                                    )}
+                                    <Button variant="outline" size="sm" className="w-full" asChild>
+                                        <a
+                                            href={`https://www.google.com/maps?q=${location.lat},${location.lng}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                        >
+                                            <MapPin className="mr-2 h-3 w-3" />
+                                            View on Map
+                                        </a>
+                                    </Button>
+                                </CardContent>
+                            </Card>
+                        )}
+
                         {/* Quick Actions */}
                         {can.manage && !isClosed && (
                             <Card>

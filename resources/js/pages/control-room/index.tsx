@@ -14,17 +14,21 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
+    AlertCircle,
     AlertTriangle,
     Bell,
     CheckCircle,
     Clock,
     FileText,
+    Info,
+    MapPin,
+    MinusCircle,
     Search,
     TrendingUp,
     User,
     XCircle,
 } from 'lucide-react';
-import { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface Alert {
     id: number;
@@ -38,6 +42,10 @@ interface Alert {
     asset_id: number | null;
     asset: { id: number; name: string; asset_tag: string } | null;
     assigned_to: { id: number; name: string } | null;
+    client_id: number | null;
+    client_name: string | null;
+    site_id: number | null;
+    sla_status: 'on_track' | 'at_risk' | 'breached' | null;
     notes: string | null;
 }
 
@@ -125,6 +133,36 @@ export default function ControlRoomIndex({
     can,
 }: Props) {
     const [searchValue, setSearchValue] = useState(filters.search || '');
+    const prevCriticalRef = useRef(stats.critical);
+
+    const severityIcons: Record<string, React.ReactNode> = {
+        critical: <AlertTriangle className="mr-1 h-3 w-3" />,
+        high: <AlertCircle className="mr-1 h-3 w-3" />,
+        medium: <Info className="mr-1 h-3 w-3" />,
+        low: <MinusCircle className="mr-1 h-3 w-3" />,
+    };
+
+    // Auto-refresh every 30 seconds
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (!document.hidden) {
+                router.reload({ only: ['alerts', 'stats', 'daily_trend', 'by_severity'] });
+            }
+        }, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Sound notification for new critical alerts
+    useEffect(() => {
+        if (stats.critical > prevCriticalRef.current) {
+            try {
+                const audio = new Audio('/sounds/alert.mp3');
+                audio.volume = 0.5;
+                audio.play().catch(() => {});
+            } catch {}
+        }
+        prevCriticalRef.current = stats.critical;
+    }, [stats.critical]);
 
     const applyFilter = (key: string, value: string) => {
         router.get(
@@ -156,14 +194,22 @@ export default function ControlRoomIndex({
                     title="Control Room"
                     description="Centralized alert management and triage system."
                     actions={
-                        can.viewReports ? (
+                        <div className="flex items-center gap-2">
                             <Button variant="outline" size="sm" asChild>
-                                <Link href="/control-room/reports">
-                                    <FileText className="mr-2 h-4 w-4" />
-                                    Reports
-                                </Link>
+                                <Link href="/control-room/map"><MapPin className="mr-2 h-4 w-4" />Map</Link>
                             </Button>
-                        ) : null
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href="/control-room/shifts"><Clock className="mr-2 h-4 w-4" />Shifts</Link>
+                            </Button>
+                            <Button variant="outline" size="sm" asChild>
+                                <Link href="/control-room/escalations"><TrendingUp className="mr-2 h-4 w-4" />Queues</Link>
+                            </Button>
+                            {can.viewReports && (
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href="/control-room/reports"><FileText className="mr-2 h-4 w-4" />Reports</Link>
+                                </Button>
+                            )}
+                        </div>
                     }
                 />
 
@@ -399,6 +445,10 @@ export default function ControlRoomIndex({
                                 <SelectItem value="external">
                                     External
                                 </SelectItem>
+                                <SelectItem value="compliance">Compliance</SelectItem>
+                                <SelectItem value="medication">Medication</SelectItem>
+                                <SelectItem value="safeguarding">Safeguarding</SelectItem>
+                                <SelectItem value="incident">Incident</SelectItem>
                             </SelectContent>
                         </Select>
 
@@ -493,6 +543,12 @@ export default function ControlRoomIndex({
                                                     </span>
                                                 </>
                                             )}
+                                            {alert.client_name && (
+                                                <>
+                                                    <span>|</span>
+                                                    <span>{alert.client_name}</span>
+                                                </>
+                                            )}
                                             {alert.assigned_to && (
                                                 <>
                                                     <span>|</span>
@@ -510,12 +566,32 @@ export default function ControlRoomIndex({
                                         )}
                                     </div>
                                     <div className="flex items-center gap-2">
+                                        {can.manage && alert.status === 'open' && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    router.post(`/control-room/alerts/${alert.id}/acknowledge`, {}, { preserveScroll: true });
+                                                }}
+                                            >
+                                                Ack
+                                            </Button>
+                                        )}
+                                        {alert.sla_status && (
+                                            <span className={`inline-block h-2 w-2 rounded-full ${
+                                                alert.sla_status === 'on_track' ? 'bg-green-500' :
+                                                alert.sla_status === 'at_risk' ? 'bg-yellow-500' : 'bg-red-500'
+                                            }`} title={`SLA: ${alert.sla_status.replace('_', ' ')}`} />
+                                        )}
                                         <Badge
                                             className={
                                                 severityColors[alert.severity] ||
                                                 ''
                                             }
                                         >
+                                            {severityIcons[alert.severity]}
                                             {alert.severity}
                                         </Badge>
                                         <Badge

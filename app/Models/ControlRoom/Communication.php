@@ -13,6 +13,7 @@ class Communication extends Model
 
     protected $fillable = [
         'alert_id',
+        'broadcast_group_id',
         'playbook_run_id',
         'channel',
         'direction',

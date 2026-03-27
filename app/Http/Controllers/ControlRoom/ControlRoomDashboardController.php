@@ -18,7 +18,7 @@ class ControlRoomDashboardController extends Controller
         abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
 
         $query = ControlRoomAlert::query()
-            ->with(['asset:id,name,asset_tag', 'assignedTo:id,name']);
+            ->with(['asset:id,name,asset_tag', 'assignedTo:id,name', 'sla', 'client:id,first_name,last_name']);
 
         // Filter by status
         if ($request->filled('status') && $request->input('status') !== 'all') {
@@ -151,6 +151,10 @@ class ControlRoomDashboardController extends Controller
                         'id' => $a->assignedTo->id,
                         'name' => $a->assignedTo->name,
                     ] : null,
+                    'client_id' => $a->client_id,
+                    'client_name' => $a->client ? trim($a->client->first_name . ' ' . $a->client->last_name) : null,
+                    'site_id' => $a->site_id,
+                    'sla_status' => $a->sla ? ($a->sla->acknowledge_breached || $a->sla->response_breached || $a->sla->resolution_breached ? 'breached' : (($a->sla->acknowledge_deadline && $a->sla->acknowledge_deadline->isPast()) || ($a->sla->response_deadline && $a->sla->response_deadline->isPast()) ? 'at_risk' : 'on_track')) : null,
                     'notes' => $a->notes ? substr($a->notes, 0, 100) . (strlen($a->notes) > 100 ? '...' : '') : null,
                 ])->values(),
                 'links' => $alerts->linkCollection()->toArray(),
