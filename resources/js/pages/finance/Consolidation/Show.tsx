@@ -29,9 +29,10 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Building2, Plus, Trash2, Play, Eye, ArrowLeftRight } from 'lucide-react';
+import { Building2, Plus, Trash2, Play, Eye, ArrowLeftRight, Calendar, Hash } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { Link } from '@inertiajs/react';
+import { type BreadcrumbItem } from '@/types';
 
 type Entity = {
     id: number;
@@ -255,7 +256,7 @@ function RunConsolidationDialog({ groupId }: { groupId: number }) {
                             {errors.period_to && <p className="text-sm text-destructive">{errors.period_to}</p>}
                         </div>
                     </div>
-                    {errors.consolidation && <p className="text-sm text-destructive">{errors.consolidation}</p>}
+                    {(errors as any).consolidation && <p className="text-sm text-destructive">{(errors as any).consolidation}</p>}
                     <DialogFooter>
                         <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
                         <Button type="submit" disabled={processing}>
@@ -272,9 +273,13 @@ function formatCurrency(value: string | number): string {
     return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(value));
 }
 
+function formatDate(dateStr: string): string {
+    return new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 export default function ConsolidationShow({ group, entities, recentRuns, mappings }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
         { title: 'Consolidation', href: '/finance/consolidation' },
         { title: group.name, href: `/finance/consolidation/${group.id}` },
     ];
@@ -285,11 +290,17 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
         }
     }
 
+    // KPI calculations
+    const activeEntities = entities.filter((e) => e.is_active).length;
+    const completedRuns = recentRuns.filter((r) => r.status === 'completed');
+    const lastRunDate = completedRuns.length > 0 ? completedRuns[0].created_at : null;
+    const totalEliminations = recentRuns.reduce((sum, r) => sum + r.eliminations_count, 0);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Consolidation - ${group.name}`} />
 
-            <div className="mx-auto max-w-6xl space-y-6 p-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">{group.name}</h1>
@@ -307,6 +318,42 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                         </Link>
                         <RunConsolidationDialog groupId={group.id} />
                     </div>
+                </div>
+
+                {/* KPI Summary Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card>
+                        <CardContent className="flex items-center justify-between p-6">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Active Entities</p>
+                                <p className="text-2xl font-bold mt-1">{activeEntities}</p>
+                                <p className="text-xs text-muted-foreground mt-1">{entities.length} total</p>
+                            </div>
+                            <Building2 className="h-8 w-8 text-muted-foreground/50" />
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center justify-between p-6">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Last Consolidation Run</p>
+                                <p className="text-2xl font-bold mt-1">
+                                    {lastRunDate ? formatDate(lastRunDate) : 'None'}
+                                </p>
+                                <p className="text-xs text-muted-foreground mt-1">{completedRuns.length} completed runs</p>
+                            </div>
+                            <Calendar className="h-8 w-8 text-muted-foreground/50" />
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center justify-between p-6">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Total Eliminations</p>
+                                <p className="text-2xl font-bold mt-1">{totalEliminations}</p>
+                                <p className="text-xs text-muted-foreground mt-1">across all runs</p>
+                            </div>
+                            <Hash className="h-8 w-8 text-muted-foreground/50" />
+                        </CardContent>
+                    </Card>
                 </div>
 
                 {/* Entities */}

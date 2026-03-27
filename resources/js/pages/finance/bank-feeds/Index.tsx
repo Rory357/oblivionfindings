@@ -22,6 +22,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Plus, RefreshCw, Trash2, FileText, Radio, AlertCircle } from 'lucide-react';
+import { type BreadcrumbItem } from '@/types';
 import { useState } from 'react';
 
 interface BankAccount {
@@ -130,7 +131,7 @@ export default function BankFeedsIndex({ feeds, bankAccounts, existingAccountIds
         router.delete(`/finance/bank-feeds/${feedId}`);
     };
 
-    const breadcrumbs = [
+    const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Bank Feeds', href: '/finance/bank-feeds' },
     ];
@@ -142,8 +143,8 @@ export default function BankFeedsIndex({ feeds, bankAccounts, existingAccountIds
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Bank Feeds</h1>
-                        <p className="text-gray-500 mt-1">
+                        <h1 className="text-3xl font-bold text-foreground">Bank Feeds</h1>
+                        <p className="text-muted-foreground mt-1">
                             Automated bank transaction imports from NZ banks
                         </p>
                     </div>
@@ -192,7 +193,7 @@ export default function BankFeedsIndex({ feeds, bankAccounts, existingAccountIds
                                                 </SelectContent>
                                             </Select>
                                             {form.errors.bank_account_id && (
-                                                <p className="text-sm text-red-600">{form.errors.bank_account_id}</p>
+                                                <p className="text-sm text-destructive">{form.errors.bank_account_id}</p>
                                             )}
                                         </div>
 
@@ -213,7 +214,7 @@ export default function BankFeedsIndex({ feeds, bankAccounts, existingAccountIds
                                                 </SelectContent>
                                             </Select>
                                             {form.errors.provider && (
-                                                <p className="text-sm text-red-600">{form.errors.provider}</p>
+                                                <p className="text-sm text-destructive">{form.errors.provider}</p>
                                             )}
                                         </div>
 
@@ -251,9 +252,9 @@ export default function BankFeedsIndex({ feeds, bankAccounts, existingAccountIds
                 {feeds.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                            <Radio className="h-12 w-12 text-gray-300 mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900 mb-1">No bank feeds</h3>
-                            <p className="text-gray-500 mb-4">
+                            <Radio className="h-12 w-12 text-muted-foreground/40 mb-4" />
+                            <h3 className="text-lg font-medium text-foreground mb-1">No bank feeds</h3>
+                            <p className="text-muted-foreground mb-4">
                                 Connect a bank feed to automatically import transactions from your NZ bank.
                             </p>
                             <Button onClick={() => setShowAddDialog(true)} disabled={availableAccounts.length === 0}>
@@ -334,7 +335,7 @@ export default function BankFeedsIndex({ feeds, bankAccounts, existingAccountIds
                                         </div>
                                     </div>
                                     {feed.last_error && feed.last_sync_status === 'failed' && (
-                                        <div className="flex items-start gap-2 mt-3 text-red-600 bg-red-50 rounded-md px-3 py-2">
+                                        <div className="flex items-start gap-2 mt-3 text-destructive bg-destructive/10 rounded-md px-3 py-2">
                                             <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
                                             <span className="text-sm">{feed.last_error}</span>
                                         </div>

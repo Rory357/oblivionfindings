@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -6,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Send, Shield } from 'lucide-react';
+import { FileText, Send, Shield, CheckCircle, Clock, DollarSign } from 'lucide-react';
 import { useState } from 'react';
 
 type Filing = {
@@ -48,8 +49,13 @@ type PageProps = {
     };
 };
 
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'IRD E-Filing', href: '/finance/ird-filings' },
+];
+
+const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -75,26 +81,29 @@ const filingTypeLabels: Record<string, string> = {
 };
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-700 border-gray-300' },
-    validated: { label: 'Validated', className: 'bg-blue-100 text-blue-700 border-blue-300' },
-    submitted: { label: 'Submitted', className: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-    accepted: { label: 'Accepted', className: 'bg-green-100 text-green-700 border-green-300' },
-    rejected: { label: 'Rejected', className: 'bg-red-100 text-red-700 border-red-300' },
-    error: { label: 'Error', className: 'bg-red-100 text-red-700 border-red-300' },
+    draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
+    validated: { label: 'Validated', className: 'bg-blue-500/10 text-blue-600 border-blue-500/30' },
+    submitted: { label: 'Submitted', className: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30' },
+    accepted: { label: 'Accepted', className: 'bg-green-500/10 text-green-600 border-green-500/30' },
+    rejected: { label: 'Rejected', className: 'bg-red-500/10 text-red-600 border-red-500/30' },
+    error: { label: 'Error', className: 'bg-red-500/10 text-red-600 border-red-500/30' },
 };
 
 export default function IrdFilingsIndex({ filings, availableGstReturns, filters }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'IRD E-Filing', href: '/finance/ird-filings' },
-    ];
-
     const [showCreateForm, setShowCreateForm] = useState(false);
     const [selectedGstReturn, setSelectedGstReturn] = useState<string>('');
 
     const createForm = useForm({
         ird_number: '',
     });
+
+    // KPI calculations
+    const allFilings = filings.data;
+    const filedCount = allFilings.filter((f) => f.status === 'accepted' || f.status === 'submitted').length;
+    const pendingCount = allFilings.filter((f) => f.status === 'draft' || f.status === 'validated').length;
+    const totalFiledAmount = allFilings
+        .filter((f) => f.status === 'accepted' || f.status === 'submitted')
+        .reduce((sum, f) => sum + Math.abs(Number(f.total_amount)), 0);
 
     function applyFilter(key: string, value: string | undefined) {
         const params: Record<string, string> = { ...filters };
@@ -130,6 +139,43 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
                     </Button>
                 </div>
 
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                    <Card>
+                        <CardContent className="flex items-center gap-4 pt-6">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-green-500/10">
+                                <CheckCircle className="h-5 w-5 text-green-600" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Filed</p>
+                                <p className="text-2xl font-bold">{filedCount}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center gap-4 pt-6">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-yellow-500/10">
+                                <Clock className="h-5 w-5 text-yellow-600" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Pending</p>
+                                <p className="text-2xl font-bold">{pendingCount}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center gap-4 pt-6">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                <DollarSign className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Total Filed Amount</p>
+                                <p className="text-2xl font-bold font-mono tabular-nums">{formatCurrency(totalFiledAmount)}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
                 {/* Create Filing Form */}
                 {showCreateForm && availableGstReturns.length > 0 && (
                     <Card>
@@ -152,7 +198,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
                                                 {availableGstReturns.map((ret) => (
                                                     <SelectItem key={ret.id} value={String(ret.id)}>
                                                         Period {ret.ird_period}: {formatDate(ret.period_start)} &ndash;{' '}
-                                                        {formatDate(ret.period_end)} ({formatNZD(ret.gst_payable)})
+                                                        {formatDate(ret.period_end)} ({formatCurrency(Number(ret.gst_payable))})
                                                     </SelectItem>
                                                 ))}
                                             </SelectContent>
@@ -280,7 +326,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
                                                         {formatDate(filing.period_to)}
                                                     </td>
                                                     <td className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${amount >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-                                                        {formatNZD(Math.abs(amount))}
+                                                        {formatCurrency(Math.abs(amount))}
                                                         {amount < 0 ? ' (Refund)' : ''}
                                                     </td>
                                                     <td className="py-3 pr-4">

@@ -1,20 +1,20 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, CalendarRange, Info } from 'lucide-react';
+import { type BreadcrumbItem } from '@/types';
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Cash Flow Forecast', href: '/finance/cash-flow-forecast' },
+    { title: 'New Forecast', href: '/finance/cash-flow-forecast/create' },
+];
 
 export default function CashFlowForecastCreate() {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Cash Flow Forecast', href: '/finance/cash-flow-forecast' },
-        { title: 'New Forecast', href: '/finance/cash-flow-forecast/create' },
-    ];
-
-    // Default: next 3 months
     const today = new Date();
     const threeMonthsLater = new Date(today);
     threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
@@ -46,13 +46,16 @@ export default function CashFlowForecastCreate() {
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
-                            <TrendingUp className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>Forecast Parameters</CardTitle>
+                            <CalendarRange className="h-5 w-5 text-muted-foreground" />
+                            <div>
+                                <CardTitle>Forecast Parameters</CardTitle>
+                                <CardDescription>Define the date range and period granularity for your forecast.</CardDescription>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={handleSubmit} className="space-y-6">
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="period_start">Period Start</Label>
                                     <Input
@@ -103,19 +106,24 @@ export default function CashFlowForecastCreate() {
                                 </p>
                             </div>
 
-                            <div className="rounded-lg border bg-muted/50 p-4 text-sm text-muted-foreground">
-                                <p className="font-medium text-foreground mb-2">What will be included:</p>
-                                <ul className="list-disc list-inside space-y-1">
-                                    <li>Current bank account balances as opening position</li>
-                                    <li>Outstanding invoice receipts (accounts receivable)</li>
-                                    <li>Upcoming bill payments (accounts payable)</li>
-                                    <li>Recurring journal entries (income and expenses)</li>
-                                    <li>GST payment obligations</li>
-                                    <li>Three scenarios: Base Case, Best Case, Worst Case</li>
-                                </ul>
+                            <div className="rounded-lg border bg-muted/50 p-4 text-sm">
+                                <div className="flex items-start gap-2">
+                                    <Info className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                                    <div>
+                                        <p className="font-medium text-foreground mb-2">What will be included:</p>
+                                        <ul className="list-disc list-inside space-y-1 text-muted-foreground">
+                                            <li>Current bank account balances as opening position</li>
+                                            <li>Outstanding invoice receipts (accounts receivable)</li>
+                                            <li>Upcoming bill payments (accounts payable)</li>
+                                            <li>Recurring journal entries (income and expenses)</li>
+                                            <li>GST payment obligations</li>
+                                            <li>Three scenarios: Base Case, Best Case, Worst Case</li>
+                                        </ul>
+                                    </div>
+                                </div>
                             </div>
 
-                            <div className="flex justify-end gap-3">
+                            <div className="flex justify-end gap-3 pt-2">
                                 <Button
                                     type="button"
                                     variant="outline"
@@ -124,6 +132,7 @@ export default function CashFlowForecastCreate() {
                                     Cancel
                                 </Button>
                                 <Button type="submit" disabled={processing}>
+                                    <TrendingUp className="mr-2 h-4 w-4" />
                                     {processing ? 'Generating...' : 'Generate Forecast'}
                                 </Button>
                             </div>

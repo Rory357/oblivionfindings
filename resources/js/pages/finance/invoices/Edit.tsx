@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,6 +83,13 @@ const emptyLine = (): LineItem => ({
 });
 
 export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }: Props) {
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Invoices', href: '/finance/invoices' },
+        { title: invoice.invoice_number, href: `/finance/invoices/${invoice.id}` },
+        { title: 'Edit', href: `/finance/invoices/${invoice.id}/edit` },
+    ];
+
     const { data, setData, put, processing, errors } = useForm<{
         invoice_date: string;
         due_date: string;
@@ -161,22 +168,14 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
     };
 
     return (
-        <AppLayout
-            user={auth.user}
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
-                { title: 'Invoices', href: '/finance/invoices' },
-                { title: invoice.invoice_number, href: `/finance/invoices/${invoice.id}` },
-                { title: 'Edit', href: `/finance/invoices/${invoice.id}/edit` },
-            ]}
-        >
+        <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title={`Edit Invoice ${invoice.invoice_number}`} />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Edit {invoice.invoice_number}</h1>
-                        <p className="text-gray-500 mt-1">Update invoice details</p>
+                        <h1 className="text-3xl font-bold text-foreground">Edit {invoice.invoice_number}</h1>
+                        <p className="text-muted-foreground mt-1">Update invoice details</p>
                     </div>
                 </div>
 
@@ -190,7 +189,7 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <Label>Invoice Number</Label>
-                                    <Input value={invoice.invoice_number} disabled className="bg-gray-50" />
+                                    <Input value={invoice.invoice_number} disabled className="bg-muted" />
                                 </div>
                                 <div>
                                     <Label htmlFor="invoice_date">Invoice Date *</Label>
@@ -200,7 +199,7 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
                                         value={data.invoice_date}
                                         onChange={(e) => setData('invoice_date', e.target.value)}
                                     />
-                                    {errors.invoice_date && <p className="text-sm text-red-600 mt-1">{errors.invoice_date}</p>}
+                                    {errors.invoice_date && <p className="text-sm text-destructive mt-1">{errors.invoice_date}</p>}
                                 </div>
                                 <div>
                                     <Label htmlFor="due_date">Due Date *</Label>
@@ -210,7 +209,7 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
                                         value={data.due_date}
                                         onChange={(e) => setData('due_date', e.target.value)}
                                     />
-                                    {errors.due_date && <p className="text-sm text-red-600 mt-1">{errors.due_date}</p>}
+                                    {errors.due_date && <p className="text-sm text-destructive mt-1">{errors.due_date}</p>}
                                 </div>
                             </div>
                         </CardContent>
@@ -230,7 +229,7 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
                                         value={data.client_name}
                                         onChange={(e) => setData('client_name', e.target.value)}
                                     />
-                                    {errors.client_name && <p className="text-sm text-red-600 mt-1">{errors.client_name}</p>}
+                                    {errors.client_name && <p className="text-sm text-destructive mt-1">{errors.client_name}</p>}
                                 </div>
                                 <div>
                                     <Label htmlFor="client_email">Client Email</Label>
@@ -240,7 +239,7 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
                                         value={data.client_email}
                                         onChange={(e) => setData('client_email', e.target.value)}
                                     />
-                                    {errors.client_email && <p className="text-sm text-red-600 mt-1">{errors.client_email}</p>}
+                                    {errors.client_email && <p className="text-sm text-destructive mt-1">{errors.client_email}</p>}
                                 </div>
                                 <div className="md:col-span-2">
                                     <Label htmlFor="client_address">Client Address</Label>
@@ -265,7 +264,7 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
                             </Button>
                         </CardHeader>
                         <CardContent>
-                            {errors.lines && <p className="text-sm text-red-600 mb-2">{errors.lines}</p>}
+                            {errors.lines && <p className="text-sm text-destructive mb-2">{errors.lines}</p>}
                             <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
@@ -361,7 +360,7 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
                                                         onClick={() => removeLine(index)}
                                                         disabled={data.lines.length <= 1}
                                                     >
-                                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                                        <Trash2 className="w-4 h-4 text-destructive" />
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>
@@ -373,11 +372,11 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
                             <div className="flex justify-end mt-4">
                                 <div className="w-64 space-y-2">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Subtotal</span>
+                                        <span className="text-muted-foreground">Subtotal</span>
                                         <span>{formatCurrency(subtotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">GST</span>
+                                        <span className="text-muted-foreground">GST</span>
                                         <span>{formatCurrency(taxTotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-base font-bold border-t pt-2">

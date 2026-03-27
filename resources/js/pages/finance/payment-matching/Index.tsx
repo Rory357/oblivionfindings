@@ -18,8 +18,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeftRight, CheckCircle2, XCircle, Zap, Settings } from 'lucide-react';
-import { useCallback } from 'react';
+import { ArrowLeftRight, CheckCircle2, XCircle, Zap, Settings, Lightbulb, ThumbsDown } from 'lucide-react';
+import { type BreadcrumbItem } from '@/types';
+import { useCallback, useMemo } from 'react';
+
+const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 interface BankTransaction {
     id: number;
@@ -76,24 +79,24 @@ const formatNZD = (amount: number | string) =>
 
 function confidenceBadge(score: number) {
     if (score >= 80) {
-        return <Badge className="bg-green-100 text-green-800">{score}%</Badge>;
+        return <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">{score}%</Badge>;
     }
     if (score >= 50) {
-        return <Badge className="bg-yellow-100 text-yellow-800">{score}%</Badge>;
+        return <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/30">{score}%</Badge>;
     }
-    return <Badge className="bg-red-100 text-red-800">{score}%</Badge>;
+    return <Badge className="bg-red-500/10 text-red-700 border-red-500/30">{score}%</Badge>;
 }
 
 function statusBadge(status: string) {
     switch (status) {
         case 'confirmed':
-            return <Badge className="bg-green-100 text-green-800">Confirmed</Badge>;
+            return <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">Confirmed</Badge>;
         case 'auto_confirmed':
-            return <Badge className="bg-blue-100 text-blue-800">Auto-confirmed</Badge>;
+            return <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/30">Auto-confirmed</Badge>;
         case 'rejected':
-            return <Badge className="bg-red-100 text-red-800">Rejected</Badge>;
+            return <Badge className="bg-red-500/10 text-red-700 border-red-500/30">Rejected</Badge>;
         case 'suggested':
-            return <Badge className="bg-amber-100 text-amber-800">Suggested</Badge>;
+            return <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/30">Suggested</Badge>;
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
@@ -129,10 +132,15 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
         });
     }
 
-    const breadcrumbs = [
+    const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Payment Matching', href: '/finance/payment-matching' },
     ];
+
+    // KPI stats from current page data
+    const suggestedCount = useMemo(() => matches.data.filter((m) => m.status === 'suggested').length, [matches.data]);
+    const confirmedCount = useMemo(() => matches.data.filter((m) => m.status === 'confirmed' || m.status === 'auto_confirmed').length, [matches.data]);
+    const rejectedCount = useMemo(() => matches.data.filter((m) => m.status === 'rejected').length, [matches.data]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -141,8 +149,8 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Payment Matching</h1>
-                        <p className="text-gray-500 mt-1">
+                        <h1 className="text-3xl font-bold text-foreground">Payment Matching</h1>
+                        <p className="text-muted-foreground mt-1">
                             Automatically match bank transactions to bills and invoices
                         </p>
                     </div>
@@ -159,6 +167,51 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                         </Button>
                     </div>
                 </div>
+
+                {/* KPI Cards */}
+                {matches.total > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-amber-500/10 p-2">
+                                        <Lightbulb className="h-5 w-5 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Suggested (this page)</p>
+                                        <p className="text-2xl font-semibold">{suggestedCount}</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-emerald-500/10 p-2">
+                                        <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Confirmed (this page)</p>
+                                        <p className="text-2xl font-semibold">{confirmedCount}</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-red-500/10 p-2">
+                                        <ThumbsDown className="h-5 w-5 text-red-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Rejected (this page)</p>
+                                        <p className="text-2xl font-semibold">{rejectedCount}</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
 
                 {/* Filters */}
                 <Card className="mb-6">
@@ -205,9 +258,9 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                     <CardContent className="p-0">
                         {matches.data.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <ArrowLeftRight className="h-12 w-12 text-gray-300 mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-1">No matches found</h3>
-                                <p className="text-gray-500 mb-4">
+                                <ArrowLeftRight className="h-12 w-12 text-muted-foreground/40 mb-4" />
+                                <h3 className="text-lg font-medium text-foreground mb-1">No matches found</h3>
+                                <p className="text-muted-foreground mb-4">
                                     Run auto-match to find matches between bank transactions and bills.
                                 </p>
                                 <Button onClick={handleMatchAll}>
@@ -303,7 +356,7 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            className="text-green-600 hover:text-green-700"
+                                                            className="text-emerald-600 hover:text-emerald-700 hover:bg-emerald-500/10"
                                                             onClick={() => handleConfirm(match.id)}
                                                         >
                                                             <CheckCircle2 className="w-4 h-4 mr-1" />
@@ -312,7 +365,7 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                                                         <Button
                                                             variant="ghost"
                                                             size="sm"
-                                                            className="text-red-600 hover:text-red-700"
+                                                            className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                             onClick={() => handleReject(match.id)}
                                                         >
                                                             <XCircle className="w-4 h-4 mr-1" />
@@ -332,7 +385,7 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                 {/* Pagination */}
                 {matches.last_page > 1 && (
                     <div className="flex items-center justify-between mt-4">
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                             Showing {(matches.current_page - 1) * matches.per_page + 1} to{' '}
                             {Math.min(matches.current_page * matches.per_page, matches.total)} of{' '}
                             {matches.total} matches

@@ -1,3 +1,4 @@
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -43,12 +44,12 @@ const statusConfig: Record<string, { label: string; variant: 'default' | 'second
     failed: { label: 'Failed', variant: 'destructive' },
 };
 
-export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Payment Runs', href: '/finance/payment-runs' },
-    ];
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Payment Runs', href: '/finance/payment-runs' },
+];
 
+export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
     const handleStatusFilter = (value: string) => {
         router.get(
             '/finance/payment-runs',
@@ -61,13 +62,13 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Payment Runs" />
 
-            <div className="mx-auto max-w-6xl space-y-6 p-6">
+            <div className="max-w-7xl mx-auto p-6 space-y-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Payment Runs</h1>
-                        <p className="text-muted-foreground">Manage batch payments to vendors</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Payment Runs</h1>
+                        <p className="text-muted-foreground mt-1">Manage batch payments to vendors</p>
                     </div>
-                    <Link href={'/finance/payment-runs/create'}>
+                    <Link href="/finance/payment-runs/create">
                         <Button>
                             <Plus className="mr-2 h-4 w-4" />
                             New Payment Run
@@ -102,8 +103,20 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                     </CardHeader>
                     <CardContent>
                         {paymentRuns.data.length === 0 ? (
-                            <div className="py-12 text-center text-muted-foreground">
-                                No payment runs found. Create one to get started.
+                            <div className="flex flex-col items-center justify-center py-16 px-4">
+                                <div className="rounded-full bg-muted p-4 mb-4">
+                                    <Banknote className="h-8 w-8 text-muted-foreground" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-foreground mb-1">No payment runs found</h3>
+                                <p className="text-sm text-muted-foreground mb-4 text-center max-w-sm">
+                                    Payment runs allow you to batch payments to vendors. Create one to get started.
+                                </p>
+                                <Link href="/finance/payment-runs/create">
+                                    <Button>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        New Payment Run
+                                    </Button>
+                                </Link>
                             </div>
                         ) : (
                             <>
@@ -125,7 +138,7 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                             return (
                                                 <TableRow
                                                     key={run.id}
-                                                    className="cursor-pointer"
+                                                    className="cursor-pointer hover:bg-muted/50"
                                                     onClick={() => router.visit(`/finance/payment-runs/${run.id}`)}
                                                 >
                                                     <TableCell className="font-mono font-medium">

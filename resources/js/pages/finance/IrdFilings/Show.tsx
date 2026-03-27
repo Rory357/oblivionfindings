@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -35,8 +36,8 @@ type PageProps = {
     filing: Filing;
 };
 
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
+const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
@@ -62,12 +63,12 @@ const filingTypeLabels: Record<string, string> = {
 };
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-700 border-gray-300' },
-    validated: { label: 'Validated', className: 'bg-blue-100 text-blue-700 border-blue-300' },
-    submitted: { label: 'Submitted', className: 'bg-yellow-100 text-yellow-700 border-yellow-300' },
-    accepted: { label: 'Accepted', className: 'bg-green-100 text-green-700 border-green-300' },
-    rejected: { label: 'Rejected', className: 'bg-red-100 text-red-700 border-red-300' },
-    error: { label: 'Error', className: 'bg-red-100 text-red-700 border-red-300' },
+    draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
+    validated: { label: 'Validated', className: 'bg-blue-500/10 text-blue-600 border-blue-500/30' },
+    submitted: { label: 'Submitted', className: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/30' },
+    accepted: { label: 'Accepted', className: 'bg-green-500/10 text-green-600 border-green-500/30' },
+    rejected: { label: 'Rejected', className: 'bg-red-500/10 text-red-600 border-red-500/30' },
+    error: { label: 'Error', className: 'bg-red-500/10 text-red-600 border-red-500/30' },
 };
 
 const filingDataLabels: Record<string, string> = {
@@ -91,8 +92,8 @@ const filingDataLabels: Record<string, string> = {
 };
 
 export default function IrdFilingShow({ filing }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
         { title: 'IRD E-Filing', href: '/finance/ird-filings' },
         {
             title: `${filingTypeLabels[filing.filing_type]} - ${formatDate(filing.period_to)}`,
@@ -124,7 +125,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`IRD Filing - ${filingTypeLabels[filing.filing_type]}`} />
 
-            <div className="mx-auto max-w-5xl space-y-6 p-6">
+            <div className="mx-auto max-w-6xl space-y-6 p-6">
                 {/* Header */}
                 <div className="flex items-start justify-between">
                     <div>
@@ -163,12 +164,12 @@ export default function IrdFilingShow({ filing }: PageProps) {
 
                 {/* Error Message */}
                 {filing.error_message && (
-                    <Card className="border-red-200 bg-red-50">
+                    <Card className="border-destructive/50 bg-destructive/5">
                         <CardContent className="flex items-start gap-3 py-4">
-                            <AlertCircle className="h-5 w-5 text-red-600 shrink-0 mt-0.5" />
+                            <AlertCircle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
                             <div>
-                                <p className="font-medium text-red-800">Submission Error</p>
-                                <p className="text-sm text-red-700">{filing.error_message}</p>
+                                <p className="font-medium text-destructive">Submission Error</p>
+                                <p className="text-sm text-destructive/80">{filing.error_message}</p>
                             </div>
                         </CardContent>
                     </Card>
@@ -176,12 +177,12 @@ export default function IrdFilingShow({ filing }: PageProps) {
 
                 {/* Submission Info */}
                 {filing.submitted_at && (
-                    <Card className="border-green-200 bg-green-50">
+                    <Card className="border-green-500/30 bg-green-500/5">
                         <CardContent className="flex items-start gap-3 py-4">
                             <CheckCircle className="h-5 w-5 text-green-600 shrink-0 mt-0.5" />
                             <div>
-                                <p className="font-medium text-green-800">Submitted to IRD</p>
-                                <p className="text-sm text-green-700">
+                                <p className="font-medium text-green-700 dark:text-green-400">Submitted to IRD</p>
+                                <p className="text-sm text-green-600 dark:text-green-500">
                                     Submitted on {formatDateTime(filing.submitted_at)}
                                     {filing.ird_reference && (
                                         <> | Reference: <span className="font-mono">{filing.ird_reference}</span></>
@@ -217,7 +218,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                             <div>
                                 <p className="text-sm text-muted-foreground">Amount</p>
                                 <p className={`font-mono font-semibold tabular-nums ${isRefund ? 'text-green-600' : 'text-red-600'}`}>
-                                    {formatNZD(Math.abs(amount))}
+                                    {formatCurrency(Math.abs(amount))}
                                     {isRefund ? ' (Refund)' : ''}
                                 </p>
                             </div>
@@ -268,7 +269,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                                             isHighlight ? 'border-primary bg-primary/5' : ''
                                                         }`}
                                                     >
-                                                        <span className="text-sm">
+                                                        <span className="text-sm text-foreground">
                                                             {filingDataLabels[key] ?? key}
                                                         </span>
                                                         <span className={`font-mono text-sm tabular-nums ${
@@ -280,7 +281,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                                                     : 'text-green-600'
                                                                 : ''
                                                         }`}>
-                                                            {isMonetary ? formatNZD(value) : String(value)}
+                                                            {isMonetary ? formatCurrency(Number(value)) : String(value)}
                                                         </span>
                                                     </div>
                                                 );
@@ -307,7 +308,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                         key={key}
                                         className="flex items-center justify-between rounded-lg border p-3"
                                     >
-                                        <span className="text-sm capitalize">
+                                        <span className="text-sm capitalize text-foreground">
                                             {key.replace(/_/g, ' ')}
                                         </span>
                                         <span className="font-mono text-sm">{String(value)}</span>
@@ -333,7 +334,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                                     </p>
                                     <p className="text-sm text-muted-foreground">
                                         IRD Period: {filing.gst_return.ird_period} | GST Payable:{' '}
-                                        {formatNZD(filing.gst_return.gst_payable)}
+                                        {formatCurrency(Number(filing.gst_return.gst_payable))}
                                     </p>
                                 </div>
                                 <Button

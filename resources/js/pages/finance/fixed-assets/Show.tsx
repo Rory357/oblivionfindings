@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -128,8 +129,8 @@ export default function FixedAssetShow({ asset, depreciationSchedule }: Props) {
 
     const bookValue = Number(asset.purchase_cost) - Number(asset.accumulated_depreciation);
 
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
         { title: 'Fixed Assets', href: '/finance/fixed-assets' },
         { title: asset.asset_name, href: `/finance/fixed-assets/${asset.id}` },
     ];
@@ -232,7 +233,7 @@ export default function FixedAssetShow({ asset, depreciationSchedule }: Props) {
                                                             return (
                                                                 <p>
                                                                     {gainLoss >= 0 ? 'Gain' : 'Loss'} on disposal:{' '}
-                                                                    <strong className={gainLoss >= 0 ? 'text-green-600' : 'text-red-600'}>
+                                                                    <strong className={gainLoss >= 0 ? 'text-emerald-600' : 'text-destructive'}>
                                                                         {formatNZD(Math.abs(gainLoss))}
                                                                     </strong>
                                                                 </p>

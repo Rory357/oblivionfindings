@@ -1,5 +1,6 @@
 import { Head, useForm, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -26,6 +27,12 @@ interface Props extends PageProps {
     fundingStreams: FundingStream[];
 }
 
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Donor Funds', href: '/finance/donor-funds' },
+    { title: 'New Fund', href: '/finance/donor-funds/create' },
+];
+
 export default function DonorFundCreate({ glAccounts, fundingStreams }: Props) {
     const { data, setData, post, processing, errors } = useForm({
         fund_code: '',
@@ -50,12 +57,12 @@ export default function DonorFundCreate({ glAccounts, fundingStreams }: Props) {
     };
 
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New Donor Fund" />
 
-            <div className="mx-auto max-w-3xl space-y-6">
+            <div className="mx-auto max-w-3xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">New Donor Fund</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">New Donor Fund</h1>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
@@ -74,7 +81,7 @@ export default function DonorFundCreate({ glAccounts, fundingStreams }: Props) {
                                         onChange={(e) => setData('fund_code', e.target.value)}
                                         placeholder="e.g. GNT-2026-001"
                                     />
-                                    {errors.fund_code && <p className="mt-1 text-sm text-red-600">{errors.fund_code}</p>}
+                                    {errors.fund_code && <p className="mt-1 text-sm text-destructive">{errors.fund_code}</p>}
                                 </div>
 
                                 <div>
@@ -85,7 +92,7 @@ export default function DonorFundCreate({ glAccounts, fundingStreams }: Props) {
                                         onChange={(e) => setData('fund_name', e.target.value)}
                                         placeholder="e.g. Lotteries NZ Community Grant"
                                     />
-                                    {errors.fund_name && <p className="mt-1 text-sm text-red-600">{errors.fund_name}</p>}
+                                    {errors.fund_name && <p className="mt-1 text-sm text-destructive">{errors.fund_name}</p>}
                                 </div>
                             </div>
 
@@ -127,7 +134,7 @@ export default function DonorFundCreate({ glAccounts, fundingStreams }: Props) {
                                             <SelectItem value="sponsorship">Sponsorship</SelectItem>
                                         </SelectContent>
                                     </Select>
-                                    {errors.fund_type && <p className="mt-1 text-sm text-red-600">{errors.fund_type}</p>}
+                                    {errors.fund_type && <p className="mt-1 text-sm text-destructive">{errors.fund_type}</p>}
                                 </div>
 
                                 <div>
@@ -222,7 +229,7 @@ export default function DonorFundCreate({ glAccounts, fundingStreams }: Props) {
                                         value={data.end_date}
                                         onChange={(e) => setData('end_date', e.target.value)}
                                     />
-                                    {errors.end_date && <p className="mt-1 text-sm text-red-600">{errors.end_date}</p>}
+                                    {errors.end_date && <p className="mt-1 text-sm text-destructive">{errors.end_date}</p>}
                                 </div>
 
                                 <div>

@@ -1,5 +1,6 @@
 import { Head, useForm, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -47,6 +48,12 @@ const providerLabels: Record<string, string> = {
     windcave: 'Windcave',
 };
 
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'EFTPOS', href: '/finance/eftpos/batches' },
+    { title: 'Terminals', href: '/finance/eftpos/terminals' },
+];
+
 export default function EftposTerminals({ terminals, bankAccounts, glAccounts }: Props) {
     const [showForm, setShowForm] = useState(false);
 
@@ -71,12 +78,15 @@ export default function EftposTerminals({ terminals, bankAccounts, glAccounts }:
     };
 
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="EFTPOS Terminals" />
 
-            <div className="space-y-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">EFTPOS Terminals</h1>
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">EFTPOS Terminals</h1>
+                        <p className="text-muted-foreground">Configure and manage EFTPOS terminal devices</p>
+                    </div>
                     <div className="flex gap-2">
                         <Button asChild variant="outline">
                             <Link href="/finance/eftpos/batches">View Batches</Link>
@@ -103,7 +113,7 @@ export default function EftposTerminals({ terminals, bankAccounts, glAccounts }:
                                         onChange={(e) => setData('terminal_id', e.target.value)}
                                         placeholder="e.g. T001234"
                                     />
-                                    {errors.terminal_id && <p className="mt-1 text-sm text-red-600">{errors.terminal_id}</p>}
+                                    {errors.terminal_id && <p className="mt-1 text-sm text-destructive">{errors.terminal_id}</p>}
                                 </div>
 
                                 <div>
@@ -114,7 +124,7 @@ export default function EftposTerminals({ terminals, bankAccounts, glAccounts }:
                                         onChange={(e) => setData('name', e.target.value)}
                                         placeholder="e.g. Front Desk Terminal"
                                     />
-                                    {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+                                    {errors.name && <p className="mt-1 text-sm text-destructive">{errors.name}</p>}
                                 </div>
 
                                 <div>
@@ -150,7 +160,7 @@ export default function EftposTerminals({ terminals, bankAccounts, glAccounts }:
                                         onChange={(e) => setData('merchant_id', e.target.value)}
                                         placeholder="Encrypted merchant ID"
                                     />
-                                    {errors.merchant_id && <p className="mt-1 text-sm text-red-600">{errors.merchant_id}</p>}
+                                    {errors.merchant_id && <p className="mt-1 text-sm text-destructive">{errors.merchant_id}</p>}
                                 </div>
 
                                 <div>

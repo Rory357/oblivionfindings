@@ -13,7 +13,8 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { RefreshCw, DollarSign, TrendingUp, TrendingDown, BarChart3 } from 'lucide-react';
-import { useState } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useState, useMemo } from 'react';
 
 type LineItem = {
     id: number;
@@ -210,6 +211,18 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
           ? 'text-amber-600'
           : 'text-green-600';
 
+    const chartData = useMemo(() =>
+        categories.map(cat => {
+            const label = categoryLabels[cat.name] || cat.name;
+            return {
+                name: label,
+                Budget: cat.subtotals.budget_amount,
+                Actual: cat.subtotals.actual_amount,
+            };
+        }),
+        [categories],
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Budget vs Actuals" />
@@ -297,6 +310,30 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
                             icon={BarChart3}
                         />
                     </div>
+                )}
+
+                {/* Budget vs Actual chart */}
+                {hasBudget && categories.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Budget vs Actual by Category</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="h-72">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                        <YAxis tickFormatter={(v) => formatNZD(v)} />
+                                        <Tooltip formatter={(value) => formatNZD(value as number)} />
+                                        <Legend />
+                                        <Bar dataKey="Budget" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="Actual" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </CardContent>
+                    </Card>
                 )}
 
                 {/* Main report table */}

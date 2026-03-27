@@ -1,11 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 type Vendor = { id: number; name: string };
@@ -25,19 +25,24 @@ type PaginationLink = { url: string | null; label: string; active: boolean };
 const formatNZD = (amount: string | number) =>
     new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
 
-const statusConfig: Record<string, { label: string; variant: string; className: string }> = {
-    draft: { label: 'Draft', variant: 'secondary', className: 'bg-gray-100 text-gray-800' },
-    approved: { label: 'Approved', variant: 'default', className: 'bg-blue-100 text-blue-800' },
-    sent: { label: 'Sent', variant: 'default', className: 'bg-indigo-100 text-indigo-800' },
-    partially_received: { label: 'Partially Received', variant: 'default', className: 'bg-yellow-100 text-yellow-800' },
-    received: { label: 'Received', variant: 'default', className: 'bg-green-100 text-green-800' },
-    cancelled: { label: 'Cancelled', variant: 'destructive', className: 'bg-red-100 text-red-800' },
+const statusConfig: Record<string, { label: string; className: string }> = {
+    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800' },
+    approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800' },
+    sent: { label: 'Sent', className: 'bg-indigo-100 text-indigo-800' },
+    partially_received: { label: 'Partially Received', className: 'bg-yellow-100 text-yellow-800' },
+    received: { label: 'Received', className: 'bg-green-100 text-green-800' },
+    cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
 };
 
 function StatusBadge({ status }: { status: string }) {
-    const config = statusConfig[status] ?? { label: status, variant: 'secondary', className: 'bg-gray-100 text-gray-800' };
+    const config = statusConfig[status] ?? { label: status, className: 'bg-gray-100 text-gray-800' };
     return <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${config.className}`}>{config.label}</span>;
 }
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Purchase Orders', href: '/finance/purchase-orders' },
+];
 
 export default function PurchaseOrderIndex() {
     const { purchaseOrders, vendors, filters } = usePage().props as any;
@@ -56,13 +61,13 @@ export default function PurchaseOrderIndex() {
     }
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance/dashboard' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }]}>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Purchase Orders" />
-            <div className="space-y-4 p-4">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-semibold">Purchase Orders</h1>
-                        <p className="text-sm text-slate-500">Manage purchase orders and convert them to bills.</p>
+                        <h1 className="text-2xl font-bold tracking-tight">Purchase Orders</h1>
+                        <p className="text-muted-foreground">Manage purchase orders and convert them to bills.</p>
                     </div>
                     <Link href="/finance/purchase-orders/create">
                         <Button>New Purchase Order</Button>
@@ -142,7 +147,7 @@ export default function PurchaseOrderIndex() {
                             <TableBody>
                                 {rows.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={6} className="text-center text-sm text-slate-500">
+                                        <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
                                             No purchase orders found.
                                         </TableCell>
                                     </TableRow>
@@ -152,14 +157,14 @@ export default function PurchaseOrderIndex() {
                                             <TableCell>
                                                 <Link
                                                     href={`/finance/purchase-orders/${po.id}`}
-                                                    className="font-medium text-blue-600 hover:underline"
+                                                    className="font-medium text-primary hover:underline"
                                                 >
                                                     {po.po_number}
                                                 </Link>
                                             </TableCell>
-                                            <TableCell>{po.vendor?.name ?? '—'}</TableCell>
+                                            <TableCell>{po.vendor?.name ?? '-'}</TableCell>
                                             <TableCell>{po.order_date}</TableCell>
-                                            <TableCell>{po.expected_date ?? '—'}</TableCell>
+                                            <TableCell>{po.expected_date ?? '-'}</TableCell>
                                             <TableCell className="text-right">{formatNZD(po.total_amount)}</TableCell>
                                             <TableCell>
                                                 <StatusBadge status={po.status} />
@@ -175,11 +180,12 @@ export default function PurchaseOrderIndex() {
                 {purchaseOrders?.links ? (
                     <div className="flex flex-wrap gap-2">
                         {purchaseOrders.links.map((l: PaginationLink, idx: number) => (
-                            <button
+                            <Button
                                 key={idx}
+                                variant={l.active ? 'default' : 'outline'}
+                                size="sm"
                                 disabled={!l.url}
                                 onClick={() => l.url && router.get(l.url, {}, { preserveScroll: true, preserveState: true })}
-                                className={`rounded border px-3 py-1 text-sm ${l.active ? 'bg-slate-100 font-semibold' : 'hover:bg-slate-50'} ${!l.url ? 'opacity-50' : ''}`}
                                 dangerouslySetInnerHTML={{ __html: l.label }}
                             />
                         ))}

@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -76,6 +77,11 @@ type Integration = {
 type PageProps = {
     integrations: Integration[];
 };
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Integrations', href: '/finance/integrations' },
+];
 
 const providerLabels: Record<string, string> = {
     xero: 'Xero',
@@ -270,9 +276,9 @@ function IntegrationCard({ integration }: { integration: Integration }) {
 
                 {/* Error display */}
                 {integration.last_error && (
-                    <div className="flex items-start gap-2 rounded-md bg-red-50 p-3 dark:bg-red-950/20">
-                        <AlertCircle className="mt-0.5 h-4 w-4 text-red-600 shrink-0" />
-                        <p className="text-sm text-red-700 dark:text-red-400">{integration.last_error}</p>
+                    <div className="flex items-start gap-2 rounded-md bg-destructive/10 p-3">
+                        <AlertCircle className="mt-0.5 h-4 w-4 text-destructive shrink-0" />
+                        <p className="text-sm text-destructive">{integration.last_error}</p>
                     </div>
                 )}
 
@@ -379,16 +385,11 @@ function IntegrationCard({ integration }: { integration: Integration }) {
 }
 
 export default function IntegrationsIndex({ integrations }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Integrations', href: '/finance/integrations' },
-    ];
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Accounting Integrations" />
 
-            <div className="mx-auto max-w-5xl space-y-6 p-6">
+            <div className="mx-auto max-w-6xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Accounting Integrations</h1>

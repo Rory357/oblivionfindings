@@ -1,13 +1,14 @@
 import { Head, router } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Printer, RefreshCw } from 'lucide-react';
-import { useState } from 'react';
+import { Printer, RefreshCw, DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { useState, useMemo } from 'react';
 
 interface FundingStream {
     name: string;
@@ -39,15 +40,15 @@ const formatCurrency = (amount: number) =>
 
 const formatPct = (pct: number) => pct.toFixed(1) + '%';
 
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Reports', href: '/finance/reports/funding-stream-summary' },
+    { title: 'Funding Stream Summary', href: '/finance/reports/funding-stream-summary' },
+];
+
 export default function FundingStreamSummary({ startDate, endDate, data }: Props) {
     const [start, setStart] = useState(startDate ?? '');
     const [end, setEnd] = useState(endDate ?? '');
-
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Reports', href: '/finance/reports/trial-balance' },
-        { title: 'Funding Stream Summary', href: '/finance/reports/funding-stream-summary' },
-    ];
 
     const handleGenerate = () => {
         router.get('/finance/reports/funding-stream-summary', {
@@ -60,15 +61,24 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
         ? (data.totals.net_margin / data.totals.revenue) * 100
         : 0;
 
+    const chartData = useMemo(() =>
+        data.streams.map(s => ({
+            name: s.name.length > 18 ? s.name.substring(0, 18) + '...' : s.name,
+            Revenue: s.revenue,
+            Expenses: s.expenses,
+        })),
+        [data.streams],
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Funding Stream Summary" />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Funding Stream Summary</h1>
-                        <p className="text-gray-500 mt-1">Revenue, expenses and margin by funding stream</p>
+                        <h1 className="text-2xl font-bold tracking-tight">Funding Stream Summary</h1>
+                        <p className="text-muted-foreground">Revenue, expenses and margin by funding stream</p>
                     </div>
                     <Button variant="outline" size="sm" onClick={() => window.print()}>
                         <Printer className="mr-1 h-4 w-4" />
@@ -76,6 +86,7 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                     </Button>
                 </div>
 
+                {/* Date filter */}
                 <Card>
                     <CardContent className="pt-6">
                         <div className="flex flex-wrap items-end gap-4">
@@ -107,6 +118,77 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                     </CardContent>
                 </Card>
 
+                {/* KPI Cards */}
+                <div className="grid gap-4 sm:grid-cols-3">
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="text-sm text-muted-foreground">Total Revenue</p>
+                                    <p className="text-2xl font-bold tabular-nums text-emerald-600 dark:text-emerald-400">{formatCurrency(data.totals.revenue)}</p>
+                                </div>
+                                <div className="rounded-lg bg-muted p-3">
+                                    <TrendingUp className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="text-sm text-muted-foreground">Total Expenses</p>
+                                    <p className="text-2xl font-bold tabular-nums text-red-600 dark:text-red-400">{formatCurrency(data.totals.expenses)}</p>
+                                </div>
+                                <div className="rounded-lg bg-muted p-3">
+                                    <TrendingDown className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <p className="text-sm text-muted-foreground">Overall Margin</p>
+                                    <p className={`text-2xl font-bold tabular-nums ${overallMarginPct >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
+                                        {formatPct(overallMarginPct)}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">{formatCurrency(data.totals.net_margin)} net</p>
+                                </div>
+                                <div className="rounded-lg bg-muted p-3">
+                                    <DollarSign className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Chart */}
+                {data.streams.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Revenue vs Expenses by Funding Stream</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="h-72">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chartData} margin={{ top: 5, right: 20, left: 20, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                        <YAxis tickFormatter={(v) => formatCurrency(v)} />
+                                        <Tooltip formatter={(value) => formatCurrency(value as number)} />
+                                        <Legend />
+                                        <Bar dataKey="Revenue" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Table */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Funding Stream Performance</CardTitle>
@@ -138,10 +220,10 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                                                 <TableCell className="text-right font-mono tabular-nums">
                                                     {formatCurrency(stream.expenses)}
                                                 </TableCell>
-                                                <TableCell className={`text-right font-mono tabular-nums font-semibold ${stream.net_margin >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                                <TableCell className={`text-right font-mono tabular-nums font-semibold ${stream.net_margin >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
                                                     {formatCurrency(stream.net_margin)}
                                                 </TableCell>
-                                                <TableCell className={`text-right font-mono tabular-nums ${stream.margin_pct >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                                <TableCell className={`text-right font-mono tabular-nums ${stream.margin_pct >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
                                                     {formatPct(stream.margin_pct)}
                                                 </TableCell>
                                             </TableRow>
@@ -154,10 +236,10 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
                                             <TableCell className="text-right font-mono tabular-nums">
                                                 {formatCurrency(data.totals.expenses)}
                                             </TableCell>
-                                            <TableCell className={`text-right font-mono tabular-nums ${data.totals.net_margin >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                            <TableCell className={`text-right font-mono tabular-nums ${data.totals.net_margin >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
                                                 {formatCurrency(data.totals.net_margin)}
                                             </TableCell>
-                                            <TableCell className={`text-right font-mono tabular-nums ${overallMarginPct >= 0 ? 'text-green-700' : 'text-red-700'}`}>
+                                            <TableCell className={`text-right font-mono tabular-nums ${overallMarginPct >= 0 ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
                                                 {formatPct(overallMarginPct)}
                                             </TableCell>
                                         </TableRow>

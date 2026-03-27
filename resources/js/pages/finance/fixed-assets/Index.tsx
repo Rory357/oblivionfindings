@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,7 +30,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Plus, Search, Package, DollarSign, TrendingDown, Calculator } from 'lucide-react';
+import { Plus, Search, Package, DollarSign, TrendingDown, Calculator, Hash } from 'lucide-react';
 import { useState, useCallback, FormEvent } from 'react';
 
 interface FixedAsset {
@@ -56,9 +57,10 @@ interface PaginatedAssets {
 }
 
 interface Summary {
+    total_count: number;
     total_cost: number;
-    total_accumulated_depreciation: number;
-    total_book_value: number;
+    total_depreciation: number;
+    net_book_value: number;
     active_count: number;
 }
 
@@ -107,6 +109,11 @@ const statusColors: Record<string, string> = {
     disposed: 'bg-gray-100 text-gray-600',
 };
 
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Fixed Assets', href: '/finance/fixed-assets' },
+];
+
 export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
     const [search, setSearch] = useState(filters.search || '');
     const [depModalOpen, setDepModalOpen] = useState(false);
@@ -145,11 +152,6 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
             onSuccess: () => setDepModalOpen(false),
         });
     }
-
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Fixed Assets', href: '/finance/fixed-assets' },
-    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -213,8 +215,21 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                     </div>
                 </div>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                {/* Summary Cards - 4 KPIs */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-primary/10 p-2">
+                                    <Hash className="h-5 w-5 text-primary" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Total Assets</p>
+                                    <p className="text-2xl font-bold">{summary.total_count}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
@@ -222,7 +237,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                     <DollarSign className="h-5 w-5 text-blue-600" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Total Asset Value</p>
+                                    <p className="text-sm text-muted-foreground">Total Cost</p>
                                     <p className="text-2xl font-bold font-mono tabular-nums">
                                         {formatNZD(summary.total_cost)}
                                     </p>
@@ -237,9 +252,9 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                                     <TrendingDown className="h-5 w-5 text-amber-600" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Total Accumulated Depreciation</p>
+                                    <p className="text-sm text-muted-foreground">Total Depreciation</p>
                                     <p className="text-2xl font-bold font-mono tabular-nums">
-                                        {formatNZD(summary.total_accumulated_depreciation)}
+                                        {formatNZD(summary.total_depreciation)}
                                     </p>
                                 </div>
                             </div>
@@ -248,13 +263,13 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                     <Card>
                         <CardContent className="pt-6">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-green-500/10 p-2">
-                                    <Package className="h-5 w-5 text-green-600" />
+                                <div className="rounded-lg bg-emerald-500/10 p-2">
+                                    <Package className="h-5 w-5 text-emerald-600" />
                                 </div>
                                 <div>
-                                    <p className="text-sm text-muted-foreground">Total Book Value</p>
+                                    <p className="text-sm text-muted-foreground">Net Book Value</p>
                                     <p className="text-2xl font-bold font-mono tabular-nums">
-                                        {formatNZD(summary.total_book_value)}
+                                        {formatNZD(summary.net_book_value)}
                                     </p>
                                 </div>
                             </div>

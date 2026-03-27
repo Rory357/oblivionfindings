@@ -3,7 +3,13 @@ import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Building2, AlertCircle } from 'lucide-react';
+import { Plus, Building2, AlertCircle, DollarSign, Landmark, Star } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { type BreadcrumbItem } from '@/types';
+import { useMemo } from 'react';
+
+const CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 interface BankAccount {
     id: number;
@@ -21,9 +27,6 @@ interface Props {
     bankAccounts: BankAccount[];
 }
 
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const accountTypeLabels: Record<string, string> = {
     cheque: 'Cheque',
     savings: 'Savings',
@@ -32,10 +35,20 @@ const accountTypeLabels: Record<string, string> = {
 };
 
 export default function BankAccountsIndex({ bankAccounts }: Props) {
-    const breadcrumbs = [
+    const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Bank Accounts', href: '/finance/bank-accounts' },
     ];
+
+    const totalCash = useMemo(() => bankAccounts.reduce((sum, a) => sum + a.current_balance, 0), [bankAccounts]);
+    const primaryAccount = useMemo(() => bankAccounts.find((a) => a.is_primary), [bankAccounts]);
+    const pieData = useMemo(
+        () =>
+            bankAccounts
+                .filter((a) => a.current_balance > 0)
+                .map((a) => ({ name: a.name, value: a.current_balance })),
+        [bankAccounts],
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -44,8 +57,8 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Bank Accounts</h1>
-                        <p className="text-gray-500 mt-1">
+                        <h1 className="text-3xl font-bold text-foreground">Bank Accounts</h1>
+                        <p className="text-muted-foreground mt-1">
                             Manage your organisation's bank accounts and balances
                         </p>
                     </div>
@@ -60,9 +73,9 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                 {bankAccounts.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                            <Building2 className="h-12 w-12 text-gray-300 mb-4" />
-                            <h3 className="text-lg font-medium text-gray-900 mb-1">No bank accounts</h3>
-                            <p className="text-gray-500 mb-4">
+                            <Building2 className="h-12 w-12 text-muted-foreground/40 mb-4" />
+                            <h3 className="text-lg font-medium text-foreground mb-1">No bank accounts</h3>
+                            <p className="text-muted-foreground mb-4">
                                 Get started by adding your first bank account.
                             </p>
                             <Button asChild>
@@ -74,67 +87,152 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                        {bankAccounts.map((account) => (
-                            <Link
-                                key={account.id}
-                                href={`/finance/bank-accounts/${account.id}`}
-                                className="block"
-                            >
-                                <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
-                                    <CardHeader className="pb-3">
-                                        <div className="flex items-start justify-between">
-                                            <div>
-                                                <CardTitle className="text-lg">{account.name}</CardTitle>
-                                                <p className="text-sm text-muted-foreground mt-1">{account.bank_name}</p>
-                                            </div>
-                                            <div className="flex gap-1">
-                                                {account.is_primary && (
-                                                    <Badge variant="default" className="bg-blue-100 text-blue-800">Primary</Badge>
-                                                )}
-                                                {!account.is_active && (
-                                                    <Badge variant="secondary">Inactive</Badge>
-                                                )}
-                                            </div>
+                    <>
+                        {/* KPI Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="rounded-lg bg-blue-500/10 p-2">
+                                            <DollarSign className="h-5 w-5 text-blue-600" />
                                         </div>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="space-y-3">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm text-muted-foreground">Type</span>
-                                                <Badge variant="outline">
-                                                    {accountTypeLabels[account.account_type] || account.account_type}
-                                                </Badge>
-                                            </div>
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Total Cash</p>
+                                            <p className={`text-2xl font-semibold font-mono tabular-nums ${totalCash >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                {formatCurrency(totalCash)}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="rounded-lg bg-violet-500/10 p-2">
+                                            <Landmark className="h-5 w-5 text-violet-600" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Account Count</p>
+                                            <p className="text-2xl font-semibold">
+                                                {bankAccounts.length}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                            <Card>
+                                <CardContent className="pt-6">
+                                    <div className="flex items-center gap-3">
+                                        <div className="rounded-lg bg-amber-500/10 p-2">
+                                            <Star className="h-5 w-5 text-amber-600" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm text-muted-foreground">Primary Account</p>
+                                            <p className={`text-2xl font-semibold font-mono tabular-nums ${(primaryAccount?.current_balance ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                {primaryAccount ? formatCurrency(primaryAccount.current_balance) : 'N/A'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
 
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-sm text-muted-foreground">Current Balance</span>
-                                                <span className={`text-lg font-semibold font-mono tabular-nums ${account.current_balance >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                                    {formatNZD(account.current_balance)}
-                                                </span>
-                                            </div>
+                        {/* PieChart - Balance Distribution */}
+                        {pieData.length > 0 && (
+                            <Card className="mb-6">
+                                <CardHeader>
+                                    <CardTitle className="text-base">Balance Distribution</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="h-[280px]">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={pieData}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={60}
+                                                    outerRadius={100}
+                                                    paddingAngle={2}
+                                                    dataKey="value"
+                                                    nameKey="name"
+                                                    label={({ name, percent }) => `${name} (${((percent ?? 0) * 100).toFixed(0)}%)`}
+                                                >
+                                                    {pieData.map((_entry, index) => (
+                                                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip formatter={(value: number) => [formatCurrency(value), 'Balance']} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
 
-                                            {account.gl_account && (
-                                                <div className="flex justify-between items-center">
-                                                    <span className="text-sm text-muted-foreground">GL Account</span>
-                                                    <span className="text-sm font-mono">{account.gl_account.code}</span>
+                        {/* Account Cards */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {bankAccounts.map((account) => (
+                                <Link
+                                    key={account.id}
+                                    href={`/finance/bank-accounts/${account.id}`}
+                                    className="block"
+                                >
+                                    <Card className="hover:shadow-md transition-shadow cursor-pointer h-full">
+                                        <CardHeader className="pb-3">
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <CardTitle className="text-lg">{account.name}</CardTitle>
+                                                    <p className="text-sm text-muted-foreground mt-1">{account.bank_name}</p>
                                                 </div>
-                                            )}
+                                                <div className="flex gap-1">
+                                                    {account.is_primary && (
+                                                        <Badge variant="default" className="bg-blue-500/10 text-blue-700 border-blue-500/30">Primary</Badge>
+                                                    )}
+                                                    {!account.is_active && (
+                                                        <Badge variant="secondary">Inactive</Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-3">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-sm text-muted-foreground">Type</span>
+                                                    <Badge variant="outline">
+                                                        {accountTypeLabels[account.account_type] || account.account_type}
+                                                    </Badge>
+                                                </div>
 
-                                            {account.unreconciled_count > 0 && (
-                                                <div className="flex items-center gap-2 text-amber-600 bg-amber-50 rounded-md px-3 py-2">
-                                                    <AlertCircle className="h-4 w-4 shrink-0" />
-                                                    <span className="text-sm font-medium">
-                                                        {account.unreconciled_count} unreconciled transaction{account.unreconciled_count !== 1 ? 's' : ''}
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-sm text-muted-foreground">Current Balance</span>
+                                                    <span className={`text-lg font-semibold font-mono tabular-nums ${account.current_balance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                        {formatCurrency(account.current_balance)}
                                                     </span>
                                                 </div>
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </Link>
-                        ))}
-                    </div>
+
+                                                {account.gl_account && (
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-sm text-muted-foreground">GL Account</span>
+                                                        <span className="text-sm font-mono">{account.gl_account.code}</span>
+                                                    </div>
+                                                )}
+
+                                                {account.unreconciled_count > 0 && (
+                                                    <div className="flex items-center gap-2 text-amber-700 bg-amber-500/10 rounded-md px-3 py-2">
+                                                        <AlertCircle className="h-4 w-4 shrink-0" />
+                                                        <span className="text-sm font-medium">
+                                                            {account.unreconciled_count} unreconciled transaction{account.unreconciled_count !== 1 ? 's' : ''}
+                                                        </span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </Link>
+                            ))}
+                        </div>
+                    </>
                 )}
             </div>
         </AppLayout>

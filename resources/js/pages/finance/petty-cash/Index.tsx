@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -23,14 +24,22 @@ interface Props extends PageProps {
 const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Petty Cash', href: '/finance/petty-cash' },
+];
+
 export default function PettyCashIndex({ funds }: Props) {
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Petty Cash" />
 
-            <div className="space-y-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Petty Cash Funds</h1>
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Petty Cash Funds</h1>
+                        <p className="text-muted-foreground">Manage petty cash floats and transactions</p>
+                    </div>
                     <Button asChild>
                         <Link href={'/finance/petty-cash/create'}>
                             <Plus className="mr-1 h-4 w-4" />
@@ -84,7 +93,7 @@ export default function PettyCashIndex({ funds }: Props) {
                                                     <span className="text-muted-foreground">Variance: </span>
                                                     <span
                                                         className={
-                                                            variance < 0 ? 'font-medium text-red-600' : 'text-green-600'
+                                                            variance < 0 ? 'font-medium text-destructive' : 'text-emerald-600'
                                                         }
                                                     >
                                                         {formatCurrency(variance)}

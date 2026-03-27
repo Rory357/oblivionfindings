@@ -7,8 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, Plus, ArrowRight, FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { Upload, ArrowRight, FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { type BreadcrumbItem } from '@/types';
 import { useState } from 'react';
+
+const CHART_COLORS = ['#3b82f6','#10b981','#f59e0b','#ef4444','#8b5cf6','#ec4899','#06b6d4','#84cc16'];
+const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 interface BankAccount {
     id: number;
@@ -41,36 +46,39 @@ interface Reconciliation {
     completed_at: string | null;
 }
 
+interface BalanceHistoryEntry {
+    date: string;
+    amount: number;
+}
+
 interface Props {
     bankAccount: BankAccount;
     transactions: Transaction[];
     reconciliations: Reconciliation[];
+    balanceHistory: BalanceHistoryEntry[];
 }
-
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const statusBadge = (status: string) => {
     switch (status) {
         case 'reconciled':
-            return <Badge className="bg-green-100 text-green-800"><CheckCircle className="h-3 w-3 mr-1" />Reconciled</Badge>;
+            return <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30"><CheckCircle className="h-3 w-3 mr-1" />Reconciled</Badge>;
         case 'matched':
-            return <Badge className="bg-blue-100 text-blue-800"><Clock className="h-3 w-3 mr-1" />Matched</Badge>;
+            return <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/30"><Clock className="h-3 w-3 mr-1" />Matched</Badge>;
         default:
-            return <Badge className="bg-amber-100 text-amber-800"><AlertCircle className="h-3 w-3 mr-1" />Unreconciled</Badge>;
+            return <Badge className="bg-amber-500/10 text-amber-700 border-amber-500/30"><AlertCircle className="h-3 w-3 mr-1" />Unreconciled</Badge>;
     }
 };
 
 const reconStatusBadge = (status: string) => {
     switch (status) {
         case 'completed':
-            return <Badge className="bg-green-100 text-green-800">Completed</Badge>;
+            return <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">Completed</Badge>;
         default:
-            return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>;
+            return <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/30">In Progress</Badge>;
     }
 };
 
-export default function BankAccountShow({ bankAccount, transactions, reconciliations }: Props) {
+export default function BankAccountShow({ bankAccount, transactions, reconciliations, balanceHistory }: Props) {
     const [importOpen, setImportOpen] = useState(false);
 
     const importForm = useForm({
@@ -94,7 +102,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
         });
     };
 
-    const breadcrumbs = [
+    const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Bank Accounts', href: '/finance/bank-accounts' },
         { title: bankAccount.name, href: `/finance/bank-accounts/${bankAccount.id}` },
@@ -108,8 +116,8 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">{bankAccount.name}</h1>
-                        <p className="text-gray-500 mt-1">{bankAccount.bank_name}</p>
+                        <h1 className="text-3xl font-bold text-foreground">{bankAccount.name}</h1>
+                        <p className="text-muted-foreground mt-1">{bankAccount.bank_name}</p>
                     </div>
                     <div className="flex gap-2">
                         <Button variant="outline" asChild>
@@ -126,15 +134,15 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Opening Balance</p>
                             <p className="text-2xl font-semibold font-mono tabular-nums mt-1">
-                                {formatNZD(bankAccount.opening_balance)}
+                                {formatCurrency(bankAccount.opening_balance)}
                             </p>
                         </CardContent>
                     </Card>
                     <Card>
                         <CardContent className="pt-6">
                             <p className="text-sm text-muted-foreground">Current Balance</p>
-                            <p className={`text-2xl font-semibold font-mono tabular-nums mt-1 ${bankAccount.current_balance >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                {formatNZD(bankAccount.current_balance)}
+                            <p className={`text-2xl font-semibold font-mono tabular-nums mt-1 ${bankAccount.current_balance >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                {formatCurrency(bankAccount.current_balance)}
                             </p>
                         </CardContent>
                     </Card>
@@ -147,6 +155,35 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Balance History Chart */}
+                {balanceHistory.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Transaction Amounts Over Time</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="h-[280px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={balanceHistory}>
+                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                        <XAxis dataKey="date" tick={{ fontSize: 12 }} className="text-muted-foreground" />
+                                        <YAxis tick={{ fontSize: 12 }} className="text-muted-foreground" tickFormatter={(v) => formatCurrency(v)} />
+                                        <Tooltip formatter={(value: number) => [formatCurrency(value), 'Amount']} />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="amount"
+                                            stroke={CHART_COLORS[0]}
+                                            strokeWidth={2}
+                                            dot={{ fill: CHART_COLORS[0], r: 3 }}
+                                            activeDot={{ r: 5 }}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* Transactions */}
                 <Card>
@@ -203,9 +240,9 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                     <CardContent className="p-0">
                         {transactions.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <FileText className="h-12 w-12 text-gray-300 mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-1">No transactions</h3>
-                                <p className="text-gray-500">Import a CSV file or add transactions manually.</p>
+                                <FileText className="h-12 w-12 text-muted-foreground/40 mb-4" />
+                                <h3 className="text-lg font-medium text-foreground mb-1">No transactions</h3>
+                                <p className="text-muted-foreground">Import a CSV file or add transactions manually.</p>
                             </div>
                         ) : (
                             <Table>
@@ -228,8 +265,8 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                                             <TableCell>
                                                 <Badge variant="outline" className="capitalize">{txn.source}</Badge>
                                             </TableCell>
-                                            <TableCell className={`text-right font-mono tabular-nums ${txn.amount >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                                {formatNZD(txn.amount)}
+                                            <TableCell className={`text-right font-mono tabular-nums ${txn.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                {formatCurrency(txn.amount)}
                                             </TableCell>
                                             <TableCell>{statusBadge(txn.status)}</TableCell>
                                         </TableRow>
@@ -248,7 +285,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                     <CardContent className="p-0">
                         {reconciliations.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-8 text-center">
-                                <p className="text-gray-500">No reconciliations yet.</p>
+                                <p className="text-muted-foreground">No reconciliations yet.</p>
                             </div>
                         ) : (
                             <Table>
@@ -267,10 +304,10 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                                         <TableRow key={recon.id}>
                                             <TableCell>{recon.statement_date}</TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {formatNZD(recon.statement_balance)}
+                                                {formatCurrency(recon.statement_balance)}
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
-                                                {recon.calculated_balance !== null ? formatNZD(recon.calculated_balance) : '-'}
+                                                {recon.calculated_balance !== null ? formatCurrency(recon.calculated_balance) : '-'}
                                             </TableCell>
                                             <TableCell>{reconStatusBadge(recon.status)}</TableCell>
                                             <TableCell className="text-muted-foreground">{recon.completed_at || '-'}</TableCell>

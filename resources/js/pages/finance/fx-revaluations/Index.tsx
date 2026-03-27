@@ -1,9 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeftRight, Plus } from 'lucide-react';
+import { ArrowLeftRight, Plus, TrendingUp, TrendingDown } from 'lucide-react';
 
 type Revaluation = {
     id: number;
@@ -27,29 +28,34 @@ type PageProps = {
     revaluations: PaginatedData;
 };
 
-const formatNZD = (amount: string | number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(amount));
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'FX Revaluations', href: '/finance/fx-revaluations' },
+];
+
+const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-700 border-gray-300' },
-    posted: { label: 'Posted', className: 'bg-green-100 text-green-700 border-green-300' },
-    reversed: { label: 'Reversed', className: 'bg-red-100 text-red-700 border-red-300' },
+    draft: { label: 'Draft', className: 'bg-muted text-muted-foreground border-border' },
+    posted: { label: 'Posted', className: 'bg-green-500/10 text-green-600 border-green-500/30' },
+    reversed: { label: 'Reversed', className: 'bg-red-500/10 text-red-600 border-red-500/30' },
 };
 
 export default function FxRevaluationsIndex({ revaluations }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'FX Revaluations', href: '/finance/fx-revaluations' },
-    ];
-
     function handlePost(id: number) {
         if (confirm('Are you sure you want to post this revaluation to the General Ledger? This will create a journal entry.')) {
             router.post(`/finance/fx-revaluations/${id}/post`);
         }
     }
+
+    // Compute KPI: total gain/loss across all revaluations on current page
+    const totalGainLoss = revaluations.data.reduce((sum, r) => sum + Number(r.total_gain_loss), 0);
+    const isGain = totalGainLoss > 0;
+    const isLoss = totalGainLoss < 0;
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -70,6 +76,31 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                         </Button>
                     </Link>
                 </div>
+
+                {/* KPI Summary */}
+                {revaluations.data.length > 0 && (
+                    <Card>
+                        <CardContent className="flex items-center gap-4 pt-6">
+                            <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${isGain ? 'bg-green-500/10' : isLoss ? 'bg-red-500/10' : 'bg-muted'}`}>
+                                {isGain ? (
+                                    <TrendingUp className="h-5 w-5 text-green-600" />
+                                ) : isLoss ? (
+                                    <TrendingDown className="h-5 w-5 text-red-600" />
+                                ) : (
+                                    <ArrowLeftRight className="h-5 w-5 text-muted-foreground" />
+                                )}
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">
+                                    Total Unrealised {isGain ? 'Gain' : isLoss ? 'Loss' : 'Gain/Loss'}
+                                </p>
+                                <p className={`text-2xl font-bold font-mono tabular-nums ${isGain ? 'text-green-600' : isLoss ? 'text-red-600' : 'text-foreground'}`}>
+                                    {isLoss ? '(' : ''}{formatCurrency(Math.abs(totalGainLoss))}{isLoss ? ')' : ''}
+                                </p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
 
                 <Card>
                     <CardHeader>
@@ -102,8 +133,8 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                     ) : (
                                         revaluations.data.map((reval) => {
                                             const gainLoss = Number(reval.total_gain_loss);
-                                            const isGain = gainLoss > 0;
-                                            const isLoss = gainLoss < 0;
+                                            const rowIsGain = gainLoss > 0;
+                                            const rowIsLoss = gainLoss < 0;
                                             const status = statusConfig[reval.status] ?? statusConfig.draft;
 
                                             return (
@@ -113,16 +144,16 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                                                     </td>
                                                     <td
                                                         className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${
-                                                            isGain
+                                                            rowIsGain
                                                                 ? 'text-green-600'
-                                                                : isLoss
+                                                                : rowIsLoss
                                                                   ? 'text-red-600'
                                                                   : ''
                                                         }`}
                                                     >
-                                                        {isLoss ? '(' : ''}
-                                                        {formatNZD(Math.abs(gainLoss))}
-                                                        {isLoss ? ')' : ''}
+                                                        {rowIsLoss ? '(' : ''}
+                                                        {formatCurrency(Math.abs(gainLoss))}
+                                                        {rowIsLoss ? ')' : ''}
                                                     </td>
                                                     <td className="py-3 pr-4">
                                                         <Badge variant="outline" className={status.className}>

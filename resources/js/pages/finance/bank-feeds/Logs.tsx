@@ -1,9 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { type BreadcrumbItem } from '@/types';
 
 interface LogEntry {
     id: number;
@@ -57,7 +58,7 @@ const formatDuration = (ms: number | null): string => {
 };
 
 export default function BankFeedLogs({ feed, logs }: Props) {
-    const breadcrumbs = [
+    const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Bank Feeds', href: '/finance/bank-feeds' },
         { title: `${feed.bank_account_name} Logs`, href: `/finance/bank-feeds/${feed.id}/logs` },
@@ -76,8 +77,8 @@ export default function BankFeedLogs({ feed, logs }: Props) {
                         </Link>
                     </Button>
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Sync Logs</h1>
-                        <p className="text-gray-500 mt-1">
+                        <h1 className="text-3xl font-bold text-foreground">Sync Logs</h1>
+                        <p className="text-muted-foreground mt-1">
                             {feed.bank_account_name} &middot; {providerLabels[feed.provider] || feed.provider} &middot; {feed.bank_name}
                         </p>
                     </div>
@@ -86,8 +87,8 @@ export default function BankFeedLogs({ feed, logs }: Props) {
                 {logs.data.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                            <h3 className="text-lg font-medium text-gray-900 mb-1">No sync logs</h3>
-                            <p className="text-gray-500">
+                            <h3 className="text-lg font-medium text-foreground mb-1">No sync logs</h3>
+                            <p className="text-muted-foreground">
                                 This bank feed has not been synced yet.
                             </p>
                         </CardContent>
@@ -137,7 +138,7 @@ export default function BankFeedLogs({ feed, logs }: Props) {
                                                         <td className="px-4 py-3 text-right font-mono tabular-nums text-xs">
                                                             {formatDuration(log.duration_ms)}
                                                         </td>
-                                                        <td className="px-4 py-3 text-red-600 max-w-xs truncate">
+                                                        <td className="px-4 py-3 text-destructive max-w-xs truncate">
                                                             {log.error_message || '-'}
                                                         </td>
                                                     </tr>

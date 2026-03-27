@@ -1,11 +1,15 @@
 import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Plus, Heart, AlertTriangle } from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 interface Fund {
     id: number;
@@ -63,14 +67,27 @@ const statusConfig: Record<string, { label: string; className: string }> = {
     returned: { label: 'Returned', className: 'border-gray-300 text-gray-600' },
 };
 
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Donor Funds', href: '/finance/donor-funds' },
+];
+
 export default function DonorFundsIndex({ funds, summary }: Props) {
+    const pieData = [
+        { name: 'Restricted', value: summary.restricted_balance },
+        { name: 'Unrestricted', value: summary.unrestricted_balance },
+    ].filter((d) => d.value > 0);
+
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Donor Funds" />
 
-            <div className="space-y-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Donor Funds</h1>
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">Donor Funds</h1>
+                        <p className="text-muted-foreground">Track donations, grants, and restricted funding</p>
+                    </div>
                     <Button asChild>
                         <Link href="/finance/donor-funds/create">
                             <Plus className="mr-1 h-4 w-4" />
@@ -79,46 +96,93 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                     </Button>
                 </div>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Total Funds</p>
-                            <p className="text-2xl font-bold">{summary.total_funds}</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Total Received</p>
-                            <p className="text-xl font-bold">{formatCurrency(summary.total_received)}</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Total Spent</p>
-                            <p className="text-xl font-bold">{formatCurrency(summary.total_spent)}</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Available</p>
-                            <p className="text-xl font-bold text-green-600">{formatCurrency(summary.total_available)}</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Restricted</p>
-                            <p className="text-xl font-bold">{formatCurrency(summary.restricted_balance)}</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Expiring Soon</p>
-                            <p className={`text-2xl font-bold ${summary.expiring_soon > 0 ? 'text-amber-600' : ''}`}>
-                                {summary.expiring_soon}
-                            </p>
-                        </CardContent>
-                    </Card>
+                {/* Summary Cards + PieChart */}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                    <div className="lg:col-span-2 grid grid-cols-2 gap-4 sm:grid-cols-3">
+                        <Card>
+                            <CardContent className="p-4">
+                                <p className="text-sm text-muted-foreground">Total Funds</p>
+                                <p className="text-2xl font-bold">{summary.total_funds}</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-4">
+                                <p className="text-sm text-muted-foreground">Total Received</p>
+                                <p className="text-xl font-bold">{formatCurrency(summary.total_received)}</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-4">
+                                <p className="text-sm text-muted-foreground">Total Spent</p>
+                                <p className="text-xl font-bold">{formatCurrency(summary.total_spent)}</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-4">
+                                <p className="text-sm text-muted-foreground">Available</p>
+                                <p className="text-xl font-bold text-emerald-600">{formatCurrency(summary.total_available)}</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-4">
+                                <p className="text-sm text-muted-foreground">Restricted</p>
+                                <p className="text-xl font-bold">{formatCurrency(summary.restricted_balance)}</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-4">
+                                <p className="text-sm text-muted-foreground">Expiring Soon</p>
+                                <p className={`text-2xl font-bold ${summary.expiring_soon > 0 ? 'text-amber-600' : ''}`}>
+                                    {summary.expiring_soon}
+                                </p>
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Restricted vs Unrestricted Pie Chart */}
+                    {pieData.length > 0 && (
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm font-medium text-muted-foreground">
+                                    Restricted vs Unrestricted
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <ResponsiveContainer width="100%" height={180}>
+                                    <PieChart>
+                                        <Pie
+                                            data={pieData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={45}
+                                            outerRadius={70}
+                                            paddingAngle={3}
+                                            dataKey="value"
+                                            nameKey="name"
+                                        >
+                                            {pieData.map((_, index) => (
+                                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip
+                                            formatter={((value: number) => formatCurrency(value)) as any}
+                                        />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                <div className="flex justify-center gap-4 text-xs">
+                                    {pieData.map((entry, index) => (
+                                        <div key={entry.name} className="flex items-center gap-1.5">
+                                            <div
+                                                className="h-2.5 w-2.5 rounded-full"
+                                                style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                                            />
+                                            <span className="text-muted-foreground">{entry.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Funds Table */}
@@ -157,7 +221,7 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                                         return (
                                             <TableRow key={fund.id}>
                                                 <TableCell className="font-mono text-sm">
-                                                    <Link href={`/finance/donor-funds/${fund.id}`} className="text-blue-600 hover:underline">
+                                                    <Link href={`/finance/donor-funds/${fund.id}`} className="text-primary hover:underline">
                                                         {fund.fund_code}
                                                     </Link>
                                                 </TableCell>
@@ -172,7 +236,7 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                                                 </TableCell>
                                                 <TableCell className="text-right">{formatCurrency(fund.total_received)}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency(fund.total_spent)}</TableCell>
-                                                <TableCell className="text-right font-medium text-green-600">
+                                                <TableCell className="text-right font-medium text-emerald-600">
                                                     {formatCurrency(fund.available_balance)}
                                                     {utilisation !== null && (
                                                         <span className="ml-1 text-xs text-muted-foreground">({utilisation}%)</span>
@@ -184,14 +248,14 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                                                             Restricted
                                                         </Badge>
                                                     ) : (
-                                                        <Badge variant="outline" className="border-gray-300 text-gray-500">
+                                                        <Badge variant="outline" className="border-gray-300 text-muted-foreground">
                                                             Unrestricted
                                                         </Badge>
                                                     )}
                                                 </TableCell>
                                                 <TableCell className="text-sm">
                                                     {fund.end_date ? (
-                                                        <span className={new Date(fund.end_date) < new Date() ? 'text-red-600' : ''}>
+                                                        <span className={new Date(fund.end_date) < new Date() ? 'text-destructive' : ''}>
                                                             {formatDate(fund.end_date)}
                                                         </span>
                                                     ) : (
@@ -203,7 +267,7 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                                                         {config.label}
                                                     </Badge>
                                                     {fund.next_report_due && new Date(fund.next_report_due) <= new Date() && (
-                                                        <AlertTriangle className="ml-1 inline h-4 w-4 text-amber-500" title="Report overdue" />
+                                                        <AlertTriangle className="ml-1 inline h-4 w-4 text-amber-500" />
                                                     )}
                                                 </TableCell>
                                             </TableRow>

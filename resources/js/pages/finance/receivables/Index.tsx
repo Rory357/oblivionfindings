@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -25,6 +26,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { DollarSign, Clock, FileText, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 type InvoiceRow = {
     id: number;
@@ -52,6 +56,11 @@ type PageProps = {
 
 const formatNZD = (amount: number) =>
     new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Accounts Receivable', href: '/finance/receivables' },
+];
 
 function PaymentDialog({ invoice, onClose }: { invoice: InvoiceRow; onClose: () => void }) {
     const form = useForm({
@@ -90,7 +99,7 @@ function PaymentDialog({ invoice, onClose }: { invoice: InvoiceRow; onClose: () 
                     onChange={(e) => form.setData('amount', e.target.value)}
                 />
                 {form.errors.amount && (
-                    <p className="text-sm text-red-600">{form.errors.amount}</p>
+                    <p className="text-sm text-destructive">{form.errors.amount}</p>
                 )}
             </div>
 
@@ -103,7 +112,7 @@ function PaymentDialog({ invoice, onClose }: { invoice: InvoiceRow; onClose: () 
                     onChange={(e) => form.setData('payment_date', e.target.value)}
                 />
                 {form.errors.payment_date && (
-                    <p className="text-sm text-red-600">{form.errors.payment_date}</p>
+                    <p className="text-sm text-destructive">{form.errors.payment_date}</p>
                 )}
             </div>
 
@@ -133,19 +142,20 @@ function PaymentDialog({ invoice, onClose }: { invoice: InvoiceRow; onClose: () 
 export default function ReceivablesIndex({ summary, invoices }: PageProps) {
     const [paymentInvoice, setPaymentInvoice] = useState<InvoiceRow | null>(null);
 
+    const currentNotOverdue = summary.total_outstanding - summary.total_overdue;
+    const pieData = [
+        { name: 'Outstanding (Current)', value: currentNotOverdue > 0 ? currentNotOverdue : 0 },
+        { name: 'Overdue', value: summary.total_overdue },
+    ].filter((d) => d.value > 0);
+
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
-                { title: 'Accounts Receivable', href: '/finance/receivables' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Accounts Receivable" />
-            <div className="space-y-6 p-4">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-semibold">Accounts Receivable</h1>
-                        <p className="text-sm text-muted-foreground">
+                        <h1 className="text-2xl font-bold tracking-tight">Accounts Receivable</h1>
+                        <p className="text-muted-foreground">
                             Outstanding invoices, payments, and receivables management.
                         </p>
                     </div>
@@ -165,8 +175,8 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                     </div>
                 </div>
 
-                {/* Summary Cards */}
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                {/* Summary Cards + PieChart */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <Card>
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -186,10 +196,10 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                             <CardTitle className="text-sm font-medium text-muted-foreground">
                                 Total Overdue
                             </CardTitle>
-                            <Clock className="h-4 w-4 text-red-500" />
+                            <Clock className="h-4 w-4 text-destructive" />
                         </CardHeader>
                         <CardContent>
-                            <div className="text-2xl font-bold text-red-600">
+                            <div className="text-2xl font-bold text-destructive">
                                 {formatNZD(summary.total_overdue)}
                             </div>
                         </CardContent>
@@ -206,6 +216,49 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                             <div className="text-2xl font-bold">{summary.unpaid_count}</div>
                         </CardContent>
                     </Card>
+
+                    {/* Outstanding vs Overdue Pie Chart */}
+                    {pieData.length > 0 && (
+                        <Card>
+                            <CardHeader className="pb-0">
+                                <CardTitle className="text-sm font-medium text-muted-foreground">
+                                    Outstanding vs Overdue
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="pb-4">
+                                <ResponsiveContainer width="100%" height={120}>
+                                    <PieChart>
+                                        <Pie
+                                            data={pieData}
+                                            cx="50%"
+                                            cy="50%"
+                                            innerRadius={30}
+                                            outerRadius={50}
+                                            paddingAngle={3}
+                                            dataKey="value"
+                                            nameKey="name"
+                                        >
+                                            {pieData.map((_, index) => (
+                                                <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip formatter={((value: number) => formatNZD(value)) as any} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                                <div className="flex justify-center gap-3 text-xs">
+                                    {pieData.map((entry, index) => (
+                                        <div key={entry.name} className="flex items-center gap-1">
+                                            <div
+                                                className="h-2 w-2 rounded-full"
+                                                style={{ backgroundColor: CHART_COLORS[index % CHART_COLORS.length] }}
+                                            />
+                                            <span className="text-muted-foreground">{entry.name}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Outstanding Invoices Table */}

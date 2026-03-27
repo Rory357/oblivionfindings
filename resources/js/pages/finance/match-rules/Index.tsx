@@ -31,6 +31,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Settings, Plus, Pencil, Trash2 } from 'lucide-react';
+import { type BreadcrumbItem } from '@/types';
 import { FormEvent, useState } from 'react';
 
 type MatchRule = {
@@ -287,7 +288,7 @@ function EditRuleDialog({ rule }: { rule: MatchRule }) {
 }
 
 export default function MatchRulesIndex({ rules }: PageProps) {
-    const breadcrumbs = [
+    const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Payment Matching', href: '/finance/payment-matching' },
         { title: 'Match Rules', href: '/finance/match-rules' },
@@ -318,7 +319,12 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                     <CardHeader>
                         <div className="flex items-center gap-2">
                             <Settings className="h-5 w-5 text-muted-foreground" />
-                            <CardTitle>All Rules</CardTitle>
+                            <div>
+                                <CardTitle>All Rules</CardTitle>
+                                <p className="text-sm text-muted-foreground mt-0.5">
+                                    Rules are evaluated in priority order during automatic matching
+                                </p>
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent>
@@ -362,8 +368,8 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                                                     variant="outline"
                                                     className={
                                                         rule.is_active
-                                                            ? 'bg-green-500/10 text-green-600 border-green-500/30'
-                                                            : 'bg-gray-500/10 text-gray-600 border-gray-500/30'
+                                                            ? 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30'
+                                                            : 'bg-muted text-muted-foreground border-border'
                                                     }
                                                 >
                                                     {rule.is_active ? 'Active' : 'Inactive'}

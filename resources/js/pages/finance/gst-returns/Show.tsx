@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -174,8 +175,8 @@ function IrdFormBox({
                 className={`font-mono text-sm font-semibold tabular-nums ${
                     highlight
                         ? amount >= 0
-                            ? 'text-red-600'
-                            : 'text-green-600'
+                            ? 'text-destructive'
+                            : 'text-emerald-600'
                         : ''
                 }`}
             >
@@ -187,13 +188,10 @@ function IrdFormBox({
 }
 
 export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
         { title: 'GST Returns', href: '/finance/gst-returns' },
-        {
-            title: `Period ending ${formatDate(gstReturn.period_end)}`,
-            href: `/finance/gst-returns/${gstReturn.id}`,
-        },
+        { title: `Period ending ${formatDate(gstReturn.period_end)}`, href: `/finance/gst-returns/${gstReturn.id}` },
     ];
 
     const status = statusConfig[gstReturn.status] ?? statusConfig.draft;

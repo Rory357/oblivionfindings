@@ -1,10 +1,9 @@
 import { Head, Link } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import {
     DollarSign,
     TrendingUp,
@@ -14,7 +13,26 @@ import {
     CreditCard,
     Plus,
     ArrowRight,
+    ArrowUpRight,
+    ArrowDownRight,
 } from 'lucide-react';
+import {
+    BarChart,
+    Bar,
+    AreaChart,
+    Area,
+    PieChart,
+    Pie,
+    Cell,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    ResponsiveContainer,
+    Legend,
+} from 'recharts';
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 interface MonthlyData {
     month: string;
@@ -58,6 +76,11 @@ interface Props extends PageProps {
     recentJournals: RecentJournal[];
 }
 
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Dashboard' },
+];
+
 const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
@@ -69,11 +92,13 @@ function KpiCard({
     value,
     icon: Icon,
     className = '',
+    trend,
 }: {
     title: string;
     value: string;
     icon: React.ComponentType<{ className?: string }>;
     className?: string;
+    trend?: { percent: number; positive: boolean } | null;
 }) {
     return (
         <Card>
@@ -82,6 +107,16 @@ function KpiCard({
                     <div>
                         <p className="text-sm font-medium text-muted-foreground">{title}</p>
                         <p className={`text-2xl font-bold ${className}`}>{value}</p>
+                        {trend != null && (
+                            <div className={`mt-1 flex items-center gap-1 text-xs ${trend.positive ? 'text-green-600' : 'text-red-600'}`}>
+                                {trend.positive ? (
+                                    <ArrowUpRight className="h-3 w-3" />
+                                ) : (
+                                    <ArrowDownRight className="h-3 w-3" />
+                                )}
+                                <span>{Math.abs(trend.percent).toFixed(1)}% vs last month</span>
+                            </div>
+                        )}
                     </div>
                     <div className="rounded-full bg-muted p-3">
                         <Icon className="h-5 w-5 text-muted-foreground" />
@@ -92,67 +127,13 @@ function KpiCard({
     );
 }
 
-function BarChart({ revenueData, expenseData }: { revenueData: MonthlyData[]; expenseData: MonthlyData[] }) {
-    const allAmounts = [...revenueData.map((d) => d.amount), ...expenseData.map((d) => d.amount)];
-    const maxAmount = Math.max(...allAmounts, 1);
-
-    return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Revenue vs Expenses (Last 6 Months)</CardTitle>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-4">
-                    {revenueData.map((rev, idx) => {
-                        const exp = expenseData[idx];
-                        const revPct = (rev.amount / maxAmount) * 100;
-                        const expPct = (exp?.amount ?? 0) / maxAmount * 100;
-
-                        return (
-                            <div key={rev.month} className="space-y-1">
-                                <div className="flex items-center justify-between text-sm">
-                                    <span className="font-medium">{rev.month}</span>
-                                    <span className="text-muted-foreground">
-                                        {formatCurrency(rev.amount)} / {formatCurrency(exp?.amount ?? 0)}
-                                    </span>
-                                </div>
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <span className="w-16 text-xs text-muted-foreground">Revenue</span>
-                                        <div className="flex-1 rounded-full bg-muted h-3">
-                                            <div
-                                                className="h-3 rounded-full bg-green-500 transition-all"
-                                                style={{ width: `${Math.max(revPct, 0.5)}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="w-16 text-xs text-muted-foreground">Expenses</span>
-                                        <div className="flex-1 rounded-full bg-muted h-3">
-                                            <div
-                                                className="h-3 rounded-full bg-red-400 transition-all"
-                                                style={{ width: `${Math.max(expPct, 0.5)}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        );
-                    })}
-                </div>
-                <div className="mt-4 flex gap-4 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                        <div className="h-2 w-4 rounded bg-green-500" />
-                        Revenue
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <div className="h-2 w-4 rounded bg-red-400" />
-                        Expenses
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
+function computeTrend(data: MonthlyData[]): { percent: number; positive: boolean } | null {
+    if (data.length < 2) return null;
+    const current = data[data.length - 1].amount;
+    const previous = data[data.length - 2].amount;
+    if (previous === 0) return null;
+    const percent = ((current - previous) / Math.abs(previous)) * 100;
+    return { percent, positive: percent >= 0 };
 }
 
 export default function FinanceDashboard({
@@ -168,11 +149,31 @@ export default function FinanceDashboard({
     upcomingBillsDue,
     recentJournals,
 }: Props) {
+    const chartData = revenueByMonth.map((rev, i) => ({
+        month: rev.month,
+        revenue: rev.amount,
+        expenses: expensesByMonth[i]?.amount ?? 0,
+    }));
+
+    const profitData = revenueByMonth.map((rev, i) => ({
+        month: rev.month,
+        profit: rev.amount - (expensesByMonth[i]?.amount ?? 0),
+    }));
+
+    const revenueTrend = computeTrend(revenueByMonth);
+    const expenseTrend = computeTrend(expensesByMonth);
+
+    const profitMonthly = revenueByMonth.map((rev, i) => ({
+        month: rev.month,
+        amount: rev.amount - (expensesByMonth[i]?.amount ?? 0),
+    }));
+    const profitTrend = computeTrend(profitMonthly);
+
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Finance Dashboard" />
 
-            <div className="space-y-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <h1 className="text-2xl font-bold">Finance Dashboard</h1>
                     <div className="flex gap-2">
@@ -210,18 +211,21 @@ export default function FinanceDashboard({
                         value={formatCurrency(totalRevenue)}
                         icon={TrendingUp}
                         className="text-green-600"
+                        trend={revenueTrend}
                     />
                     <KpiCard
                         title="Expenses (Month)"
                         value={formatCurrency(totalExpenses)}
                         icon={TrendingDown}
                         className="text-red-600"
+                        trend={expenseTrend ? { ...expenseTrend, positive: !expenseTrend.positive } : null}
                     />
                     <KpiCard
                         title="Net Profit"
                         value={formatCurrency(netProfit)}
                         icon={DollarSign}
                         className={netProfit >= 0 ? 'text-green-600' : 'text-red-600'}
+                        trend={profitTrend}
                     />
                     <KpiCard
                         title="Cash Balance"
@@ -240,38 +244,93 @@ export default function FinanceDashboard({
                     />
                 </div>
 
-                {/* Charts & Lists */}
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-                    <BarChart revenueData={revenueByMonth} expenseData={expensesByMonth} />
+                {/* Net Profit Trend */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">Net Profit Trend</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="h-64">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <AreaChart data={profitData}>
+                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                    <XAxis dataKey="month" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                                    <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                    <Area type="monotone" dataKey="profit" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.1} name="Net Profit" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    </CardContent>
+                </Card>
 
+                {/* Charts */}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                    {/* Revenue vs Expenses Bar Chart */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Top Expense Categories (This Month)</CardTitle>
+                            <CardTitle className="text-base">Revenue vs Expenses (Last 6 Months)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chartData}>
+                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                        <XAxis dataKey="month" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                                        <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                        <Legend />
+                                        <Bar dataKey="revenue" fill="#10b981" name="Revenue" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="expenses" fill="#ef4444" name="Expenses" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    {/* Top Expense Categories Pie Chart */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Top Expense Categories (This Month)</CardTitle>
                         </CardHeader>
                         <CardContent>
                             {topExpenseCategories.length === 0 ? (
                                 <p className="text-sm text-muted-foreground">No expenses recorded this month.</p>
                             ) : (
-                                <div className="space-y-3">
-                                    {topExpenseCategories.map((cat, idx) => {
-                                        const maxExp = topExpenseCategories[0]?.amount || 1;
-                                        const pct = (cat.amount / maxExp) * 100;
-                                        return (
-                                            <div key={idx} className="space-y-1">
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <span className="truncate font-medium">{cat.account_name}</span>
-                                                    <span className="font-semibold">{formatCurrency(cat.amount)}</span>
-                                                </div>
-                                                <div className="h-2 rounded-full bg-muted">
-                                                    <div
-                                                        className="h-2 rounded-full bg-blue-500"
-                                                        style={{ width: `${pct}%` }}
-                                                    />
-                                                </div>
+                                <>
+                                    <div className="h-64">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie
+                                                    data={topExpenseCategories}
+                                                    dataKey="amount"
+                                                    nameKey="account_name"
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    outerRadius={90}
+                                                    innerRadius={50}
+                                                    paddingAngle={2}
+                                                >
+                                                    {topExpenseCategories.map((_, idx) => (
+                                                        <Cell key={idx} fill={CHART_COLORS[idx % CHART_COLORS.length]} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                    <div className="mt-2 flex flex-wrap justify-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                                        {topExpenseCategories.map((cat, idx) => (
+                                            <div key={idx} className="flex items-center gap-1">
+                                                <div
+                                                    className="h-2 w-3 rounded"
+                                                    style={{ backgroundColor: CHART_COLORS[idx % CHART_COLORS.length] }}
+                                                />
+                                                <span className="truncate">{cat.account_name}</span>
                                             </div>
-                                        );
-                                    })}
-                                </div>
+                                        ))}
+                                    </div>
+                                </>
                             )}
                         </CardContent>
                     </Card>

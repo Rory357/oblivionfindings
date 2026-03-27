@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +31,13 @@ type PageProps = {
     date: string;
 };
 
-const formatNZD = (amount: number) =>
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'FX Revaluations', href: '/finance/fx-revaluations' },
+    { title: 'New Revaluation', href: '/finance/fx-revaluations/create' },
+];
+
+const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const formatRate = (rate: number) => rate.toFixed(6);
@@ -41,12 +48,6 @@ const typeLabels: Record<string, string> = {
 };
 
 export default function FxRevaluationCreate({ preview, date }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'FX Revaluations', href: '/finance/fx-revaluations' },
-        { title: 'New Revaluation', href: '/finance/fx-revaluations/create' },
-    ];
-
     const [revalDate, setRevalDate] = useState(date);
 
     const { data, setData, post, processing, errors } = useForm({
@@ -57,7 +58,6 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
     function handleDateChange(newDate: string) {
         setRevalDate(newDate);
         setData('date', newDate);
-        // Refresh preview with new date
         router.get('/finance/fx-revaluations/create', { date: newDate }, { preserveState: true });
     }
 
@@ -125,11 +125,11 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                             </div>
                             <div
                                 className={`text-2xl font-bold font-mono tabular-nums ${
-                                    isGain ? 'text-green-600' : isLoss ? 'text-red-600' : ''
+                                    isGain ? 'text-green-600' : isLoss ? 'text-red-600' : 'text-foreground'
                                 }`}
                             >
                                 {isLoss ? '(' : ''}
-                                {formatNZD(Math.abs(totalGainLoss))}
+                                {formatCurrency(Math.abs(totalGainLoss))}
                                 {isLoss ? ')' : ''}
                             </div>
                         </div>
@@ -178,10 +178,10 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                                                         {formatRate(item.current_rate)}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatNZD(item.booked_base_value)}
+                                                        {formatCurrency(item.booked_base_value)}
                                                     </td>
                                                     <td className="py-3 pr-4 text-right font-mono tabular-nums">
-                                                        {formatNZD(item.current_base_value)}
+                                                        {formatCurrency(item.current_base_value)}
                                                     </td>
                                                     <td
                                                         className={`py-3 text-right font-mono font-semibold tabular-nums ${
@@ -193,7 +193,7 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                                                         }`}
                                                     >
                                                         {itemLoss ? '(' : ''}
-                                                        {formatNZD(Math.abs(item.gain_loss))}
+                                                        {formatCurrency(Math.abs(item.gain_loss))}
                                                         {itemLoss ? ')' : ''}
                                                     </td>
                                                 </tr>

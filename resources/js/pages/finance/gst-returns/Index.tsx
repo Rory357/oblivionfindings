@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Plus } from 'lucide-react';
+import { FileText, Plus, DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
+import { useMemo } from 'react';
 
 type GstReturn = {
     id: number;
@@ -61,14 +63,23 @@ const statusConfig: Record<string, { label: string; className: string }> = {
     amended: { label: 'Amended', className: 'bg-blue-100 text-blue-700 border-blue-300' },
 };
 
-export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'GST Returns', href: '/finance/gst-returns' },
-    ];
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'GST Returns', href: '/finance/gst-returns' },
+];
 
+export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
     const currentYear = new Date().getFullYear();
     const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+
+    const kpis = useMemo(() => {
+        const data = gstReturns.data;
+        const totalCollected = data.reduce((sum, r) => sum + Number(r.total_gst_collected), 0);
+        const totalPaid = data.reduce((sum, r) => sum + Number(r.total_gst_paid), 0);
+        const totalPayable = data.reduce((sum, r) => sum + Number(r.gst_payable), 0);
+        const draftCount = data.filter((r) => r.status === 'draft').length;
+        return { totalCollected, totalPaid, totalPayable, draftCount };
+    }, [gstReturns.data]);
 
     function applyFilter(key: string, value: string | undefined) {
         const params: Record<string, string> = { ...filters };
@@ -96,6 +107,65 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                             Prepare Return
                         </Button>
                     </Link>
+                </div>
+
+                {/* KPI Summary Cards */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-emerald-500/10 p-2">
+                                    <TrendingUp className="h-5 w-5 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">GST Collected</p>
+                                    <p className="text-xl font-bold font-mono tabular-nums">{formatNZD(kpis.totalCollected)}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-blue-500/10 p-2">
+                                    <TrendingDown className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">GST Paid</p>
+                                    <p className="text-xl font-bold font-mono tabular-nums">{formatNZD(kpis.totalPaid)}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-amber-500/10 p-2">
+                                    <DollarSign className="h-5 w-5 text-amber-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Net Payable</p>
+                                    <p className={`text-xl font-bold font-mono tabular-nums ${kpis.totalPayable < 0 ? 'text-emerald-600' : ''}`}>
+                                        {formatNZD(Math.abs(kpis.totalPayable))}
+                                        {kpis.totalPayable < 0 ? ' (Refund)' : ''}
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-gray-500/10 p-2">
+                                    <FileText className="h-5 w-5 text-muted-foreground" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Draft Returns</p>
+                                    <p className="text-xl font-bold">{kpis.draftCount}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <Card>
@@ -204,7 +274,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                                     </td>
                                                     <td
                                                         className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${
-                                                            isRefund ? 'text-green-600' : 'text-red-600'
+                                                            isRefund ? 'text-emerald-600' : 'text-destructive'
                                                         }`}
                                                     >
                                                         {isRefund ? '(' : ''}

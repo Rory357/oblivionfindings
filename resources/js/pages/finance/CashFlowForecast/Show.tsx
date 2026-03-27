@@ -3,8 +3,21 @@ import { Head, router } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Printer, Trash2, TrendingUp, TrendingDown, ArrowRight } from 'lucide-react';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Printer, Trash2, TrendingUp, TrendingDown, DollarSign, ArrowUpDown } from 'lucide-react';
 import { useState } from 'react';
+import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { type BreadcrumbItem } from '@/types';
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 type Inflows = {
     total: string;
@@ -94,8 +107,8 @@ const periodTypeLabels: Record<string, string> = {
 export default function CashFlowForecastShow({ forecast, chartData }: PageProps) {
     const [selectedScenario, setSelectedScenario] = useState<number | null>(null);
 
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
         { title: 'Cash Flow Forecast', href: '/finance/cash-flow-forecast' },
         { title: forecast.name, href: `/finance/cash-flow-forecast/${forecast.id}` },
     ];
@@ -119,13 +132,35 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
         }
     }
 
-    // Simple bar chart using CSS (no chart library dependency)
-    const maxValue = Math.max(
-        ...activeForecastData.map((p) =>
-            Math.max(Math.abs(Number(p.inflows.total)), Math.abs(Number(p.outflows.total)), Math.abs(Number(p.closing_balance)))
-        ),
-        1,
-    );
+    // Build Recharts data from active forecast data
+    const rechartsData = activeForecastData.map((period) => {
+        const row: Record<string, string | number> = {
+            period: period.period_label,
+            inflows: Number(period.inflows.total),
+            outflows: Math.abs(Number(period.outflows.total)),
+            closingBalance: Number(period.closing_balance),
+        };
+        return row;
+    });
+
+    // Add scenario closing balances to chart data
+    if (forecast.scenarios.length > 0) {
+        forecast.scenarios.forEach((scenario) => {
+            const scenarioData = scenario.forecast_data ?? [];
+            scenarioData.forEach((period, idx) => {
+                if (rechartsData[idx]) {
+                    rechartsData[idx][`scenario_${scenario.id}`] = Number(period.closing_balance);
+                }
+            });
+        });
+    }
+
+    // KPI calculations
+    const totalInflows = activeForecastData.reduce((sum, p) => sum + Number(p.inflows.total), 0);
+    const totalOutflows = activeForecastData.reduce((sum, p) => sum + Number(p.outflows.total), 0);
+    const lastPeriod = activeForecastData[activeForecastData.length - 1];
+    const finalBalance = lastPeriod ? Number(lastPeriod.closing_balance) : 0;
+    const netCashFlow = totalInflows - Math.abs(totalOutflows);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -165,6 +200,50 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                     </div>
                 </div>
 
+                {/* KPI Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Card>
+                        <CardContent className="flex items-center justify-between p-6">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Total Inflows</p>
+                                <p className="text-2xl font-bold mt-1 text-green-600">{formatCurrency(totalInflows)}</p>
+                            </div>
+                            <TrendingUp className="h-8 w-8 text-green-500/50" />
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center justify-between p-6">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Total Outflows</p>
+                                <p className="text-2xl font-bold mt-1 text-red-600">{formatCurrency(Math.abs(totalOutflows))}</p>
+                            </div>
+                            <TrendingDown className="h-8 w-8 text-red-500/50" />
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center justify-between p-6">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Net Cash Flow</p>
+                                <p className={`text-2xl font-bold mt-1 ${netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {formatCurrency(netCashFlow)}
+                                </p>
+                            </div>
+                            <ArrowUpDown className="h-8 w-8 text-muted-foreground/50" />
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center justify-between p-6">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Final Balance</p>
+                                <p className={`text-2xl font-bold mt-1 ${finalBalance >= 0 ? 'text-foreground' : 'text-red-600'}`}>
+                                    {formatCurrency(finalBalance)}
+                                </p>
+                            </div>
+                            <DollarSign className="h-8 w-8 text-muted-foreground/50" />
+                        </CardContent>
+                    </Card>
+                </div>
+
                 {/* Scenario selector */}
                 {forecast.scenarios.length > 0 && (
                     <Card>
@@ -201,61 +280,57 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                     </Card>
                 )}
 
-                {/* Visual Chart (CSS-based) */}
+                {/* Recharts ComposedChart */}
                 <Card>
                     <CardHeader>
                         <CardTitle>Cash Flow Overview</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="space-y-3">
-                            {activeForecastData.map((period, idx) => {
-                                const inflowPct = (Math.abs(Number(period.inflows.total)) / maxValue) * 100;
-                                const outflowPct = (Math.abs(Number(period.outflows.total)) / maxValue) * 100;
-                                const netFlow = Number(period.net_cash_flow);
-                                const closingBal = Number(period.closing_balance);
-
-                                return (
-                                    <div key={idx} className="space-y-1">
-                                        <div className="flex items-center justify-between text-sm">
-                                            <span className="font-medium w-32 shrink-0">{period.period_label}</span>
-                                            <div className="flex-1 mx-4 space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="w-16 text-xs text-muted-foreground">In</span>
-                                                    <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-green-500 rounded-full transition-all"
-                                                            style={{ width: `${Math.min(inflowPct, 100)}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="w-28 text-right font-mono tabular-nums text-xs text-green-600">
-                                                        {formatNZD(period.inflows.total)}
-                                                    </span>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="w-16 text-xs text-muted-foreground">Out</span>
-                                                    <div className="flex-1 bg-muted rounded-full h-4 overflow-hidden">
-                                                        <div
-                                                            className="h-full bg-red-500 rounded-full transition-all"
-                                                            style={{ width: `${Math.min(outflowPct, 100)}%` }}
-                                                        />
-                                                    </div>
-                                                    <span className="w-28 text-right font-mono tabular-nums text-xs text-red-600">
-                                                        {formatNZD(period.outflows.total)}
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            <div className="text-right shrink-0 w-36">
-                                                <div className={`font-mono text-xs font-semibold tabular-nums ${netFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                                    Net: {formatNZD(netFlow)}
-                                                </div>
-                                                <div className={`font-mono text-xs tabular-nums ${closingBal >= 0 ? 'text-foreground' : 'text-red-600 font-bold'}`}>
-                                                    Bal: {formatNZD(closingBal)}
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                        <div className="h-[400px] w-full">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <ComposedChart data={rechartsData} margin={{ top: 20, right: 30, left: 20, bottom: 20 }}>
+                                    <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                                    <XAxis
+                                        dataKey="period"
+                                        tick={{ fontSize: 12 }}
+                                        angle={-45}
+                                        textAnchor="end"
+                                        height={80}
+                                    />
+                                    <YAxis
+                                        tick={{ fontSize: 12 }}
+                                        tickFormatter={(value: number) => {
+                                            if (Math.abs(value) >= 1000000) return `$${(value / 1000000).toFixed(1)}M`;
+                                            if (Math.abs(value) >= 1000) return `$${(value / 1000).toFixed(0)}k`;
+                                            return `$${value}`;
+                                        }}
+                                    />
+                                    <Tooltip formatter={(value) => formatCurrency(Number(value))} />
+                                    <Legend />
+                                    <Bar dataKey="inflows" name="Inflows" fill="#10b981" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="outflows" name="Outflows" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="closingBalance"
+                                        name="Closing Balance"
+                                        stroke="#3b82f6"
+                                        strokeWidth={2}
+                                        dot={{ r: 4 }}
+                                    />
+                                    {forecast.scenarios.map((scenario, idx) => (
+                                        <Line
+                                            key={scenario.id}
+                                            type="monotone"
+                                            dataKey={`scenario_${scenario.id}`}
+                                            name={scenario.name}
+                                            stroke={CHART_COLORS[(idx + 3) % CHART_COLORS.length]}
+                                            strokeWidth={2}
+                                            strokeDasharray="5 5"
+                                            dot={false}
+                                        />
+                                    ))}
+                                </ComposedChart>
+                            </ResponsiveContainer>
                         </div>
                     </CardContent>
                 </Card>
@@ -267,67 +342,67 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                     </CardHeader>
                     <CardContent>
                         <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b text-left text-muted-foreground">
-                                        <th className="pb-3 pr-4 font-medium">Period</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Opening</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Invoice Receipts</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Overdue Collections</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Recurring Income</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Bill Payments</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Overdue Bills</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Recurring Exp.</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">GST</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Net Flow</th>
-                                        <th className="pb-3 font-medium text-right">Closing</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Period</TableHead>
+                                        <TableHead className="text-right">Opening</TableHead>
+                                        <TableHead className="text-right">Invoice Receipts</TableHead>
+                                        <TableHead className="text-right">Overdue Collections</TableHead>
+                                        <TableHead className="text-right">Recurring Income</TableHead>
+                                        <TableHead className="text-right">Bill Payments</TableHead>
+                                        <TableHead className="text-right">Overdue Bills</TableHead>
+                                        <TableHead className="text-right">Recurring Exp.</TableHead>
+                                        <TableHead className="text-right">GST</TableHead>
+                                        <TableHead className="text-right">Net Flow</TableHead>
+                                        <TableHead className="text-right">Closing</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
                                     {activeForecastData.map((period, idx) => {
                                         const netFlow = Number(period.net_cash_flow);
                                         const closingBal = Number(period.closing_balance);
 
                                         return (
-                                            <tr key={idx} className="border-b last:border-0">
-                                                <td className="py-3 pr-4 font-medium whitespace-nowrap">
+                                            <TableRow key={idx}>
+                                                <TableCell className="font-medium whitespace-nowrap">
                                                     {period.period_label}
-                                                </td>
-                                                <td className="py-3 pr-4 text-right font-mono tabular-nums">
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums">
                                                     {formatNZD(period.opening_balance)}
-                                                </td>
-                                                <td className="py-3 pr-4 text-right font-mono tabular-nums text-green-600">
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums text-green-600">
                                                     {formatNZD(period.inflows.invoice_receipts)}
-                                                </td>
-                                                <td className="py-3 pr-4 text-right font-mono tabular-nums text-green-600">
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums text-green-600">
                                                     {formatNZD(period.inflows.overdue_collections)}
-                                                </td>
-                                                <td className="py-3 pr-4 text-right font-mono tabular-nums text-green-600">
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums text-green-600">
                                                     {formatNZD(period.inflows.recurring_income)}
-                                                </td>
-                                                <td className="py-3 pr-4 text-right font-mono tabular-nums text-red-600">
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums text-red-600">
                                                     {formatNZD(period.outflows.bill_payments)}
-                                                </td>
-                                                <td className="py-3 pr-4 text-right font-mono tabular-nums text-red-600">
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums text-red-600">
                                                     {formatNZD(period.outflows.overdue_bills)}
-                                                </td>
-                                                <td className="py-3 pr-4 text-right font-mono tabular-nums text-red-600">
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums text-red-600">
                                                     {formatNZD(period.outflows.recurring_expenses)}
-                                                </td>
-                                                <td className="py-3 pr-4 text-right font-mono tabular-nums text-red-600">
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums text-red-600">
                                                     {formatNZD(period.outflows.gst_payments)}
-                                                </td>
-                                                <td className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${netFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                                </TableCell>
+                                                <TableCell className={`text-right font-mono font-semibold tabular-nums ${netFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                                                     {formatNZD(netFlow)}
-                                                </td>
-                                                <td className={`py-3 text-right font-mono font-semibold tabular-nums ${closingBal >= 0 ? '' : 'text-red-600'}`}>
+                                                </TableCell>
+                                                <TableCell className={`text-right font-mono font-semibold tabular-nums ${closingBal >= 0 ? '' : 'text-red-600'}`}>
                                                     {formatNZD(closingBal)}
-                                                </td>
-                                            </tr>
+                                                </TableCell>
+                                            </TableRow>
                                         );
                                     })}
-                                </tbody>
-                            </table>
+                                </TableBody>
+                            </Table>
                         </div>
                     </CardContent>
                 </Card>
@@ -340,52 +415,52 @@ export default function CashFlowForecastShow({ forecast, chartData }: PageProps)
                         </CardHeader>
                         <CardContent>
                             <div className="overflow-x-auto">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b text-left text-muted-foreground">
-                                            <th className="pb-3 pr-4 font-medium">Scenario</th>
-                                            <th className="pb-3 pr-4 font-medium">Description</th>
-                                            <th className="pb-3 pr-4 font-medium text-right">Final Balance</th>
-                                            <th className="pb-3 pr-4 font-medium text-right">Total Inflows</th>
-                                            <th className="pb-3 font-medium text-right">Total Outflows</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Scenario</TableHead>
+                                            <TableHead>Description</TableHead>
+                                            <TableHead className="text-right">Final Balance</TableHead>
+                                            <TableHead className="text-right">Total Inflows</TableHead>
+                                            <TableHead className="text-right">Total Outflows</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
                                         {forecast.scenarios.map((scenario) => {
                                             const periods = scenario.forecast_data ?? [];
-                                            const lastPeriod = periods[periods.length - 1];
-                                            const totalInflows = periods.reduce(
+                                            const scenarioLastPeriod = periods[periods.length - 1];
+                                            const scenarioTotalInflows = periods.reduce(
                                                 (sum, p) => sum + Number(p.inflows?.total ?? 0),
                                                 0,
                                             );
-                                            const totalOutflows = periods.reduce(
+                                            const scenarioTotalOutflows = periods.reduce(
                                                 (sum, p) => sum + Number(p.outflows?.total ?? 0),
                                                 0,
                                             );
-                                            const finalBalance = lastPeriod
-                                                ? Number(lastPeriod.closing_balance)
+                                            const scenarioFinalBalance = scenarioLastPeriod
+                                                ? Number(scenarioLastPeriod.closing_balance)
                                                 : 0;
 
                                             return (
-                                                <tr key={scenario.id} className="border-b last:border-0">
-                                                    <td className="py-3 pr-4 font-medium">{scenario.name}</td>
-                                                    <td className="py-3 pr-4 text-muted-foreground">
+                                                <TableRow key={scenario.id}>
+                                                    <TableCell className="font-medium">{scenario.name}</TableCell>
+                                                    <TableCell className="text-muted-foreground">
                                                         {scenario.adjustments.description}
-                                                    </td>
-                                                    <td className={`py-3 pr-4 text-right font-mono font-semibold tabular-nums ${finalBalance >= 0 ? '' : 'text-red-600'}`}>
-                                                        {formatNZD(finalBalance)}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-right font-mono tabular-nums text-green-600">
-                                                        {formatNZD(totalInflows)}
-                                                    </td>
-                                                    <td className="py-3 text-right font-mono tabular-nums text-red-600">
-                                                        {formatNZD(totalOutflows)}
-                                                    </td>
-                                                </tr>
+                                                    </TableCell>
+                                                    <TableCell className={`text-right font-mono font-semibold tabular-nums ${scenarioFinalBalance >= 0 ? '' : 'text-red-600'}`}>
+                                                        {formatNZD(scenarioFinalBalance)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-mono tabular-nums text-green-600">
+                                                        {formatNZD(scenarioTotalInflows)}
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-mono tabular-nums text-red-600">
+                                                        {formatNZD(scenarioTotalOutflows)}
+                                                    </TableCell>
+                                                </TableRow>
                                             );
                                         })}
-                                    </tbody>
-                                </table>
+                                    </TableBody>
+                                </Table>
                             </div>
                         </CardContent>
                     </Card>

@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -54,6 +55,12 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
     const providerName = providerLabels[integration.provider];
     const externalIdLabel = integration.provider === 'xero' ? 'Xero Account ID' : 'MYOB Account UID';
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Integrations', href: '/finance/integrations' },
+        { title: `${providerName} Mapping`, href: `/finance/integrations/${integration.id}/mapping` },
+    ];
+
     // Build initial mapping from existing data
     const initialMapping: Record<string, string> = {};
     localAccounts.forEach((account) => {
@@ -93,12 +100,6 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
 
     const mappedCount = Object.values(data.account_mapping).filter((v) => v && v.trim()).length;
 
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Integrations', href: '/finance/integrations' },
-        { title: `${providerName} Mapping`, href: `/finance/integrations/${integration.id}/mapping` },
-    ];
-
     // Group accounts by type
     const groupedAccounts = localAccounts.reduce<Record<string, LocalAccount[]>>((acc, account) => {
         const type = account.type;
@@ -113,7 +114,7 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${providerName} Account Mapping`} />
 
-            <div className="mx-auto max-w-5xl space-y-6 p-6">
+            <div className="mx-auto max-w-6xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">{providerName} Account Mapping</h1>

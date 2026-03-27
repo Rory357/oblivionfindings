@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +24,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Coins, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Coins, Plus, Pencil, Trash2, CircleDollarSign } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type Currency = {
@@ -41,6 +42,11 @@ type Currency = {
 type PageProps = {
     currencies: Currency[];
 };
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Currencies', href: '/finance/currencies' },
+];
 
 const formatDate = (dateStr: string | null) => {
     if (!dateStr) return '-';
@@ -297,10 +303,8 @@ function EditCurrencyDialog({ currency }: { currency: Currency }) {
 }
 
 export default function CurrenciesIndex({ currencies }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Currencies', href: '/finance/currencies' },
-    ];
+    const activeCurrencies = currencies.filter((c) => c.is_active);
+    const baseCurrency = currencies.find((c) => c.is_base);
 
     function handleDelete(id: number) {
         if (confirm('Are you sure you want to delete this currency?')) {
@@ -319,6 +323,32 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                         <p className="text-muted-foreground">Manage currencies and exchange rates for multi-currency transactions</p>
                     </div>
                     <CreateCurrencyDialog />
+                </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Card>
+                        <CardContent className="flex items-center gap-4 pt-6">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                <Coins className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Active Currencies</p>
+                                <p className="text-2xl font-bold">{activeCurrencies.length}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center gap-4 pt-6">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                <CircleDollarSign className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Base Currency</p>
+                                <p className="text-2xl font-bold">{baseCurrency ? `${baseCurrency.code} (${baseCurrency.symbol})` : 'Not set'}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <Card>
@@ -373,7 +403,7 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                                                     className={
                                                         currency.is_active
                                                             ? 'bg-green-500/10 text-green-600 border-green-500/30'
-                                                            : 'bg-gray-500/10 text-gray-600 border-gray-500/30'
+                                                            : 'bg-muted text-muted-foreground border-border'
                                                     }
                                                 >
                                                     {currency.is_active ? 'Active' : 'Inactive'}

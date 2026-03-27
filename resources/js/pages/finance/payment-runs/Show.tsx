@@ -1,3 +1,4 @@
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -56,8 +57,8 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
     const [approving, setApproving] = useState(false);
     const [processingRun, setProcessingRun] = useState(false);
 
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
         { title: 'Payment Runs', href: '/finance/payment-runs' },
         { title: paymentRun.run_number, href: `/finance/payment-runs/${paymentRun.id}` },
     ];
@@ -84,12 +85,12 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Payment Run ${paymentRun.run_number}`} />
 
-            <div className="mx-auto max-w-6xl space-y-6 p-6">
+            <div className="max-w-7xl mx-auto p-6 space-y-6">
                 {/* Header */}
                 <div className="flex items-start justify-between">
                     <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{paymentRun.run_number}</h1>
-                        <p className="text-muted-foreground">Payment run details and items</p>
+                        <h1 className="text-3xl font-bold tracking-tight text-foreground">{paymentRun.run_number}</h1>
+                        <p className="text-muted-foreground mt-1">Payment run details and items</p>
                     </div>
                     <div className="flex items-center gap-2">
                         {paymentRun.status === 'draft' && (
@@ -205,50 +206,62 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Vendor</TableHead>
-                                    <TableHead>Bill #</TableHead>
-                                    <TableHead className="text-right">Amount</TableHead>
-                                    <TableHead>Bank Account</TableHead>
-                                    <TableHead>Status</TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {paymentRun.items.map((item) => {
-                                    const itemConfig = statusConfig[item.status] || { label: item.status, variant: 'secondary' as const };
-                                    return (
-                                        <TableRow key={item.id}>
-                                            <TableCell className="font-medium">
-                                                {item.vendor?.name || '-'}
-                                            </TableCell>
-                                            <TableCell className="font-mono">
-                                                {item.bill ? (
-                                                    <Link
-                                                        href={`/finance/bills/${item.bill.id}`}
-                                                        className="text-primary hover:underline"
-                                                    >
-                                                        {item.bill.bill_number}
-                                                    </Link>
-                                                ) : (
-                                                    '-'
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono tabular-nums">
-                                                {formatNZD(item.amount)}
-                                            </TableCell>
-                                            <TableCell className="font-mono text-muted-foreground">
-                                                {item.bank_account_number || '-'}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge variant={itemConfig.variant}>{itemConfig.label}</Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    );
-                                })}
-                            </TableBody>
-                        </Table>
+                        {paymentRun.items.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-12 px-4">
+                                <div className="rounded-full bg-muted p-4 mb-4">
+                                    <FileText className="h-8 w-8 text-muted-foreground" />
+                                </div>
+                                <h3 className="text-lg font-semibold text-foreground mb-1">No payment items</h3>
+                                <p className="text-sm text-muted-foreground text-center max-w-sm">
+                                    This payment run has no items yet.
+                                </p>
+                            </div>
+                        ) : (
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Vendor</TableHead>
+                                        <TableHead>Bill #</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
+                                        <TableHead>Bank Account</TableHead>
+                                        <TableHead>Status</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {paymentRun.items.map((item) => {
+                                        const itemConfig = statusConfig[item.status] || { label: item.status, variant: 'secondary' as const };
+                                        return (
+                                            <TableRow key={item.id}>
+                                                <TableCell className="font-medium">
+                                                    {item.vendor?.name || '-'}
+                                                </TableCell>
+                                                <TableCell className="font-mono">
+                                                    {item.bill ? (
+                                                        <Link
+                                                            href={`/finance/bills/${item.bill.id}`}
+                                                            className="text-primary hover:underline"
+                                                        >
+                                                            {item.bill.bill_number}
+                                                        </Link>
+                                                    ) : (
+                                                        '-'
+                                                    )}
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono tabular-nums">
+                                                    {formatNZD(item.amount)}
+                                                </TableCell>
+                                                <TableCell className="font-mono text-muted-foreground">
+                                                    {item.bank_account_number || '-'}
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge variant={itemConfig.variant}>{itemConfig.label}</Badge>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                    })}
+                                </TableBody>
+                            </Table>
+                        )}
                     </CardContent>
                 </Card>
             </div>

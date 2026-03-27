@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -29,7 +30,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowLeftRight, Plus, Send } from 'lucide-react';
+import { ArrowLeftRight, Plus, Send, Clock, DollarSign } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type Entity = {
@@ -69,9 +70,8 @@ const statusColors: Record<string, string> = {
     eliminated: 'bg-blue-500/10 text-blue-600 border-blue-500/30',
 };
 
-function formatCurrency(value: string | number): string {
-    return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(Number(value));
-}
+const formatCurrency = (amount: number) =>
+    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 function CreateTransactionDialog({ groupId, entities }: { groupId: number; entities: Entity[] }) {
     const [open, setOpen] = useState(false);
@@ -201,12 +201,15 @@ function CreateTransactionDialog({ groupId, entities }: { groupId: number; entit
 export default function IntercompanyIndex({ group, transactions, entities }: PageProps) {
     const [postingId, setPostingId] = useState<number | null>(null);
 
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
         { title: 'Consolidation', href: '/finance/consolidation' },
         { title: group.name, href: `/finance/consolidation/${group.id}` },
         { title: 'Intercompany', href: `/finance/intercompany/${group.id}` },
     ];
+
+    const pendingTransactions = transactions.filter((t) => t.status === 'pending');
+    const pendingTotal = pendingTransactions.reduce((sum, t) => sum + Number(t.amount), 0);
 
     function handlePost(transactionId: number) {
         setPostingId(transactionId);
@@ -226,6 +229,32 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                         <p className="text-muted-foreground">Manage transactions between entities in {group.name}</p>
                     </div>
                     <CreateTransactionDialog groupId={group.id} entities={entities} />
+                </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Card>
+                        <CardContent className="flex items-center gap-4 pt-6">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-yellow-500/10">
+                                <Clock className="h-5 w-5 text-yellow-600" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Pending Transactions</p>
+                                <p className="text-2xl font-bold">{pendingTransactions.length}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center gap-4 pt-6">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                <DollarSign className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Pending Amount</p>
+                                <p className="text-2xl font-bold font-mono tabular-nums">{formatCurrency(pendingTotal)}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <Card>
@@ -264,8 +293,8 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                                             <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
                                                 {txn.description}
                                             </TableCell>
-                                            <TableCell className="text-right font-mono">
-                                                {formatCurrency(txn.amount)}
+                                            <TableCell className="text-right font-mono tabular-nums">
+                                                {formatCurrency(Number(txn.amount))}
                                             </TableCell>
                                             <TableCell>
                                                 <Badge variant="outline" className={statusColors[txn.status]}>

@@ -1,5 +1,6 @@
 import { Head, useForm, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -63,6 +64,12 @@ const typeConfig: Record<string, { label: string; className: string }> = {
 export default function PettyCashShow({ summary, expenseAccounts }: Props) {
     const { fund, transactions } = summary;
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Petty Cash', href: '/finance/petty-cash' },
+        { title: fund.name, href: `/finance/petty-cash/${fund.id}` },
+    ];
+
     const { data, setData, post, processing, errors, reset } = useForm({
         transaction_date: new Date().toISOString().split('T')[0],
         type: 'expense',
@@ -80,10 +87,10 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
     };
 
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Petty Cash - ${fund.name}`} />
 
-            <div className="space-y-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center gap-4">
                     <Button asChild variant="ghost" size="sm">
                         <Link href={'/finance/petty-cash'}>
@@ -91,7 +98,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                             Back
                         </Link>
                     </Button>
-                    <h1 className="text-2xl font-bold">{fund.name}</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">{fund.name}</h1>
                     {fund.is_active ? (
                         <Badge variant="outline" className="border-green-300 text-green-600">
                             Active
@@ -119,7 +126,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Variance</p>
                             <p
-                                className={`text-xl font-bold ${fund.variance < 0 ? 'text-red-600' : fund.variance > 0 ? 'text-green-600' : ''}`}
+                                className={`text-xl font-bold ${fund.variance < 0 ? 'text-destructive' : fund.variance > 0 ? 'text-emerald-600' : ''}`}
                             >
                                 {formatCurrency(fund.variance)}
                             </p>
@@ -216,7 +223,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                             </Button>
                         </form>
                         {(errors.amount || errors.transaction_date || (errors as Record<string, string>).transaction) && (
-                            <p className="mt-2 text-sm text-red-600">
+                            <p className="mt-2 text-sm text-destructive">
                                 {errors.amount || errors.transaction_date || (errors as Record<string, string>).transaction}
                             </p>
                         )}
@@ -266,7 +273,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                                                     {txn.account_name ?? '-'}
                                                 </TableCell>
                                                 <TableCell
-                                                    className={`text-right font-medium ${txn.type === 'expense' ? 'text-red-600' : 'text-green-600'}`}
+                                                    className={`text-right font-medium ${txn.type === 'expense' ? 'text-destructive' : 'text-emerald-600'}`}
                                                 >
                                                     {txn.type === 'expense' ? '-' : '+'}
                                                     {formatCurrency(txn.amount)}
@@ -278,7 +285,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                                                 </TableCell>
                                                 <TableCell>
                                                     {txn.receipt_path ? (
-                                                        <Receipt className="h-4 w-4 text-green-600" />
+                                                        <Receipt className="h-4 w-4 text-emerald-600" />
                                                     ) : (
                                                         <span className="text-muted-foreground">-</span>
                                                     )}

@@ -3,7 +3,16 @@ import { Head, Link, router } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Plus, TrendingUp, Trash2 } from 'lucide-react';
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from '@/components/ui/table';
+import { Plus, TrendingUp, Trash2, FileBarChart } from 'lucide-react';
+import { type BreadcrumbItem } from '@/types';
 
 type Forecast = {
     id: number;
@@ -47,12 +56,12 @@ const statusConfig: Record<string, { label: string; className: string }> = {
     final: { label: 'Final', className: 'bg-green-100 text-green-700 border-green-300' },
 };
 
-export default function CashFlowForecastIndex({ forecasts }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Cash Flow Forecast', href: '/finance/cash-flow-forecast' },
-    ];
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Cash Flow Forecast', href: '/finance/cash-flow-forecast' },
+];
 
+export default function CashFlowForecastIndex({ forecasts }: PageProps) {
     function handleDelete(id: number) {
         if (confirm('Are you sure you want to delete this forecast?')) {
             router.delete(`/finance/cash-flow-forecast/${id}`);
@@ -63,7 +72,7 @@ export default function CashFlowForecastIndex({ forecasts }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Cash Flow Forecast" />
 
-            <div className="mx-auto max-w-6xl space-y-6 p-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Cash Flow Forecast</h1>
@@ -87,66 +96,76 @@ export default function CashFlowForecastIndex({ forecasts }: PageProps) {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b text-left text-muted-foreground">
-                                        <th className="pb-3 pr-4 font-medium">Name</th>
-                                        <th className="pb-3 pr-4 font-medium">Period</th>
-                                        <th className="pb-3 pr-4 font-medium">Type</th>
-                                        <th className="pb-3 pr-4 font-medium text-right">Opening Balance</th>
-                                        <th className="pb-3 pr-4 font-medium">Scenarios</th>
-                                        <th className="pb-3 pr-4 font-medium">Status</th>
-                                        <th className="pb-3 font-medium">Created</th>
-                                        <th className="pb-3 font-medium"></th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {forecasts.data.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={8} className="py-8 text-center text-muted-foreground">
-                                                No forecasts yet. Create your first cash flow forecast to get started.
-                                            </td>
-                                        </tr>
-                                    ) : (
-                                        forecasts.data.map((forecast) => {
+                        {forecasts.data.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center py-16 text-center">
+                                <div className="rounded-full bg-muted p-4 mb-4">
+                                    <FileBarChart className="h-8 w-8 text-muted-foreground" />
+                                </div>
+                                <h3 className="text-lg font-semibold">No forecasts yet</h3>
+                                <p className="text-muted-foreground mt-1 max-w-sm">
+                                    Create your first cash flow forecast to project future cash positions and plan ahead.
+                                </p>
+                                <Link href="/finance/cash-flow-forecast/create" className="mt-4">
+                                    <Button>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        New Forecast
+                                    </Button>
+                                </Link>
+                            </div>
+                        ) : (
+                            <>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Name</TableHead>
+                                            <TableHead>Period</TableHead>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead className="text-right">Opening Balance</TableHead>
+                                            <TableHead>Scenarios</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Created</TableHead>
+                                            <TableHead className="w-12"></TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {forecasts.data.map((forecast) => {
                                             const status = statusConfig[forecast.status] ?? statusConfig.draft;
                                             return (
-                                                <tr
+                                                <TableRow
                                                     key={forecast.id}
-                                                    className="border-b last:border-0 hover:bg-muted/50 cursor-pointer"
+                                                    className="cursor-pointer"
                                                     onClick={() => router.visit(`/finance/cash-flow-forecast/${forecast.id}`)}
                                                 >
-                                                    <td className="py-3 pr-4 font-medium">{forecast.name}</td>
-                                                    <td className="py-3 pr-4">
+                                                    <TableCell className="font-medium">{forecast.name}</TableCell>
+                                                    <TableCell>
                                                         {formatDate(forecast.period_start)} &ndash;{' '}
                                                         {formatDate(forecast.period_end)}
-                                                    </td>
-                                                    <td className="py-3 pr-4">
+                                                    </TableCell>
+                                                    <TableCell>
                                                         {periodTypeLabels[forecast.period_type] ?? forecast.period_type}
-                                                    </td>
-                                                    <td className="py-3 pr-4 text-right font-mono tabular-nums">
+                                                    </TableCell>
+                                                    <TableCell className="text-right font-mono tabular-nums">
                                                         {formatNZD(forecast.opening_balance)}
-                                                    </td>
-                                                    <td className="py-3 pr-4">{forecast.scenarios_count}</td>
-                                                    <td className="py-3 pr-4">
+                                                    </TableCell>
+                                                    <TableCell>{forecast.scenarios_count}</TableCell>
+                                                    <TableCell>
                                                         <Badge variant="outline" className={status.className}>
                                                             {status.label}
                                                         </Badge>
-                                                    </td>
-                                                    <td className="py-3 pr-4 whitespace-nowrap">
+                                                    </TableCell>
+                                                    <TableCell className="whitespace-nowrap">
                                                         <div>{formatDate(forecast.forecast_date)}</div>
                                                         {forecast.created_by && (
                                                             <div className="text-xs text-muted-foreground">
                                                                 {forecast.created_by.name}
                                                             </div>
                                                         )}
-                                                    </td>
-                                                    <td className="py-3">
+                                                    </TableCell>
+                                                    <TableCell>
                                                         {forecast.status === 'draft' && (
                                                             <Button
                                                                 variant="ghost"
-                                                                size="sm"
+                                                                size="icon"
                                                                 onClick={(e) => {
                                                                     e.stopPropagation();
                                                                     handleDelete(forecast.id);
@@ -155,28 +174,28 @@ export default function CashFlowForecastIndex({ forecasts }: PageProps) {
                                                                 <Trash2 className="h-4 w-4 text-destructive" />
                                                             </Button>
                                                         )}
-                                                    </td>
-                                                </tr>
+                                                    </TableCell>
+                                                </TableRow>
                                             );
-                                        })
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
+                                        })}
+                                    </TableBody>
+                                </Table>
 
-                        {forecasts.last_page > 1 && (
-                            <div className="mt-4 flex items-center justify-center gap-1">
-                                {forecasts.links.map((link, i) => (
-                                    <Button
-                                        key={i}
-                                        variant={link.active ? 'default' : 'outline'}
-                                        size="sm"
-                                        disabled={!link.url}
-                                        onClick={() => link.url && router.visit(link.url)}
-                                        dangerouslySetInnerHTML={{ __html: link.label }}
-                                    />
-                                ))}
-                            </div>
+                                {forecasts.last_page > 1 && (
+                                    <div className="mt-4 flex items-center justify-center gap-1">
+                                        {forecasts.links.map((link, i) => (
+                                            <Button
+                                                key={i}
+                                                variant={link.active ? 'default' : 'outline'}
+                                                size="sm"
+                                                disabled={!link.url}
+                                                onClick={() => link.url && router.visit(link.url)}
+                                                dangerouslySetInnerHTML={{ __html: link.label }}
+                                            />
+                                        ))}
+                                    </div>
+                                )}
+                            </>
                         )}
                     </CardContent>
                 </Card>

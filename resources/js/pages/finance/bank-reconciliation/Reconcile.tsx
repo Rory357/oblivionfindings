@@ -13,7 +13,10 @@ import {
     ArrowRight,
     Sparkles,
 } from 'lucide-react';
+import { type BreadcrumbItem } from '@/types';
 import { useState, useMemo } from 'react';
+
+const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 interface BankTransaction {
     id: number;
@@ -67,13 +70,10 @@ interface Props {
     suggestedMatches: SuggestedMatch[];
 }
 
-const formatNZD = (amount: number) =>
-    new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
-
 const confidenceColors: Record<string, string> = {
-    high: 'bg-green-100 text-green-800 border-green-300',
-    medium: 'bg-amber-100 text-amber-800 border-amber-300',
-    low: 'bg-gray-100 text-gray-600 border-gray-300',
+    high: 'bg-emerald-500/10 text-emerald-700 border-emerald-500/30',
+    medium: 'bg-amber-500/10 text-amber-700 border-amber-500/30',
+    low: 'bg-muted text-muted-foreground border-border',
 };
 
 export default function Reconcile({
@@ -193,7 +193,7 @@ export default function Reconcile({
         );
     };
 
-    const breadcrumbs = [
+    const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Bank Reconciliation', href: '/finance/bank-reconciliation' },
         { title: `${reconciliation.bank_account_name} - ${reconciliation.statement_date}`, href: `/finance/bank-reconciliation/${reconciliation.id}` },
@@ -207,15 +207,15 @@ export default function Reconcile({
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">
+                        <h1 className="text-3xl font-bold text-foreground">
                             Bank Reconciliation
                         </h1>
-                        <p className="text-gray-500 mt-1">
+                        <p className="text-muted-foreground mt-1">
                             {reconciliation.bank_account_name} &mdash; Statement date: {reconciliation.statement_date}
                         </p>
                     </div>
                     {isCompleted && (
-                        <Badge className="bg-green-100 text-green-800 text-sm px-3 py-1">
+                        <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30 text-sm px-3 py-1">
                             <CheckCircle className="h-4 w-4 mr-1" />
                             Completed {reconciliation.completed_at}
                             {reconciliation.completed_by_name && ` by ${reconciliation.completed_by_name}`}
@@ -229,7 +229,7 @@ export default function Reconcile({
                         <CardContent className="pt-4 pb-4">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Starting Balance</p>
                             <p className="text-lg font-semibold font-mono tabular-nums mt-1">
-                                {formatNZD(reconciliation.starting_balance)}
+                                {formatCurrency(reconciliation.starting_balance)}
                             </p>
                         </CardContent>
                     </Card>
@@ -237,7 +237,7 @@ export default function Reconcile({
                         <CardContent className="pt-4 pb-4">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Statement Balance</p>
                             <p className="text-lg font-semibold font-mono tabular-nums mt-1">
-                                {formatNZD(reconciliation.statement_balance)}
+                                {formatCurrency(reconciliation.statement_balance)}
                             </p>
                         </CardContent>
                     </Card>
@@ -245,15 +245,15 @@ export default function Reconcile({
                         <CardContent className="pt-4 pb-4">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Calculated Balance</p>
                             <p className="text-lg font-semibold font-mono tabular-nums mt-1">
-                                {formatNZD(calculatedBalance)}
+                                {formatCurrency(calculatedBalance)}
                             </p>
                         </CardContent>
                     </Card>
-                    <Card className={isBalanced ? 'border-green-300 bg-green-50' : 'border-amber-300 bg-amber-50'}>
+                    <Card className={isBalanced ? 'border-emerald-500/30 bg-emerald-500/5' : 'border-amber-500/30 bg-amber-500/5'}>
                         <CardContent className="pt-4 pb-4">
                             <p className="text-xs text-muted-foreground uppercase tracking-wider">Difference</p>
-                            <p className={`text-lg font-semibold font-mono tabular-nums mt-1 ${isBalanced ? 'text-green-700' : 'text-amber-700'}`}>
-                                {formatNZD(difference)}
+                            <p className={`text-lg font-semibold font-mono tabular-nums mt-1 ${isBalanced ? 'text-emerald-600' : 'text-amber-600'}`}>
+                                {formatCurrency(difference)}
                             </p>
                         </CardContent>
                     </Card>
@@ -291,7 +291,7 @@ export default function Reconcile({
                         <Button
                             onClick={handleComplete}
                             disabled={!isBalanced || processing}
-                            className={isBalanced ? 'bg-green-600 hover:bg-green-700' : ''}
+                            className={isBalanced ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : ''}
                         >
                             <CheckCircle className="h-4 w-4 mr-2" />
                             Complete Reconciliation
@@ -301,7 +301,7 @@ export default function Reconcile({
 
                 {/* Suggested Matches */}
                 {!isCompleted && suggestedMatches.length > 0 && (
-                    <Card className="border-blue-200 bg-blue-50/50">
+                    <Card className="border-blue-500/30 bg-blue-500/5">
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
                                 <Sparkles className="h-4 w-4 text-blue-600" />
@@ -322,13 +322,13 @@ export default function Reconcile({
                                     return (
                                         <div
                                             key={`${match.bank_transaction_id}-${match.journal_line_id}`}
-                                            className="flex items-center gap-4 p-3 bg-white rounded-lg border"
+                                            className="flex items-center gap-4 p-3 bg-background rounded-lg border"
                                         >
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-medium truncate">{txn.description}</span>
-                                                    <span className={`font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                                        {formatNZD(txn.amount)}
+                                                    <span className={`font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                        {formatCurrency(txn.amount)}
                                                     </span>
                                                     <span className="text-xs text-muted-foreground">{txn.transaction_date}</span>
                                                 </div>
@@ -338,7 +338,7 @@ export default function Reconcile({
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-sm font-medium truncate">{jl.description || jl.journal_description}</span>
                                                     <span className="font-mono tabular-nums text-sm">
-                                                        {jl.debit > 0 ? formatNZD(jl.debit) : formatNZD(-jl.credit)}
+                                                        {jl.debit > 0 ? formatCurrency(jl.debit) : formatCurrency(-jl.credit)}
                                                     </span>
                                                     <span className="text-xs text-muted-foreground">#{jl.journal_number}</span>
                                                 </div>
@@ -395,9 +395,9 @@ export default function Reconcile({
                                                     key={txn.id}
                                                     className={`cursor-pointer transition-colors ${
                                                         isSelected
-                                                            ? 'bg-blue-100 hover:bg-blue-100'
+                                                            ? 'bg-blue-500/10 hover:bg-blue-500/10'
                                                             : hasSuggestion
-                                                              ? 'bg-blue-50/50 hover:bg-blue-50'
+                                                              ? 'bg-blue-500/5 hover:bg-blue-500/10'
                                                               : 'hover:bg-muted/50'
                                                     } ${isCompleted ? 'pointer-events-none' : ''}`}
                                                     onClick={() => {
@@ -415,8 +415,8 @@ export default function Reconcile({
                                                     <TableCell className="whitespace-nowrap text-sm">
                                                         {txn.transaction_date}
                                                     </TableCell>
-                                                    <TableCell className={`text-right font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                                        {formatNZD(txn.amount)}
+                                                    <TableCell className={`text-right font-mono tabular-nums text-sm ${txn.amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                        {formatCurrency(txn.amount)}
                                                     </TableCell>
                                                     <TableCell className="text-sm truncate max-w-[200px]">
                                                         {txn.description}
@@ -465,7 +465,7 @@ export default function Reconcile({
                                                     key={line.id}
                                                     className={`cursor-pointer transition-colors ${
                                                         isSelected
-                                                            ? 'bg-blue-100 hover:bg-blue-100'
+                                                            ? 'bg-blue-500/10 hover:bg-blue-500/10'
                                                             : 'hover:bg-muted/50'
                                                     } ${isCompleted ? 'pointer-events-none' : ''}`}
                                                     onClick={() => {
@@ -476,8 +476,8 @@ export default function Reconcile({
                                                     <TableCell className="whitespace-nowrap text-sm">
                                                         {line.journal_date}
                                                     </TableCell>
-                                                    <TableCell className={`text-right font-mono tabular-nums text-sm ${amount >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                                        {formatNZD(amount)}
+                                                    <TableCell className={`text-right font-mono tabular-nums text-sm ${amount >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                        {formatCurrency(amount)}
                                                     </TableCell>
                                                     <TableCell className="text-sm truncate max-w-[200px]">
                                                         {line.description || line.journal_description || '-'}
@@ -500,7 +500,7 @@ export default function Reconcile({
                     <Card>
                         <CardHeader className="pb-3">
                             <CardTitle className="text-base flex items-center gap-2">
-                                <CheckCircle className="h-4 w-4 text-green-600" />
+                                <CheckCircle className="h-4 w-4 text-emerald-600" />
                                 Matched Items ({matchedLines.length})
                             </CardTitle>
                         </CardHeader>
@@ -529,8 +529,8 @@ export default function Reconcile({
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className={`text-right font-mono tabular-nums ${(line.bank_transaction?.amount ?? 0) >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                                {line.bank_transaction ? formatNZD(line.bank_transaction.amount) : '-'}
+                                            <TableCell className={`text-right font-mono tabular-nums ${(line.bank_transaction?.amount ?? 0) >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                                                {line.bank_transaction ? formatCurrency(line.bank_transaction.amount) : '-'}
                                             </TableCell>
                                             <TableCell>
                                                 {line.journal_line ? (
@@ -548,7 +548,7 @@ export default function Reconcile({
                                             </TableCell>
                                             <TableCell className="text-right font-mono tabular-nums">
                                                 {line.journal_line
-                                                    ? formatNZD(line.journal_line.debit > 0 ? line.journal_line.debit : -line.journal_line.credit)
+                                                    ? formatCurrency(line.journal_line.debit > 0 ? line.journal_line.debit : -line.journal_line.credit)
                                                     : '-'}
                                             </TableCell>
                                             {!isCompleted && (
@@ -556,7 +556,7 @@ export default function Reconcile({
                                                     <Button
                                                         variant="ghost"
                                                         size="sm"
-                                                        className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                                                        className="text-destructive hover:text-destructive hover:bg-destructive/10"
                                                         onClick={() => handleUnmatch(line.id)}
                                                         disabled={processing}
                                                     >

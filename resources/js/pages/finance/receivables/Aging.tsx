@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -42,7 +43,7 @@ const formatNZD = (amount: number) =>
     new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const bucketColors: Record<string, string> = {
-    current: 'text-green-700 dark:text-green-400',
+    current: 'text-emerald-700 dark:text-emerald-400',
     '1_30': 'text-yellow-700 dark:text-yellow-400',
     '31_60': 'text-orange-700 dark:text-orange-400',
     '61_90': 'text-red-600 dark:text-red-400',
@@ -50,12 +51,18 @@ const bucketColors: Record<string, string> = {
 };
 
 const bucketBgColors: Record<string, string> = {
-    current: 'bg-green-50 dark:bg-green-950/30',
+    current: 'bg-emerald-50 dark:bg-emerald-950/30',
     '1_30': 'bg-yellow-50 dark:bg-yellow-950/30',
     '31_60': 'bg-orange-50 dark:bg-orange-950/30',
     '61_90': 'bg-red-50 dark:bg-red-950/20',
     '90_plus': 'bg-red-100 dark:bg-red-950/40',
 };
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Accounts Receivable', href: '/finance/receivables' },
+    { title: 'Aging Report', href: '/finance/receivables/aging' },
+];
 
 function AmountCell({ amount, bucket }: { amount: number; bucket: string }) {
     if (amount === 0) {
@@ -70,19 +77,13 @@ function AmountCell({ amount, bucket }: { amount: number; bucket: string }) {
 
 export default function AgingReport({ clients, totals }: PageProps) {
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
-                { title: 'Accounts Receivable', href: '/finance/receivables' },
-                { title: 'Aging Report', href: '/finance/receivables/aging' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Aged Receivables" />
-            <div className="space-y-6 p-4">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-xl font-semibold">Aged Receivables</h1>
-                        <p className="text-sm text-muted-foreground">
+                        <h1 className="text-2xl font-bold tracking-tight">Aged Receivables</h1>
+                        <p className="text-muted-foreground">
                             Outstanding receivables grouped by client and aging bucket.
                         </p>
                     </div>

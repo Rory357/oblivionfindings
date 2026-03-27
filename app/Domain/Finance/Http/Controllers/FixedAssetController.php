@@ -47,12 +47,13 @@ class FixedAssetController extends Controller
             ->withQueryString();
 
         // Summary totals
-        $summaryQuery = FinFixedAsset::forOrganization($orgId);
+        $allAssets = FinFixedAsset::forOrganization($orgId)->get();
         $summary = [
-            'total_cost' => (float) (clone $summaryQuery)->sum('purchase_cost'),
-            'total_accumulated_depreciation' => (float) (clone $summaryQuery)->sum('accumulated_depreciation'),
-            'total_book_value' => (float) (clone $summaryQuery)->selectRaw('SUM(purchase_cost - accumulated_depreciation) as total')->value('total') ?? 0,
-            'active_count' => (clone $summaryQuery)->active()->count(),
+            'total_count' => $allAssets->count(),
+            'total_cost' => (float) $allAssets->sum('purchase_cost'),
+            'total_depreciation' => (float) $allAssets->sum('accumulated_depreciation'),
+            'net_book_value' => (float) ($allAssets->sum('purchase_cost') - $allAssets->sum('accumulated_depreciation')),
+            'active_count' => $allAssets->where('status', 'active')->count(),
         ];
 
         return Inertia::render('finance/fixed-assets/Index', [

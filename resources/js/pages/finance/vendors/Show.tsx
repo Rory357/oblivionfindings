@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { type PageProps } from '@/types';
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -119,19 +120,19 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
         .filter(Boolean)
         .join(', ');
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Vendors', href: '/finance/vendors' },
+        { title: vendor.name, href: `/finance/vendors/${vendor.id}` },
+    ];
+
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
-                { title: 'Vendors', href: '/finance/vendors' },
-                { title: vendor.name, href: `/finance/vendors/${vendor.id}` },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={vendor.name} />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
                         <Button variant="ghost" size="sm" asChild>
                             <Link href="/finance/vendors">
@@ -141,7 +142,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                         </Button>
                         <div>
                             <div className="flex items-center gap-3">
-                                <h1 className="text-3xl font-bold text-gray-900">{vendor.name}</h1>
+                                <h1 className="text-2xl font-bold tracking-tight">{vendor.name}</h1>
                                 <Badge
                                     variant={vendor.is_active ? 'default' : 'secondary'}
                                     className={
@@ -154,7 +155,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                 </Badge>
                             </div>
                             {vendor.trading_name && (
-                                <p className="text-gray-500 mt-1">
+                                <p className="text-muted-foreground mt-1">
                                     Trading as: {vendor.trading_name}
                                 </p>
                             )}
@@ -179,7 +180,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                             <CardContent>
                                 <dl className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-4">
                                     <div>
-                                        <dt className="text-sm font-medium text-gray-500">Type</dt>
+                                        <dt className="text-sm font-medium text-muted-foreground">Type</dt>
                                         <dd className="mt-1">
                                             <Badge
                                                 variant="secondary"
@@ -190,18 +191,18 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-sm font-medium text-gray-500">GST Number</dt>
-                                        <dd className="mt-1 text-sm text-gray-900">
+                                        <dt className="text-sm font-medium text-muted-foreground">GST Number</dt>
+                                        <dd className="mt-1 text-sm">
                                             {vendor.gst_number || '-'}
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-sm font-medium text-gray-500">Email</dt>
-                                        <dd className="mt-1 text-sm text-gray-900">
+                                        <dt className="text-sm font-medium text-muted-foreground">Email</dt>
+                                        <dd className="mt-1 text-sm">
                                             {vendor.email ? (
                                                 <a
                                                     href={`mailto:${vendor.email}`}
-                                                    className="text-blue-600 hover:underline"
+                                                    className="text-primary hover:underline"
                                                 >
                                                     {vendor.email}
                                                 </a>
@@ -211,20 +212,20 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-sm font-medium text-gray-500">Phone</dt>
-                                        <dd className="mt-1 text-sm text-gray-900">
+                                        <dt className="text-sm font-medium text-muted-foreground">Phone</dt>
+                                        <dd className="mt-1 text-sm">
                                             {vendor.phone || '-'}
                                         </dd>
                                     </div>
                                     <div className="sm:col-span-2">
-                                        <dt className="text-sm font-medium text-gray-500">Address</dt>
-                                        <dd className="mt-1 text-sm text-gray-900">
+                                        <dt className="text-sm font-medium text-muted-foreground">Address</dt>
+                                        <dd className="mt-1 text-sm">
                                             {address || '-'}
                                         </dd>
                                     </div>
                                     <div>
-                                        <dt className="text-sm font-medium text-gray-500">Payment Terms</dt>
-                                        <dd className="mt-1 text-sm text-gray-900">
+                                        <dt className="text-sm font-medium text-muted-foreground">Payment Terms</dt>
+                                        <dd className="mt-1 text-sm">
                                             {vendor.payment_terms_days != null
                                                 ? `${vendor.payment_terms_days} days`
                                                 : '-'}
@@ -232,8 +233,8 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                     </div>
                                     {vendor.notes && (
                                         <div className="sm:col-span-2">
-                                            <dt className="text-sm font-medium text-gray-500">Notes</dt>
-                                            <dd className="mt-1 text-sm text-gray-900 whitespace-pre-line">
+                                            <dt className="text-sm font-medium text-muted-foreground">Notes</dt>
+                                            <dd className="mt-1 text-sm whitespace-pre-line">
                                                 {vendor.notes}
                                             </dd>
                                         </div>
@@ -246,13 +247,13 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center gap-2">
-                                    <Users className="w-5 h-5 text-gray-400" />
+                                    <Users className="w-5 h-5 text-muted-foreground" />
                                     <CardTitle>Contacts</CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 {vendor.contacts.length === 0 ? (
-                                    <p className="text-sm text-gray-500 text-center py-4">
+                                    <p className="text-sm text-muted-foreground text-center py-4">
                                         No contacts recorded.
                                     </p>
                                 ) : (
@@ -272,13 +273,13 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                                     <TableCell className="font-medium">
                                                         {contact.name}
                                                     </TableCell>
-                                                    <TableCell className="text-gray-500">
+                                                    <TableCell className="text-muted-foreground">
                                                         {contact.role || '-'}
                                                     </TableCell>
-                                                    <TableCell className="text-gray-500">
+                                                    <TableCell className="text-muted-foreground">
                                                         {contact.email || '-'}
                                                     </TableCell>
-                                                    <TableCell className="text-gray-500">
+                                                    <TableCell className="text-muted-foreground">
                                                         {contact.phone || '-'}
                                                     </TableCell>
                                                     <TableCell>
@@ -300,13 +301,13 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center gap-2">
-                                    <FileText className="w-5 h-5 text-gray-400" />
+                                    <FileText className="w-5 h-5 text-muted-foreground" />
                                     <CardTitle>Recent Bills</CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 {bills.length === 0 ? (
-                                    <p className="text-sm text-gray-500 text-center py-4">
+                                    <p className="text-sm text-muted-foreground text-center py-4">
                                         No bills recorded.
                                     </p>
                                 ) : (
@@ -326,15 +327,15 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                                     <TableCell>
                                                         <Link
                                                             href={`/finance/bills/${bill.id}`}
-                                                            className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                                            className="font-medium text-primary hover:underline"
                                                         >
                                                             {bill.bill_number}
                                                         </Link>
                                                     </TableCell>
-                                                    <TableCell className="text-gray-500">
+                                                    <TableCell className="text-muted-foreground">
                                                         {formatDate(bill.bill_date)}
                                                     </TableCell>
-                                                    <TableCell className="text-gray-500">
+                                                    <TableCell className="text-muted-foreground">
                                                         {formatDate(bill.due_date)}
                                                     </TableCell>
                                                     <TableCell className="text-right">
@@ -360,13 +361,13 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center gap-2">
-                                    <ShoppingCart className="w-5 h-5 text-gray-400" />
+                                    <ShoppingCart className="w-5 h-5 text-muted-foreground" />
                                     <CardTitle>Recent Purchase Orders</CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent>
                                 {purchaseOrders.length === 0 ? (
-                                    <p className="text-sm text-gray-500 text-center py-4">
+                                    <p className="text-sm text-muted-foreground text-center py-4">
                                         No purchase orders recorded.
                                     </p>
                                 ) : (
@@ -385,12 +386,12 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                                     <TableCell>
                                                         <Link
                                                             href={`/finance/purchase-orders/${po.id}`}
-                                                            className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                                            className="font-medium text-primary hover:underline"
                                                         >
                                                             {po.po_number}
                                                         </Link>
                                                     </TableCell>
-                                                    <TableCell className="text-gray-500">
+                                                    <TableCell className="text-muted-foreground">
                                                         {formatDate(po.order_date)}
                                                     </TableCell>
                                                     <TableCell className="text-right">
@@ -418,20 +419,20 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                         <Card>
                             <CardHeader>
                                 <div className="flex items-center gap-2">
-                                    <DollarSign className="w-5 h-5 text-gray-400" />
+                                    <DollarSign className="w-5 h-5 text-muted-foreground" />
                                     <CardTitle>Financial Summary</CardTitle>
                                 </div>
                             </CardHeader>
                             <CardContent className="space-y-6">
                                 <div>
-                                    <p className="text-sm font-medium text-gray-500">Total Outstanding</p>
-                                    <p className="text-2xl font-bold text-gray-900 mt-1">
+                                    <p className="text-sm font-medium text-muted-foreground">Total Outstanding</p>
+                                    <p className="text-2xl font-bold mt-1">
                                         {formatCurrency(totalOutstanding)}
                                     </p>
                                 </div>
                                 <div>
-                                    <p className="text-sm font-medium text-gray-500">Total Paid YTD</p>
-                                    <p className="text-2xl font-bold text-gray-900 mt-1">
+                                    <p className="text-sm font-medium text-muted-foreground">Total Paid YTD</p>
+                                    <p className="text-2xl font-bold mt-1">
                                         {formatCurrency(totalPaidYtd)}
                                     </p>
                                 </div>

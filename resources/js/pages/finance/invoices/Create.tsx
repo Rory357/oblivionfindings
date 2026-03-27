@@ -1,5 +1,5 @@
 import { Head, Link, useForm } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -56,6 +56,12 @@ const emptyLine = (): LineItem => ({
     tax_rate_id: '',
     account_id: '',
 });
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Invoices', href: '/finance/invoices' },
+    { title: 'New Invoice', href: '/finance/invoices/create' },
+];
 
 export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props) {
     const { data, setData, post, processing, errors } = useForm<{
@@ -130,21 +136,14 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
     };
 
     return (
-        <AppLayout
-            user={auth.user}
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
-                { title: 'Invoices', href: '/finance/invoices' },
-                { title: 'New Invoice', href: '/finance/invoices/create' },
-            ]}
-        >
+        <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title="New Invoice" />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto p-6">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">New Invoice</h1>
-                        <p className="text-gray-500 mt-1">Create and send a new invoice</p>
+                        <h1 className="text-3xl font-bold text-foreground">New Invoice</h1>
+                        <p className="text-muted-foreground mt-1">Create and send a new invoice</p>
                     </div>
                 </div>
 
@@ -164,7 +163,7 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                                         onChange={(e) => setData('invoice_number', e.target.value)}
                                         placeholder="Auto-generated"
                                     />
-                                    {errors.invoice_number && <p className="text-sm text-red-600 mt-1">{errors.invoice_number}</p>}
+                                    {errors.invoice_number && <p className="text-sm text-destructive mt-1">{errors.invoice_number}</p>}
                                 </div>
                                 <div>
                                     <Label htmlFor="invoice_date">Invoice Date *</Label>
@@ -174,7 +173,7 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                                         value={data.invoice_date}
                                         onChange={(e) => setData('invoice_date', e.target.value)}
                                     />
-                                    {errors.invoice_date && <p className="text-sm text-red-600 mt-1">{errors.invoice_date}</p>}
+                                    {errors.invoice_date && <p className="text-sm text-destructive mt-1">{errors.invoice_date}</p>}
                                 </div>
                                 <div>
                                     <Label htmlFor="due_date">Due Date *</Label>
@@ -184,7 +183,7 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                                         value={data.due_date}
                                         onChange={(e) => setData('due_date', e.target.value)}
                                     />
-                                    {errors.due_date && <p className="text-sm text-red-600 mt-1">{errors.due_date}</p>}
+                                    {errors.due_date && <p className="text-sm text-destructive mt-1">{errors.due_date}</p>}
                                 </div>
                             </div>
                         </CardContent>
@@ -205,7 +204,7 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                                         onChange={(e) => setData('client_name', e.target.value)}
                                         placeholder="Client or company name"
                                     />
-                                    {errors.client_name && <p className="text-sm text-red-600 mt-1">{errors.client_name}</p>}
+                                    {errors.client_name && <p className="text-sm text-destructive mt-1">{errors.client_name}</p>}
                                 </div>
                                 <div>
                                     <Label htmlFor="client_email">Client Email</Label>
@@ -216,7 +215,7 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                                         onChange={(e) => setData('client_email', e.target.value)}
                                         placeholder="client@example.com"
                                     />
-                                    {errors.client_email && <p className="text-sm text-red-600 mt-1">{errors.client_email}</p>}
+                                    {errors.client_email && <p className="text-sm text-destructive mt-1">{errors.client_email}</p>}
                                 </div>
                                 <div className="md:col-span-2">
                                     <Label htmlFor="client_address">Client Address</Label>
@@ -242,7 +241,7 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                             </Button>
                         </CardHeader>
                         <CardContent>
-                            {errors.lines && <p className="text-sm text-red-600 mb-2">{errors.lines}</p>}
+                            {errors.lines && <p className="text-sm text-destructive mb-2">{errors.lines}</p>}
                             <div className="overflow-x-auto">
                                 <Table>
                                     <TableHeader>
@@ -268,7 +267,7 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                                                         className="min-w-[180px]"
                                                     />
                                                     {errors[`lines.${index}.description` as keyof typeof errors] && (
-                                                        <p className="text-xs text-red-600">{errors[`lines.${index}.description` as keyof typeof errors]}</p>
+                                                        <p className="text-xs text-destructive">{errors[`lines.${index}.description` as keyof typeof errors]}</p>
                                                     )}
                                                 </TableCell>
                                                 <TableCell>
@@ -341,7 +340,7 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                                                         onClick={() => removeLine(index)}
                                                         disabled={data.lines.length <= 1}
                                                     >
-                                                        <Trash2 className="w-4 h-4 text-red-500" />
+                                                        <Trash2 className="w-4 h-4 text-destructive" />
                                                     </Button>
                                                 </TableCell>
                                             </TableRow>
@@ -354,11 +353,11 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                             <div className="flex justify-end mt-4">
                                 <div className="w-64 space-y-2">
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">Subtotal</span>
+                                        <span className="text-muted-foreground">Subtotal</span>
                                         <span>{formatCurrency(subtotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-sm">
-                                        <span className="text-gray-500">GST</span>
+                                        <span className="text-muted-foreground">GST</span>
                                         <span>{formatCurrency(taxTotal)}</span>
                                     </div>
                                     <div className="flex justify-between text-base font-bold border-t pt-2">

@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,7 +9,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, AlertTriangle, Clock, CreditCard } from 'lucide-react';
+import { CheckCircle2, AlertTriangle, Clock, CreditCard, DollarSign, Hash } from 'lucide-react';
+import { useMemo } from 'react';
 
 interface Batch {
     id: number;
@@ -77,6 +79,11 @@ const statusConfig: Record<string, { label: string; icon: typeof CheckCircle2; c
     discrepancy: { label: 'Discrepancy', icon: AlertTriangle, className: 'border-red-300 text-red-600' },
 };
 
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'EFTPOS Batches', href: '/finance/eftpos/batches' },
+];
+
 export default function EftposBatches({ batches, terminals, unmatchedBankTransactions, filters }: Props) {
     const handleReconcile = (batchId: number, bankTransactionId?: number) => {
         router.post(`/finance/eftpos/batches/${batchId}/reconcile`, {
@@ -84,16 +91,84 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
         });
     };
 
+    const kpis = useMemo(() => {
+        const data = batches.data;
+        const totalSettlement = data.reduce((sum, b) => sum + b.settlement_amount, 0);
+        const totalFees = data.reduce((sum, b) => sum + b.fees, 0);
+        const totalTxns = data.reduce((sum, b) => sum + b.total_transactions, 0);
+        const unreconciledCount = data.filter((b) => b.status !== 'reconciled').length;
+        return { totalSettlement, totalFees, totalTxns, unreconciledCount };
+    }, [batches.data]);
+
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="EFTPOS Batches" />
 
-            <div className="space-y-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">EFTPOS Batches</h1>
+                    <div>
+                        <h1 className="text-2xl font-bold tracking-tight">EFTPOS Batches</h1>
+                        <p className="text-muted-foreground">Reconcile EFTPOS settlements with bank transactions</p>
+                    </div>
                     <Button asChild variant="outline">
                         <Link href="/finance/eftpos/terminals">Manage Terminals</Link>
                     </Button>
+                </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-emerald-500/10 p-2">
+                                    <DollarSign className="h-5 w-5 text-emerald-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Total Settlement</p>
+                                    <p className="text-xl font-bold font-mono tabular-nums">{formatCurrency(kpis.totalSettlement)}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-amber-500/10 p-2">
+                                    <DollarSign className="h-5 w-5 text-amber-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Total Fees</p>
+                                    <p className="text-xl font-bold font-mono tabular-nums">{formatCurrency(kpis.totalFees)}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-blue-500/10 p-2">
+                                    <Hash className="h-5 w-5 text-blue-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Total Transactions</p>
+                                    <p className="text-xl font-bold">{kpis.totalTxns}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-red-500/10 p-2">
+                                    <AlertTriangle className="h-5 w-5 text-red-600" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Unreconciled</p>
+                                    <p className="text-xl font-bold">{kpis.unreconciledCount}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 {/* Filters */}
@@ -199,7 +274,7 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                                         return (
                                             <TableRow key={batch.id}>
                                                 <TableCell>
-                                                    <Link href={`/finance/eftpos/batches/${batch.id}`} className="font-medium text-blue-600 hover:underline">
+                                                    <Link href={`/finance/eftpos/batches/${batch.id}`} className="font-medium text-primary hover:underline">
                                                         {batch.batch_number}
                                                     </Link>
                                                 </TableCell>
@@ -207,7 +282,7 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                                                 <TableCell className="text-sm">{batch.terminal_name ?? '-'}</TableCell>
                                                 <TableCell className="text-right">{batch.total_transactions}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency(batch.total_amount)}</TableCell>
-                                                <TableCell className="text-right text-red-600">
+                                                <TableCell className="text-right text-destructive">
                                                     {batch.total_refunds > 0 ? `-${formatCurrency(batch.total_refunds)}` : '-'}
                                                 </TableCell>
                                                 <TableCell className="text-right text-muted-foreground">
@@ -220,7 +295,7 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                                                         {config.label}
                                                     </Badge>
                                                     {batch.discrepancy_amount !== 0 && (
-                                                        <span className="ml-1 text-xs text-red-600">
+                                                        <span className="ml-1 text-xs text-destructive">
                                                             ({formatCurrency(batch.discrepancy_amount)})
                                                         </span>
                                                     )}

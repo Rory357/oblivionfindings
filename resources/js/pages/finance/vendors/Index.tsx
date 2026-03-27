@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { type PageProps } from '@/types';
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -57,6 +58,11 @@ const vendorTypeColors: Record<string, string> = {
     other: 'bg-gray-100 text-gray-800',
 };
 
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Vendors', href: '/finance/vendors' },
+];
+
 export default function VendorsIndex({ vendors, filters }: Props) {
     const [search, setSearch] = useState(filters.search);
 
@@ -85,20 +91,15 @@ export default function VendorsIndex({ vendors, filters }: Props) {
     );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
-                { title: 'Vendors', href: '/finance/vendors' },
-            ]}
-        >
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Vendors" />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 {/* Header */}
-                <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center justify-between">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Vendors</h1>
-                        <p className="text-gray-500 mt-1">
+                        <h1 className="text-2xl font-bold tracking-tight">Vendors</h1>
+                        <p className="text-muted-foreground">
                             Manage your suppliers, contractors and service providers
                         </p>
                     </div>
@@ -111,12 +112,12 @@ export default function VendorsIndex({ vendors, filters }: Props) {
                 </div>
 
                 {/* Filters */}
-                <Card className="mb-6">
+                <Card>
                     <CardContent className="pt-6">
                         <div className="flex flex-col sm:flex-row gap-4">
                             <div className="flex-1">
                                 <div className="relative">
-                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                                     <Input
                                         placeholder="Search by name or email..."
                                         value={search}
@@ -171,9 +172,9 @@ export default function VendorsIndex({ vendors, filters }: Props) {
                     <CardContent className="p-0">
                         {vendors.data.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <Building2 className="h-12 w-12 text-gray-300 mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-1">No vendors found</h3>
-                                <p className="text-gray-500 mb-4">
+                                <Building2 className="h-12 w-12 text-muted-foreground/30 mb-4" />
+                                <h3 className="text-lg font-medium mb-1">No vendors found</h3>
+                                <p className="text-muted-foreground mb-4">
                                     Get started by adding your first vendor.
                                 </p>
                                 <Button asChild>
@@ -202,12 +203,12 @@ export default function VendorsIndex({ vendors, filters }: Props) {
                                             <TableCell>
                                                 <Link
                                                     href={`/finance/vendors/${vendor.id}`}
-                                                    className="font-medium text-blue-600 hover:text-blue-800 hover:underline"
+                                                    className="font-medium text-primary hover:underline"
                                                 >
                                                     {vendor.name}
                                                 </Link>
                                             </TableCell>
-                                            <TableCell className="text-gray-500">
+                                            <TableCell className="text-muted-foreground">
                                                 {vendor.trading_name || '-'}
                                             </TableCell>
                                             <TableCell>
@@ -218,10 +219,10 @@ export default function VendorsIndex({ vendors, filters }: Props) {
                                                     {vendorTypeLabels[vendor.vendor_type] || vendor.vendor_type}
                                                 </Badge>
                                             </TableCell>
-                                            <TableCell className="text-gray-500">
+                                            <TableCell className="text-muted-foreground">
                                                 {vendor.email || '-'}
                                             </TableCell>
-                                            <TableCell className="text-gray-500">
+                                            <TableCell className="text-muted-foreground">
                                                 {vendor.phone || '-'}
                                             </TableCell>
                                             <TableCell className="text-center">
@@ -249,8 +250,8 @@ export default function VendorsIndex({ vendors, filters }: Props) {
 
                 {/* Pagination */}
                 {vendors.last_page > 1 && (
-                    <div className="flex items-center justify-between mt-4">
-                        <p className="text-sm text-gray-500">
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
                             Showing {(vendors.current_page - 1) * vendors.per_page + 1} to{' '}
                             {Math.min(vendors.current_page * vendors.per_page, vendors.total)} of{' '}
                             {vendors.total} vendors

@@ -1,5 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Search, AlertTriangle } from 'lucide-react';
+import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -43,10 +43,17 @@ interface Filters {
     date_to?: string;
 }
 
+interface Summary {
+    total_unpaid: number;
+    total_overdue: number;
+    due_this_week: number;
+}
+
 interface Props extends PageProps {
     bills: PaginatedBills;
     vendors: Vendor[];
     filters: Filters;
+    summary: Summary;
 }
 
 const formatCurrency = (amount: string | number) =>
@@ -56,15 +63,20 @@ const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800' },
-    awaiting_approval: { label: 'Awaiting Approval', className: 'bg-yellow-100 text-yellow-800' },
-    approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800' },
-    partially_paid: { label: 'Partially Paid', className: 'bg-orange-100 text-orange-800' },
-    paid: { label: 'Paid', className: 'bg-green-100 text-green-800' },
-    cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
+    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' },
+    awaiting_approval: { label: 'Awaiting Approval', className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' },
+    approved: { label: 'Approved', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
+    partially_paid: { label: 'Partially Paid', className: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300' },
+    paid: { label: 'Paid', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
+    cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
 };
 
-export default function BillsIndex({ auth, bills, vendors, filters }: Props) {
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Bills', href: '/finance/bills' },
+];
+
+export default function BillsIndex({ auth, bills, vendors, filters, summary }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [vendorId, setVendorId] = useState(filters.vendor_id ?? '');
@@ -97,21 +109,15 @@ export default function BillsIndex({ auth, bills, vendors, filters }: Props) {
     };
 
     return (
-        <AppLayout
-            user={auth.user}
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
-                { title: 'Bills', href: '/finance/bills' },
-            ]}
-        >
+        <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title="Bills" />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto p-6">
                 {/* Header */}
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Bills</h1>
-                        <p className="text-gray-500 mt-1">Manage accounts payable</p>
+                        <h1 className="text-3xl font-bold text-foreground">Bills</h1>
+                        <p className="text-muted-foreground mt-1">Manage accounts payable</p>
                     </div>
                     <Button asChild>
                         <Link href="/finance/bills/create">
@@ -121,12 +127,55 @@ export default function BillsIndex({ auth, bills, vendors, filters }: Props) {
                     </Button>
                 </div>
 
+                {/* KPI Summary Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-blue-100 p-2 dark:bg-blue-900">
+                                    <DollarSign className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Total Unpaid</p>
+                                    <p className="text-xl font-bold text-foreground">{formatCurrency(summary.total_unpaid)}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-red-100 p-2 dark:bg-red-900">
+                                    <AlertTriangle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Overdue</p>
+                                    <p className="text-xl font-bold text-foreground">{formatCurrency(summary.total_overdue)}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="pt-6">
+                            <div className="flex items-center gap-3">
+                                <div className="rounded-lg bg-amber-100 p-2 dark:bg-amber-900">
+                                    <CalendarClock className="h-5 w-5 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <div>
+                                    <p className="text-sm text-muted-foreground">Due This Week</p>
+                                    <p className="text-xl font-bold text-foreground">{formatCurrency(summary.due_this_week)}</p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+
                 {/* Filters */}
                 <Card className="mb-6">
                     <CardContent className="pt-6">
                         <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                             <div className="relative">
-                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                                 <Input
                                     placeholder="Search bill # or vendor ref..."
                                     value={search}
@@ -202,7 +251,7 @@ export default function BillsIndex({ auth, bills, vendors, filters }: Props) {
                         <TableBody>
                             {bills.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center text-gray-500 py-8">
+                                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                                         No bills found.
                                     </TableCell>
                                 </TableRow>
@@ -211,23 +260,23 @@ export default function BillsIndex({ auth, bills, vendors, filters }: Props) {
                                     <TableRow
                                         key={bill.id}
                                         className={cn(
-                                            'cursor-pointer hover:bg-gray-50',
-                                            isOverdue(bill) && 'bg-red-50 hover:bg-red-100',
+                                            'cursor-pointer hover:bg-muted/50',
+                                            isOverdue(bill) && 'bg-red-50 hover:bg-red-100 dark:bg-red-950/20 dark:hover:bg-red-950/30',
                                         )}
                                         onClick={() => router.get(`/finance/bills/${bill.id}`)}
                                     >
                                         <TableCell className="font-medium">
-                                            <Link href={`/finance/bills/${bill.id}`} className="text-blue-600 hover:underline">
+                                            <Link href={`/finance/bills/${bill.id}`} className="text-primary hover:underline">
                                                 {bill.bill_number}
                                             </Link>
                                         </TableCell>
-                                        <TableCell className="text-gray-500">{bill.vendor_reference ?? '-'}</TableCell>
+                                        <TableCell className="text-muted-foreground">{bill.vendor_reference ?? '-'}</TableCell>
                                         <TableCell>{bill.vendor?.name ?? '-'}</TableCell>
                                         <TableCell>{formatDate(bill.bill_date)}</TableCell>
                                         <TableCell>
                                             <span className="inline-flex items-center gap-1">
                                                 {isOverdue(bill) && <AlertTriangle className="w-3.5 h-3.5 text-red-500" />}
-                                                <span className={cn(isOverdue(bill) && 'text-red-600 font-medium')}>
+                                                <span className={cn(isOverdue(bill) && 'text-red-600 font-medium dark:text-red-400')}>
                                                     {formatDate(bill.due_date)}
                                                 </span>
                                             </span>

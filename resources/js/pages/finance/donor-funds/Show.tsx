@@ -1,5 +1,6 @@
 import { Head, useForm, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -8,9 +9,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsRoot, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ArrowLeft, TrendingUp, TrendingDown } from 'lucide-react';
 import { FormEvent } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 interface FundData {
     id: number;
@@ -113,6 +117,18 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
     const config = statusConfig[fund.status] ?? statusConfig.active;
     const utilisation = fund.budget_amount ? Math.round((fund.total_spent / fund.budget_amount) * 100) : null;
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Donor Funds', href: '/finance/donor-funds' },
+        { title: fund.fund_name, href: `/finance/donor-funds/${fund.id}` },
+    ];
+
+    const chartData = [
+        { name: 'Received', amount: fund.total_received },
+        { name: 'Spent', amount: fund.total_spent },
+        { name: 'Available', amount: fund.available_balance },
+    ];
+
     const receiptForm = useForm({
         transaction_date: new Date().toISOString().split('T')[0],
         description: '',
@@ -156,10 +172,10 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
     };
 
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${fund.fund_name}`} />
 
-            <div className="space-y-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center gap-4">
                     <Button asChild variant="ghost" size="sm">
                         <Link href="/finance/donor-funds">
@@ -168,7 +184,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                         </Link>
                     </Button>
                     <div>
-                        <h1 className="text-2xl font-bold">{fund.fund_name}</h1>
+                        <h1 className="text-2xl font-bold tracking-tight">{fund.fund_name}</h1>
                         <p className="text-sm text-muted-foreground">
                             {fund.fund_code} - {fundTypeLabels[fund.fund_type] ?? fund.fund_type}
                             {fund.donor_name && ` from ${fund.donor_name}`}
@@ -184,43 +200,69 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                     )}
                 </div>
 
-                {/* Fund Balance Cards */}
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Total Received</p>
-                            <p className="text-xl font-bold">{formatCurrency(fund.total_received)}</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Total Spent</p>
-                            <p className="text-xl font-bold">{formatCurrency(fund.total_spent)}</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Committed</p>
-                            <p className="text-xl font-bold">{formatCurrency(fund.total_committed)}</p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <p className="text-sm text-muted-foreground">Available Balance</p>
-                            <p className="text-xl font-bold text-green-600">{formatCurrency(fund.available_balance)}</p>
-                        </CardContent>
-                    </Card>
-                    {fund.budget_amount && (
+                {/* Fund Balance Cards + Bar Chart */}
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+                    <div className="lg:col-span-2 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
                         <Card>
                             <CardContent className="p-4">
-                                <p className="text-sm text-muted-foreground">Budget Utilisation</p>
-                                <p className={`text-xl font-bold ${utilisation && utilisation > 90 ? 'text-red-600' : ''}`}>
-                                    {utilisation}%
-                                </p>
-                                <p className="text-xs text-muted-foreground">of {formatCurrency(fund.budget_amount)}</p>
+                                <p className="text-sm text-muted-foreground">Total Received</p>
+                                <p className="text-xl font-bold">{formatCurrency(fund.total_received)}</p>
                             </CardContent>
                         </Card>
-                    )}
+                        <Card>
+                            <CardContent className="p-4">
+                                <p className="text-sm text-muted-foreground">Total Spent</p>
+                                <p className="text-xl font-bold">{formatCurrency(fund.total_spent)}</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-4">
+                                <p className="text-sm text-muted-foreground">Committed</p>
+                                <p className="text-xl font-bold">{formatCurrency(fund.total_committed)}</p>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="p-4">
+                                <p className="text-sm text-muted-foreground">Available Balance</p>
+                                <p className="text-xl font-bold text-emerald-600">{formatCurrency(fund.available_balance)}</p>
+                            </CardContent>
+                        </Card>
+                        {fund.budget_amount && (
+                            <Card>
+                                <CardContent className="p-4">
+                                    <p className="text-sm text-muted-foreground">Budget Utilisation</p>
+                                    <p className={`text-xl font-bold ${utilisation && utilisation > 90 ? 'text-destructive' : ''}`}>
+                                        {utilisation}%
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">of {formatCurrency(fund.budget_amount)}</p>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+
+                    {/* Fund Utilization Bar Chart */}
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">
+                                Fund Utilisation
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={180}>
+                                <BarChart data={chartData}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                                    <YAxis tick={{ fontSize: 12 }} />
+                                    <Tooltip formatter={((value: number) => formatCurrency(value)) as any} />
+                                    <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
+                                        {chartData.map((_, index) => (
+                                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 {/* Fund Info */}
@@ -240,7 +282,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                 {fund.end_date && (
                                     <div>
                                         <dt className="text-muted-foreground">End Date</dt>
-                                        <dd className={`font-medium ${new Date(fund.end_date) < new Date() ? 'text-red-600' : ''}`}>
+                                        <dd className={`font-medium ${new Date(fund.end_date) < new Date() ? 'text-destructive' : ''}`}>
                                             {formatDate(fund.end_date)}
                                         </dd>
                                     </div>
@@ -272,7 +314,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                 {fund.next_report_due && (
                                     <div>
                                         <dt className="text-muted-foreground">Next Report Due</dt>
-                                        <dd className={`font-medium ${new Date(fund.next_report_due) <= new Date() ? 'text-red-600' : ''}`}>
+                                        <dd className={`font-medium ${new Date(fund.next_report_due) <= new Date() ? 'text-destructive' : ''}`}>
                                             {formatDate(fund.next_report_due)}
                                         </dd>
                                     </div>
@@ -283,7 +325,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                 )}
 
                 {/* Actions Tabs */}
-                <Tabs defaultValue="transactions">
+                <TabsRoot defaultValue="transactions" className="space-y-4">
                     <TabsList>
                         <TabsTrigger value="transactions">Transactions</TabsTrigger>
                         <TabsTrigger value="receipt">Record Receipt</TabsTrigger>
@@ -331,7 +373,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                                         <TableCell className="max-w-[250px] truncate">{txn.description}</TableCell>
                                                         <TableCell className="text-sm">{txn.reference ?? '-'}</TableCell>
                                                         <TableCell className="text-right">
-                                                            <span className={`font-medium ${typeConf.isInflow ? 'text-green-600' : 'text-red-600'}`}>
+                                                            <span className={`font-medium ${typeConf.isInflow ? 'text-emerald-600' : 'text-destructive'}`}>
                                                                 {typeConf.isInflow ? '+' : '-'}
                                                                 {formatCurrency(txn.amount)}
                                                             </span>
@@ -353,7 +395,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <TrendingUp className="h-5 w-5 text-green-600" />
+                                    <TrendingUp className="h-5 w-5 text-emerald-600" />
                                     Record Receipt
                                 </CardTitle>
                             </CardHeader>
@@ -421,7 +463,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                             {receiptForm.processing ? 'Recording...' : 'Record Receipt'}
                                         </Button>
                                         {(receiptForm.errors as Record<string, string>).receipt && (
-                                            <p className="mt-2 text-sm text-red-600">{(receiptForm.errors as Record<string, string>).receipt}</p>
+                                            <p className="mt-2 text-sm text-destructive">{(receiptForm.errors as Record<string, string>).receipt}</p>
                                         )}
                                     </div>
                                 </form>
@@ -434,7 +476,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                         <Card>
                             <CardHeader>
                                 <CardTitle className="flex items-center gap-2">
-                                    <TrendingDown className="h-5 w-5 text-red-600" />
+                                    <TrendingDown className="h-5 w-5 text-destructive" />
                                     Record Expenditure
                                 </CardTitle>
                             </CardHeader>
@@ -507,7 +549,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                             {expenditureForm.processing ? 'Recording...' : 'Record Expenditure'}
                                         </Button>
                                         {(expenditureForm.errors as Record<string, string>).expenditure && (
-                                            <p className="mt-2 text-sm text-red-600">
+                                            <p className="mt-2 text-sm text-destructive">
                                                 {(expenditureForm.errors as Record<string, string>).expenditure}
                                             </p>
                                         )}
@@ -577,10 +619,10 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                                                             {formatDate(report.period_from)} - {formatDate(report.period_to)}
                                                         </TableCell>
                                                         <TableCell className="text-right">{formatCurrency(report.opening_balance)}</TableCell>
-                                                        <TableCell className="text-right text-green-600">
+                                                        <TableCell className="text-right text-emerald-600">
                                                             {formatCurrency(report.total_receipts)}
                                                         </TableCell>
-                                                        <TableCell className="text-right text-red-600">
+                                                        <TableCell className="text-right text-destructive">
                                                             {formatCurrency(report.total_expenditure)}
                                                         </TableCell>
                                                         <TableCell className="text-right font-medium">
@@ -598,7 +640,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                             )}
                         </div>
                     </TabsContent>
-                </Tabs>
+                </TabsRoot>
             </div>
         </AppLayout>
     );

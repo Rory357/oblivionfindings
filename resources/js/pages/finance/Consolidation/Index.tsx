@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -22,7 +23,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Building2, Plus, Eye } from 'lucide-react';
+import { Building2, Plus, Eye, Users } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { Textarea } from '@/components/ui/textarea';
@@ -42,6 +43,11 @@ type ConsolidationGroup = {
 type PageProps = {
     groups: ConsolidationGroup[];
 };
+
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Consolidation', href: '/finance/consolidation' },
+];
 
 function CreateGroupDialog() {
     const [open, setOpen] = useState(false);
@@ -120,22 +126,46 @@ function CreateGroupDialog() {
 }
 
 export default function ConsolidationIndex({ groups }: PageProps) {
-    const breadcrumbs = [
-        { title: 'Finance', href: '/finance' },
-        { title: 'Consolidation', href: '/finance/consolidation' },
-    ];
+    const activeGroups = groups.filter((g) => g.is_active);
+    const totalEntities = groups.reduce((sum, g) => sum + g.entities_count, 0);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Consolidation Groups" />
 
-            <div className="mx-auto max-w-5xl space-y-6 p-6">
+            <div className="mx-auto max-w-6xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
                     <div>
                         <h1 className="text-2xl font-bold tracking-tight">Consolidation Groups</h1>
                         <p className="text-muted-foreground">Manage inter-company consolidation groups and entities</p>
                     </div>
                     <CreateGroupDialog />
+                </div>
+
+                {/* KPI Cards */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <Card>
+                        <CardContent className="flex items-center gap-4 pt-6">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                <Building2 className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Active Groups</p>
+                                <p className="text-2xl font-bold">{activeGroups.length}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center gap-4 pt-6">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10">
+                                <Users className="h-5 w-5 text-primary" />
+                            </div>
+                            <div>
+                                <p className="text-sm text-muted-foreground">Total Entities</p>
+                                <p className="text-2xl font-bold">{totalEntities}</p>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 <Card>
@@ -186,7 +216,7 @@ export default function ConsolidationIndex({ groups }: PageProps) {
                                                     className={
                                                         group.is_active
                                                             ? 'bg-green-500/10 text-green-600 border-green-500/30'
-                                                            : 'bg-gray-500/10 text-gray-600 border-gray-500/30'
+                                                            : 'bg-muted text-muted-foreground border-border'
                                                     }
                                                 >
                                                     {group.is_active ? 'Active' : 'Inactive'}

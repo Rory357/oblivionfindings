@@ -120,6 +120,18 @@ class BankAccountController extends Controller
                 'completed_at' => $recon->completed_at?->format('Y-m-d H:i'),
             ]);
 
+        $balanceHistory = $bankAccount->transactions()
+            ->orderBy('transaction_date')
+            ->get()
+            ->groupBy(fn($t) => $t->transaction_date->format('d M'))
+            ->map(fn($group, $date) => [
+                'date' => $date,
+                'amount' => $group->sum('amount'),
+            ])
+            ->values()
+            ->take(30)
+            ->toArray();
+
         return Inertia::render('finance/bank-accounts/Show', [
             'bankAccount' => [
                 'id' => $bankAccount->id,
@@ -138,6 +150,7 @@ class BankAccountController extends Controller
             ],
             'transactions' => $transactions,
             'reconciliations' => $reconciliations,
+            'balanceHistory' => $balanceHistory,
         ]);
     }
 

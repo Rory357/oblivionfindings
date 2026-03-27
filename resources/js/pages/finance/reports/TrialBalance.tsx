@@ -1,12 +1,16 @@
 import { Head, router } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { PageProps, type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Printer } from 'lucide-react';
-import { useState } from 'react';
+import { Badge } from '@/components/ui/badge';
+import { Printer, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Fragment, useState, useMemo } from 'react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
 
 interface TrialBalanceRow {
     account_code: string;
@@ -41,6 +45,12 @@ const typeLabels: Record<string, string> = {
 
 const typeOrder = ['asset', 'liability', 'equity', 'revenue', 'expense'];
 
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'Finance', href: '/finance/dashboard' },
+    { title: 'Reports' },
+    { title: 'Trial Balance' },
+];
+
 export default function TrialBalance({ report, filters }: Props) {
     const [asOfDate, setAsOfDate] = useState(filters.as_of_date);
 
@@ -58,19 +68,82 @@ export default function TrialBalance({ report, filters }: Props) {
 
     const isBalanced = Math.abs(report.total_debits - report.total_credits) < 0.01;
 
+    const chartData = useMemo(() => {
+        return typeOrder
+            .map((type) => {
+                const rows = report.rows.filter((r) => r.account_type === type);
+                if (rows.length === 0) return null;
+                return {
+                    name: typeLabels[type],
+                    debit: rows.reduce((sum, r) => sum + r.debit_balance, 0),
+                    credit: rows.reduce((sum, r) => sum + r.credit_balance, 0),
+                };
+            })
+            .filter(Boolean) as { name: string; debit: number; credit: number }[];
+    }, [report.rows]);
+
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Trial Balance" />
 
-            <div className="space-y-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Trial Balance</h1>
+                    <div>
+                        <h1 className="text-2xl font-bold">Trial Balance</h1>
+                        <p className="text-muted-foreground">
+                            Summary of all account balances verifying debits equal credits
+                        </p>
+                    </div>
                     <Button variant="outline" size="sm" onClick={() => window.print()}>
                         <Printer className="mr-1 h-4 w-4" />
                         Print
                     </Button>
                 </div>
 
+                {/* KPI Summary Cards */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    <Card>
+                        <CardContent className="flex items-center justify-between pt-6">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Total Debits</p>
+                                <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                    {formatCurrency(report.total_debits)}
+                                </p>
+                            </div>
+                            {isBalanced ? (
+                                <Badge variant="outline" className="border-emerald-300 text-emerald-600 dark:text-emerald-400">
+                                    <CheckCircle className="mr-1 h-3 w-3" />
+                                    Balanced
+                                </Badge>
+                            ) : (
+                                <Badge variant="destructive">
+                                    <AlertTriangle className="mr-1 h-3 w-3" />
+                                    Unbalanced
+                                </Badge>
+                            )}
+                        </CardContent>
+                    </Card>
+                    <Card>
+                        <CardContent className="flex items-center justify-between pt-6">
+                            <div>
+                                <p className="text-sm text-muted-foreground">Total Credits</p>
+                                <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+                                    {formatCurrency(report.total_credits)}
+                                </p>
+                            </div>
+                            {!isBalanced && (
+                                <div className="text-right">
+                                    <p className="text-xs text-muted-foreground">Difference</p>
+                                    <p className="text-sm font-semibold text-red-600 dark:text-red-400">
+                                        {formatCurrency(Math.abs(report.total_debits - report.total_credits))}
+                                    </p>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Filter */}
                 <Card>
                     <CardContent className="flex items-end gap-4 pt-6">
                         <div>
@@ -86,6 +159,31 @@ export default function TrialBalance({ report, filters }: Props) {
                     </CardContent>
                 </Card>
 
+                {/* Bar Chart - Debits/Credits by Account Type */}
+                {chartData.length > 0 && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Debits & Credits by Account Type</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="h-64">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 20 }}>
+                                        <CartesianGrid strokeDasharray="3 3" />
+                                        <XAxis dataKey="name" />
+                                        <YAxis tickFormatter={(v) => formatCurrency(v)} />
+                                        <Tooltip formatter={(value: number) => formatCurrency(value)} />
+                                        <Legend />
+                                        <Bar dataKey="debit" name="Debit" fill="#3b82f6" radius={[4, 4, 0, 0]} />
+                                        <Bar dataKey="credit" name="Credit" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Existing Table */}
                 <Card>
                     <CardHeader>
                         <CardTitle>
@@ -109,8 +207,8 @@ export default function TrialBalance({ report, filters }: Props) {
                             </TableHeader>
                             <TableBody>
                                 {grouped.map((group) => (
-                                    <>
-                                        <TableRow key={`header-${group.type}`} className="bg-muted/50">
+                                    <Fragment key={`group-${group.type}`}>
+                                        <TableRow className="bg-muted/50">
                                             <TableCell colSpan={4} className="font-semibold">
                                                 {group.label}
                                             </TableCell>
@@ -127,7 +225,7 @@ export default function TrialBalance({ report, filters }: Props) {
                                                 </TableCell>
                                             </TableRow>
                                         ))}
-                                    </>
+                                    </Fragment>
                                 ))}
                                 <TableRow className="border-t-2 font-bold">
                                     <TableCell colSpan={2}>Totals</TableCell>
@@ -137,11 +235,11 @@ export default function TrialBalance({ report, filters }: Props) {
                                 <TableRow>
                                     <TableCell colSpan={4} className="text-center">
                                         {isBalanced ? (
-                                            <span className="font-medium text-green-600">
+                                            <span className="font-medium text-emerald-600 dark:text-emerald-400">
                                                 Trial balance is in balance.
                                             </span>
                                         ) : (
-                                            <span className="font-medium text-red-600">
+                                            <span className="font-medium text-red-600 dark:text-red-400">
                                                 Warning: Trial balance is out of balance by{' '}
                                                 {formatCurrency(Math.abs(report.total_debits - report.total_credits))}.
                                             </span>

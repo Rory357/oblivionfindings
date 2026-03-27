@@ -5,8 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, FileCheck } from 'lucide-react';
-import { useCallback } from 'react';
+import { Plus, FileCheck, CheckCircle, Clock, ListChecks } from 'lucide-react';
+import { type BreadcrumbItem } from '@/types';
+import { useCallback, useMemo } from 'react';
+
+const formatCurrency = (amount: number) => new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 interface Reconciliation {
     id: number;
@@ -50,9 +53,9 @@ const formatNZD = (amount: number | string) =>
 const statusBadge = (status: string) => {
     switch (status) {
         case 'completed':
-            return <Badge className="bg-green-100 text-green-800">Completed</Badge>;
+            return <Badge className="bg-emerald-500/10 text-emerald-700 border-emerald-500/30">Completed</Badge>;
         case 'in_progress':
-            return <Badge className="bg-blue-100 text-blue-800">In Progress</Badge>;
+            return <Badge className="bg-blue-500/10 text-blue-700 border-blue-500/30">In Progress</Badge>;
         default:
             return <Badge variant="secondary">{status}</Badge>;
     }
@@ -70,10 +73,14 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
         [filters],
     );
 
-    const breadcrumbs = [
+    const breadcrumbs: BreadcrumbItem[] = [
         { title: 'Finance', href: '/finance' },
         { title: 'Bank Reconciliation', href: '/finance/bank-reconciliation' },
     ];
+
+    const totalCount = reconciliations.total;
+    const completedCount = useMemo(() => reconciliations.data.filter((r) => r.status === 'completed').length, [reconciliations.data]);
+    const inProgressCount = useMemo(() => reconciliations.data.filter((r) => r.status === 'in_progress').length, [reconciliations.data]);
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -82,8 +89,8 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex items-center justify-between mb-6">
                     <div>
-                        <h1 className="text-3xl font-bold text-gray-900">Bank Reconciliation</h1>
-                        <p className="text-gray-500 mt-1">
+                        <h1 className="text-3xl font-bold text-foreground">Bank Reconciliation</h1>
+                        <p className="text-muted-foreground mt-1">
                             Reconcile bank statements against your ledger
                         </p>
                     </div>
@@ -94,6 +101,51 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                         </Link>
                     </Button>
                 </div>
+
+                {/* KPI Cards */}
+                {totalCount > 0 && (
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-blue-500/10 p-2">
+                                        <ListChecks className="h-5 w-5 text-blue-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Total Reconciliations</p>
+                                        <p className="text-2xl font-semibold">{totalCount}</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-emerald-500/10 p-2">
+                                        <CheckCircle className="h-5 w-5 text-emerald-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">Completed (this page)</p>
+                                        <p className="text-2xl font-semibold">{completedCount}</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                        <Card>
+                            <CardContent className="pt-6">
+                                <div className="flex items-center gap-3">
+                                    <div className="rounded-lg bg-amber-500/10 p-2">
+                                        <Clock className="h-5 w-5 text-amber-600" />
+                                    </div>
+                                    <div>
+                                        <p className="text-sm text-muted-foreground">In Progress (this page)</p>
+                                        <p className="text-2xl font-semibold">{inProgressCount}</p>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </div>
+                )}
 
                 {/* Filters */}
                 <Card className="mb-6">
@@ -141,9 +193,9 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                     <CardContent className="p-0">
                         {reconciliations.data.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <FileCheck className="h-12 w-12 text-gray-300 mb-4" />
-                                <h3 className="text-lg font-medium text-gray-900 mb-1">No reconciliations</h3>
-                                <p className="text-gray-500 mb-4">
+                                <FileCheck className="h-12 w-12 text-muted-foreground/40 mb-4" />
+                                <h3 className="text-lg font-medium text-foreground mb-1">No reconciliations</h3>
+                                <p className="text-muted-foreground mb-4">
                                     Start your first bank reconciliation.
                                 </p>
                                 <Button asChild>
@@ -201,7 +253,7 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                 {/* Pagination */}
                 {reconciliations.last_page > 1 && (
                     <div className="flex items-center justify-between mt-4">
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                             Showing {(reconciliations.current_page - 1) * reconciliations.per_page + 1} to{' '}
                             {Math.min(reconciliations.current_page * reconciliations.per_page, reconciliations.total)} of{' '}
                             {reconciliations.total} reconciliations

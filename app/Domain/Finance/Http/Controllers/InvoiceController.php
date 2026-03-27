@@ -46,9 +46,19 @@ class InvoiceController extends Controller
 
         $invoices = $query->paginate(20)->withQueryString();
 
+        $allInvoices = FinInvoice::forOrganization($orgId)->get();
+        $summary = [
+            'total_outstanding' => $allInvoices->whereIn('status', ['sent', 'viewed', 'overdue'])->sum('total_amount'),
+            'total_overdue' => $allInvoices->where('status', 'overdue')->sum('total_amount'),
+            'draft_count' => $allInvoices->where('status', 'draft')->count(),
+            'paid_this_month' => $allInvoices->where('status', 'paid')
+                ->where('paid_at', '>=', now()->startOfMonth())->sum('total_amount'),
+        ];
+
         return Inertia::render('finance/invoices/Index', [
             'invoices' => $invoices,
             'filters' => $request->only(['status', 'search', 'date_from', 'date_to']),
+            'summary' => $summary,
         ]);
     }
 

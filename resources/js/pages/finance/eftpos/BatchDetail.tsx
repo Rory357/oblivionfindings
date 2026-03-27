@@ -1,5 +1,6 @@
 import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
+import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -86,11 +87,17 @@ const statusBadge: Record<string, { label: string; className: string }> = {
 export default function EftposBatchDetail({ batch, transactions }: Props) {
     const badge = statusBadge[batch.status] ?? statusBadge.open;
 
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'EFTPOS Batches', href: '/finance/eftpos/batches' },
+        { title: `Batch ${batch.batch_number}`, href: `/finance/eftpos/batches/${batch.id}` },
+    ];
+
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`EFTPOS Batch ${batch.batch_number}`} />
 
-            <div className="space-y-6">
+            <div className="mx-auto max-w-7xl space-y-6 p-6">
                 <div className="flex items-center gap-4">
                     <Button asChild variant="ghost" size="sm">
                         <Link href="/finance/eftpos/batches">
@@ -98,7 +105,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                             Back
                         </Link>
                     </Button>
-                    <h1 className="text-2xl font-bold">Batch {batch.batch_number}</h1>
+                    <h1 className="text-2xl font-bold tracking-tight">Batch {batch.batch_number}</h1>
                     <Badge variant="outline" className={badge.className}>
                         {badge.label}
                     </Badge>
@@ -115,7 +122,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                     <Card>
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Refunds</p>
-                            <p className="text-xl font-bold text-red-600">{formatCurrency(batch.total_refunds)}</p>
+                            <p className="text-xl font-bold text-destructive">{formatCurrency(batch.total_refunds)}</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -133,7 +140,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                     <Card>
                         <CardContent className="p-4">
                             <p className="text-sm text-muted-foreground">Settlement</p>
-                            <p className="text-xl font-bold text-green-600">{formatCurrency(batch.settlement_amount)}</p>
+                            <p className="text-xl font-bold text-emerald-600">{formatCurrency(batch.settlement_amount)}</p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -182,7 +189,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                             {batch.discrepancy_amount !== 0 && (
                                 <div className="col-span-2">
                                     <dt className="text-muted-foreground">Discrepancy</dt>
-                                    <dd className="font-medium text-red-600">
+                                    <dd className="font-medium text-destructive">
                                         {formatCurrency(batch.discrepancy_amount)}
                                         {batch.discrepancy_notes && (
                                             <span className="ml-2 text-muted-foreground">- {batch.discrepancy_notes}</span>
@@ -245,7 +252,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                                                     </Badge>
                                                 </TableCell>
                                                 <TableCell
-                                                    className={`text-right font-medium ${txn.transaction_type === 'refund' ? 'text-red-600' : ''}`}
+                                                    className={`text-right font-medium ${txn.transaction_type === 'refund' ? 'text-destructive' : ''}`}
                                                 >
                                                     {txn.transaction_type === 'refund' ? '-' : ''}
                                                     {formatCurrency(txn.amount)}
@@ -259,9 +266,9 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                                                 </TableCell>
                                                 <TableCell>
                                                     {txn.status === 'approved' ? (
-                                                        <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                                                     ) : txn.status === 'declined' ? (
-                                                        <AlertTriangle className="h-4 w-4 text-red-600" />
+                                                        <AlertTriangle className="h-4 w-4 text-destructive" />
                                                     ) : (
                                                         <span className="text-muted-foreground">{txn.status}</span>
                                                     )}

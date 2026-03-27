@@ -1,12 +1,12 @@
 import { Head, Link, router } from '@inertiajs/react';
-import { PageProps } from '@/types';
+import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
-import { AlertTriangle, CheckCircle, Download, Edit, Mail, Send, XCircle } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Download, Edit, Mail, Send } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface InvoiceLine {
@@ -61,12 +61,12 @@ const formatDateTime = (date: string | null) =>
     date ? new Date(date).toLocaleString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-';
 
 const statusConfig: Record<string, { label: string; className: string }> = {
-    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800' },
-    sent: { label: 'Sent', className: 'bg-blue-100 text-blue-800' },
-    viewed: { label: 'Viewed', className: 'bg-indigo-100 text-indigo-800' },
-    paid: { label: 'Paid', className: 'bg-green-100 text-green-800' },
-    overdue: { label: 'Overdue', className: 'bg-red-100 text-red-800' },
-    cancelled: { label: 'Cancelled', className: 'bg-gray-100 text-gray-500' },
+    draft: { label: 'Draft', className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-300' },
+    sent: { label: 'Sent', className: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
+    viewed: { label: 'Viewed', className: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-300' },
+    paid: { label: 'Paid', className: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
+    overdue: { label: 'Overdue', className: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300' },
+    cancelled: { label: 'Cancelled', className: 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400' },
 };
 
 export default function InvoiceShow({ auth, invoice }: Props) {
@@ -74,6 +74,12 @@ export default function InvoiceShow({ auth, invoice }: Props) {
     const isDraft = invoice.status === 'draft';
     const canSend = invoice.status !== 'cancelled' && invoice.status !== 'paid' && !!invoice.client_email;
     const canMarkPaid = invoice.status !== 'cancelled' && invoice.status !== 'paid';
+
+    const breadcrumbs: BreadcrumbItem[] = [
+        { title: 'Finance', href: '/finance/dashboard' },
+        { title: 'Invoices', href: '/finance/invoices' },
+        { title: invoice.invoice_number, href: `/finance/invoices/${invoice.id}` },
+    ];
 
     const handleSend = () => {
         if (confirm('Send this invoice to ' + invoice.client_email + '?')) {
@@ -88,33 +94,26 @@ export default function InvoiceShow({ auth, invoice }: Props) {
     };
 
     return (
-        <AppLayout
-            user={auth.user}
-            breadcrumbs={[
-                { title: 'Finance', href: '/finance/dashboard' },
-                { title: 'Invoices', href: '/finance/invoices' },
-                { title: invoice.invoice_number, href: `/finance/invoices/${invoice.id}` },
-            ]}
-        >
+        <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title={`Invoice ${invoice.invoice_number}`} />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="max-w-7xl mx-auto p-6">
                 {/* Header */}
                 <div className="flex items-start justify-between mb-6">
                     <div>
                         <div className="flex items-center gap-3">
-                            <h1 className="text-3xl font-bold text-gray-900">{invoice.invoice_number}</h1>
+                            <h1 className="text-3xl font-bold text-foreground">{invoice.invoice_number}</h1>
                             <Badge className={statusConfig[invoice.status]?.className ?? 'bg-gray-100 text-gray-800'}>
                                 {statusConfig[invoice.status]?.label ?? invoice.status}
                             </Badge>
                             {isOverdue && (
-                                <Badge className="bg-red-100 text-red-800">
+                                <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300">
                                     <AlertTriangle className="w-3 h-3 mr-1" />
                                     Overdue
                                 </Badge>
                             )}
                         </div>
-                        <p className="text-gray-500 mt-1">{invoice.client_name}</p>
+                        <p className="text-muted-foreground mt-1">{invoice.client_name}</p>
                     </div>
                     <div className="flex items-center gap-2">
                         {isDraft && (
@@ -154,30 +153,30 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Invoice Date</span>
+                                <span className="text-muted-foreground">Invoice Date</span>
                                 <span className="font-medium">{formatDate(invoice.invoice_date)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Due Date</span>
-                                <span className={cn('font-medium', isOverdue && 'text-red-600')}>
+                                <span className="text-muted-foreground">Due Date</span>
+                                <span className={cn('font-medium', isOverdue && 'text-red-600 dark:text-red-400')}>
                                     {formatDate(invoice.due_date)}
                                 </span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Currency</span>
+                                <span className="text-muted-foreground">Currency</span>
                                 <span className="font-medium">{invoice.currency_code}</span>
                             </div>
                             {invoice.bill && (
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Linked Bill</span>
-                                    <Link href={`/finance/bills/${invoice.bill.id}`} className="text-blue-600 hover:underline font-medium">
+                                    <span className="text-muted-foreground">Linked Bill</span>
+                                    <Link href={`/finance/bills/${invoice.bill.id}`} className="text-primary hover:underline font-medium">
                                         {invoice.bill.bill_number}
                                     </Link>
                                 </div>
                             )}
                             {invoice.created_by && (
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Created By</span>
+                                    <span className="text-muted-foreground">Created By</span>
                                     <span className="font-medium">{invoice.created_by.name}</span>
                                 </div>
                             )}
@@ -195,13 +194,13 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                             </div>
                             {invoice.client_email && (
                                 <div className="flex items-center gap-2">
-                                    <Mail className="w-4 h-4 text-gray-400" />
+                                    <Mail className="w-4 h-4 text-muted-foreground" />
                                     <span>{invoice.client_email}</span>
                                 </div>
                             )}
                             {invoice.client_address && (
                                 <div className="pt-2 border-t">
-                                    <p className="text-gray-700 whitespace-pre-wrap">{invoice.client_address}</p>
+                                    <p className="text-muted-foreground whitespace-pre-wrap">{invoice.client_address}</p>
                                 </div>
                             )}
                         </CardContent>
@@ -214,11 +213,11 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                         </CardHeader>
                         <CardContent className="space-y-3 text-sm">
                             <div className="flex justify-between">
-                                <span className="text-gray-500">Subtotal</span>
+                                <span className="text-muted-foreground">Subtotal</span>
                                 <span>{formatCurrency(invoice.subtotal, invoice.currency_code)}</span>
                             </div>
                             <div className="flex justify-between">
-                                <span className="text-gray-500">GST</span>
+                                <span className="text-muted-foreground">GST</span>
                                 <span>{formatCurrency(invoice.tax_amount, invoice.currency_code)}</span>
                             </div>
                             <Separator />
@@ -231,19 +230,19 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                                 <>
                                     <Separator />
                                     <div className="flex justify-between">
-                                        <span className="text-gray-500">Sent At</span>
+                                        <span className="text-muted-foreground">Sent At</span>
                                         <span className="font-medium">{formatDateTime(invoice.sent_at)}</span>
                                     </div>
                                 </>
                             )}
                             {invoice.viewed_at && (
                                 <div className="flex justify-between">
-                                    <span className="text-gray-500">Viewed At</span>
+                                    <span className="text-muted-foreground">Viewed At</span>
                                     <span className="font-medium">{formatDateTime(invoice.viewed_at)}</span>
                                 </div>
                             )}
                             {invoice.paid_at && (
-                                <div className="flex justify-between text-green-700">
+                                <div className="flex justify-between text-green-700 dark:text-green-400">
                                     <span>Paid At</span>
                                     <span className="font-medium">{formatDateTime(invoice.paid_at)}</span>
                                 </div>
@@ -298,7 +297,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                                     <CardTitle className="text-base">Notes</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{invoice.notes}</p>
+                                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{invoice.notes}</p>
                                 </CardContent>
                             </Card>
                         )}
@@ -308,7 +307,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                                     <CardTitle className="text-base">Payment Terms</CardTitle>
                                 </CardHeader>
                                 <CardContent>
-                                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{invoice.terms}</p>
+                                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{invoice.terms}</p>
                                 </CardContent>
                             </Card>
                         )}

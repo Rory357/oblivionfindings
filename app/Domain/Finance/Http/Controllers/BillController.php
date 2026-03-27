@@ -61,10 +61,18 @@ class BillController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        $allBills = FinBill::forOrganization($orgId)->get();
+        $summary = [
+            'total_unpaid' => $allBills->whereIn('status', ['approved', 'partial'])->sum(fn($b) => $b->total_amount - $b->amount_paid),
+            'total_overdue' => $allBills->where('status', 'approved')->filter(fn($b) => $b->due_date < now())->sum(fn($b) => $b->total_amount - $b->amount_paid),
+            'due_this_week' => $allBills->whereIn('status', ['approved', 'partial'])->filter(fn($b) => $b->due_date >= now() && $b->due_date <= now()->addDays(7))->sum(fn($b) => $b->total_amount - $b->amount_paid),
+        ];
+
         return Inertia::render('finance/bills/Index', [
             'bills' => $bills,
             'vendors' => $vendors,
             'filters' => $request->only(['status', 'vendor_id', 'search', 'date_from', 'date_to']),
+            'summary' => $summary,
         ]);
     }
 
