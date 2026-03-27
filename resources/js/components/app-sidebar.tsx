@@ -663,10 +663,24 @@ function buildControlRoomSubPanelGroups({ can }: { can?: any }): SubPanelGroup[]
             ],
         },
         {
+            label: 'Operations',
+            items: [
+                { title: 'Devices', href: '/control-room/devices', icon: Smartphone },
+                { title: 'Playbooks', href: '/control-room/playbooks', icon: ClipboardCheck },
+                { title: 'SLA Management', href: '/control-room/sla', icon: Target },
+            ],
+        },
+        {
             label: 'Analytics',
             items: [
                 { title: 'Real-time Stats', href: '/control-room/stats', icon: Activity },
                 { title: 'Reports', href: '/control-room/reports', icon: FileText },
+            ],
+        },
+        {
+            label: 'Configuration',
+            items: [
+                { title: 'Settings', href: '/control-room/settings', icon: Settings },
             ],
         },
     ];
