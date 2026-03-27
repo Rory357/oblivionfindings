@@ -77,17 +77,17 @@ class FinAccount extends Model
 
     public function scopeActive($query)
     {
-        return $query->where('is_active', true);
+        return $query->where('fin_accounts.is_active', true);
     }
 
     public function scopeOfType($query, string $type)
     {
-        return $query->where('type', $type);
+        return $query->where('fin_accounts.type', $type);
     }
 
     public function scopeBySubType($query, string $subType)
     {
-        return $query->where('sub_type', $subType);
+        return $query->where('fin_accounts.sub_type', $subType);
     }
 
     /**
