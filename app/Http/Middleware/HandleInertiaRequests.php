@@ -553,6 +553,42 @@ class HandleInertiaRequests extends Middleware
                     ],
                 ],
 
+                'finance' => [
+                    'dashboard' => $user->canDo('finance.dashboard'),
+                    'ledger' => [
+                        'view' => $user->canDo('finance.ledger.view'),
+                        'manage' => $user->canDo('finance.ledger.manage'),
+                    ],
+                    'ap' => [
+                        'view' => $user->canDo('finance.ap.view'),
+                        'manage' => $user->canDo('finance.ap.manage'),
+                    ],
+                    'ar' => [
+                        'view' => $user->canDo('finance.ar.view'),
+                        'manage' => $user->canDo('finance.ar.manage'),
+                    ],
+                    'bank' => [
+                        'view' => $user->canDo('finance.bank.view'),
+                        'manage' => $user->canDo('finance.bank.manage'),
+                    ],
+                    'tax' => [
+                        'view' => $user->canDo('finance.tax.view'),
+                        'manage' => $user->canDo('finance.tax.manage'),
+                    ],
+                    'assets' => [
+                        'view' => $user->canDo('finance.assets.view'),
+                        'manage' => $user->canDo('finance.assets.manage'),
+                    ],
+                    'pettyCash' => [
+                        'view' => $user->canDo('finance.petty_cash.view'),
+                        'manage' => $user->canDo('finance.petty_cash.manage'),
+                    ],
+                    'reports' => [
+                        'view' => $user->canDo('finance.reports.view'),
+                    ],
+                    'admin' => $user->canDo('finance.admin'),
+                ],
+
                 'roadmap' => [
                     'view' => $user->canDo('roadmap.view'),
                     'manage' => $user->canDo('roadmap.manage'),

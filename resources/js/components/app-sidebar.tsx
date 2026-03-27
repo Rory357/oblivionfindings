@@ -22,6 +22,7 @@ import {
     BarChart3,
     Bell,
     BookOpen,
+    Banknote,
     Briefcase,
     Building2,
     CalendarDays,
@@ -205,7 +206,12 @@ function buildIconNavItems({
 
     // Governance
     if (can?.governance?.view) {
-        items.push({ id: 'governance', icon: Landmark, label: 'Governance', subPanel: true, dividerAfter: true });
+        items.push({ id: 'governance', icon: Landmark, label: 'Governance', subPanel: true });
+    }
+
+    // Finance
+    if (can?.finance?.dashboard || can?.finance?.ledger?.view || can?.finance?.ap?.view) {
+        items.push({ id: 'finance', icon: Banknote, label: 'Finance', subPanel: true, dividerAfter: true });
     }
 
     // Reporting
@@ -488,6 +494,63 @@ function buildGovernanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] 
     items.push({ title: 'Board Packs', href: '/governance/packs', icon: FileText });
     items.push({ title: 'Action Items', href: '/governance/actions', icon: ClipboardList });
     return [{ label: 'Governance', items }];
+}
+
+function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    const overview: NavItem[] = [];
+    overview.push({ title: 'Dashboard', href: '/finance/dashboard', icon: LayoutDashboard });
+
+    if (can?.finance?.ledger?.view) {
+        overview.push({ title: 'Chart of Accounts', href: '/finance/accounts', icon: ClipboardList });
+        overview.push({ title: 'Journals', href: '/finance/journals', icon: BookOpen });
+    }
+
+    const ap: NavItem[] = [];
+    if (can?.finance?.ap?.view) {
+        ap.push({ title: 'Vendors', href: '/finance/vendors', icon: Users });
+        ap.push({ title: 'Purchase Orders', href: '/finance/purchase-orders', icon: ClipboardCheck });
+        ap.push({ title: 'Bills', href: '/finance/bills', icon: Receipt });
+        ap.push({ title: 'Credit Notes', href: '/finance/credit-notes', icon: FileText });
+        ap.push({ title: 'Payment Runs', href: '/finance/payment-runs', icon: ArrowLeftRight });
+    }
+
+    const ar: NavItem[] = [];
+    if (can?.finance?.ar?.view) {
+        ar.push({ title: 'Receivables', href: '/finance/receivables', icon: DollarSign });
+    }
+
+    const banking: NavItem[] = [];
+    if (can?.finance?.bank?.view) {
+        banking.push({ title: 'Bank Accounts', href: '/finance/bank-accounts', icon: Landmark });
+        banking.push({ title: 'Reconciliation', href: '/finance/bank-reconciliation', icon: CheckCircle2 });
+    }
+
+    const other: NavItem[] = [];
+    if (can?.finance?.tax?.view) other.push({ title: 'GST Returns', href: '/finance/gst-returns', icon: Receipt });
+    if (can?.finance?.assets?.view) other.push({ title: 'Fixed Assets', href: '/finance/fixed-assets', icon: Package });
+    if (can?.finance?.pettyCash?.view) other.push({ title: 'Petty Cash', href: '/finance/petty-cash', icon: Banknote });
+
+    const reports: NavItem[] = [];
+    if (can?.finance?.reports?.view) {
+        reports.push({ title: 'Trial Balance', href: '/finance/reports/trial-balance', icon: BarChart3 });
+        reports.push({ title: 'Profit & Loss', href: '/finance/reports/profit-loss', icon: BarChart3 });
+        reports.push({ title: 'Balance Sheet', href: '/finance/reports/balance-sheet', icon: BarChart3 });
+        reports.push({ title: 'Budget vs Actuals', href: '/finance/reports/budget-vs-actuals', icon: Target });
+    }
+
+    if (can?.finance?.admin) {
+        other.push({ title: 'Fiscal Periods', href: '/finance/fiscal-periods', icon: CalendarDays });
+        other.push({ title: 'Cost Centres', href: '/finance/cost-centres', icon: Building2 });
+        other.push({ title: 'Funding Streams', href: '/finance/funding-streams', icon: GitBranch });
+    }
+
+    const groups: SubPanelGroup[] = [{ label: 'Finance', items: overview }];
+    if (ap.length) groups.push({ label: 'Accounts Payable', items: ap });
+    if (ar.length) groups.push({ label: 'Accounts Receivable', items: ar });
+    if (banking.length) groups.push({ label: 'Banking', items: banking });
+    if (other.length) groups.push({ label: 'Other', items: other });
+    if (reports.length) groups.push({ label: 'Reports', items: reports });
+    return groups;
 }
 
 function buildSystemSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
@@ -856,6 +919,7 @@ export function AppSidebar() {
         'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
         hr: buildHrSubPanelGroups({ can }),
         governance: buildGovernanceSubPanelGroups({ can }),
+        finance: buildFinanceSubPanelGroups({ can }),
         reporting: buildReportingSubPanelGroups({ can }),
         'control-room': buildControlRoomSubPanelGroups({ can }),
     }), [can, role]);
@@ -1041,6 +1105,7 @@ export function AppSidebarMobile({
         'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
         hr: buildHrSubPanelGroups({ can }),
         governance: buildGovernanceSubPanelGroups({ can }),
+        finance: buildFinanceSubPanelGroups({ can }),
         reporting: buildReportingSubPanelGroups({ can }),
         'control-room': buildControlRoomSubPanelGroups({ can }),
     }), [can, role]);
