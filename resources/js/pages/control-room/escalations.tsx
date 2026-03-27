@@ -16,11 +16,15 @@ import {
     AlertTriangle,
     ArrowUpRight,
     CheckCircle2,
+    ChevronRight,
     Clock,
+    ExternalLink,
+    Hand,
     MoveRight,
     ShieldAlert,
     Timer,
     User,
+    UserCheck,
 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -48,12 +52,14 @@ interface QueueAlert {
     id: number;
     severity: string;
     alert_type: string;
+    alert_type_raw?: string;
     source: string;
     status: string;
     escalation_level: number | null;
     triggered_at: string | null;
     acknowledged_at: string | null;
     assigned_to: AssignedUser | null;
+    client_name: string | null;
     context: Record<string, unknown> | null;
     entered_queue_at: string | null;
     sla: AlertSla | null;
@@ -83,16 +89,23 @@ interface Props {
     serverTime: string;
     can: {
         manage: boolean;
+        assign: boolean;
     };
 }
 
 // --- Severity config ---
 
-const severityConfig: Record<string, { label: string; className: string; order: number }> = {
-    critical: { label: 'Critical', className: 'bg-red-600 text-white', order: 0 },
-    high: { label: 'High', className: 'bg-orange-500 text-white', order: 1 },
-    medium: { label: 'Medium', className: 'bg-yellow-500 text-white', order: 2 },
-    low: { label: 'Low', className: 'bg-blue-500 text-white', order: 3 },
+const severityConfig: Record<string, { label: string; className: string; borderColor: string; order: number }> = {
+    critical: { label: 'Critical', className: 'bg-red-600 text-white', borderColor: 'border-l-red-600', order: 0 },
+    high: { label: 'High', className: 'bg-orange-500 text-white', borderColor: 'border-l-orange-500', order: 1 },
+    medium: { label: 'Medium', className: 'bg-yellow-500 text-white', borderColor: 'border-l-yellow-500', order: 2 },
+    low: { label: 'Low', className: 'bg-blue-500 text-white', borderColor: 'border-l-blue-500', order: 3 },
+};
+
+const tierBgColors: Record<number, string> = {
+    1: 'bg-blue-600',
+    2: 'bg-orange-600',
+    3: 'bg-red-600',
 };
 
 const tierColors: Record<number, string> = {
@@ -145,9 +158,6 @@ function computeSlaCountdown(
     const minutes = totalMinutes % 60;
     const display = hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
 
-    // Calculate percentage of original time remaining
-    // Use the triggered_at -> deadline span to compute
-    // Simplified: use absolute thresholds
     if (totalMinutes <= 5) {
         return { label: display, color: 'red' };
     }
@@ -155,6 +165,24 @@ function computeSlaCountdown(
         return { label: display, color: 'yellow' };
     }
     return { label: display, color: 'green' };
+}
+
+function getSlaStatusDotColor(
+    deadline: string | null,
+    completedAt: string | null,
+    breached: boolean,
+    nowMs: number,
+): string {
+    if (completedAt) return 'bg-green-500';
+    if (!deadline) return 'bg-gray-300';
+    if (breached) return 'bg-red-500';
+    const deadlineMs = new Date(deadline).getTime();
+    const remainingMs = deadlineMs - nowMs;
+    if (remainingMs <= 0) return 'bg-red-500';
+    const totalMinutes = Math.floor(remainingMs / 60000);
+    if (totalMinutes <= 5) return 'bg-red-500';
+    if (totalMinutes <= 30) return 'bg-yellow-500';
+    return 'bg-green-500';
 }
 
 function getSlaCountdownColor(color: 'green' | 'yellow' | 'red' | 'muted'): string {
@@ -173,6 +201,10 @@ function getSlaCountdownColor(color: 'green' | 'yellow' | 'red' | 'muted'): stri
 function isAlertBreached(sla: AlertSla | null): boolean {
     if (!sla) return false;
     return sla.acknowledge_breached || sla.response_breached || sla.resolution_breached;
+}
+
+function getInitial(name: string): string {
+    return name.charAt(0).toUpperCase();
 }
 
 // --- Components ---
@@ -201,11 +233,26 @@ function SlaTimerDisplay({
     );
 }
 
+function SlaDotsCompact({ sla, nowMs }: { sla: AlertSla; nowMs: number }) {
+    const ackColor = getSlaStatusDotColor(sla.acknowledge_deadline, sla.acknowledged_at, sla.acknowledge_breached, nowMs);
+    const respColor = getSlaStatusDotColor(sla.response_deadline, sla.responded_at, sla.response_breached, nowMs);
+    const resColor = getSlaStatusDotColor(sla.resolution_deadline, sla.resolved_at, sla.resolution_breached, nowMs);
+
+    return (
+        <div className="flex items-center gap-1.5" title="SLA: Ack / Respond / Resolve">
+            <div className={`h-2 w-2 rounded-full ${ackColor}`} title="Acknowledge" />
+            <div className={`h-2 w-2 rounded-full ${respColor}`} title="Respond" />
+            <div className={`h-2 w-2 rounded-full ${resColor}`} title="Resolve" />
+        </div>
+    );
+}
+
 function AlertCard({
     alert,
     allQueues,
     currentQueueId,
     canManage,
+    canAssign,
     nowMs,
     selectedAlertIds,
     onToggleSelect,
@@ -214,11 +261,14 @@ function AlertCard({
     allQueues: QueueOption[];
     currentQueueId: number;
     canManage: boolean;
+    canAssign: boolean;
     nowMs: number;
     selectedAlertIds: Set<number>;
     onToggleSelect: (id: number) => void;
 }) {
     const [moving, setMoving] = useState(false);
+    const [acking, setAcking] = useState(false);
+    const [assigning, setAssigning] = useState(false);
     const breached = isAlertBreached(alert.sla);
     const sev = severityConfig[alert.severity] ?? severityConfig.low;
     const isSelected = selectedAlertIds.has(alert.id);
@@ -236,101 +286,191 @@ function AlertCard({
         );
     };
 
+    const handleAcknowledge = () => {
+        if (acking) return;
+        setAcking(true);
+        router.post(
+            `/control-room/escalations/${alert.id}/acknowledge`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setAcking(false),
+            },
+        );
+    };
+
+    const handleAssignToMe = () => {
+        if (assigning) return;
+        setAssigning(true);
+        router.post(
+            `/control-room/escalations/${alert.id}/assign-to-me`,
+            {},
+            {
+                preserveScroll: true,
+                onFinish: () => setAssigning(false),
+            },
+        );
+    };
+
     const otherQueues = allQueues.filter((q) => q.id !== currentQueueId);
 
     return (
         <div
-            className={`rounded-lg border bg-card p-3 transition-all ${
-                breached ? 'animate-pulse-subtle border-red-400 shadow-red-100 shadow-sm' : 'border-border'
+            className={`rounded-lg border-l-4 border bg-card transition-all ${sev.borderColor} ${
+                breached ? 'animate-pulse-subtle border-r-red-300 border-t-red-300 border-b-red-300 shadow-red-100 shadow-sm' : 'border-r-border border-t-border border-b-border'
             } ${isSelected ? 'ring-2 ring-primary ring-offset-1' : ''}`}
         >
-            <div className="mb-2 flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2">
-                    {canManage && (
-                        <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={() => onToggleSelect(alert.id)}
-                            className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300"
-                        />
-                    )}
-                    <Badge className={sev.className}>{sev.label}</Badge>
-                    <span className="text-xs font-medium text-muted-foreground">#{alert.id}</span>
+            <div className="p-3">
+                {/* Title row: checkbox, alert type, severity badge */}
+                <div className="mb-2 flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                        {canManage && (
+                            <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => onToggleSelect(alert.id)}
+                                className="mt-0.5 h-3.5 w-3.5 rounded border-gray-300"
+                            />
+                        )}
+                        <div className="min-w-0">
+                            <p className="text-sm font-semibold leading-tight truncate">{alert.alert_type}</p>
+                            <span className="text-[10px] font-medium text-muted-foreground">#{alert.id}</span>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                        <Badge className={`text-[10px] px-1.5 py-0 ${sev.className}`}>{sev.label}</Badge>
+                        {breached && <ShieldAlert className="h-3.5 w-3.5 text-red-500" />}
+                    </div>
                 </div>
-                {breached && (
-                    <ShieldAlert className="h-4 w-4 shrink-0 text-red-500" />
+
+                {/* Detail row: source, client, time-in-queue */}
+                <div className="mb-2 space-y-0.5 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                        <span className="capitalize">{alert.source}</span>
+                        {alert.client_name && (
+                            <>
+                                <span className="text-border">|</span>
+                                <span className="truncate">{alert.client_name}</span>
+                            </>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <Clock className="h-3 w-3 shrink-0" />
+                        <span>{formatTimeInQueue(alert.entered_queue_at, nowMs)} in queue</span>
+                        {alert.status !== 'open' && (
+                            <Badge variant="outline" className="ml-1 text-[9px] px-1 py-0 capitalize">
+                                {alert.status}
+                            </Badge>
+                        )}
+                    </div>
+                </div>
+
+                {/* SLA compact dots */}
+                {alert.sla && (
+                    <div className="mb-2 flex items-center justify-between rounded bg-muted/50 px-2 py-1.5">
+                        <SlaDotsCompact sla={alert.sla} nowMs={nowMs} />
+                        <div className="flex gap-3">
+                            <SlaTimerDisplay
+                                label="Ack"
+                                deadline={alert.sla.acknowledge_deadline}
+                                completedAt={alert.sla.acknowledged_at}
+                                breached={alert.sla.acknowledge_breached}
+                                nowMs={nowMs}
+                            />
+                            <SlaTimerDisplay
+                                label="Resp"
+                                deadline={alert.sla.response_deadline}
+                                completedAt={alert.sla.responded_at}
+                                breached={alert.sla.response_breached}
+                                nowMs={nowMs}
+                            />
+                            <SlaTimerDisplay
+                                label="Res"
+                                deadline={alert.sla.resolution_deadline}
+                                completedAt={alert.sla.resolved_at}
+                                breached={alert.sla.resolution_breached}
+                                nowMs={nowMs}
+                            />
+                        </div>
+                    </div>
                 )}
-            </div>
 
-            <div className="mb-2">
-                <p className="text-sm font-medium leading-tight">{alert.alert_type}</p>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                    Source: {alert.source}
-                    {alert.status !== 'open' && (
-                        <span className="ml-2 capitalize">({alert.status})</span>
+                {/* Assigned row */}
+                <div className="mb-2 flex items-center gap-1.5 text-xs">
+                    {alert.assigned_to ? (
+                        <>
+                            <div className="flex h-5 w-5 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                                {getInitial(alert.assigned_to.name)}
+                            </div>
+                            <span className="text-foreground">{alert.assigned_to.name}</span>
+                        </>
+                    ) : (
+                        <>
+                            <User className="h-3.5 w-3.5 text-muted-foreground/50" />
+                            <span className="text-muted-foreground/50 italic">Unassigned</span>
+                        </>
                     )}
-                </p>
+                </div>
+
+                {/* Action buttons row */}
+                <div className="flex items-center gap-1.5 border-t border-border/50 pt-2">
+                    {/* Ack button (if open) */}
+                    {canManage && alert.status === 'open' && (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-7 px-2 text-xs border-yellow-400 text-yellow-700 hover:bg-yellow-50"
+                            onClick={handleAcknowledge}
+                            disabled={acking}
+                        >
+                            <Hand className="mr-1 h-3 w-3" />
+                            Ack
+                        </Button>
+                    )}
+
+                    {/* Assign to Me button (if unassigned) */}
+                    {canAssign && !alert.assigned_to && (
+                        <Button
+                            size="sm"
+                            variant="default"
+                            className="h-7 px-2 text-xs"
+                            onClick={handleAssignToMe}
+                            disabled={assigning}
+                        >
+                            <UserCheck className="mr-1 h-3 w-3" />
+                            Assign to Me
+                        </Button>
+                    )}
+
+                    {/* Move to queue dropdown */}
+                    {canManage && otherQueues.length > 0 && (
+                        <Select onValueChange={handleMove} disabled={moving}>
+                            <SelectTrigger className="h-7 w-auto min-w-0 gap-1 px-2 text-xs">
+                                <MoveRight className="h-3 w-3 shrink-0" />
+                                <span className="hidden sm:inline">Move</span>
+                            </SelectTrigger>
+                            <SelectContent>
+                                {otherQueues.map((q) => (
+                                    <SelectItem key={q.id} value={String(q.id)}>
+                                        Tier {q.tier}: {q.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+
+                    {/* Link to detail page */}
+                    <Button
+                        size="sm"
+                        variant="ghost"
+                        className="ml-auto h-7 w-7 p-0"
+                        onClick={() => router.visit(`/control-room/alerts/${alert.id}`)}
+                        title="View alert detail"
+                    >
+                        <ExternalLink className="h-3.5 w-3.5" />
+                    </Button>
+                </div>
             </div>
-
-            {/* Time in queue */}
-            <div className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
-                <Clock className="h-3 w-3" />
-                <span>In queue: {formatTimeInQueue(alert.entered_queue_at, nowMs)}</span>
-            </div>
-
-            {/* Assigned to */}
-            {alert.assigned_to && (
-                <div className="mb-2 flex items-center gap-1 text-xs text-muted-foreground">
-                    <User className="h-3 w-3" />
-                    <span>{alert.assigned_to.name}</span>
-                </div>
-            )}
-
-            {/* SLA timers */}
-            {alert.sla && (
-                <div className="mb-2 space-y-0.5 rounded bg-muted/50 p-2">
-                    <SlaTimerDisplay
-                        label="Ack"
-                        deadline={alert.sla.acknowledge_deadline}
-                        completedAt={alert.sla.acknowledged_at}
-                        breached={alert.sla.acknowledge_breached}
-                        nowMs={nowMs}
-                    />
-                    <SlaTimerDisplay
-                        label="Respond"
-                        deadline={alert.sla.response_deadline}
-                        completedAt={alert.sla.responded_at}
-                        breached={alert.sla.response_breached}
-                        nowMs={nowMs}
-                    />
-                    <SlaTimerDisplay
-                        label="Resolve"
-                        deadline={alert.sla.resolution_deadline}
-                        completedAt={alert.sla.resolved_at}
-                        breached={alert.sla.resolution_breached}
-                        nowMs={nowMs}
-                    />
-                </div>
-            )}
-
-            {/* Move to queue action */}
-            {canManage && otherQueues.length > 0 && (
-                <div className="mt-2">
-                    <Select onValueChange={handleMove} disabled={moving}>
-                        <SelectTrigger className="h-7 text-xs">
-                            <MoveRight className="mr-1 h-3 w-3" />
-                            <SelectValue placeholder="Move to queue..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {otherQueues.map((q) => (
-                                <SelectItem key={q.id} value={String(q.id)}>
-                                    Tier {q.tier}: {q.name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                </div>
-            )}
         </div>
     );
 }
@@ -339,6 +479,7 @@ function QueueColumn({
     queue,
     allQueues,
     canManage,
+    canAssign,
     nowMs,
     selectedAlertIds,
     onToggleSelect,
@@ -346,70 +487,74 @@ function QueueColumn({
     queue: QueueData;
     allQueues: QueueOption[];
     canManage: boolean;
+    canAssign: boolean;
     nowMs: number;
     selectedAlertIds: Set<number>;
     onToggleSelect: (id: number) => void;
 }) {
-    const tierColor = tierColors[queue.tier] ?? tierColors[1];
     const breachedCount = queue.alerts.filter((a) => isAlertBreached(a.sla)).length;
+    const capacityPercent = Math.min(100, (queue.alert_count / 20) * 100);
+    const tierBg = tierBgColors[queue.tier] ?? tierBgColors[1];
 
     return (
-        <div className="flex min-w-[320px] flex-col rounded-lg border bg-muted/30">
+        <div className="flex min-w-[340px] flex-col rounded-lg border bg-muted/30">
             {/* Queue header */}
             <div className="border-b p-4">
-                <div className="mb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <h3 className="text-sm font-semibold">{queue.name}</h3>
-                        <Badge variant="outline" className={tierColor}>
-                            Tier {queue.tier}
-                        </Badge>
+                <div className="mb-2 flex items-center gap-3">
+                    {/* Tier number with colored circle */}
+                    <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-white text-lg font-bold ${tierBg}`}>
+                        {queue.tier}
                     </div>
-                    <Badge variant="secondary" className="tabular-nums">
-                        {queue.alert_count}
-                    </Badge>
+                    <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2">
+                            <h3 className="text-sm font-semibold truncate">{queue.name}</h3>
+                            <Badge variant="secondary" className="tabular-nums shrink-0">
+                                {queue.alert_count}
+                            </Badge>
+                            {breachedCount > 0 && (
+                                <Badge variant="destructive" className="tabular-nums shrink-0 text-[10px] px-1.5">
+                                    {breachedCount} breached
+                                </Badge>
+                            )}
+                        </div>
+                        {queue.auto_escalate_after_minutes && (
+                            <div className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                                <Timer className="h-3 w-3" />
+                                Auto-escalates after {queue.auto_escalate_after_minutes}m
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {queue.description && (
                     <p className="mb-2 text-xs text-muted-foreground">{queue.description}</p>
                 )}
 
-                {/* Capacity / status bar */}
-                <div className="flex items-center gap-3 text-xs">
-                    {breachedCount > 0 && (
-                        <span className="flex items-center gap-1 text-red-600">
-                            <AlertTriangle className="h-3 w-3" />
-                            {breachedCount} breached
-                        </span>
-                    )}
-                    {queue.auto_escalate_after_minutes && (
-                        <span className="flex items-center gap-1 text-muted-foreground">
-                            <Timer className="h-3 w-3" />
-                            Auto-escalate: {queue.auto_escalate_after_minutes}m
-                        </span>
-                    )}
-                </div>
-
-                {/* Visual capacity bar */}
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted">
-                    <div
-                        className={`h-full rounded-full transition-all ${
-                            queue.alert_count === 0
-                                ? 'bg-green-400'
-                                : queue.alert_count <= 5
-                                  ? 'bg-green-500'
-                                  : queue.alert_count <= 10
-                                    ? 'bg-yellow-500'
-                                    : 'bg-red-500'
-                        }`}
-                        style={{
-                            width: `${Math.min(100, (queue.alert_count / 20) * 100)}%`,
-                        }}
-                    />
+                {/* Capacity progress bar */}
+                <div className="mt-1">
+                    <div className="mb-0.5 flex items-center justify-between text-[10px] text-muted-foreground">
+                        <span>Capacity</span>
+                        <span>{queue.alert_count} / 20</span>
+                    </div>
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                            className={`h-full rounded-full transition-all ${
+                                queue.alert_count === 0
+                                    ? 'bg-green-400'
+                                    : queue.alert_count <= 5
+                                      ? 'bg-green-500'
+                                      : queue.alert_count <= 10
+                                        ? 'bg-yellow-500'
+                                        : 'bg-red-500'
+                            }`}
+                            style={{ width: `${capacityPercent}%` }}
+                        />
+                    </div>
                 </div>
             </div>
 
             {/* Alert cards */}
-            <div className="flex-1 space-y-2 overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 320px)' }}>
+            <div className="flex-1 space-y-2 overflow-y-auto p-3" style={{ maxHeight: 'calc(100vh - 360px)' }}>
                 {queue.alerts.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-8 text-center">
                         <CheckCircle2 className="mb-2 h-8 w-8 text-green-400" />
@@ -423,6 +568,7 @@ function QueueColumn({
                             allQueues={allQueues}
                             currentQueueId={queue.id}
                             canManage={canManage}
+                            canAssign={canAssign}
                             nowMs={nowMs}
                             selectedAlertIds={selectedAlertIds}
                             onToggleSelect={onToggleSelect}
@@ -516,19 +662,6 @@ export default function EscalationQueue({ queues, allQueues, serverTime, can }: 
                 <PageHeader
                     title="Escalation Queue"
                     description="Kanban-style triage queue management with SLA tracking and escalation workflows."
-                    actions={
-                        can.manage && selectedAlertIds.size > 0 ? (
-                            <Button
-                                size="sm"
-                                variant="default"
-                                onClick={handleBulkEscalate}
-                                disabled={bulkEscalating}
-                            >
-                                <ArrowUpRight className="mr-2 h-4 w-4" />
-                                Escalate {selectedAlertIds.size} Alert{selectedAlertIds.size !== 1 ? 's' : ''}
-                            </Button>
-                        ) : undefined
-                    }
                 />
 
                 {/* Summary stats */}
@@ -591,21 +724,55 @@ export default function EscalationQueue({ queues, allQueues, serverTime, can }: 
                         </CardContent>
                     </Card>
                 ) : (
-                    <div className="flex gap-4 overflow-x-auto pb-4">
-                        {queues.map((queue) => (
-                            <QueueColumn
-                                key={queue.id}
-                                queue={queue}
-                                allQueues={allQueues}
-                                canManage={can.manage}
-                                nowMs={nowMs}
-                                selectedAlertIds={selectedAlertIds}
-                                onToggleSelect={handleToggleSelect}
-                            />
+                    <div className="flex items-start gap-0 overflow-x-auto pb-4">
+                        {queues.map((queue, index) => (
+                            <div key={queue.id} className="flex items-start">
+                                {index > 0 && (
+                                    <div className="flex items-center self-stretch px-1 pt-20">
+                                        <ChevronRight className="h-5 w-5 text-muted-foreground/40" />
+                                    </div>
+                                )}
+                                <QueueColumn
+                                    queue={queue}
+                                    allQueues={allQueues}
+                                    canManage={can.manage}
+                                    canAssign={can.assign}
+                                    nowMs={nowMs}
+                                    selectedAlertIds={selectedAlertIds}
+                                    onToggleSelect={handleToggleSelect}
+                                />
+                            </div>
                         ))}
                     </div>
                 )}
             </PageShell>
+
+            {/* Floating bulk action bar */}
+            {can.manage && selectedAlertIds.size > 0 && (
+                <div className="fixed bottom-6 left-1/2 z-50 -translate-x-1/2 transform">
+                    <div className="flex items-center gap-3 rounded-xl border bg-card px-5 py-3 shadow-lg">
+                        <span className="text-sm font-medium">
+                            {selectedAlertIds.size} alert{selectedAlertIds.size !== 1 ? 's' : ''} selected
+                        </span>
+                        <Button
+                            size="sm"
+                            variant="default"
+                            onClick={handleBulkEscalate}
+                            disabled={bulkEscalating}
+                        >
+                            <ArrowUpRight className="mr-1.5 h-4 w-4" />
+                            Escalate {selectedAlertIds.size} Selected
+                        </Button>
+                        <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setSelectedAlertIds(new Set())}
+                        >
+                            Clear
+                        </Button>
+                    </div>
+                </div>
+            )}
 
             {/* Pulse animation style */}
             <style>{`

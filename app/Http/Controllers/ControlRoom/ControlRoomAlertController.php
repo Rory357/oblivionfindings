@@ -10,11 +10,263 @@ use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\User;
 use App\Services\AuditLogger;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class ControlRoomAlertController extends Controller
 {
+    /**
+     * Display the alerts list with filters, sorting and stats.
+     */
+    public function index(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+
+        $query = ControlRoomAlert::with([
+            'asset:id,name,asset_tag',
+            'assignedTo:id,name,email',
+            'client:id,first_name,last_name',
+            'sla',
+        ]);
+
+        // Filters
+        if ($status = $request->input('status')) {
+            $query->where('status', $status);
+        }
+
+        if ($severity = $request->input('severity')) {
+            $query->where('severity', $severity);
+        }
+
+        if ($source = $request->input('source')) {
+            $query->where('source', $source);
+        }
+
+        if ($assignedTo = $request->input('assigned_to')) {
+            if ($assignedTo === 'me') {
+                $query->where('assigned_to_user_id', $user->id);
+            } elseif ($assignedTo === 'unassigned') {
+                $query->whereNull('assigned_to_user_id');
+            } else {
+                $query->where('assigned_to_user_id', (int) $assignedTo);
+            }
+        }
+
+        if ($search = $request->input('search')) {
+            $query->where(function ($q) use ($search) {
+                $q->where('alert_type', 'like', "%{$search}%")
+                  ->orWhere('notes', 'like', "%{$search}%")
+                  ->orWhere('source', 'like', "%{$search}%");
+            });
+        }
+
+        if ($dateFrom = $request->input('date_from')) {
+            $query->where('triggered_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+        }
+
+        if ($dateTo = $request->input('date_to')) {
+            $query->where('triggered_at', '<=', Carbon::parse($dateTo)->endOfDay());
+        }
+
+        // Sorting
+        $sortField = $request->input('sort', 'triggered_at');
+        $sortDir = $request->input('dir', 'desc');
+        $allowedSorts = ['triggered_at', 'severity', 'status', 'alert_type'];
+        if (in_array($sortField, $allowedSorts)) {
+            if ($sortField === 'severity') {
+                $query->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low') " . ($sortDir === 'desc' ? 'DESC' : 'ASC'));
+            } else {
+                $query->orderBy($sortField, $sortDir === 'asc' ? 'asc' : 'desc');
+            }
+        } else {
+            $query->orderByDesc('triggered_at');
+        }
+
+        $paginated = $query->paginate(30)->withQueryString();
+
+        $alerts = $paginated->through(fn(ControlRoomAlert $alert) => [
+            'id' => $alert->id,
+            'source' => $alert->source,
+            'alert_type' => $alert->alert_type,
+            'severity' => $alert->severity,
+            'status' => $alert->status,
+            'escalation_level' => $alert->escalation_level,
+            'triggered_at' => optional($alert->triggered_at)->toISOString(),
+            'asset' => $alert->asset ? [
+                'id' => $alert->asset->id,
+                'name' => $alert->asset->name,
+                'asset_tag' => $alert->asset->asset_tag,
+            ] : null,
+            'assigned_to' => $alert->assignedTo ? [
+                'id' => $alert->assignedTo->id,
+                'name' => $alert->assignedTo->name,
+            ] : null,
+            'client_name' => $alert->client
+                ? trim($alert->client->first_name . ' ' . $alert->client->last_name)
+                : null,
+            'sla_status' => $this->deriveSlaStatus($alert),
+            'notes' => $alert->notes ? \Illuminate\Support\Str::limit($alert->notes, 120) : null,
+        ]);
+
+        // Stats (unfiltered counts)
+        $stats = [
+            'total' => ControlRoomAlert::count(),
+            'open' => ControlRoomAlert::where('status', 'open')->count(),
+            'critical' => ControlRoomAlert::where('severity', 'critical')->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'assigned_to_me' => ControlRoomAlert::where('assigned_to_user_id', $user->id)->whereNotIn('status', ['resolved', 'closed'])->count(),
+            'unassigned' => ControlRoomAlert::whereNull('assigned_to_user_id')->whereNotIn('status', ['resolved', 'closed'])->count(),
+        ];
+
+        $staff = User::staff()
+            ->whereHas('roles', fn($q) => $q->whereIn('name', ['admin', 'provider_manager', 'coordinator']))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        return Inertia::render('control-room/alerts/index', [
+            'alerts' => $alerts,
+            'filters' => $request->only(['status', 'severity', 'source', 'assigned_to', 'search', 'date_from', 'date_to', 'sort', 'dir']),
+            'stats' => $stats,
+            'staff' => $staff,
+            'can' => [
+                'manage' => $user->canDo('controlRoom.alerts.manage'),
+                'assign' => $user->canDo('controlRoom.alerts.assign'),
+            ],
+        ]);
+    }
+
+    /**
+     * Derive SLA status for a given alert (green/yellow/red/none).
+     */
+    private function deriveSlaStatus(ControlRoomAlert $alert): ?string
+    {
+        if (!$alert->sla) {
+            return null;
+        }
+
+        $sla = $alert->sla;
+        if ($sla->resolution_breached || $sla->response_breached || $sla->acknowledge_breached) {
+            return 'red';
+        }
+
+        // Check if any deadline is approaching (within 30 minutes)
+        $now = now();
+        $deadlines = array_filter([
+            $sla->acknowledge_deadline,
+            $sla->response_deadline,
+            $sla->resolution_deadline,
+        ]);
+
+        foreach ($deadlines as $deadline) {
+            if ($deadline && $deadline->gt($now) && $deadline->diffInMinutes($now) <= 30) {
+                return 'yellow';
+            }
+        }
+
+        return 'green';
+    }
+
+    /**
+     * Bulk acknowledge multiple alerts.
+     */
+    public function bulkAcknowledge(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+
+        $data = $request->validate([
+            'alert_ids' => ['required', 'array'],
+            'alert_ids.*' => ['integer'],
+        ]);
+
+        $alerts = ControlRoomAlert::whereIn('id', $data['alert_ids'])
+            ->where('status', 'open')
+            ->get();
+
+        $count = 0;
+        foreach ($alerts as $alert) {
+            $alert->update([
+                'status' => 'ack',
+                'acknowledged_at' => now(),
+                'acknowledged_by_user_id' => $user->id,
+            ]);
+
+            $alert->sla?->recordAcknowledge();
+
+            AuditLogger::log('controlRoom.alert.acknowledge', $alert, [
+                'alert_id' => $alert->id,
+                'acknowledged_by' => $user->id,
+                'bulk' => true,
+            ]);
+
+            $count++;
+        }
+
+        return back()->with('success', "{$count} alert(s) acknowledged.");
+    }
+
+    /**
+     * Bulk assign multiple alerts to a staff member.
+     */
+    public function bulkAssign(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
+
+        $data = $request->validate([
+            'alert_ids' => ['required', 'array'],
+            'alert_ids.*' => ['integer'],
+            'assigned_to_user_id' => ['required', 'integer', 'exists:users,id'],
+        ]);
+
+        $alerts = ControlRoomAlert::whereIn('id', $data['alert_ids'])->get();
+
+        $count = 0;
+        foreach ($alerts as $alert) {
+            $alert->update([
+                'assigned_to_user_id' => $data['assigned_to_user_id'],
+                'assigned_at' => now(),
+                'assigned_by_user_id' => $user->id,
+            ]);
+
+            AuditLogger::log('controlRoom.alert.assign', $alert, [
+                'alert_id' => $alert->id,
+                'assigned_to' => $data['assigned_to_user_id'],
+                'assigned_by' => $user->id,
+                'bulk' => true,
+            ]);
+
+            $count++;
+        }
+
+        return back()->with('success', "{$count} alert(s) assigned.");
+    }
+
+    /**
+     * Assign an alert to the current user (shortcut).
+     */
+    public function assignToMe(Request $request, ControlRoomAlert $alert)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
+
+        $alert->update([
+            'assigned_to_user_id' => $user->id,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $user->id,
+        ]);
+
+        AuditLogger::log('controlRoom.alert.assign', $alert, [
+            'alert_id' => $alert->id,
+            'assigned_to' => $user->id,
+            'assigned_by' => $user->id,
+            'self_assign' => true,
+        ]);
+
+        return back()->with('success', 'Alert assigned to you.');
+    }
+
     /**
      * Display the specified alert.
      */
@@ -337,13 +589,31 @@ class ControlRoomAlertController extends Controller
         $data = $request->validate([
             'assigned_to_user_id' => ['required', 'integer', 'exists:users,id'],
             'notes' => ['nullable', 'string', 'max:2000'],
+            'reason' => ['nullable', 'string', 'max:500'],
         ]);
+
+        // Record assignment change in history
+        $assignmentHistory = $alert->context['assignment_history'] ?? [];
+        $assignmentHistory[] = [
+            'action' => $alert->assigned_to_user_id ? 'reassigned' : 'assigned',
+            'from_user_id' => $alert->assigned_to_user_id,
+            'from_user_name' => $alert->assignedTo?->name,
+            'to_user_id' => $data['assigned_to_user_id'],
+            'to_user_name' => User::find($data['assigned_to_user_id'])?->name,
+            'by_user_id' => $user->id,
+            'by_user_name' => $user->name,
+            'reason' => $data['reason'] ?? null,
+            'at' => now()->toISOString(),
+        ];
 
         $alert->update([
             'assigned_to_user_id' => $data['assigned_to_user_id'],
             'assigned_at' => now(),
             'assigned_by_user_id' => $user->id,
             'notes' => $data['notes'] ?? $alert->notes,
+            'context' => array_merge($alert->context ?? [], [
+                'assignment_history' => $assignmentHistory,
+            ]),
         ]);
 
         AuditLogger::log('controlRoom.alert.assign', $alert, [
@@ -365,10 +635,27 @@ class ControlRoomAlertController extends Controller
 
         $previousAssignee = $alert->assigned_to_user_id;
 
+        // Record unassignment in history
+        $assignmentHistory = $alert->context['assignment_history'] ?? [];
+        $assignmentHistory[] = [
+            'action' => 'unassigned',
+            'from_user_id' => $alert->assigned_to_user_id,
+            'from_user_name' => $alert->assignedTo?->name,
+            'to_user_id' => null,
+            'to_user_name' => null,
+            'by_user_id' => $user->id,
+            'by_user_name' => $user->name,
+            'reason' => null,
+            'at' => now()->toISOString(),
+        ];
+
         $alert->update([
             'assigned_to_user_id' => null,
             'assigned_at' => null,
             'assigned_by_user_id' => null,
+            'context' => array_merge($alert->context ?? [], [
+                'assignment_history' => $assignmentHistory,
+            ]),
         ]);
 
         AuditLogger::log('controlRoom.alert.unassign', $alert, [

@@ -18,6 +18,7 @@ use App\Http\Controllers\ControlRoom\ControlRoomPlaybookController;
 use App\Http\Controllers\ControlRoom\AlertController as IntegrationAlertController;
 use App\Http\Controllers\ControlRoom\ControlRoomHandoverController;
 use App\Http\Controllers\ControlRoom\ControlRoomDeviceController;
+use App\Http\Controllers\ControlRoom\ControlRoomMyTasksController;
 
 /**
  * Control Room Routes
@@ -25,10 +26,32 @@ use App\Http\Controllers\ControlRoom\ControlRoomDeviceController;
  * Centralized alert management and triage system.
  */
 Route::middleware(['auth'])->group(function () {
+    // My Tasks
+    Route::get('/control-room/my-tasks', ControlRoomMyTasksController::class)
+        ->middleware('permission:controlRoom.viewAny')
+        ->name('control-room.my-tasks');
+
+    Route::post('/control-room/my-tasks/followups/{note}/complete', function (\Illuminate\Http\Request $request, int $note) {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.viewAny'), 403);
+
+        $operatorNote = \App\Models\ControlRoom\OperatorNote::where('id', $note)
+            ->where('user_id', $user->id)
+            ->where('requires_followup', true)
+            ->firstOrFail();
+
+        $operatorNote->update(['requires_followup' => false]);
+
+        return back()->with('success', 'Follow-up completed.');
+    })->middleware('permission:controlRoom.viewAny')->name('control-room.my-tasks.followup-complete');
+
     // Dashboard and viewing
     Route::middleware('permission:controlRoom.viewAny')->group(function () {
         Route::get('/control-room', ControlRoomDashboardController::class)
             ->name('control-room.index');
+
+        Route::get('/control-room/alerts', [ControlRoomAlertController::class, 'index'])
+            ->name('control-room.alerts.index');
 
         Route::get('/control-room/alerts/{alert}', [ControlRoomAlertController::class, 'show'])
             ->whereNumber('alert')
@@ -39,6 +62,19 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.reports.index');
         Route::get('/control-room/reports/export', [ControlRoomReportController::class, 'export'])
             ->name('control-room.reports.export');
+    });
+
+    // Bulk alert operations
+    Route::middleware('permission:controlRoom.alerts.manage')->group(function () {
+        Route::post('/control-room/alerts/bulk-acknowledge', [ControlRoomAlertController::class, 'bulkAcknowledge'])
+            ->name('control-room.alerts.bulk-acknowledge');
+    });
+    Route::middleware('permission:controlRoom.alerts.assign')->group(function () {
+        Route::post('/control-room/alerts/bulk-assign', [ControlRoomAlertController::class, 'bulkAssign'])
+            ->name('control-room.alerts.bulk-assign');
+        Route::post('/control-room/alerts/{alert}/assign-to-me', [ControlRoomAlertController::class, 'assignToMe'])
+            ->whereNumber('alert')
+            ->name('control-room.alerts.assign-to-me');
     });
 
     // Alert management (acknowledge, triage, resolve, close)
@@ -107,11 +143,6 @@ Route::middleware(['auth'])->group(function () {
             ->name('control-room.integration-alerts.create-incident');
     });
 
-    // Alerts list (real implementation)
-    Route::get('/control-room/alerts', [ControlRoomAlertController::class, 'index'])
-        ->middleware('permission:controlRoom.viewAny')
-        ->name('control-room.alerts.index');
-
     // Live Map
     Route::get('/control-room/map', ControlRoomMapController::class)
         ->middleware('permission:controlRoom.viewAny')
@@ -145,6 +176,12 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/control-room/escalations/bulk-escalate', [ControlRoomEscalationController::class, 'bulkEscalate'])
             ->name('control-room.escalations.bulk-escalate');
     });
+    Route::post('/control-room/escalations/{alert}/acknowledge', [ControlRoomEscalationController::class, 'acknowledgeFromQueue'])
+        ->middleware('permission:controlRoom.alerts.manage')
+        ->name('control-room.escalations.acknowledge');
+    Route::post('/control-room/escalations/{alert}/assign-to-me', [ControlRoomEscalationController::class, 'assignToMe'])
+        ->middleware('permission:controlRoom.alerts.assign')
+        ->name('control-room.escalations.assign-to-me');
 
     // Incident tracker
     Route::get('/control-room/incidents', [ControlRoomIncidentController::class, 'index'])

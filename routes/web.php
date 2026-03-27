@@ -97,6 +97,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/quality/checklist', QualityChecklistController::class)->name('quality.checklist');
 });
 
+Route::get('/my-tasks', \App\Http\Controllers\MyTasksController::class)
+    ->middleware(['auth'])
+    ->name('my-tasks');
+
 // ── Backward-compatible redirects (old → new Operations URLs) ────────
 Route::middleware(['auth'])->group(function () {
     Route::redirect('/clients', '/operations/clients');

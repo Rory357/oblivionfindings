@@ -6,7 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class ControlRoomEscalationController extends Controller
@@ -27,7 +29,7 @@ class ControlRoomEscalationController extends Controller
                 // Load unresolved alerts currently in this queue
                 $alerts = ControlRoomAlert::unresolved()
                     ->where('queue_id', $queue->id)
-                    ->with(['assignedTo:id,name', 'sla'])
+                    ->with(['assignedTo:id,name', 'sla', 'client:id,first_name,last_name'])
                     ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
                     ->orderBy('triggered_at')
                     ->get();
@@ -44,10 +46,20 @@ class ControlRoomEscalationController extends Controller
 
                     $sla = $alert->sla;
 
+                    // Format alert_type nicely: replace dots/underscores with spaces, title case
+                    $formattedAlertType = Str::title(str_replace(['.', '_'], ' ', $alert->alert_type));
+
+                    // Build client name from relation
+                    $clientName = null;
+                    if ($alert->client) {
+                        $clientName = trim($alert->client->first_name . ' ' . $alert->client->last_name);
+                    }
+
                     return [
                         'id' => $alert->id,
                         'severity' => $alert->severity,
-                        'alert_type' => $alert->alert_type,
+                        'alert_type' => $formattedAlertType,
+                        'alert_type_raw' => $alert->alert_type,
                         'source' => $alert->source,
                         'status' => $alert->status,
                         'escalation_level' => $alert->escalation_level,
@@ -57,6 +69,7 @@ class ControlRoomEscalationController extends Controller
                             'id' => $alert->assignedTo->id,
                             'name' => $alert->assignedTo->name,
                         ] : null,
+                        'client_name' => $clientName,
                         'context' => $alert->context,
                         'entered_queue_at' => $enteredAt?->toISOString(),
                         'sla' => $sla ? [
@@ -106,8 +119,62 @@ class ControlRoomEscalationController extends Controller
             'serverTime' => now()->toISOString(),
             'can' => [
                 'manage' => $user->canDo('controlRoom.alerts.manage'),
+                'assign' => $user->canDo('controlRoom.alerts.assign'),
             ],
         ]);
+    }
+
+    /**
+     * Acknowledge an alert from the escalation queue page.
+     */
+    public function acknowledgeFromQueue(Request $request, ControlRoomAlert $alert)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.manage'), 403);
+
+        if ($alert->status === 'closed' || $alert->status === 'resolved') {
+            return back()->withErrors(['alert' => 'Cannot acknowledge a closed or resolved alert.']);
+        }
+
+        $alert->update([
+            'status' => 'ack',
+            'acknowledged_at' => now(),
+            'acknowledged_by_user_id' => $user->id,
+        ]);
+
+        $alert->sla?->recordAcknowledge();
+
+        AuditLogger::log('controlRoom.alert.acknowledge', $alert, [
+            'alert_id' => $alert->id,
+            'acknowledged_by' => $user->id,
+            'source' => 'escalation_queue',
+        ]);
+
+        return back()->with('success', 'Alert acknowledged.');
+    }
+
+    /**
+     * Assign an alert to the current user.
+     */
+    public function assignToMe(Request $request, ControlRoomAlert $alert)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('controlRoom.alerts.assign'), 403);
+
+        $alert->update([
+            'assigned_to_user_id' => $user->id,
+            'assigned_at' => now(),
+            'assigned_by_user_id' => $user->id,
+        ]);
+
+        AuditLogger::log('controlRoom.alert.assignToMe', $alert, [
+            'alert_id' => $alert->id,
+            'assigned_to' => $user->id,
+            'assigned_by' => $user->id,
+            'source' => 'escalation_queue',
+        ]);
+
+        return back()->with('success', 'Alert assigned to you.');
     }
 
     /**

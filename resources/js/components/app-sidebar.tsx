@@ -173,7 +173,8 @@ function buildIconNavItems({
 }): IconNavItem[] {
     const items: IconNavItem[] = [
         { id: 'dashboard', icon: LayoutGrid, label: 'Dashboard', href: '/dashboard' },
-        { id: 'today', icon: ClipboardList, label: 'Today', href: '/today', dividerAfter: true },
+        { id: 'today', icon: ClipboardList, label: 'Today', href: '/today' },
+        { id: 'my-tasks', icon: CheckCircle2, label: 'My Tasks', href: '/my-tasks', dividerAfter: true },
     ];
 
     // Sites & Locations
@@ -643,6 +644,7 @@ function buildControlRoomSubPanelGroups({ can }: { can?: any }): SubPanelGroup[]
             label: 'Live Monitoring',
             items: [
                 { title: 'Dashboard', href: '/control-room', icon: LayoutDashboard },
+                { title: 'My Tasks', href: '/control-room/my-tasks', icon: CheckCircle2 },
                 { title: 'Live Map', href: '/control-room/map', icon: Map },
                 { title: 'Active Shifts', href: '/control-room/shifts', icon: Clock },
             ],
@@ -650,7 +652,7 @@ function buildControlRoomSubPanelGroups({ can }: { can?: any }): SubPanelGroup[]
         {
             label: 'Alerts & Escalations',
             items: [
-                { title: 'Active Alerts', href: '/control-room/alerts', icon: AlertTriangle },
+                { title: 'All Alerts', href: '/control-room/alerts', icon: AlertTriangle },
                 { title: 'Escalation Queue', href: '/control-room/escalations', icon: ArrowUpCircle },
                 { title: 'Incident Tracker', href: '/control-room/incidents', icon: AlertCircle },
             ],
