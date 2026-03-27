@@ -17,11 +17,7 @@ class FinanceSeeder extends Seeder
     {
         $organizationIds = $organizationId
             ? [$organizationId]
-            : DB::table('app_settings')->pluck('organization_id')->filter()->unique()->values()->toArray();
-
-        if (empty($organizationIds)) {
-            $organizationIds = [1];
-        }
+            : [0];
 
         foreach ($organizationIds as $orgId) {
             $this->seedTaxRates($orgId);
@@ -32,7 +28,7 @@ class FinanceSeeder extends Seeder
     /**
      * Seed default NZ tax rates for an organization.
      */
-    private function seedTaxRates(int $organizationId): void
+    private function seedTaxRates(?int $organizationId): void
     {
         $taxRates = [
             [
@@ -77,7 +73,7 @@ class FinanceSeeder extends Seeder
     /**
      * Seed the default Chart of Accounts for NZ supported living.
      */
-    private function seedChartOfAccounts(int $organizationId): void
+    private function seedChartOfAccounts(?int $organizationId): void
     {
         $accounts = $this->getDefaultAccounts();
 
