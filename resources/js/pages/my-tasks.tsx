@@ -153,7 +153,7 @@ interface Props {
 // Helpers
 // ---------------------------------------------------------------------------
 
-type OpenItemFilter = 'all' | 'alert' | 'incident' | 'followup';
+type OpenItemFilter = 'all' | 'shift' | 'alert' | 'incident' | 'followup' | 'calendar';
 
 const priorityOrder: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
 
@@ -165,6 +165,7 @@ const priorityConfig: Record<string, { border: string; badge: string; bg: string
 };
 
 const typeConfig: Record<string, { badge: string; icon: typeof Bell; label: string }> = {
+    shift: { badge: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300', icon: Calendar, label: 'Shift' },
     alert: { badge: 'bg-purple-100 text-purple-800 border-purple-200 dark:bg-purple-900/30 dark:text-purple-300', icon: Bell, label: 'Alert' },
     followup: { badge: 'bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/30 dark:text-sky-300', icon: ClipboardList, label: 'Follow-up' },
     note_followup: { badge: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300', icon: FileText, label: 'Note' },
@@ -295,6 +296,18 @@ export default function MyDay({
         time: string;
     }> = [];
 
+    shifts.forEach((s) => {
+        openItems.push({
+            id: `shift-${s.id}`,
+            type: 'shift' as any,
+            title: `${s.client.name} — ${formatTime(s.starts_at)} to ${formatTime(s.ends_at)}`,
+            priority: s.status === 'in_progress' ? 'high' : 'medium',
+            client_name: s.client.name,
+            url: `/clients/${s.client.id}`,
+            time: s.starts_at,
+        });
+    });
+
     tasks.forEach((t) => {
         openItems.push({
             id: `task-${t.id}`,
@@ -321,11 +334,15 @@ export default function MyDay({
 
     const filteredOpenItems = openItemFilter === 'all'
         ? openItems
-        : openItemFilter === 'incident'
-            ? openItems.filter((i) => i.type === 'incident')
-            : openItemFilter === 'alert'
-                ? openItems.filter((i) => i.type === 'alert')
-                : openItems.filter((i) => i.type === 'followup' || i.type === 'note_followup');
+        : openItemFilter === 'shift'
+            ? openItems.filter((i) => i.type === 'shift')
+            : openItemFilter === 'incident'
+                ? openItems.filter((i) => i.type === 'incident')
+                : openItemFilter === 'alert'
+                    ? openItems.filter((i) => i.type === 'alert')
+                    : openItemFilter === 'calendar'
+                        ? [] // calendar tab shows a different view
+                        : openItems.filter((i) => i.type === 'followup' || i.type === 'note_followup');
 
     const sortedOpenItems = [...filteredOpenItems].sort((a, b) => {
         const pa = priorityOrder[a.priority] ?? 3;
@@ -334,12 +351,29 @@ export default function MyDay({
         return new Date(b.time).getTime() - new Date(a.time).getTime();
     });
 
-    const openItemCounts = {
+    const openItemCounts: Record<string, number> = {
         all: openItems.length,
+        shift: shifts.length,
         alert: openItems.filter((i) => i.type === 'alert').length,
         incident: openItems.filter((i) => i.type === 'incident').length,
         followup: openItems.filter((i) => i.type === 'followup' || i.type === 'note_followup').length,
+        calendar: shifts.length,
     };
+
+    // Build calendar week data (7 days starting from today)
+    const calendarDays: Array<{ date: string; dayName: string; dayNum: number; isToday: boolean; shifts: typeof shifts }> = [];
+    for (let i = 0; i < 7; i++) {
+        const d = new Date();
+        d.setDate(d.getDate() + i);
+        const dateStr = d.toISOString().split('T')[0];
+        calendarDays.push({
+            date: dateStr,
+            dayName: d.toLocaleDateString('en-NZ', { weekday: 'short' }),
+            dayNum: d.getDate(),
+            isToday: i === 0,
+            shifts: shifts.filter((s) => s.starts_at.startsWith(dateStr)),
+        });
+    }
 
     // Sort meds: overdue first, then by scheduled_for
     const sortedMeds = [...medications_due].sort((a, b) => {
@@ -692,12 +726,11 @@ export default function MyDay({
                 )}
 
                 {/* ── Section 4: Open Items ─────────────────────────────── */}
-                {openItems.length > 0 && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-lg">
-                                <OctagonAlert className="h-5 w-5" />
-                                Open Items
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-lg">
+                            <OctagonAlert className="h-5 w-5" />
+                            Open Items
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4 pt-0">
@@ -705,9 +738,11 @@ export default function MyDay({
                             <div className="flex gap-1 rounded-lg border bg-muted/50 p-1">
                                 {([
                                     { key: 'all' as OpenItemFilter, label: 'All' },
+                                    { key: 'shift' as OpenItemFilter, label: 'Shifts' },
                                     { key: 'alert' as OpenItemFilter, label: 'Alerts' },
                                     { key: 'incident' as OpenItemFilter, label: 'Incidents' },
                                     { key: 'followup' as OpenItemFilter, label: 'Follow-ups' },
+                                    { key: 'calendar' as OpenItemFilter, label: 'Calendar' },
                                 ] as const).map((tab) => (
                                     <button
                                         key={tab.key}
@@ -730,8 +765,62 @@ export default function MyDay({
                                 ))}
                             </div>
 
-                            {/* Item list */}
-                            {sortedOpenItems.length === 0 ? (
+                            {/* Calendar view */}
+                            {openItemFilter === 'calendar' ? (
+                                <div>
+                                    <div className="mb-3 flex items-center gap-2 text-sm text-muted-foreground">
+                                        <Calendar className="h-4 w-4" />
+                                        <span>Next 7 days</span>
+                                    </div>
+                                    <div className="grid grid-cols-7 gap-2">
+                                        {calendarDays.map((day) => (
+                                            <div
+                                                key={day.date}
+                                                className={`rounded-lg border p-2 ${
+                                                    day.isToday
+                                                        ? 'border-primary bg-primary/5'
+                                                        : 'bg-card'
+                                                }`}
+                                            >
+                                                <div className="mb-1.5 text-center">
+                                                    <div className={`text-[10px] font-medium uppercase ${day.isToday ? 'text-primary' : 'text-muted-foreground'}`}>
+                                                        {day.dayName}
+                                                    </div>
+                                                    <div className={`text-lg font-bold ${day.isToday ? 'text-primary' : ''}`}>
+                                                        {day.dayNum}
+                                                    </div>
+                                                </div>
+                                                {day.shifts.length === 0 ? (
+                                                    <div className="rounded bg-muted/50 px-1.5 py-1 text-center text-[10px] text-muted-foreground">
+                                                        No shifts
+                                                    </div>
+                                                ) : (
+                                                    <div className="space-y-1">
+                                                        {day.shifts.map((s) => (
+                                                            <Link
+                                                                key={s.id}
+                                                                href={`/clients/${s.client.id}`}
+                                                                className={`block rounded px-1.5 py-1 text-[10px] transition-colors hover:ring-1 hover:ring-primary/50 ${
+                                                                    s.status === 'in_progress'
+                                                                        ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                                                                        : s.status === 'completed'
+                                                                            ? 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+                                                                            : 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300'
+                                                                }`}
+                                                            >
+                                                                <div className="truncate font-medium">{s.client.name}</div>
+                                                                <div className="text-[9px] opacity-75">
+                                                                    {formatTime(s.starts_at)}
+                                                                </div>
+                                                            </Link>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            ) : sortedOpenItems.length === 0 ? (
                                 <div className="flex flex-col items-center py-8 text-center">
                                     <CheckCircle2 className="h-8 w-8 text-green-500" />
                                     <p className="mt-2 text-sm text-muted-foreground">No items in this category.</p>
@@ -739,10 +828,13 @@ export default function MyDay({
                             ) : (
                                 <div className="space-y-2">
                                     {sortedOpenItems.map((item) => {
+                                        const isShift = item.type === 'shift';
                                         const isIncident = item.type === 'incident';
-                                        const tConfig = isIncident
-                                            ? { badge: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300', icon: AlertTriangle, label: 'Incident' }
-                                            : typeConfig[item.type] ?? typeConfig.alert;
+                                        const tConfig = isShift
+                                            ? { badge: 'bg-blue-100 text-blue-800 border-blue-200 dark:bg-blue-900/30 dark:text-blue-300', icon: Calendar, label: 'Shift' }
+                                            : isIncident
+                                                ? { badge: 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/30 dark:text-red-300', icon: AlertTriangle, label: 'Incident' }
+                                                : typeConfig[item.type] ?? typeConfig.alert;
                                         const pConfig = priorityConfig[item.priority] ?? priorityConfig.medium;
                                         const TypeIcon = tConfig.icon;
                                         const PriorityIcon = pConfig.icon;
@@ -796,7 +888,6 @@ export default function MyDay({
                             )}
                         </CardContent>
                     </Card>
-                )}
 
                 {/* ── Section 5: Leave Balance ──────────────────────────── */}
                 {leave && leave.balances.length > 0 && (
