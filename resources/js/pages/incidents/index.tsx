@@ -8,17 +8,29 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
     AlertTriangle,
     ArrowRight,
     Calendar,
     CheckCircle2,
     Clock,
+    Copy,
     Eye,
+    ExternalLink,
     FileEdit,
     Filter,
+    MoreVertical,
     Plus,
     Search,
+    Send,
     ShieldAlert,
+    Trash2,
     User,
     XCircle,
     Activity,
@@ -284,25 +296,23 @@ export default function IncidentsIndex({ filters, incidents, clients }: Props) {
                         const TypeIcon = typeIcons[i.type] ?? AlertTriangle;
                         const StatusIcon = stat.icon;
                         const clientName = i.client ? `${i.client.first_name ?? ''} ${i.client.last_name ?? ''}`.trim() : null;
+                        const preview = i.description ? (i.description.length > 120 ? i.description.slice(0, 120) + '...' : i.description) : null;
 
                         return (
-                            <Link
+                            <div
                                 key={i.id}
-                                href={`/incidents/${i.id}`}
-                                className="block rounded-lg border border-l-4 bg-white transition-all hover:shadow-md hover:border-slate-300"
-                                style={{ borderLeftColor: `var(--severity-${i.severity})` }}
+                                className={`group relative cursor-pointer rounded-lg border border-l-4 bg-white transition-all hover:shadow-md ${sev.border}`}
+                                onClick={() => router.visit(`/incidents/${i.id}`)}
                             >
-                                <div className={`rounded-lg border-l-4 ${sev.border}`}>
-                                    <div className="flex items-center gap-4 px-4 py-3">
-                                        {/* Type icon */}
-                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${sev.bg}`}>
+                                <div className="block px-4 py-3 pr-12">
+                                    <div className="flex items-start gap-4">
+                                        <div className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${sev.bg}`}>
                                             <TypeIcon className={`h-5 w-5 ${sev.text}`} />
                                         </div>
-
-                                        {/* Main content */}
                                         <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-semibold capitalize">{i.type?.replace(/_/g, ' ')}</span>
+                                                <span className="text-slate-300">|</span>
                                                 <Badge className={`${sev.bg} ${sev.text} border-0 text-[10px] font-medium`}>
                                                     {i.severity}
                                                 </Badge>
@@ -313,34 +323,69 @@ export default function IncidentsIndex({ filters, incidents, clients }: Props) {
                                                 {i.is_notifiable && (
                                                     <Badge className="bg-red-100 text-red-700 border-0 text-[10px]">WorkSafe</Badge>
                                                 )}
+                                                {i.requires_followup && (
+                                                    <Badge className="bg-purple-100 text-purple-700 border-0 text-[10px]">Follow-up</Badge>
+                                                )}
                                             </div>
-                                            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                                            {preview && (
+                                                <p className="mt-1 text-sm text-slate-600 line-clamp-1">{preview}</p>
+                                            )}
+                                            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
                                                 {clientName && (
-                                                    <span className="flex items-center gap-1">
-                                                        <User className="h-3 w-3" />
-                                                        {clientName}
-                                                    </span>
+                                                    <span className="flex items-center gap-1"><User className="h-3 w-3" />{clientName}</span>
                                                 )}
                                                 {i.occurred_at && (
-                                                    <span className="flex items-center gap-1">
-                                                        <Calendar className="h-3 w-3" />
-                                                        {formatDateTime(i.occurred_at)}
-                                                    </span>
+                                                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDateTime(i.occurred_at)}</span>
                                                 )}
-                                                <span className="flex items-center gap-1">
-                                                    {i.shift_id ? 'Shift-linked' : 'Standalone'}
-                                                </span>
-                                                {i.reported_by?.name && (
-                                                    <span className="text-slate-400">by {i.reported_by.name}</span>
-                                                )}
+                                                <span className="text-slate-400">{i.shift_id ? 'Shift-linked' : 'Standalone'}</span>
+                                                {i.reported_by?.name && <span className="text-slate-400">by {i.reported_by.name}</span>}
                                             </div>
                                         </div>
-
-                                        {/* Arrow */}
-                                        <ArrowRight className="h-4 w-4 shrink-0 text-slate-300" />
                                     </div>
                                 </div>
-                            </Link>
+
+                                {/* Three-dot menu */}
+                                <div className="absolute right-2 top-2.5 z-10" onClick={(e) => e.stopPropagation()}>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <button className="rounded p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors">
+                                                <MoreVertical className="h-4 w-4" />
+                                            </button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="w-48">
+                                            <DropdownMenuItem onClick={() => router.visit(`/incidents/${i.id}`)}>
+                                                <ExternalLink className="mr-2 h-4 w-4" />
+                                                Open incident
+                                            </DropdownMenuItem>
+                                            {i.status === 'draft' && can.update && (
+                                                <DropdownMenuItem onClick={() => router.post(`/incidents/${i.id}/submit`)}>
+                                                    <Send className="mr-2 h-4 w-4" />
+                                                    Submit for review
+                                                </DropdownMenuItem>
+                                            )}
+                                            {i.status === 'submitted' && can.approve && (
+                                                <DropdownMenuItem onClick={() => router.visit(`/incidents/${i.id}`)}>
+                                                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                                                    Review incident
+                                                </DropdownMenuItem>
+                                            )}
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => {
+                                                if (i.client) router.visit(`/operations/clients/${i.client.id}`);
+                                            }} disabled={!i.client}>
+                                                <User className="mr-2 h-4 w-4" />
+                                                View {clientSingular.toLowerCase()}
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => {
+                                                navigator.clipboard.writeText(`${window.location.origin}/incidents/${i.id}`);
+                                            }}>
+                                                <Copy className="mr-2 h-4 w-4" />
+                                                Copy link
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </div>
                         );
                     })}
 
