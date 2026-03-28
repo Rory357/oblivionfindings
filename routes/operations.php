@@ -58,6 +58,8 @@ use App\Http\Controllers\Operations\PayrollExportController;
 use App\Http\Controllers\Operations\CalendarSyncController;
 use App\Http\Controllers\Operations\GeofenceController;
 use App\Http\Controllers\Operations\ClientConsentController;
+use App\Http\Controllers\TimelineController;
+use App\Http\Controllers\SummaryController;
 
 /**
  * Operations Module Routes
@@ -74,6 +76,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
     Route::get('/', DashboardController::class)->name('operations.dashboard');
     Route::get('/activity', [ActivityFeedController::class, 'index'])->name('operations.activity.index');
+
+    // Timeline
+    Route::get('/timeline', [TimelineController::class, 'my'])->name('operations.timeline');
+
+    // Summaries
+    Route::get('/summaries', [SummaryController::class, 'my'])->name('operations.summaries');
 
     // -------------------------------------------------------------------------
     // Clients (migrated from /clients)
