@@ -5,17 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { 
-    ShieldAlert, 
-    AlertTriangle, 
-    AlertCircle, 
-    Clock, 
-    CheckCircle2,
-    ArrowLeft,
-    User,
-    Calendar
-} from 'lucide-react';
-import { useState } from 'react';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import {
     Select,
     SelectContent,
@@ -23,6 +19,23 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    AlertTriangle,
+    Calendar,
+    CheckCircle2,
+    Clock,
+    FileText,
+    MapPin,
+    Send,
+    Lock,
+    User,
+    Image,
+    ArrowLeft,
+    Shield,
+    Zap,
+} from 'lucide-react';
+import { useState } from 'react';
+import { formatDateTime } from '@/lib/date-format';
 
 type Site = {
     id: number;
@@ -45,6 +58,7 @@ type Hazard = {
     likelihood: string;
     risk_rating: string;
     description: string;
+    location?: string;
     photo_paths?: string[];
     immediate_action_applied: boolean;
     immediate_action_taken?: string;
@@ -65,30 +79,63 @@ type Props = {
     canClose: boolean;
 };
 
-const severityColors: Record<string, string> = {
-    low: 'border-slate-500/30 text-slate-400 bg-slate-500/10',
-    medium: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
-    high: 'border-orange-500/30 text-orange-400 bg-orange-500/10',
-    critical: 'border-red-500/30 text-red-400 bg-red-500/10',
+const RISK_MATRIX: Record<string, Record<string, string>> = {
+    low: { rare: 'low', unlikely: 'low', possible: 'medium', likely: 'medium', almost_certain: 'high' },
+    medium: { rare: 'low', unlikely: 'medium', possible: 'medium', likely: 'high', almost_certain: 'high' },
+    high: { rare: 'medium', unlikely: 'medium', possible: 'high', likely: 'high', almost_certain: 'extreme' },
+    critical: { rare: 'high', unlikely: 'high', possible: 'extreme', likely: 'extreme', almost_certain: 'extreme' },
 };
 
-const statusColors: Record<string, string> = {
-    open: 'border-red-500/30 text-red-400',
-    in_progress: 'border-blue-500/30 text-blue-400',
-    mitigated: 'border-emerald-500/30 text-emerald-400',
-    closed: 'border-slate-500/30 text-slate-400',
+const sevKeys = ['low', 'medium', 'high', 'critical'];
+const likKeys = ['rare', 'unlikely', 'possible', 'likely', 'almost_certain'];
+
+const riskBarColors: Record<string, string> = {
+    extreme: 'bg-red-500',
+    high: 'bg-orange-500',
+    medium: 'bg-amber-500',
+    low: 'bg-emerald-500',
 };
 
-const statusIcons = {
-    open: AlertCircle,
-    in_progress: Clock,
-    mitigated: CheckCircle2,
-    closed: CheckCircle2,
+const severityConfig: Record<string, { bg: string; text: string }> = {
+    low: { bg: 'bg-emerald-50', text: 'text-emerald-700' },
+    medium: { bg: 'bg-amber-50', text: 'text-amber-700' },
+    high: { bg: 'bg-orange-50', text: 'text-orange-700' },
+    critical: { bg: 'bg-red-100', text: 'text-red-800' },
 };
+
+const statusConfig: Record<string, { bg: string; text: string; icon: typeof Clock }> = {
+    open: { bg: 'bg-red-100', text: 'text-red-700', icon: AlertTriangle },
+    in_progress: { bg: 'bg-blue-100', text: 'text-blue-700', icon: Clock },
+    mitigated: { bg: 'bg-purple-100', text: 'text-purple-700', icon: CheckCircle2 },
+    closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2 },
+};
+
+const riskConfig: Record<string, { bg: string; text: string }> = {
+    low: { bg: 'bg-emerald-100', text: 'text-emerald-800' },
+    medium: { bg: 'bg-amber-100', text: 'text-amber-800' },
+    high: { bg: 'bg-orange-100', text: 'text-orange-800' },
+    extreme: { bg: 'bg-red-100', text: 'text-red-800' },
+};
+
+const WORKFLOW_STEPS = [
+    { key: 'open', label: 'Open', icon: AlertTriangle },
+    { key: 'in_progress', label: 'In Progress', icon: Clock },
+    { key: 'mitigated', label: 'Mitigated', icon: Shield },
+    { key: 'closed', label: 'Closed', icon: Lock },
+];
+
+function matrixCellColor(rating: string) {
+    switch (rating) {
+        case 'extreme': return 'bg-red-500 text-white';
+        case 'high': return 'bg-orange-400 text-white';
+        case 'medium': return 'bg-amber-300 text-amber-900';
+        default: return 'bg-emerald-200 text-emerald-900';
+    }
+}
 
 export default function HazardShow({ hazard, users, canAssign, canClose }: Props) {
-    const [showAssignForm, setShowAssignForm] = useState(false);
-    const [showCloseForm, setShowCloseForm] = useState(false);
+    const [showAssignDialog, setShowAssignDialog] = useState(false);
+    const [showCloseDialog, setShowCloseDialog] = useState(false);
 
     const assignForm = useForm({
         assigned_to_user_id: hazard.assigned_to?.id?.toString() || '',
@@ -98,209 +145,258 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
         resolution_summary: '',
     });
 
-    const StatusIcon = statusIcons[hazard.status];
+    const sev = severityConfig[hazard.severity] ?? severityConfig.low;
+    const stat = statusConfig[hazard.status] ?? statusConfig.open;
+    const risk = riskConfig[hazard.risk_rating] ?? riskConfig.low;
+    const StatusIcon = stat.icon;
 
-    const isOverdue = hazard.due_date && new Date(hazard.due_date) < new Date() && 
+    const isOverdue = hazard.due_date && new Date(hazard.due_date) < new Date() &&
         !['closed', 'mitigated'].includes(hazard.status);
+
+    const stepIndex = WORKFLOW_STEPS.findIndex((s) => s.key === hazard.status);
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: hazard.site.name, href: `/sites/${hazard.site.id}` }, { title: 'Hazards', href: `/sites/${hazard.site.id}/hazards` }, { title: hazard.reference_number, href: `/hazards/${hazard.id}` }]}>
             <Head title={`Hazard ${hazard.reference_number}`} />
 
-            <div className="m-4 max-w-4xl">
-                <Button asChild variant="ghost" size="sm" className="mb-4">
-                    <Link href={`/sites/${hazard.site.id}/hazards`}>
-                        <ArrowLeft className="w-4 h-4 mr-1" />
-                        Back to Hazards
-                    </Link>
-                </Button>
+            <div className="mx-auto max-w-4xl space-y-6 pb-8">
+                {/* Back button */}
+                <Link href={`/sites/${hazard.site.id}/hazards`} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground transition-colors">
+                    <ArrowLeft className="h-4 w-4" />
+                    Back to Hazards
+                </Link>
 
-                {/* Header */}
-                <div className="flex items-start justify-between mb-6">
-                    <div>
-                        <div className="flex items-center gap-2 mb-2">
-                            <span className="font-mono text-lg text-slate-400">{hazard.reference_number}</span>
-                            <Badge variant="outline" className={severityColors[hazard.severity]}>
-                                {hazard.severity}
-                            </Badge>
-                            <Badge variant="outline" className={statusColors[hazard.status]}>
-                                <StatusIcon className="w-3 h-3 mr-1" />
-                                {hazard.status.replace('_', ' ')}
-                            </Badge>
-                            {isOverdue && (
-                                <Badge variant="outline" className="border-red-500/50 text-red-400">
-                                    <AlertTriangle className="w-3 h-3 mr-1" />
-                                    Overdue
-                                </Badge>
-                            )}
-                        </div>
-                        <h1 className="text-xl font-semibold">
-                            {hazard.custom_hazard_type || hazard.hazard_type}
-                        </h1>
-                        <p className="text-slate-400 text-sm mt-1">
-                            {hazard.site.name} • Logged by {hazard.reported_by.name} on {new Date(hazard.created_at).toLocaleDateString()}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {hazard.status !== 'closed' && canAssign && (
-                            <Button variant="outline" onClick={() => setShowAssignForm(!showAssignForm)}>
-                                <User className="w-4 h-4 mr-1" />
-                                {hazard.assigned_to ? 'Reassign' : 'Assign'}
-                            </Button>
-                        )}
-                        {['open', 'in_progress', 'mitigated'].includes(hazard.status) && canClose && (
-                            <Button onClick={() => setShowCloseForm(!showCloseForm)}>
-                                <CheckCircle2 className="w-4 h-4 mr-1" />
-                                Close
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Assignment Form */}
-                {showAssignForm && (
-                    <Card className="mb-4">
-                        <CardContent className="p-4">
-                            <form
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    assignForm.post(`/hazards/${hazard.id}/assign`, {
-                                        onSuccess: () => setShowAssignForm(false),
-                                    });
-                                }}
-                                className="flex items-end gap-2"
-                            >
-                                <div className="flex-1">
-                                    <Label>Assign to</Label>
-                                    <Select
-                                        value={assignForm.data.assigned_to_user_id || undefined}
-                                        onValueChange={(v) => assignForm.setData('assigned_to_user_id', v)}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select user..." />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {users.map((u) => (
-                                                <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
+                {/* Header card */}
+                <Card className="overflow-hidden">
+                    <div className={`h-2 ${riskBarColors[hazard.risk_rating] ?? 'bg-slate-300'}`} />
+                    <CardContent className="pt-5">
+                        <div className="flex items-start justify-between gap-4">
+                            <div>
+                                <div className="flex items-center gap-2 flex-wrap mb-2">
+                                    <span className="text-lg font-semibold">{hazard.reference_number}</span>
+                                    <span className="text-slate-300">|</span>
+                                    <span className="text-lg capitalize">{hazard.custom_hazard_type || hazard.hazard_type.replace(/_/g, ' ')}</span>
                                 </div>
-                                <Button type="submit" disabled={assignForm.processing}>
-                                    Assign
-                                </Button>
-                                <Button type="button" variant="outline" onClick={() => setShowAssignForm(false)}>
-                                    Cancel
-                                </Button>
-                            </form>
-                        </CardContent>
-                    </Card>
-                )}
-
-                {/* Close Form */}
-                {showCloseForm && (
-                    <Card className="mb-4">
-                        <CardContent className="p-4">
-                            <form
-                                onSubmit={(e) => {
-                                    e.preventDefault();
-                                    closeForm.post(`/hazards/${hazard.id}/close`, {
-                                        onSuccess: () => setShowCloseForm(false),
-                                    });
-                                }}
-                                className="space-y-3"
-                            >
-                                <div>
-                                    <Label>Resolution Summary *</Label>
-                                    <Textarea
-                                        value={closeForm.data.resolution_summary}
-                                        onChange={(e) => closeForm.setData('resolution_summary', e.target.value)}
-                                        rows={3}
-                                        placeholder="Describe how the hazard was resolved..."
-                                        required
-                                    />
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button type="submit" disabled={closeForm.processing}>
-                                        Close Hazard
-                                    </Button>
-                                    <Button type="button" variant="outline" onClick={() => setShowCloseForm(false)}>
-                                        Cancel
-                                    </Button>
-                                </div>
-                            </form>
-                        </CardContent>
-                    </Card>
-                )}
-
-                <div className="grid gap-4 lg:grid-cols-2">
-                    {/* Description */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Description</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="whitespace-pre-wrap">{hazard.description}</p>
-                        </CardContent>
-                    </Card>
-
-                    {/* Risk Assessment */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Risk Assessment</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <div className="text-sm text-slate-400">Severity</div>
-                                    <Badge variant="outline" className={severityColors[hazard.severity]}>
+                                <div className="flex items-center gap-2 flex-wrap">
+                                    <Badge className={`${sev.bg} ${sev.text} border-0 text-[10px] font-medium`}>
                                         {hazard.severity}
                                     </Badge>
-                                </div>
-                                <div>
-                                    <div className="text-sm text-slate-400">Likelihood</div>
-                                    <div className="capitalize">{hazard.likelihood.replace('_', ' ')}</div>
+                                    <Badge className={`${stat.bg} ${stat.text} border-0 text-[10px] font-medium`}>
+                                        <StatusIcon className="mr-1 h-3 w-3" />
+                                        {hazard.status.replace(/_/g, ' ')}
+                                    </Badge>
+                                    <Badge className={`${risk.bg} ${risk.text} border-0 text-[10px] font-medium`}>
+                                        {hazard.risk_rating} risk
+                                    </Badge>
+                                    {isOverdue && (
+                                        <Badge className="bg-red-100 text-red-700 border-0 text-[10px] font-medium">
+                                            <Clock className="mr-1 h-3 w-3" />
+                                            Overdue
+                                        </Badge>
+                                    )}
                                 </div>
                             </div>
-                            <div className="pt-3 border-t">
-                                <div className="text-sm text-slate-400">Risk Rating</div>
-                                <Badge 
-                                    variant="outline" 
-                                    className={`mt-1 text-lg ${
-                                        hazard.risk_rating === 'extreme' ? 'border-red-500/50 text-red-400' :
-                                        hazard.risk_rating === 'high' ? 'border-orange-500/50 text-orange-400' :
-                                        hazard.risk_rating === 'medium' ? 'border-yellow-500/50 text-yellow-400' :
-                                        'border-slate-500/30'
-                                    }`}
-                                >
-                                    {hazard.risk_rating.toUpperCase()}
-                                </Badge>
+                            <div className="flex items-center gap-2">
+                                {hazard.status !== 'closed' && canAssign && (
+                                    <Button variant="outline" size="sm" onClick={() => setShowAssignDialog(true)}>
+                                        <User className="mr-1 h-4 w-4" />
+                                        {hazard.assigned_to ? 'Reassign' : 'Assign'}
+                                    </Button>
+                                )}
+                                {['open', 'in_progress', 'mitigated'].includes(hazard.status) && canClose && (
+                                    <Button size="sm" onClick={() => setShowCloseDialog(true)}>
+                                        <CheckCircle2 className="mr-1 h-4 w-4" />
+                                        Close
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Status timeline */}
+                <Card>
+                    <CardContent className="pt-5">
+                        <div className="flex items-center justify-between">
+                            {WORKFLOW_STEPS.map((step, idx) => {
+                                const StepIcon = step.icon;
+                                const isReached = idx <= stepIndex;
+                                const isCurrent = idx === stepIndex;
+                                return (
+                                    <div key={step.key} className="flex items-center flex-1">
+                                        <div className="flex flex-col items-center gap-1">
+                                            <div className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors ${
+                                                isCurrent
+                                                    ? 'bg-primary text-primary-foreground border-primary'
+                                                    : isReached
+                                                        ? 'bg-primary/10 text-primary border-primary/30'
+                                                        : 'bg-muted text-muted-foreground border-muted'
+                                            }`}>
+                                                <StepIcon className="h-4 w-4" />
+                                            </div>
+                                            <span className={`text-xs font-medium ${isCurrent ? 'text-primary' : isReached ? 'text-primary/70' : 'text-muted-foreground'}`}>
+                                                {step.label}
+                                            </span>
+                                        </div>
+                                        {idx < WORKFLOW_STEPS.length - 1 && (
+                                            <div className={`flex-1 h-0.5 mx-2 ${isReached && idx < stepIndex ? 'bg-primary/30' : 'bg-muted'}`} />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                <div className="grid gap-4 lg:grid-cols-2">
+                    {/* Risk matrix visual */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-sm flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                                Risk Matrix
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-start gap-4">
+                                <div className="flex-1 overflow-x-auto">
+                                    <table className="text-[10px] border-collapse w-full">
+                                        <thead>
+                                            <tr>
+                                                <th className="p-1.5" />
+                                                {likKeys.map((l) => (
+                                                    <th key={l} className="p-1.5 text-center font-medium text-muted-foreground capitalize">
+                                                        {l.replace('_', ' ').split(' ')[0]}
+                                                    </th>
+                                                ))}
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {[...sevKeys].reverse().map((s) => (
+                                                <tr key={s}>
+                                                    <td className="p-1.5 font-medium text-muted-foreground capitalize pr-2 text-right">{s}</td>
+                                                    {likKeys.map((l) => {
+                                                        const cellRating = RISK_MATRIX[s]?.[l] ?? 'low';
+                                                        const isActive = s === hazard.severity && l === hazard.likelihood;
+                                                        return (
+                                                            <td
+                                                                key={l}
+                                                                className={`p-1.5 text-center rounded ${matrixCellColor(cellRating)} ${
+                                                                    isActive ? 'ring-2 ring-offset-1 ring-slate-900 font-bold text-xs' : ''
+                                                                }`}
+                                                            >
+                                                                {cellRating.charAt(0).toUpperCase()}
+                                                            </td>
+                                                        );
+                                                    })}
+                                                </tr>
+                                            ))}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="space-y-2 text-xs">
+                                    <div>
+                                        <div className="text-muted-foreground">Severity</div>
+                                        <Badge className={`${sev.bg} ${sev.text} border-0 text-[10px]`}>{hazard.severity}</Badge>
+                                    </div>
+                                    <div>
+                                        <div className="text-muted-foreground">Likelihood</div>
+                                        <span className="capitalize font-medium">{hazard.likelihood.replace(/_/g, ' ')}</span>
+                                    </div>
+                                    <div>
+                                        <div className="text-muted-foreground">Risk Rating</div>
+                                        <Badge className={`${risk.bg} ${risk.text} border-0 text-[10px] font-semibold`}>
+                                            {hazard.risk_rating.toUpperCase()}
+                                        </Badge>
+                                    </div>
+                                </div>
                             </div>
                         </CardContent>
                     </Card>
 
-                    {/* Assignment Info */}
+                    {/* Details */}
                     <Card>
                         <CardHeader>
-                            <CardTitle>Assignment</CardTitle>
+                            <CardTitle className="text-sm flex items-center gap-2">
+                                <FileText className="h-4 w-4 text-muted-foreground" />
+                                Details
+                            </CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-2">
-                            <div className="flex items-center gap-2">
-                                <User className="w-4 h-4 text-slate-400" />
-                                <span className="text-slate-400">Assigned to:</span>
-                                <span>{hazard.assigned_to?.name || 'Unassigned'}</span>
+                        <CardContent className="space-y-4">
+                            <div>
+                                <div className="text-xs text-muted-foreground mb-1">Description</div>
+                                <p className="text-sm whitespace-pre-wrap">{hazard.description}</p>
                             </div>
-                            {hazard.assigned_at && (
-                                <div className="flex items-center gap-2 text-sm text-slate-500">
-                                    <Clock className="w-4 h-4" />
-                                    Assigned on {new Date(hazard.assigned_at).toLocaleDateString()}
+                            {hazard.location && (
+                                <div className="flex items-center gap-2 text-sm">
+                                    <MapPin className="h-4 w-4 text-muted-foreground" />
+                                    <span>{hazard.location}</span>
                                 </div>
                             )}
+                            <div className="flex items-center gap-2 text-sm">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                                <span>Reported by {hazard.reported_by.name}</span>
+                            </div>
+                            <div className="flex items-center gap-2 text-sm">
+                                <Calendar className="h-4 w-4 text-muted-foreground" />
+                                <span>{formatDateTime(hazard.created_at)}</span>
+                            </div>
                             {hazard.due_date && (
-                                <div className={`flex items-center gap-2 ${isOverdue ? 'text-red-400' : ''}`}>
-                                    <Calendar className="w-4 h-4" />
-                                    Due: {new Date(hazard.due_date).toLocaleDateString()}
+                                <div className={`flex items-center gap-2 text-sm ${isOverdue ? 'text-red-600 font-medium' : ''}`}>
+                                    <Clock className="h-4 w-4" />
+                                    <span>Due {new Date(hazard.due_date).toLocaleDateString()}</span>
                                 </div>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    {/* Photos */}
+                    {hazard.photo_paths && hazard.photo_paths.length > 0 && (
+                        <Card>
+                            <CardHeader>
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                    <Image className="h-4 w-4 text-muted-foreground" />
+                                    Photos ({hazard.photo_paths.length})
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                    {hazard.photo_paths.map((path, idx) => (
+                                        <div key={idx} className="aspect-square rounded-lg bg-muted overflow-hidden">
+                                            <img src={`/storage/${path}`} alt={`Hazard photo ${idx + 1}`} className="h-full w-full object-cover" />
+                                        </div>
+                                    ))}
+                                </div>
+                            </CardContent>
+                        </Card>
+                    )}
+
+                    {/* Assignment */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-sm flex items-center gap-2">
+                                <User className="h-4 w-4 text-muted-foreground" />
+                                Assignment
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="flex items-center gap-3">
+                                <div className={`flex h-10 w-10 items-center justify-center rounded-full ${hazard.assigned_to ? 'bg-blue-100 text-blue-700' : 'bg-muted text-muted-foreground'}`}>
+                                    <User className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <div className="text-sm font-medium">{hazard.assigned_to?.name || 'Unassigned'}</div>
+                                    {hazard.assigned_at && (
+                                        <div className="text-xs text-muted-foreground">
+                                            Assigned on {new Date(hazard.assigned_at).toLocaleDateString()}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                            {hazard.status !== 'closed' && canAssign && (
+                                <Button variant="outline" size="sm" className="w-full" onClick={() => setShowAssignDialog(true)}>
+                                    {hazard.assigned_to ? 'Reassign' : 'Assign someone'}
+                                </Button>
                             )}
                         </CardContent>
                     </Card>
@@ -309,10 +405,13 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                     {hazard.immediate_action_applied && (
                         <Card>
                             <CardHeader>
-                                <CardTitle>Immediate Action Taken</CardTitle>
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                    <Zap className="h-4 w-4 text-muted-foreground" />
+                                    Immediate Action Taken
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="whitespace-pre-wrap text-slate-300">
+                                <p className="text-sm whitespace-pre-wrap">
                                     {hazard.immediate_action_taken || 'No details provided'}
                                 </p>
                             </CardContent>
@@ -321,14 +420,17 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
 
                     {/* Resolution */}
                     {hazard.resolution_summary && (
-                        <Card>
+                        <Card className="border-green-200 bg-green-50/30">
                             <CardHeader>
-                                <CardTitle>Resolution</CardTitle>
+                                <CardTitle className="text-sm flex items-center gap-2 text-green-800">
+                                    <CheckCircle2 className="h-4 w-4" />
+                                    Resolution
+                                </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                <p className="whitespace-pre-wrap">{hazard.resolution_summary}</p>
+                                <p className="text-sm whitespace-pre-wrap">{hazard.resolution_summary}</p>
                                 {hazard.closed_at && (
-                                    <div className="text-sm text-slate-500 mt-2">
+                                    <div className="text-xs text-muted-foreground mt-3">
                                         Closed on {new Date(hazard.closed_at).toLocaleDateString()}
                                     </div>
                                 )}
@@ -337,6 +439,78 @@ export default function HazardShow({ hazard, users, canAssign, canClose }: Props
                     )}
                 </div>
             </div>
+
+            {/* Assign Dialog */}
+            <Dialog open={showAssignDialog} onOpenChange={setShowAssignDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Assign Hazard</DialogTitle>
+                    </DialogHeader>
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            assignForm.post(`/hazards/${hazard.id}/assign`, {
+                                onSuccess: () => setShowAssignDialog(false),
+                            });
+                        }}
+                        className="space-y-4"
+                    >
+                        <div className="space-y-1.5">
+                            <Label>Assign to</Label>
+                            <Select
+                                value={assignForm.data.assigned_to_user_id || undefined}
+                                onValueChange={(v) => assignForm.setData('assigned_to_user_id', v)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select user..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {users.map((u) => (
+                                        <SelectItem key={u.id} value={u.id.toString()}>{u.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setShowAssignDialog(false)}>Cancel</Button>
+                            <Button type="submit" disabled={assignForm.processing}>Assign</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
+
+            {/* Close Dialog */}
+            <Dialog open={showCloseDialog} onOpenChange={setShowCloseDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Close Hazard</DialogTitle>
+                    </DialogHeader>
+                    <form
+                        onSubmit={(e) => {
+                            e.preventDefault();
+                            closeForm.post(`/hazards/${hazard.id}/close`, {
+                                onSuccess: () => setShowCloseDialog(false),
+                            });
+                        }}
+                        className="space-y-4"
+                    >
+                        <div className="space-y-1.5">
+                            <Label>Resolution Summary</Label>
+                            <Textarea
+                                value={closeForm.data.resolution_summary}
+                                onChange={(e) => closeForm.setData('resolution_summary', e.target.value)}
+                                rows={4}
+                                placeholder="Describe how the hazard was resolved..."
+                                required
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button type="button" variant="outline" onClick={() => setShowCloseDialog(false)}>Cancel</Button>
+                            <Button type="submit" disabled={closeForm.processing}>Close Hazard</Button>
+                        </DialogFooter>
+                    </form>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }
