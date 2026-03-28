@@ -54,7 +54,7 @@ return new class extends Migration
             $table->foreign('changed_by')->references('id')->on('users')->nullOnDelete();
 
             $table->index('safe_work_procedure_id');
-            $table->unique(['safe_work_procedure_id', 'version_number']);
+            $table->unique(['safe_work_procedure_id', 'version_number'], 'swp_versions_procedure_version_unique');
         });
     }
 

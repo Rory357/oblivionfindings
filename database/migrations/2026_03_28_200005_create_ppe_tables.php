@@ -87,7 +87,7 @@ return new class extends Migration
         Schema::create('ppe_inspections', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('ppe_inventory_id');
-            $table->unsignedBigInteger('inspected_by');
+            $table->unsignedBigInteger('inspected_by')->nullable();
             $table->dateTime('inspected_at');
             $table->string('result');
             $table->string('condition_after')->nullable();

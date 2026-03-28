@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\LoneWorkerAlert;
 use App\Models\LoneWorkerSession;
+use App\Models\Site;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -13,105 +17,92 @@ class LoneWorkerController extends Controller
     /**
      * List active lone worker sessions and recent alerts.
      */
-    public function index(Request $request)
+    public function index(Request $request): \Inertia\Response
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.view'), 403);
-
-        $tenantId = $user->tenant_id;
         $filters = $request->only(['site_id', 'status', 'user_id']);
 
-        $query = \DB::table('lone_worker_sessions')
-            ->join('users', 'lone_worker_sessions.user_id', '=', 'users.id')
-            ->leftJoin('sites', 'lone_worker_sessions.site_id', '=', 'sites.id')
-            ->leftJoin('clients', 'lone_worker_sessions.client_id', '=', 'clients.id')
-            ->where('users.tenant_id', $tenantId)
-            ->whereNull('lone_worker_sessions.deleted_at')
-            ->when(!empty($filters['site_id']), fn ($q) => $q->where('lone_worker_sessions.site_id', $filters['site_id']))
-            ->when(!empty($filters['status']), fn ($q) => $q->where('lone_worker_sessions.status', $filters['status']))
-            ->when(!empty($filters['user_id']), fn ($q) => $q->where('lone_worker_sessions.user_id', $filters['user_id']));
-
-        $sessions = (clone $query)
-            ->select(
-                'lone_worker_sessions.*',
-                'users.name as user_name',
-                'sites.name as site_name',
-                'clients.first_name as client_first_name',
-                'clients.last_name as client_last_name'
-            )
-            ->orderByDesc('lone_worker_sessions.started_at')
+        $sessions = LoneWorkerSession::with(['user:id,name', 'site:id,name', 'client:id,first_name,last_name'])
+            ->when(!empty($filters['site_id']), fn ($q) => $q->where('site_id', $filters['site_id']))
+            ->when(!empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
+            ->when(!empty($filters['user_id']), fn ($q) => $q->where('user_id', $filters['user_id']))
+            ->orderByDesc('started_at')
             ->paginate(25)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(function ($session) {
+                $data = $session->toArray();
+                if (isset($data['client']) && $data['client']) {
+                    $data['client'] = [
+                        'id' => $data['client']['id'],
+                        'name' => ($data['client']['first_name'] ?? '') . ' ' . ($data['client']['last_name'] ?? ''),
+                    ];
+                }
+                return $data;
+            });
 
         // Stats
-        $activeSessions = \DB::table('lone_worker_sessions')
-            ->join('users', 'lone_worker_sessions.user_id', '=', 'users.id')
-            ->where('users.tenant_id', $tenantId)
-            ->where('lone_worker_sessions.status', 'active')
-            ->whereNull('lone_worker_sessions.deleted_at')
-            ->count();
+        $activeSessions = LoneWorkerSession::where('status', 'active')->count();
+        $overdueCheckIns = LoneWorkerSession::where('status', 'overdue')->count();
 
-        $overdueCheckIns = \DB::table('lone_worker_sessions')
-            ->join('users', 'lone_worker_sessions.user_id', '=', 'users.id')
-            ->where('users.tenant_id', $tenantId)
-            ->where('lone_worker_sessions.status', 'overdue')
-            ->whereNull('lone_worker_sessions.deleted_at')
-            ->count();
+        $alertsToday = LoneWorkerAlert::where('triggered_at', '>=', now()->startOfDay())->count();
 
-        $alertsToday = \DB::table('lone_worker_alerts')
-            ->join('lone_worker_sessions', 'lone_worker_alerts.lone_worker_session_id', '=', 'lone_worker_sessions.id')
-            ->join('users', 'lone_worker_sessions.user_id', '=', 'users.id')
-            ->where('users.tenant_id', $tenantId)
-            ->where('lone_worker_alerts.triggered_at', '>=', now()->startOfDay())
-            ->whereNull('lone_worker_alerts.deleted_at')
-            ->count();
-
-        $emergencyAlerts = \DB::table('lone_worker_alerts')
-            ->join('lone_worker_sessions', 'lone_worker_alerts.lone_worker_session_id', '=', 'lone_worker_sessions.id')
-            ->join('users', 'lone_worker_sessions.user_id', '=', 'users.id')
-            ->where('users.tenant_id', $tenantId)
-            ->where('lone_worker_alerts.alert_type', 'emergency')
-            ->where('lone_worker_alerts.status', 'active')
-            ->whereNull('lone_worker_alerts.deleted_at')
+        $emergencyAlerts = LoneWorkerAlert::where('alert_type', 'emergency')
+            ->where('status', 'active')
             ->count();
 
         // Recent alerts
-        $recentAlerts = \DB::table('lone_worker_alerts')
-            ->join('lone_worker_sessions', 'lone_worker_alerts.lone_worker_session_id', '=', 'lone_worker_sessions.id')
-            ->join('users', 'lone_worker_sessions.user_id', '=', 'users.id')
-            ->where('users.tenant_id', $tenantId)
-            ->whereNull('lone_worker_alerts.deleted_at')
-            ->select(
-                'lone_worker_alerts.*',
-                'users.name as worker_name',
-                'lone_worker_sessions.location'
-            )
-            ->orderByDesc('lone_worker_alerts.triggered_at')
+        $recentAlerts = LoneWorkerAlert::with([
+                'loneWorkerSession.user:id,name',
+                'loneWorkerSession.site:id,name',
+                'loneWorkerSession.client:id,first_name,last_name',
+            ])
+            ->orderByDesc('triggered_at')
             ->limit(20)
-            ->get();
-
-        $sites = \DB::table('sites')
-            ->where('tenant_id', $tenantId)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        $staff = \DB::table('users')
-            ->where('tenant_id', $tenantId)
-            ->where('status', 'active')
-            ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get()
+            ->map(fn ($alert) => [
+                'id' => $alert->id,
+                'session' => $alert->loneWorkerSession ? [
+                    'id' => $alert->loneWorkerSession->id,
+                    'user' => $alert->loneWorkerSession->user ? [
+                        'id' => $alert->loneWorkerSession->user->id,
+                        'name' => $alert->loneWorkerSession->user->name,
+                    ] : null,
+                    'site' => $alert->loneWorkerSession->site ? [
+                        'id' => $alert->loneWorkerSession->site->id,
+                        'name' => $alert->loneWorkerSession->site->name,
+                    ] : null,
+                    'client' => $alert->loneWorkerSession->client ? [
+                        'id' => $alert->loneWorkerSession->client->id,
+                        'name' => $alert->loneWorkerSession->client->first_name . ' ' . $alert->loneWorkerSession->client->last_name,
+                    ] : null,
+                    'started_at' => $alert->loneWorkerSession->started_at,
+                    'expected_end_at' => $alert->loneWorkerSession->expected_end_at,
+                    'last_check_in_at' => $alert->loneWorkerSession->last_check_in_at,
+                    'status' => $alert->loneWorkerSession->status,
+                    'activity_description' => $alert->loneWorkerSession->activity_description,
+                    'check_in_interval_minutes' => $alert->loneWorkerSession->check_in_interval_minutes,
+                    'location' => $alert->loneWorkerSession->location,
+                ] : null,
+                'type' => $alert->alert_type,
+                'triggered_at' => $alert->triggered_at,
+                'status' => $alert->status,
+                'notes' => $alert->notes ?? null,
+            ]);
 
         return Inertia::render('health-safety/lone-workers/index', [
             'sessions' => $sessions,
-            'recentAlerts' => $recentAlerts,
+            'alerts' => $recentAlerts,
             'stats' => [
                 'active_sessions' => $activeSessions,
                 'overdue_check_ins' => $overdueCheckIns,
                 'alerts_today' => $alertsToday,
                 'emergency_alerts' => $emergencyAlerts,
             ],
-            'sites' => $sites,
-            'staff' => $staff,
+            'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
+            'staff' => User::select('id', 'name')->orderBy('name')->get(),
+            'clients' => Client::select('id', 'first_name', 'last_name')->orderBy('last_name')->get()->map(fn ($c) => [
+                'id' => $c->id,
+                'name' => $c->first_name . ' ' . $c->last_name,
+            ]),
             'filters' => $filters,
         ]);
     }
@@ -119,11 +110,8 @@ class LoneWorkerController extends Controller
     /**
      * Start a new lone worker session.
      */
-    public function startSession(Request $request)
+    public function startSession(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
             'site_id' => ['nullable', 'exists:sites,id'],
@@ -136,13 +124,13 @@ class LoneWorkerController extends Controller
             'location_lng' => ['nullable', 'numeric', 'between:-180,180'],
         ]);
 
-        $session = LoneWorkerSession::create(array_merge($validated, [
+        LoneWorkerSession::create(array_merge($validated, [
             'started_at' => now(),
             'last_check_in_at' => now(),
             'status' => 'active',
             'check_in_interval_minutes' => $validated['check_in_interval_minutes'] ?? 60,
-            'created_by' => $user->id,
-            'updated_by' => $user->id,
+            'created_by' => $request->user()->id,
+            'updated_by' => $request->user()->id,
         ]));
 
         return redirect()->route('health-safety.lone-workers.index')
@@ -152,11 +140,8 @@ class LoneWorkerController extends Controller
     /**
      * Record a check-in for an active session.
      */
-    public function checkIn(Request $request, LoneWorkerSession $session)
+    public function checkIn(Request $request, LoneWorkerSession $session): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'status' => ['sometimes', 'string', 'in:ok,concern,emergency'],
             'notes' => ['nullable', 'string', 'max:1000'],
@@ -172,7 +157,7 @@ class LoneWorkerController extends Controller
         $session->update([
             'last_check_in_at' => now(),
             'status' => 'active',
-            'updated_by' => $user->id,
+            'updated_by' => $request->user()->id,
         ]);
 
         // If check-in status is emergency, trigger emergency flow
@@ -196,15 +181,12 @@ class LoneWorkerController extends Controller
     /**
      * End a lone worker session.
      */
-    public function endSession(Request $request, LoneWorkerSession $session)
+    public function endSession(Request $request, LoneWorkerSession $session): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $session->update([
             'ended_at' => now(),
             'status' => 'completed',
-            'updated_by' => $user->id,
+            'updated_by' => $request->user()->id,
         ]);
 
         return redirect()->back()->with('success', 'Lone worker session ended successfully.');
@@ -213,11 +195,8 @@ class LoneWorkerController extends Controller
     /**
      * Trigger emergency for an active session.
      */
-    public function triggerEmergency(Request $request, LoneWorkerSession $session)
+    public function triggerEmergency(Request $request, LoneWorkerSession $session): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'emergency_notes' => ['nullable', 'string', 'max:2000'],
         ]);
@@ -226,7 +205,7 @@ class LoneWorkerController extends Controller
             'status' => 'emergency',
             'emergency_triggered_at' => now(),
             'emergency_notes' => $validated['emergency_notes'] ?? null,
-            'updated_by' => $user->id,
+            'updated_by' => $request->user()->id,
         ]);
 
         $session->alerts()->create([
@@ -241,14 +220,11 @@ class LoneWorkerController extends Controller
     /**
      * Acknowledge an alert.
      */
-    public function acknowledgeAlert(Request $request, LoneWorkerAlert $alert)
+    public function acknowledgeAlert(Request $request, LoneWorkerAlert $alert): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $alert->update([
             'acknowledged_at' => now(),
-            'acknowledged_by' => $user->id,
+            'acknowledged_by' => $request->user()->id,
             'status' => 'acknowledged',
         ]);
 
@@ -258,11 +234,8 @@ class LoneWorkerController extends Controller
     /**
      * Resolve an alert with notes.
      */
-    public function resolveAlert(Request $request, LoneWorkerAlert $alert)
+    public function resolveAlert(Request $request, LoneWorkerAlert $alert): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'resolution_notes' => ['required', 'string', 'max:2000'],
         ]);

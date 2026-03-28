@@ -5,55 +5,37 @@ namespace App\Http\Controllers\HealthSafety;
 use App\Http\Controllers\Controller;
 use App\Models\SafeWorkProcedure;
 use App\Models\SafeWorkProcedureVersion;
+use App\Models\User;
+use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
-use Carbon\Carbon;
 
 class SafeWorkProcedureController extends Controller
 {
     /**
      * List safe work procedures.
      */
-    public function index(Request $request)
+    public function index(Request $request): \Inertia\Response
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.view'), 403);
-
         $filters = $request->only(['category', 'status', 'q']);
 
-        $query = DB::table('safe_work_procedures')
-            ->leftJoin('users as approver', 'safe_work_procedures.approved_by', '=', 'approver.id')
-            ->whereNull('safe_work_procedures.deleted_at')
-            ->when(!empty($filters['category']), fn ($q) => $q->where('safe_work_procedures.category', $filters['category']))
-            ->when(!empty($filters['status']), fn ($q) => $q->where('safe_work_procedures.status', $filters['status']))
+        $procedures = SafeWorkProcedure::with('approvedBy:id,name')
+            ->when(!empty($filters['category']), fn ($q) => $q->where('category', $filters['category']))
+            ->when(!empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
             ->when(!empty($filters['q']), fn ($q) => $q->where(function ($sub) use ($filters) {
-                $sub->where('safe_work_procedures.title', 'like', "%{$filters['q']}%")
-                    ->orWhere('safe_work_procedures.reference_number', 'like', "%{$filters['q']}%");
-            }));
-
-        $procedures = (clone $query)
-            ->select(
-                'safe_work_procedures.*',
-                'approver.name as approved_by_name'
-            )
-            ->orderBy('safe_work_procedures.title')
+                $sub->where('title', 'like', "%{$filters['q']}%")
+                    ->orWhere('reference_number', 'like', "%{$filters['q']}%");
+            }))
+            ->orderBy('title')
             ->paginate(25)
             ->withQueryString();
 
         // Stats
-        $total = DB::table('safe_work_procedures')
-            ->whereNull('deleted_at')
-            ->count();
-
-        $approved = DB::table('safe_work_procedures')
-            ->whereNull('deleted_at')
-            ->where('status', 'approved')
-            ->count();
-
-        $dueReview = DB::table('safe_work_procedures')
-            ->whereNull('deleted_at')
-            ->where('status', 'approved')
+        $total = SafeWorkProcedure::count();
+        $approved = SafeWorkProcedure::where('status', 'approved')->count();
+        $dueReview = SafeWorkProcedure::where('status', 'approved')
             ->whereNotNull('review_date')
             ->where('review_date', '<=', Carbon::now()->addDays(30))
             ->count();
@@ -72,30 +54,18 @@ class SafeWorkProcedureController extends Controller
     /**
      * Create form.
      */
-    public function create()
+    public function create(): \Inertia\Response
     {
-        $user = request()->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
-        $users = DB::table('users')
-            ->whereNull('deleted_at')
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get();
-
         return Inertia::render('health-safety/procedures/create', [
-            'users' => $users,
+            'users' => User::select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 
     /**
      * Store a new procedure.
      */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'reference_number' => 'required|string|max:100|unique:safe_work_procedures,reference_number',
@@ -112,7 +82,7 @@ class SafeWorkProcedureController extends Controller
             'related_training' => 'nullable|array',
         ]);
 
-        $validated['created_by'] = $user->id;
+        $validated['created_by'] = $request->user()->id;
         $validated['current_version'] = 1;
         $validated['status'] = 'draft';
 
@@ -124,7 +94,7 @@ class SafeWorkProcedureController extends Controller
             'version_number' => 1,
             'content_snapshot' => $procedure->toArray(),
             'change_summary' => 'Initial version',
-            'changed_by' => $user->id,
+            'changed_by' => $request->user()->id,
         ]);
 
         return redirect()->route('health-safety.procedures.show', $procedure)
@@ -134,26 +104,21 @@ class SafeWorkProcedureController extends Controller
     /**
      * Show a procedure with versions.
      */
-    public function show(SafeWorkProcedure $procedure)
+    public function show(SafeWorkProcedure $procedure): \Inertia\Response
     {
-        $user = request()->user();
-        abort_unless($user && $user->canDo('health-safety.view'), 403);
-
-        $procedure->load(['approvedBy', 'creator', 'updater']);
+        $procedure->load(['approvedBy:id,name', 'creator:id,name', 'updater:id,name']);
 
         $versions = $procedure->versions()
             ->with('changedBy:id,name')
             ->orderByDesc('version_number')
             ->get()
-            ->map(function ($v) {
-                return [
-                    'id' => $v->id,
-                    'version' => $v->version_number,
-                    'change_summary' => $v->change_summary,
-                    'changed_by' => $v->changedBy ? ['id' => $v->changedBy->id, 'name' => $v->changedBy->name] : null,
-                    'created_at' => $v->created_at->toISOString(),
-                ];
-            });
+            ->map(fn ($v) => [
+                'id' => $v->id,
+                'version' => $v->version_number,
+                'change_summary' => $v->change_summary,
+                'changed_by' => $v->changedBy ? ['id' => $v->changedBy->id, 'name' => $v->changedBy->name] : null,
+                'created_at' => $v->created_at->toISOString(),
+            ]);
 
         // Map procedure to expected shape
         $procedureData = [
@@ -180,18 +145,15 @@ class SafeWorkProcedureController extends Controller
         return Inertia::render('health-safety/procedures/show', [
             'procedure' => $procedureData,
             'versions' => $versions,
-            'canApprove' => $user->canDo('health-safety.manage'),
+            'canApprove' => $procedure->status !== 'approved',
         ]);
     }
 
     /**
      * Update a procedure and create a version snapshot.
      */
-    public function update(Request $request, SafeWorkProcedure $procedure)
+    public function update(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'category' => 'nullable|in:manual_handling,infection_control,medication,chemical_handling,fire_safety,vehicle_operation,personal_care,challenging_behaviour,lone_working,equipment_use,other',
@@ -211,7 +173,7 @@ class SafeWorkProcedureController extends Controller
         $changeSummary = $validated['change_summary'] ?? 'Updated procedure';
         unset($validated['change_summary']);
 
-        $validated['updated_by'] = $user->id;
+        $validated['updated_by'] = $request->user()->id;
         $validated['current_version'] = $procedure->current_version + 1;
 
         // If approved, revert to under_review on content change
@@ -227,7 +189,7 @@ class SafeWorkProcedureController extends Controller
             'version_number' => $procedure->current_version,
             'content_snapshot' => $procedure->fresh()->toArray(),
             'change_summary' => $changeSummary,
-            'changed_by' => $user->id,
+            'changed_by' => $request->user()->id,
         ]);
 
         return redirect()->route('health-safety.procedures.show', $procedure)
@@ -237,16 +199,13 @@ class SafeWorkProcedureController extends Controller
     /**
      * Approve a procedure.
      */
-    public function approve(Request $request, SafeWorkProcedure $procedure)
+    public function approve(Request $request, SafeWorkProcedure $procedure): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $procedure->update([
             'status' => 'approved',
-            'approved_by' => $user->id,
+            'approved_by' => $request->user()->id,
             'approved_at' => Carbon::now(),
-            'updated_by' => $user->id,
+            'updated_by' => $request->user()->id,
         ]);
 
         return redirect()->route('health-safety.procedures.show', $procedure)

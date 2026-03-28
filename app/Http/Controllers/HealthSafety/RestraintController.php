@@ -4,86 +4,51 @@ namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
 use App\Models\BehaviourSupportPlan;
+use App\Models\Client;
 use App\Models\RestraintEvent;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use App\Models\Site;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class RestraintController extends Controller
 {
     /**
      * List restraint events and behaviour support plans.
      */
-    public function index(Request $request)
+    public function index(Request $request): \Inertia\Response
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.view'), 403);
-
         $filters = $request->only(['client_id', 'site_id', 'restraint_type', 'severity', 'from', 'to']);
 
-        $events = DB::table('restraint_events')
-            ->join('clients', 'restraint_events.client_id', '=', 'clients.id')
-            ->leftJoin('sites', 'restraint_events.site_id', '=', 'sites.id')
-            ->leftJoin('behaviour_support_plans', 'restraint_events.behaviour_support_plan_id', '=', 'behaviour_support_plans.id')
-            ->whereNull('restraint_events.deleted_at')
-            ->when(!empty($filters['client_id']), fn ($q) => $q->where('restraint_events.client_id', $filters['client_id']))
-            ->when(!empty($filters['site_id']), fn ($q) => $q->where('restraint_events.site_id', $filters['site_id']))
-            ->when(!empty($filters['restraint_type']), fn ($q) => $q->where('restraint_events.restraint_type', $filters['restraint_type']))
-            ->when(!empty($filters['severity']), fn ($q) => $q->where('restraint_events.severity', $filters['severity']))
-            ->when(!empty($filters['from']), fn ($q) => $q->where('restraint_events.started_at', '>=', $filters['from']))
-            ->when(!empty($filters['to']), fn ($q) => $q->where('restraint_events.started_at', '<=', $filters['to']))
-            ->select(
-                'restraint_events.*',
-                'clients.first_name as client_first_name',
-                'clients.last_name as client_last_name',
-                'sites.name as site_name',
-                'behaviour_support_plans.title as plan_title'
-            )
-            ->orderByDesc('restraint_events.started_at')
+        $events = RestraintEvent::with([
+                'client:id,first_name,last_name',
+                'site:id,name',
+                'behaviourSupportPlan:id,title',
+            ])
+            ->when(!empty($filters['client_id']), fn ($q) => $q->where('client_id', $filters['client_id']))
+            ->when(!empty($filters['site_id']), fn ($q) => $q->where('site_id', $filters['site_id']))
+            ->when(!empty($filters['restraint_type']), fn ($q) => $q->where('restraint_type', $filters['restraint_type']))
+            ->when(!empty($filters['severity']), fn ($q) => $q->where('severity', $filters['severity']))
+            ->when(!empty($filters['from']), fn ($q) => $q->where('started_at', '>=', $filters['from']))
+            ->when(!empty($filters['to']), fn ($q) => $q->where('started_at', '<=', $filters['to']))
+            ->orderByDesc('started_at')
             ->paginate(25)
             ->withQueryString();
 
         $plans = BehaviourSupportPlan::with('client:id,first_name,last_name')
-            ->whereNull('deleted_at')
             ->orderByDesc('created_at')
             ->get();
 
         // Stats
         $thirtyDaysAgo = Carbon::now()->subDays(30);
-
-        $events30d = DB::table('restraint_events')
-            ->whereNull('deleted_at')
-            ->where('started_at', '>=', $thirtyDaysAgo)
-            ->count();
-
-        $activePlans = BehaviourSupportPlan::where('status', 'active')
-            ->whereNull('deleted_at')
-            ->count();
-
+        $events30d = RestraintEvent::where('started_at', '>=', $thirtyDaysAgo)->count();
+        $activePlans = BehaviourSupportPlan::where('status', 'active')->count();
         $reviewsDue = BehaviourSupportPlan::where('status', 'active')
             ->whereNotNull('review_date')
             ->where('review_date', '<=', Carbon::now()->addDays(30))
-            ->whereNull('deleted_at')
             ->count();
-
-        $clients = DB::table('clients')
-            ->whereNull('deleted_at')
-            ->select('id', 'first_name', 'last_name')
-            ->orderBy('last_name')
-            ->get();
-
-        $sites = DB::table('sites')
-            ->whereNull('deleted_at')
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get();
-
-        $users = DB::table('users')
-            ->whereNull('deleted_at')
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get();
 
         return Inertia::render('health-safety/restraints/index', [
             'events' => $events,
@@ -94,20 +59,17 @@ class RestraintController extends Controller
                 'active_plans' => $activePlans,
                 'reviews_due' => $reviewsDue,
             ],
-            'clients' => $clients,
-            'sites' => $sites,
-            'staff' => $users,
+            'clients' => Client::select('id', 'first_name', 'last_name')->orderBy('last_name')->get(),
+            'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
+            'staff' => User::select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 
     /**
      * Create a restraint event.
      */
-    public function storeEvent(Request $request)
+    public function storeEvent(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,id',
             'behaviour_support_plan_id' => 'nullable|exists:behaviour_support_plans,id',
@@ -131,7 +93,7 @@ class RestraintController extends Controller
             'related_incident_id' => 'nullable|exists:client_incidents,id',
         ]);
 
-        $validated['created_by'] = $user->id;
+        $validated['created_by'] = $request->user()->id;
 
         RestraintEvent::create($validated);
 
@@ -142,11 +104,8 @@ class RestraintController extends Controller
     /**
      * Update/review a restraint event.
      */
-    public function updateEvent(Request $request, RestraintEvent $event)
+    public function updateEvent(Request $request, RestraintEvent $event): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'reviewed_by' => 'nullable|exists:users,id',
             'reviewed_at' => 'nullable|date',
@@ -156,7 +115,7 @@ class RestraintController extends Controller
             'post_incident_support' => 'nullable|string',
         ]);
 
-        $validated['updated_by'] = $user->id;
+        $validated['updated_by'] = $request->user()->id;
 
         $event->update($validated);
 
@@ -167,11 +126,8 @@ class RestraintController extends Controller
     /**
      * Create a behaviour support plan.
      */
-    public function storePlan(Request $request)
+    public function storePlan(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,id',
             'title' => 'required|string|max:255',
@@ -187,7 +143,7 @@ class RestraintController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $validated['created_by'] = $user->id;
+        $validated['created_by'] = $request->user()->id;
 
         BehaviourSupportPlan::create($validated);
 
@@ -198,11 +154,8 @@ class RestraintController extends Controller
     /**
      * Update a behaviour support plan.
      */
-    public function updatePlan(Request $request, BehaviourSupportPlan $plan)
+    public function updatePlan(Request $request, BehaviourSupportPlan $plan): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'title' => 'nullable|string|max:255',
             'triggers' => 'nullable|string',
@@ -215,7 +168,7 @@ class RestraintController extends Controller
             'notes' => 'nullable|string',
         ]);
 
-        $validated['updated_by'] = $user->id;
+        $validated['updated_by'] = $request->user()->id;
 
         $plan->update($validated);
 

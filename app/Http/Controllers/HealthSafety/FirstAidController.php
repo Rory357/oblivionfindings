@@ -4,78 +4,44 @@ namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
 use App\Models\FirstAidRecord;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
+use App\Models\Site;
+use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Inertia\Inertia;
 
 class FirstAidController extends Controller
 {
     /**
      * List first aid records with stats.
      */
-    public function index(Request $request)
+    public function index(Request $request): \Inertia\Response
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.view'), 403);
-
         $filters = $request->only(['site_id', 'treated_person_type', 'injury_illness_type', 'from', 'to', 'q']);
 
-        $query = DB::table('first_aid_records')
-            ->join('sites', 'first_aid_records.site_id', '=', 'sites.id')
-            ->join('users as first_aider', 'first_aid_records.first_aider_id', '=', 'first_aider.id')
-            ->whereNull('first_aid_records.deleted_at')
-            ->when(!empty($filters['site_id']), fn ($q) => $q->where('first_aid_records.site_id', $filters['site_id']))
-            ->when(!empty($filters['treated_person_type']), fn ($q) => $q->where('first_aid_records.treated_person_type', $filters['treated_person_type']))
-            ->when(!empty($filters['injury_illness_type']), fn ($q) => $q->where('first_aid_records.injury_illness_type', $filters['injury_illness_type']))
-            ->when(!empty($filters['from']), fn ($q) => $q->where('first_aid_records.treatment_date', '>=', $filters['from']))
-            ->when(!empty($filters['to']), fn ($q) => $q->where('first_aid_records.treatment_date', '<=', $filters['to']))
+        $records = FirstAidRecord::with(['site:id,name', 'firstAider:id,name'])
+            ->when(!empty($filters['site_id']), fn ($q) => $q->where('site_id', $filters['site_id']))
+            ->when(!empty($filters['treated_person_type']), fn ($q) => $q->where('treated_person_type', $filters['treated_person_type']))
+            ->when(!empty($filters['injury_illness_type']), fn ($q) => $q->where('injury_illness_type', $filters['injury_illness_type']))
+            ->when(!empty($filters['from']), fn ($q) => $q->where('treatment_date', '>=', $filters['from']))
+            ->when(!empty($filters['to']), fn ($q) => $q->where('treatment_date', '<=', $filters['to']))
             ->when(!empty($filters['q']), fn ($q) => $q->where(function ($sub) use ($filters) {
-                $sub->where('first_aid_records.treated_person_name', 'like', "%{$filters['q']}%")
-                    ->orWhere('first_aid_records.injury_illness_description', 'like', "%{$filters['q']}%");
-            }));
-
-        $records = (clone $query)
-            ->select(
-                'first_aid_records.*',
-                'sites.name as site_name',
-                'first_aider.name as first_aider_name'
-            )
-            ->orderByDesc('first_aid_records.treatment_date')
+                $sub->where('treated_person_name', 'like', "%{$filters['q']}%")
+                    ->orWhere('injury_illness_description', 'like', "%{$filters['q']}%");
+            }))
+            ->orderByDesc('treatment_date')
             ->paginate(25)
             ->withQueryString();
 
         // Stats
         $thirtyDaysAgo = Carbon::now()->subDays(30);
 
-        $records30d = DB::table('first_aid_records')
-            ->whereNull('deleted_at')
-            ->where('treatment_date', '>=', $thirtyDaysAgo)
-            ->count();
-
-        $ambulanceCalls30d = DB::table('first_aid_records')
-            ->whereNull('deleted_at')
-            ->where('treatment_date', '>=', $thirtyDaysAgo)
-            ->where('ambulance_called', true)
-            ->count();
-
-        $incidentLinked = DB::table('first_aid_records')
-            ->whereNull('deleted_at')
-            ->where('treatment_date', '>=', $thirtyDaysAgo)
-            ->where('incident_reported', true)
-            ->count();
-
-        $sites = DB::table('sites')
-            ->whereNull('deleted_at')
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get();
-
-        $users = DB::table('users')
-            ->whereNull('deleted_at')
-            ->select('id', 'name')
-            ->orderBy('name')
-            ->get();
+        $records30d = FirstAidRecord::where('treatment_date', '>=', $thirtyDaysAgo)->count();
+        $ambulanceCalls30d = FirstAidRecord::where('treatment_date', '>=', $thirtyDaysAgo)
+            ->where('ambulance_called', true)->count();
+        $incidentLinked = FirstAidRecord::where('treatment_date', '>=', $thirtyDaysAgo)
+            ->where('incident_reported', true)->count();
 
         return Inertia::render('health-safety/first-aid/index', [
             'records' => $records,
@@ -85,19 +51,16 @@ class FirstAidController extends Controller
                 'ambulance_calls_30d' => $ambulanceCalls30d,
                 'linked_to_incidents' => $incidentLinked,
             ],
-            'sites' => $sites,
-            'staff' => $users,
+            'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
+            'staff' => User::select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 
     /**
      * Store a new first aid record.
      */
-    public function store(Request $request)
+    public function store(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'site_id' => 'required|exists:sites,id',
             'treated_person_id' => 'nullable|exists:users,id',
@@ -116,7 +79,7 @@ class FirstAidController extends Controller
             'related_incident_id' => 'nullable|exists:client_incidents,id',
         ]);
 
-        $validated['created_by'] = $user->id;
+        $validated['created_by'] = $request->user()->id;
 
         FirstAidRecord::create($validated);
 

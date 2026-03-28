@@ -6,6 +6,9 @@ use App\Http\Controllers\Controller;
 use App\Models\PpeAllocation;
 use App\Models\PpeInventory;
 use App\Models\PpeType;
+use App\Models\Site;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -14,119 +17,69 @@ class PpeController extends Controller
     /**
      * List PPE types, inventory items, and allocations.
      */
-    public function index(Request $request)
+    public function index(Request $request): \Inertia\Response
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.view'), 403);
-
-        $tenantId = $user->tenant_id;
         $filters = $request->only(['site_id', 'category', 'status', 'ppe_type_id']);
 
         // PPE Types
-        $ppeTypes = \DB::table('ppe_types')
-            ->whereNull('deleted_at')
-            ->where('is_active', true)
+        $ppeTypes = PpeType::where('is_active', true)
             ->orderBy('category')
             ->orderBy('name')
             ->get();
 
         // PPE Inventory with type and site info
-        $inventoryQuery = \DB::table('ppe_inventory')
-            ->join('ppe_types', 'ppe_inventory.ppe_type_id', '=', 'ppe_types.id')
-            ->join('sites', 'ppe_inventory.site_id', '=', 'sites.id')
-            ->where('sites.tenant_id', $tenantId)
-            ->whereNull('ppe_inventory.deleted_at')
-            ->when(!empty($filters['site_id']), fn ($q) => $q->where('ppe_inventory.site_id', $filters['site_id']))
-            ->when(!empty($filters['category']), fn ($q) => $q->where('ppe_types.category', $filters['category']))
-            ->when(!empty($filters['status']), fn ($q) => $q->where('ppe_inventory.status', $filters['status']))
-            ->when(!empty($filters['ppe_type_id']), fn ($q) => $q->where('ppe_inventory.ppe_type_id', $filters['ppe_type_id']));
-
-        $inventory = (clone $inventoryQuery)
-            ->select(
-                'ppe_inventory.*',
-                'ppe_types.name as type_name',
-                'ppe_types.category as type_category',
-                'sites.name as site_name'
-            )
-            ->orderBy('ppe_types.category')
-            ->orderBy('ppe_types.name')
+        $inventory = PpeInventory::with(['ppeType:id,name,category', 'site:id,name'])
+            ->when(!empty($filters['site_id']), fn ($q) => $q->where('site_id', $filters['site_id']))
+            ->when(!empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
+            ->when(!empty($filters['ppe_type_id']), fn ($q) => $q->where('ppe_type_id', $filters['ppe_type_id']))
+            ->when(!empty($filters['category']), fn ($q) => $q->whereHas('ppeType', fn ($tq) => $tq->where('category', $filters['category'])))
+            ->orderBy('created_at', 'desc')
             ->paginate(25)
             ->withQueryString();
 
         // Active allocations
-        $allocations = \DB::table('ppe_allocations')
-            ->join('ppe_inventory', 'ppe_allocations.ppe_inventory_id', '=', 'ppe_inventory.id')
-            ->join('ppe_types', 'ppe_inventory.ppe_type_id', '=', 'ppe_types.id')
-            ->join('sites', 'ppe_inventory.site_id', '=', 'sites.id')
-            ->join('users', 'ppe_allocations.user_id', '=', 'users.id')
-            ->where('sites.tenant_id', $tenantId)
-            ->whereNull('ppe_allocations.returned_at')
-            ->whereNull('ppe_allocations.deleted_at')
-            ->select(
-                'ppe_allocations.*',
-                'ppe_types.name as type_name',
-                'ppe_types.category as type_category',
-                'users.name as user_name',
-                'sites.name as site_name'
-            )
-            ->orderByDesc('ppe_allocations.allocated_at')
-            ->limit(50)
-            ->get();
+        $allocations = PpeAllocation::with([
+                'ppeInventory.ppeType:id,name,category',
+                'ppeInventory.site:id,name',
+                'user:id,name',
+            ])
+            ->whereNull('returned_at')
+            ->orderByDesc('allocated_at')
+            ->paginate(25, ['*'], 'allocations_page')
+            ->withQueryString()
+            ->through(function ($allocation) {
+                $data = $allocation->toArray();
+                $data['inventory_item'] = $data['ppe_inventory'] ?? null;
+                $data['ppe_type_name'] = $allocation->ppeInventory?->ppeType?->name;
+                $data['allocated_date'] = $data['allocated_at'] ?? null;
+                unset($data['ppe_inventory']);
+                return $data;
+            });
 
         // Stats
-        $totalItems = \DB::table('ppe_inventory')
-            ->join('sites', 'ppe_inventory.site_id', '=', 'sites.id')
-            ->where('sites.tenant_id', $tenantId)
-            ->whereNull('ppe_inventory.deleted_at')
-            ->whereNotIn('ppe_inventory.status', ['condemned', 'disposed'])
-            ->sum('ppe_inventory.quantity');
+        $totalItems = (int) PpeInventory::whereNotIn('status', ['condemned', 'disposed'])
+            ->sum('quantity');
 
-        $allocated = \DB::table('ppe_allocations')
-            ->join('ppe_inventory', 'ppe_allocations.ppe_inventory_id', '=', 'ppe_inventory.id')
-            ->join('sites', 'ppe_inventory.site_id', '=', 'sites.id')
-            ->where('sites.tenant_id', $tenantId)
-            ->whereNull('ppe_allocations.returned_at')
-            ->whereNull('ppe_allocations.deleted_at')
+        $allocated = PpeAllocation::whereNull('returned_at')->count();
+
+        $inspectionsDue = PpeInventory::whereNotNull('next_inspection_due')
+            ->where('next_inspection_due', '<=', now()->toDateString())
             ->count();
 
-        $inspectionsDue = \DB::table('ppe_inventory')
-            ->join('sites', 'ppe_inventory.site_id', '=', 'sites.id')
-            ->where('sites.tenant_id', $tenantId)
-            ->whereNull('ppe_inventory.deleted_at')
-            ->whereNotNull('ppe_inventory.next_inspection_due')
-            ->where('ppe_inventory.next_inspection_due', '<=', now()->toDateString())
-            ->count();
-
-        $condemned = \DB::table('ppe_inventory')
-            ->join('sites', 'ppe_inventory.site_id', '=', 'sites.id')
-            ->where('sites.tenant_id', $tenantId)
-            ->whereNull('ppe_inventory.deleted_at')
-            ->where('ppe_inventory.status', 'condemned')
-            ->count();
-
-        $sites = \DB::table('sites')
-            ->where('tenant_id', $tenantId)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        $staff = \DB::table('users')
-            ->where('tenant_id', $tenantId)
-            ->where('status', 'active')
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $condemned = PpeInventory::where('status', 'condemned')->count();
 
         return Inertia::render('health-safety/ppe/index', [
-            'ppeTypes' => $ppeTypes,
+            'types' => $ppeTypes,
             'inventory' => $inventory,
             'allocations' => $allocations,
             'stats' => [
-                'total_items' => (int) $totalItems,
+                'total_items' => $totalItems,
                 'allocated' => $allocated,
                 'inspections_due' => $inspectionsDue,
                 'condemned' => $condemned,
             ],
-            'sites' => $sites,
-            'staff' => $staff,
+            'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
+            'staff' => User::select('id', 'name')->orderBy('name')->get(),
             'filters' => $filters,
         ]);
     }
@@ -134,11 +87,8 @@ class PpeController extends Controller
     /**
      * Create a new PPE type.
      */
-    public function storeType(Request $request)
+    public function storeType(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', 'in:head,eye,ear,respiratory,hand,foot,body,fall_protection,high_visibility,other'],
@@ -157,11 +107,8 @@ class PpeController extends Controller
     /**
      * Add a PPE inventory item.
      */
-    public function storeInventory(Request $request)
+    public function storeInventory(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'ppe_type_id' => ['required', 'exists:ppe_types,id'],
             'site_id' => ['required', 'exists:sites,id'],
@@ -178,8 +125,8 @@ class PpeController extends Controller
 
         PpeInventory::create(array_merge($validated, [
             'status' => 'available',
-            'created_by' => $user->id,
-            'updated_by' => $user->id,
+            'created_by' => $request->user()->id,
+            'updated_by' => $request->user()->id,
         ]));
 
         return redirect()->back()->with('success', 'PPE inventory item added successfully.');
@@ -188,11 +135,8 @@ class PpeController extends Controller
     /**
      * Update a PPE inventory item.
      */
-    public function updateInventory(Request $request, PpeInventory $inventory)
+    public function updateInventory(Request $request, PpeInventory $inventory): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'brand' => ['sometimes', 'nullable', 'string', 'max:255'],
             'model' => ['sometimes', 'nullable', 'string', 'max:255'],
@@ -206,7 +150,7 @@ class PpeController extends Controller
         ]);
 
         $inventory->update(array_merge($validated, [
-            'updated_by' => $user->id,
+            'updated_by' => $request->user()->id,
         ]));
 
         return redirect()->back()->with('success', 'PPE inventory item updated successfully.');
@@ -215,11 +159,8 @@ class PpeController extends Controller
     /**
      * Allocate PPE to a worker.
      */
-    public function allocate(Request $request, PpeInventory $inventory)
+    public function allocate(Request $request, PpeInventory $inventory): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
             'fit_test_completed' => ['sometimes', 'boolean'],
@@ -232,13 +173,13 @@ class PpeController extends Controller
 
         $inventory->allocations()->create(array_merge($validated, [
             'allocated_at' => now(),
-            'created_by' => $user->id,
-            'updated_by' => $user->id,
+            'created_by' => $request->user()->id,
+            'updated_by' => $request->user()->id,
         ]));
 
         $inventory->update([
             'status' => 'allocated',
-            'updated_by' => $user->id,
+            'updated_by' => $request->user()->id,
         ]);
 
         return redirect()->back()->with('success', 'PPE allocated to worker successfully.');
@@ -247,11 +188,8 @@ class PpeController extends Controller
     /**
      * Return PPE from a worker.
      */
-    public function returnPpe(Request $request, PpeAllocation $allocation)
+    public function returnPpe(Request $request, PpeAllocation $allocation): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'notes' => ['nullable', 'string', 'max:1000'],
             'condition' => ['nullable', 'string', 'in:new,good,fair,poor,condemned'],
@@ -260,12 +198,12 @@ class PpeController extends Controller
         $allocation->update([
             'returned_at' => now(),
             'notes' => $validated['notes'] ?? $allocation->notes,
-            'updated_by' => $user->id,
+            'updated_by' => $request->user()->id,
         ]);
 
         // Update inventory condition and status if provided
         $inventoryUpdate = [
-            'updated_by' => $user->id,
+            'updated_by' => $request->user()->id,
         ];
 
         if (!empty($validated['condition'])) {
@@ -283,11 +221,8 @@ class PpeController extends Controller
     /**
      * Record a PPE inspection.
      */
-    public function storeInspection(Request $request, PpeInventory $inventory)
+    public function storeInspection(Request $request, PpeInventory $inventory): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'result' => ['required', 'string', 'in:pass,fail,needs_repair,condemned'],
             'condition_after' => ['nullable', 'string', 'in:good,fair,poor,condemned'],
@@ -297,16 +232,16 @@ class PpeController extends Controller
         ]);
 
         $inventory->inspections()->create(array_merge($validated, [
-            'inspected_by' => $user->id,
+            'inspected_by' => $request->user()->id,
             'inspected_at' => now(),
-            'created_by' => $user->id,
-            'updated_by' => $user->id,
+            'created_by' => $request->user()->id,
+            'updated_by' => $request->user()->id,
         ]));
 
         // Update inventory inspection dates and condition
         $inventoryUpdate = [
             'last_inspected_at' => now()->toDateString(),
-            'updated_by' => $user->id,
+            'updated_by' => $request->user()->id,
         ];
 
         if (!empty($validated['next_inspection_due'])) {

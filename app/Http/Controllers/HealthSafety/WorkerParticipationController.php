@@ -3,8 +3,14 @@
 namespace App\Http\Controllers\HealthSafety;
 
 use App\Http\Controllers\Controller;
+use App\Models\HsCommittee;
+use App\Models\HsCommitteeMeeting;
+use App\Models\HsConsultation;
+use App\Models\HsRepresentative;
+use App\Models\Site;
+use App\Models\User;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 
 class WorkerParticipationController extends Controller
@@ -12,93 +18,57 @@ class WorkerParticipationController extends Controller
     /**
      * List H&S reps, committees, upcoming meetings, and consultations.
      */
-    public function index(Request $request)
+    public function index(Request $request): \Inertia\Response
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.view'), 403);
-
-        $tenantId = $user->tenant_id;
         $siteFilter = $request->input('site_id');
 
         // H&S Representatives
-        $repsQuery = \DB::table('hs_representatives')
-            ->where('tenant_id', $tenantId)
-            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter));
-
-        $activeReps = (clone $repsQuery)->where('status', 'active')->count();
-
-        $reps = (clone $repsQuery)
-            ->leftJoin('users', 'hs_representatives.user_id', '=', 'users.id')
-            ->leftJoin('sites', 'hs_representatives.site_id', '=', 'sites.id')
-            ->select(
-                'hs_representatives.*',
-                'users.name as user_name',
-                'sites.name as site_name'
-            )
-            ->orderByDesc('hs_representatives.created_at')
+        $reps = HsRepresentative::with(['user:id,name', 'site:id,name'])
+            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter))
+            ->orderByDesc('created_at')
             ->get();
 
-        // Committees
-        $committeesQuery = \DB::table('hs_committees')
-            ->where('tenant_id', $tenantId)
-            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter));
-
-        $activeCommittees = (clone $committeesQuery)->where('status', 'active')->count();
-
-        $committees = (clone $committeesQuery)
-            ->leftJoin('sites', 'hs_committees.site_id', '=', 'sites.id')
-            ->select('hs_committees.*', 'sites.name as site_name')
-            ->orderByDesc('hs_committees.created_at')
-            ->get();
-
-        // Committee Meetings this month
-        $meetingsThisMonth = \DB::table('hs_committee_meetings')
-            ->join('hs_committees', 'hs_committee_meetings.committee_id', '=', 'hs_committees.id')
-            ->where('hs_committees.tenant_id', $tenantId)
-            ->whereBetween('hs_committee_meetings.scheduled_at', [
-                now()->startOfMonth(),
-                now()->endOfMonth(),
-            ])
+        $activeReps = HsRepresentative::where('status', 'active')
+            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter))
             ->count();
 
-        $upcomingMeetings = \DB::table('hs_committee_meetings')
-            ->join('hs_committees', 'hs_committee_meetings.committee_id', '=', 'hs_committees.id')
-            ->where('hs_committees.tenant_id', $tenantId)
-            ->where('hs_committee_meetings.scheduled_at', '>=', now())
-            ->orderBy('hs_committee_meetings.scheduled_at')
-            ->select('hs_committee_meetings.*', 'hs_committees.name as committee_name')
+        // Committees
+        $committees = HsCommittee::with('site:id,name')
+            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter))
+            ->orderByDesc('created_at')
+            ->get();
+
+        $activeCommittees = HsCommittee::where('status', 'active')
+            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter))
+            ->count();
+
+        // Committee Meetings this month
+        $meetingsThisMonth = HsCommitteeMeeting::whereBetween('scheduled_at', [
+            now()->startOfMonth(),
+            now()->endOfMonth(),
+        ])->count();
+
+        $upcomingMeetings = HsCommitteeMeeting::with('committee:id,name')
+            ->where('scheduled_at', '>=', now())
+            ->orderBy('scheduled_at')
             ->limit(20)
             ->get();
 
         // Consultations
-        $consultationsQuery = \DB::table('hs_consultations')
-            ->where('tenant_id', $tenantId)
-            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter));
-
-        $openConsultations = (clone $consultationsQuery)->where('status', 'open')->count();
-
-        $consultations = (clone $consultationsQuery)
-            ->leftJoin('sites', 'hs_consultations.site_id', '=', 'sites.id')
-            ->select('hs_consultations.*', 'sites.name as site_name')
-            ->orderByDesc('hs_consultations.created_at')
+        $consultations = HsConsultation::with('site:id,name')
+            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter))
+            ->orderByDesc('created_at')
             ->limit(50)
             ->get();
 
-        $sites = \DB::table('sites')
-            ->where('tenant_id', $tenantId)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        $staff = \DB::table('users')
-            ->where('tenant_id', $tenantId)
-            ->where('status', 'active')
-            ->orderBy('name')
-            ->get(['id', 'name']);
+        $openConsultations = HsConsultation::where('status', 'open')
+            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter))
+            ->count();
 
         return Inertia::render('health-safety/worker-participation/index', [
-            'reps' => $reps,
+            'representatives' => $reps,
             'committees' => $committees,
-            'upcomingMeetings' => $upcomingMeetings,
+            'meetings' => $upcomingMeetings,
             'consultations' => $consultations,
             'stats' => [
                 'active_reps' => $activeReps,
@@ -106,8 +76,8 @@ class WorkerParticipationController extends Controller
                 'meetings_this_month' => $meetingsThisMonth,
                 'open_consultations' => $openConsultations,
             ],
-            'sites' => $sites,
-            'staff' => $staff,
+            'sites' => Site::select('id', 'name')->where('is_active', true)->orderBy('name')->get(),
+            'staff' => User::select('id', 'name')->orderBy('name')->get(),
             'filters' => $request->only(['site_id']),
         ]);
     }
@@ -115,27 +85,21 @@ class WorkerParticipationController extends Controller
     /**
      * Create a new H&S representative.
      */
-    public function storeRepresentative(Request $request)
+    public function storeRepresentative(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'user_id' => ['required', 'exists:users,id'],
             'site_id' => ['required', 'exists:sites,id'],
             'election_method' => ['required', 'string', 'in:elected,appointed,volunteered'],
             'elected_at' => ['required', 'date'],
             'term_expires_at' => ['nullable', 'date', 'after:elected_at'],
-            'training_days_used' => ['nullable', 'integer', 'min:0'],
+            'training_days_completed' => ['nullable', 'integer', 'min:0'],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
-        \DB::table('hs_representatives')->insert(array_merge($validated, [
-            'tenant_id' => $user->tenant_id,
+        HsRepresentative::create(array_merge($validated, [
             'status' => 'active',
-            'created_by' => $user->id,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'created_by' => $request->user()->id,
         ]));
 
         return redirect()->back()->with('success', 'H&S representative added successfully.');
@@ -144,28 +108,16 @@ class WorkerParticipationController extends Controller
     /**
      * Update an H&S representative.
      */
-    public function updateRepresentative(Request $request, int $representative)
+    public function updateRepresentative(Request $request, HsRepresentative $representative): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
-        $rep = \DB::table('hs_representatives')
-            ->where('id', $representative)
-            ->where('tenant_id', $user->tenant_id)
-            ->firstOrFail();
-
         $validated = $request->validate([
             'status' => ['sometimes', 'string', 'in:active,inactive,resigned'],
-            'training_days_used' => ['sometimes', 'integer', 'min:0'],
+            'training_days_completed' => ['sometimes', 'integer', 'min:0'],
             'term_expires_at' => ['sometimes', 'nullable', 'date'],
             'notes' => ['sometimes', 'nullable', 'string', 'max:2000'],
         ]);
 
-        \DB::table('hs_representatives')
-            ->where('id', $representative)
-            ->update(array_merge($validated, [
-                'updated_at' => now(),
-            ]));
+        $representative->update($validated);
 
         return redirect()->back()->with('success', 'Representative updated successfully.');
     }
@@ -173,11 +125,8 @@ class WorkerParticipationController extends Controller
     /**
      * Create a new H&S committee.
      */
-    public function storeCommittee(Request $request)
+    public function storeCommittee(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'site_id' => ['required', 'exists:sites,id'],
@@ -188,27 +137,10 @@ class WorkerParticipationController extends Controller
             'members.*' => ['exists:users,id'],
         ]);
 
-        $members = $validated['members'];
-        unset($validated['members']);
-
-        $committeeId = \DB::table('hs_committees')->insertGetId(array_merge($validated, [
-            'tenant_id' => $user->tenant_id,
+        HsCommittee::create(array_merge($validated, [
             'status' => 'active',
-            'created_by' => $user->id,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'created_by' => $request->user()->id,
         ]));
-
-        // Attach members
-        foreach ($members as $memberId) {
-            \DB::table('hs_committee_members')->insert([
-                'committee_id' => $committeeId,
-                'user_id' => $memberId,
-                'joined_at' => now(),
-                'created_at' => now(),
-                'updated_at' => now(),
-            ]);
-        }
 
         return redirect()->back()->with('success', 'Committee created successfully.');
     }
@@ -216,16 +148,8 @@ class WorkerParticipationController extends Controller
     /**
      * Create a meeting for a committee.
      */
-    public function storeMeeting(Request $request, int $committee)
+    public function storeMeeting(Request $request, HsCommittee $committee): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
-        $committeeRecord = \DB::table('hs_committees')
-            ->where('id', $committee)
-            ->where('tenant_id', $user->tenant_id)
-            ->firstOrFail();
-
         $validated = $request->validate([
             'scheduled_at' => ['required', 'date'],
             'location' => ['nullable', 'string', 'max:255'],
@@ -235,26 +159,10 @@ class WorkerParticipationController extends Controller
             'attendees.*' => ['exists:users,id'],
         ]);
 
-        $attendees = $validated['attendees'] ?? [];
-        unset($validated['attendees']);
-
-        $validated['agenda_items'] = json_encode($validated['agenda_items'] ?? []);
-
-        $meetingId = \DB::table('hs_committee_meetings')->insertGetId(array_merge($validated, [
-            'committee_id' => $committee,
+        $committee->meetings()->create(array_merge($validated, [
             'status' => 'scheduled',
-            'created_by' => $user->id,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'created_by' => $request->user()->id,
         ]));
-
-        foreach ($attendees as $attendeeId) {
-            \DB::table('hs_committee_meeting_attendees')->insert([
-                'meeting_id' => $meetingId,
-                'user_id' => $attendeeId,
-                'created_at' => now(),
-            ]);
-        }
 
         return redirect()->back()->with('success', 'Meeting scheduled successfully.');
     }
@@ -262,18 +170,8 @@ class WorkerParticipationController extends Controller
     /**
      * Update a committee meeting (minutes, action items, status).
      */
-    public function updateMeeting(Request $request, int $meeting)
+    public function updateMeeting(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
-        $meetingRecord = \DB::table('hs_committee_meetings')
-            ->join('hs_committees', 'hs_committee_meetings.committee_id', '=', 'hs_committees.id')
-            ->where('hs_committee_meetings.id', $meeting)
-            ->where('hs_committees.tenant_id', $user->tenant_id)
-            ->select('hs_committee_meetings.*')
-            ->firstOrFail();
-
         $validated = $request->validate([
             'status' => ['sometimes', 'string', 'in:scheduled,in_progress,completed,cancelled'],
             'minutes' => ['sometimes', 'nullable', 'string', 'max:10000'],
@@ -283,15 +181,7 @@ class WorkerParticipationController extends Controller
             'action_items.*.due_date' => ['required_with:action_items', 'date'],
         ]);
 
-        if (isset($validated['action_items'])) {
-            $validated['action_items'] = json_encode($validated['action_items']);
-        }
-
-        \DB::table('hs_committee_meetings')
-            ->where('id', $meeting)
-            ->update(array_merge($validated, [
-                'updated_at' => now(),
-            ]));
+        $meeting->update($validated);
 
         return redirect()->back()->with('success', 'Meeting updated successfully.');
     }
@@ -299,25 +189,20 @@ class WorkerParticipationController extends Controller
     /**
      * Create a worker consultation record.
      */
-    public function storeConsultation(Request $request)
+    public function storeConsultation(Request $request): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'type' => ['required', 'string', 'in:change_notification,hazard_review,policy_review,risk_assessment,general'],
+            'consultation_type' => ['required', 'string', 'in:change_notification,hazard_review,policy_review,risk_assessment,general'],
             'description' => ['required', 'string', 'max:5000'],
             'site_id' => ['required', 'exists:sites,id'],
             'consultation_date' => ['required', 'date'],
         ]);
 
-        \DB::table('hs_consultations')->insert(array_merge($validated, [
-            'tenant_id' => $user->tenant_id,
+        HsConsultation::create(array_merge($validated, [
             'status' => 'open',
-            'created_by' => $user->id,
-            'created_at' => now(),
-            'updated_at' => now(),
+            'initiated_by' => $request->user()->id,
+            'created_by' => $request->user()->id,
         ]));
 
         return redirect()->back()->with('success', 'Consultation created successfully.');
@@ -326,27 +211,15 @@ class WorkerParticipationController extends Controller
     /**
      * Update a consultation (feedback, outcome, status).
      */
-    public function updateConsultation(Request $request, int $consultation)
+    public function updateConsultation(Request $request, HsConsultation $consultation): RedirectResponse
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('health-safety.manage'), 403);
-
-        $record = \DB::table('hs_consultations')
-            ->where('id', $consultation)
-            ->where('tenant_id', $user->tenant_id)
-            ->firstOrFail();
-
         $validated = $request->validate([
             'status' => ['sometimes', 'string', 'in:open,in_progress,closed'],
-            'feedback' => ['sometimes', 'nullable', 'string', 'max:5000'],
+            'worker_feedback_summary' => ['sometimes', 'nullable', 'string', 'max:5000'],
             'outcome' => ['sometimes', 'nullable', 'string', 'max:5000'],
         ]);
 
-        \DB::table('hs_consultations')
-            ->where('id', $consultation)
-            ->update(array_merge($validated, [
-                'updated_at' => now(),
-            ]));
+        $consultation->update($validated);
 
         return redirect()->back()->with('success', 'Consultation updated successfully.');
     }
