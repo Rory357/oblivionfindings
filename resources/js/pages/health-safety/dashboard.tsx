@@ -16,13 +16,27 @@ import {
     Bell,
     Users,
     FileWarning,
-    Plus,
     Eye,
-    HardHat,
-    Siren,
     Radio,
     Truck,
+    ArrowRight,
+    TrendingUp,
+    ChevronRight,
+    ShieldAlert,
 } from 'lucide-react';
+import {
+    BarChart,
+    Bar,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+    ResponsiveContainer,
+    PieChart,
+    Pie,
+    Cell,
+} from 'recharts';
 
 type Props = {
     kpis: Record<string, number>;
@@ -61,37 +75,168 @@ type Props = {
     }>;
 };
 
+/* ------------------------------------------------------------------ */
+/*  KPI card configuration                                            */
+/* ------------------------------------------------------------------ */
+
 const KPI_CONFIG: Array<{
     key: string;
     label: string;
     icon: React.ElementType;
+    href: string;
     color: (v: number) => string;
+    bgColor: (v: number) => string;
+    iconBg: (v: number) => string;
 }> = [
-    { key: 'incidents_30d', label: 'Incidents (30d)', icon: AlertTriangle, color: () => 'text-slate-700' },
-    { key: 'near_misses_30d', label: 'Near Misses (30d)', icon: Eye, color: () => 'text-slate-700' },
-    { key: 'open_hazards', label: 'Open Hazards', icon: Flame, color: () => 'text-orange-600' },
-    { key: 'overdue_actions', label: 'Overdue Actions', icon: Clock, color: (v) => (v > 0 ? 'text-red-600' : 'text-green-600') },
-    { key: 'workplace_injuries_ytd', label: 'Workplace Injuries (YTD)', icon: Heart, color: () => 'text-slate-700' },
-    { key: 'lost_time_days_ytd', label: 'Lost Time Days (YTD)', icon: Activity, color: () => 'text-slate-700' },
-    { key: 'days_since_notifiable', label: 'Days Since Notifiable', icon: FileWarning, color: (v) => (v > 30 ? 'text-green-600' : 'text-red-600') },
-    { key: 'drill_compliance_pct', label: 'Drill Compliance %', icon: CalendarCheck, color: (v) => (v >= 90 ? 'text-green-600' : v >= 70 ? 'text-amber-600' : 'text-red-600') },
-    { key: 'active_alerts', label: 'Active Alerts', icon: Bell, color: () => 'text-slate-700' },
-    { key: 'open_safeguarding', label: 'Open Safeguarding', icon: Shield, color: () => 'text-purple-600' },
-    { key: 'fleet_incidents_30d', label: 'Fleet Incidents (30d)', icon: Truck, color: () => 'text-slate-700' },
-    { key: 'fleet_unresolved', label: 'Fleet Unresolved', icon: Car, color: (v) => (v > 0 ? 'text-amber-600' : 'text-green-600') },
-    { key: 'staff_compliance_pct', label: 'Staff Compliance %', icon: Users, color: () => 'text-slate-700' },
+    {
+        key: 'incidents_30d',
+        label: 'Incidents (30 days)',
+        icon: AlertTriangle,
+        href: '/incidents',
+        color: (v) => (v > 5 ? 'text-red-700' : v > 0 ? 'text-amber-700' : 'text-slate-700'),
+        bgColor: (v) => (v > 5 ? 'border-red-200 bg-red-50/60' : v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-white'),
+        iconBg: (v) => (v > 5 ? 'bg-red-100 text-red-600' : v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600'),
+    },
+    {
+        key: 'near_misses_30d',
+        label: 'Near Misses (30 days)',
+        icon: Eye,
+        href: '/incidents?type=near_miss',
+        color: () => 'text-slate-700',
+        bgColor: () => 'border-slate-200 bg-white',
+        iconBg: () => 'bg-blue-100 text-blue-600',
+    },
+    {
+        key: 'open_hazards',
+        label: 'Open Hazards',
+        icon: Flame,
+        href: '/compliance/hazards',
+        color: (v) => (v > 0 ? 'text-orange-700' : 'text-green-700'),
+        bgColor: (v) => (v > 0 ? 'border-orange-200 bg-orange-50/60' : 'border-green-200 bg-green-50/60'),
+        iconBg: (v) => (v > 0 ? 'bg-orange-100 text-orange-600' : 'bg-green-100 text-green-600'),
+    },
+    {
+        key: 'overdue_actions',
+        label: 'Overdue Actions',
+        icon: Clock,
+        href: '/compliance/hazards?status=open',
+        color: (v) => (v > 0 ? 'text-red-700' : 'text-green-700'),
+        bgColor: (v) => (v > 0 ? 'border-red-200 bg-red-50/60' : 'border-green-200 bg-green-50/60'),
+        iconBg: (v) => (v > 0 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-600'),
+    },
+    {
+        key: 'workplace_injuries_ytd',
+        label: 'Workplace Injuries (YTD)',
+        icon: Heart,
+        href: '/health-safety/injuries',
+        color: (v) => (v > 0 ? 'text-red-700' : 'text-slate-700'),
+        bgColor: (v) => (v > 0 ? 'border-red-200 bg-red-50/60' : 'border-slate-200 bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-600'),
+    },
+    {
+        key: 'lost_time_days_ytd',
+        label: 'Lost Time Days (YTD)',
+        icon: Activity,
+        href: '/health-safety/injuries',
+        color: (v) => (v > 0 ? 'text-amber-700' : 'text-slate-700'),
+        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600'),
+    },
+    {
+        key: 'days_since_notifiable',
+        label: 'Days Since Notifiable',
+        icon: FileWarning,
+        href: '/governance/compliance',
+        color: (v) => (v > 30 ? 'text-green-700' : 'text-red-700'),
+        bgColor: (v) => (v > 30 ? 'border-green-200 bg-green-50/60' : 'border-red-200 bg-red-50/60'),
+        iconBg: (v) => (v > 30 ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'),
+    },
+    {
+        key: 'drill_compliance_pct',
+        label: 'Drill Compliance',
+        icon: CalendarCheck,
+        href: '/health-safety/drills',
+        color: (v) => (v >= 90 ? 'text-green-700' : v >= 70 ? 'text-amber-700' : 'text-red-700'),
+        bgColor: (v) => (v >= 90 ? 'border-green-200 bg-green-50/60' : v >= 70 ? 'border-amber-200 bg-amber-50/60' : 'border-red-200 bg-red-50/60'),
+        iconBg: (v) => (v >= 90 ? 'bg-green-100 text-green-600' : v >= 70 ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'),
+    },
+    {
+        key: 'active_alerts',
+        label: 'Active Alerts',
+        icon: Bell,
+        href: '/health-safety/lone-workers',
+        color: (v) => (v > 0 ? 'text-amber-700' : 'text-slate-700'),
+        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600'),
+    },
+    {
+        key: 'open_safeguarding',
+        label: 'Open Safeguarding',
+        icon: ShieldAlert,
+        href: '/safeguarding',
+        color: (v) => (v > 0 ? 'text-purple-700' : 'text-slate-700'),
+        bgColor: (v) => (v > 0 ? 'border-purple-200 bg-purple-50/60' : 'border-slate-200 bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-purple-100 text-purple-600' : 'bg-slate-100 text-slate-600'),
+    },
+    {
+        key: 'fleet_incidents_30d',
+        label: 'Fleet Incidents (30 days)',
+        icon: Truck,
+        href: '/fleet-assets/incidents',
+        color: (v) => (v > 0 ? 'text-amber-700' : 'text-slate-700'),
+        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-slate-200 bg-white'),
+        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-slate-100 text-slate-600'),
+    },
+    {
+        key: 'fleet_unresolved',
+        label: 'Fleet Unresolved',
+        icon: Car,
+        href: '/fleet-assets/incidents',
+        color: (v) => (v > 0 ? 'text-amber-700' : 'text-green-700'),
+        bgColor: (v) => (v > 0 ? 'border-amber-200 bg-amber-50/60' : 'border-green-200 bg-green-50/60'),
+        iconBg: (v) => (v > 0 ? 'bg-amber-100 text-amber-600' : 'bg-green-100 text-green-600'),
+    },
+    {
+        key: 'staff_compliance_pct',
+        label: 'Staff Compliance',
+        icon: Users,
+        href: '/hr/compliance',
+        color: (v) => (v >= 90 ? 'text-green-700' : v >= 70 ? 'text-amber-700' : 'text-red-700'),
+        bgColor: (v) => (v >= 90 ? 'border-green-200 bg-green-50/60' : v >= 70 ? 'border-amber-200 bg-amber-50/60' : 'border-red-200 bg-red-50/60'),
+        iconBg: (v) => (v >= 90 ? 'bg-green-100 text-green-600' : v >= 70 ? 'bg-amber-100 text-amber-600' : 'bg-red-100 text-red-600'),
+    },
 ];
 
-function kpiBg(key: string, value: number): string {
-    if (key === 'overdue_actions') return value > 0 ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50';
-    if (key === 'days_since_notifiable') return value > 30 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50';
-    if (key === 'drill_compliance_pct') {
-        if (value >= 90) return 'border-green-200 bg-green-50';
-        if (value >= 70) return 'border-amber-200 bg-amber-50';
-        return 'border-red-200 bg-red-50';
-    }
-    return '';
-}
+/* ------------------------------------------------------------------ */
+/*  Chart colour constants                                            */
+/* ------------------------------------------------------------------ */
+
+const TYPE_COLORS: Record<string, string> = {
+    injury: '#ef4444',
+    behaviour: '#f59e0b',
+    medication: '#3b82f6',
+    safeguarding: '#8b5cf6',
+    near_miss: '#6b7280',
+    other: '#94a3b8',
+};
+
+const SEVERITY_COLORS: Record<string, string> = {
+    critical: '#ef4444',
+    high: '#f97316',
+    medium: '#f59e0b',
+    low: '#3b82f6',
+};
+
+const HAZARD_COLORS: Record<string, string> = {
+    extreme: '#ef4444',
+    high: '#f97316',
+    medium: '#eab308',
+    low: '#22c55e',
+};
+
+/* ------------------------------------------------------------------ */
+/*  Badge helpers                                                     */
+/* ------------------------------------------------------------------ */
 
 function severityColor(s: string) {
     switch (s) {
@@ -131,14 +276,23 @@ function drillStatusBadge(status: string) {
     }
 }
 
-const TYPE_COLORS: Record<string, string> = {
-    injury: '#ef4444',
-    behaviour: '#f59e0b',
-    medication: '#3b82f6',
-    safeguarding: '#8b5cf6',
-    near_miss: '#6b7280',
-    other: '#94a3b8',
-};
+/* ------------------------------------------------------------------ */
+/*  Quick actions                                                     */
+/* ------------------------------------------------------------------ */
+
+const QUICK_ACTIONS = [
+    { label: 'Report Incident', icon: AlertTriangle, href: '/incidents/create', variant: 'destructive' as const },
+    { label: 'Report Near-Miss', icon: Eye, href: '/incidents/create', variant: 'outline' as const },
+    { label: 'Report Hazard', icon: Flame, href: '/compliance/hazards', variant: 'outline' as const },
+    { label: 'Record First Aid', icon: Heart, href: '/health-safety/first-aid', variant: 'outline' as const },
+    { label: 'Start Lone Worker', icon: Radio, href: '/health-safety/lone-workers', variant: 'outline' as const },
+    { label: 'Report Safeguarding', icon: ShieldAlert, href: '/safeguarding/create', variant: 'outline' as const },
+    { label: 'Log Fleet Incident', icon: Truck, href: '/fleet-assets/incidents/create', variant: 'outline' as const },
+];
+
+/* ================================================================== */
+/*  COMPONENT                                                         */
+/* ================================================================== */
 
 export default function HealthSafetyDashboard({
     kpis,
@@ -150,275 +304,433 @@ export default function HealthSafetyDashboard({
     recent_hazards,
     recent_fleet_incidents = [],
 }: Props) {
-    const maxTrendCount = Math.max(...incident_trends.map((t) => t.count), 1);
 
-    const hazardLevels = [
-        { key: 'extreme', label: 'Extreme', color: 'bg-red-500' },
-        { key: 'high', label: 'High', color: 'bg-orange-500' },
-        { key: 'medium', label: 'Medium', color: 'bg-yellow-500' },
-        { key: 'low', label: 'Low', color: 'bg-green-500' },
-    ];
-    const maxHazardCount = Math.max(...hazardLevels.map((h) => hazard_summary[h.key] ?? 0), 1);
+    /* -------------------------------------------------------------- */
+    /*  Derive chart data                                             */
+    /* -------------------------------------------------------------- */
 
-    const severityLevels = [
-        { key: 'critical', label: 'Critical', bg: 'bg-red-100 border-red-300 text-red-800' },
-        { key: 'high', label: 'High', bg: 'bg-orange-100 border-orange-300 text-orange-800' },
-        { key: 'medium', label: 'Medium', bg: 'bg-yellow-100 border-yellow-300 text-yellow-800' },
-        { key: 'low', label: 'Low', bg: 'bg-blue-100 border-blue-300 text-blue-800' },
+    // Collect all incident type keys across the trends
+    const allTypes = Array.from(
+        new Set(incident_trends.flatMap((t) => Object.keys(t.types ?? {})))
+    );
+
+    // Stacked bar chart data: one row per month, one key per type
+    const trendChartData = incident_trends.map((t) => {
+        const row: Record<string, string | number> = { month: t.month };
+        allTypes.forEach((type) => {
+            row[type] = (t.types ?? {})[type] ?? 0;
+        });
+        return row;
+    });
+
+    // Severity donut data
+    const severityData = ['critical', 'high', 'medium', 'low']
+        .map((key) => ({ name: key.charAt(0).toUpperCase() + key.slice(1), value: severity_breakdown[key] ?? 0, key }))
+        .filter((d) => d.value > 0);
+
+    const totalSeverity = severityData.reduce((sum, d) => sum + d.value, 0);
+
+    // Hazard horizontal bar data
+    const hazardChartData = [
+        { level: 'Extreme', count: hazard_summary['extreme'] ?? 0, key: 'extreme' },
+        { level: 'High', count: hazard_summary['high'] ?? 0, key: 'high' },
+        { level: 'Medium', count: hazard_summary['medium'] ?? 0, key: 'medium' },
+        { level: 'Low', count: hazard_summary['low'] ?? 0, key: 'low' },
     ];
+
+    /* -------------------------------------------------------------- */
+    /*  Render                                                        */
+    /* -------------------------------------------------------------- */
 
     return (
         <AppLayout breadcrumbs={[{ title: 'Health & Safety', href: '/health-safety' }, { title: 'Dashboard', href: '/health-safety/dashboard' }]}>
             <Head title="Health & Safety Dashboard" />
 
-            <div className="space-y-6">
-                {/* Page Title */}
-                <div className="flex items-center gap-2">
-                    <Shield className="h-6 w-6 text-blue-600" />
-                    <h1 className="text-xl font-semibold">Health & Safety Dashboard</h1>
+            <div className="mx-auto max-w-[1600px] space-y-8 p-1">
+
+                {/* ------------------------------------------------ */}
+                {/*  Page Header                                     */}
+                {/* ------------------------------------------------ */}
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white">
+                            <Shield className="h-5 w-5" />
+                        </div>
+                        <div>
+                            <h1 className="text-2xl font-bold tracking-tight">Health & Safety Dashboard</h1>
+                            <p className="text-sm text-muted-foreground">Real-time overview of workplace safety performance</p>
+                        </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        <Link href="/incidents/create">
+                            <Button size="sm" variant="destructive" className="gap-1.5">
+                                <AlertTriangle className="h-4 w-4" />
+                                Report Incident
+                            </Button>
+                        </Link>
+                        <Link href="/compliance/hazards">
+                            <Button size="sm" variant="outline" className="gap-1.5">
+                                <Flame className="h-4 w-4" />
+                                Report Hazard
+                            </Button>
+                        </Link>
+                    </div>
                 </div>
 
-                {/* KPI Grid */}
+                {/* ------------------------------------------------ */}
+                {/*  KPI Grid                                        */}
+                {/* ------------------------------------------------ */}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                     {KPI_CONFIG.map((cfg) => {
                         const value = kpis[cfg.key] ?? 0;
                         const Icon = cfg.icon;
+                        const displayValue = cfg.key.endsWith('_pct') ? `${value}%` : value;
+
                         return (
-                            <Card key={cfg.key} className={kpiBg(cfg.key, value)}>
-                                <CardContent className="flex items-center gap-3 pt-4">
-                                    <Icon className={`h-5 w-5 ${cfg.color(value)}`} />
-                                    <div>
-                                        <div className={`text-2xl font-bold ${cfg.color(value)}`}>{cfg.key.endsWith('_pct') ? `${value}%` : value}</div>
-                                        <div className="text-xs text-slate-500">{cfg.label}</div>
-                                    </div>
-                                </CardContent>
-                            </Card>
+                            <Link
+                                key={cfg.key}
+                                href={cfg.href}
+                                className="group"
+                            >
+                                <Card className={`transition-all duration-150 group-hover:shadow-md group-hover:-translate-y-0.5 ${cfg.bgColor(value)}`}>
+                                    <CardContent className="flex items-center gap-4 p-4">
+                                        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${cfg.iconBg(value)}`}>
+                                            <Icon className="h-5 w-5" />
+                                        </div>
+                                        <div className="min-w-0 flex-1">
+                                            <div className={`text-2xl font-bold leading-none ${cfg.color(value)}`}>
+                                                {displayValue}
+                                            </div>
+                                            <div className="mt-1 truncate text-xs text-muted-foreground">
+                                                {cfg.label}
+                                            </div>
+                                        </div>
+                                        <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                                    </CardContent>
+                                </Card>
+                            </Link>
                         );
                     })}
                 </div>
 
-                {/* Charts Section */}
-                <div className="grid gap-4 lg:grid-cols-2">
-                    {/* Incident Trends */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Incident Trends (12 months)</CardTitle>
+                {/* ------------------------------------------------ */}
+                {/*  Charts Row 1: Incident Trends + Severity Donut  */}
+                {/* ------------------------------------------------ */}
+                <div className="grid gap-4 lg:grid-cols-3">
+                    {/* Incident Trends - takes 2 cols */}
+                    <Card className="lg:col-span-2">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                                <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                                Incident Trends (12 months)
+                            </CardTitle>
+                            <Link href="/incidents" className="text-xs text-muted-foreground hover:text-foreground">
+                                View all <ArrowRight className="ml-0.5 inline h-3 w-3" />
+                            </Link>
                         </CardHeader>
-                        <CardContent className="space-y-2">
-                            {incident_trends.map((t) => (
-                                <div key={t.month} className="flex items-center gap-2">
-                                    <span className="w-16 text-xs text-slate-500">{t.month}</span>
-                                    <div className="flex flex-1 items-center">
-                                        <div className="flex h-5 overflow-hidden rounded" style={{ width: `${(t.count / maxTrendCount) * 100}%`, minWidth: t.count > 0 ? '2px' : '0' }}>
-                                            {Object.entries(t.types ?? {}).map(([type, count]) => (
-                                                <div
-                                                    key={type}
-                                                    className="h-full"
-                                                    style={{ width: `${(count / t.count) * 100}%`, backgroundColor: TYPE_COLORS[type] ?? '#94a3b8' }}
-                                                    title={`${type}: ${count}`}
-                                                />
-                                            ))}
-                                            {!Object.keys(t.types ?? {}).length && t.count > 0 && (
-                                                <div className="h-full w-full bg-blue-500" />
-                                            )}
-                                        </div>
-                                    </div>
-                                    <span className="w-8 text-right text-xs font-medium">{t.count}</span>
+                        <CardContent>
+                            {incident_trends.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={300}>
+                                    <BarChart data={trendChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                        <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} className="text-muted-foreground" />
+                                        <Tooltip
+                                            contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+                                            labelFormatter={(label) => `Month: ${label}`}
+                                            formatter={(value: number, name: string) => [value, name.replace(/_/g, ' ')]}
+                                        />
+                                        <Legend
+                                            formatter={(value: string) => <span className="text-xs capitalize">{value.replace(/_/g, ' ')}</span>}
+                                        />
+                                        {allTypes.map((type) => (
+                                            <Bar
+                                                key={type}
+                                                dataKey={type}
+                                                stackId="incidents"
+                                                fill={TYPE_COLORS[type] ?? '#94a3b8'}
+                                                radius={type === allTypes[allTypes.length - 1] ? [2, 2, 0, 0] : [0, 0, 0, 0]}
+                                            />
+                                        ))}
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
+                                    No trend data available.
                                 </div>
-                            ))}
-                            {!incident_trends.length && <div className="py-4 text-center text-sm text-slate-500">No data available.</div>}
+                            )}
                         </CardContent>
                     </Card>
 
-                    {/* Hazard Risk Distribution */}
+                    {/* Severity Breakdown Donut */}
                     <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Hazard Risk Distribution</CardTitle>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-base font-semibold">Severity Breakdown</CardTitle>
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                            {hazardLevels.map((h) => {
-                                const count = hazard_summary[h.key] ?? 0;
-                                return (
-                                    <div key={h.key} className="flex items-center gap-2">
-                                        <span className="w-16 text-xs font-medium capitalize">{h.label}</span>
-                                        <div className="flex-1">
-                                            <div className={`h-6 rounded ${h.color}`} style={{ width: `${(count / maxHazardCount) * 100}%`, minWidth: count > 0 ? '4px' : '0' }} />
-                                        </div>
-                                        <span className="w-8 text-right text-sm font-semibold">{count}</span>
+                        <CardContent>
+                            {totalSeverity > 0 ? (
+                                <div className="flex flex-col items-center">
+                                    <ResponsiveContainer width="100%" height={200}>
+                                        <PieChart>
+                                            <Pie
+                                                data={severityData}
+                                                cx="50%"
+                                                cy="50%"
+                                                innerRadius={55}
+                                                outerRadius={85}
+                                                paddingAngle={3}
+                                                dataKey="value"
+                                                stroke="none"
+                                            >
+                                                {severityData.map((entry) => (
+                                                    <Cell key={entry.key} fill={SEVERITY_COLORS[entry.key] ?? '#94a3b8'} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip
+                                                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+                                                formatter={(value: number, name: string) => [`${value} incidents`, name]}
+                                            />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                    {/* Legend */}
+                                    <div className="mt-2 grid w-full grid-cols-2 gap-2">
+                                        {severityData.map((d) => (
+                                            <div key={d.key} className="flex items-center gap-2 text-xs">
+                                                <span
+                                                    className="inline-block h-2.5 w-2.5 rounded-full"
+                                                    style={{ backgroundColor: SEVERITY_COLORS[d.key] }}
+                                                />
+                                                <span className="text-muted-foreground">{d.name}</span>
+                                                <span className="ml-auto font-semibold">{d.value}</span>
+                                            </div>
+                                        ))}
                                     </div>
-                                );
-                            })}
+                                </div>
+                            ) : (
+                                <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
+                                    No incident severity data.
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
 
-                {/* Severity Breakdown */}
-                <div className="grid gap-3 sm:grid-cols-4">
-                    {severityLevels.map((s) => (
-                        <div key={s.key} className={`rounded-lg border p-4 text-center ${s.bg}`}>
-                            <div className="text-2xl font-bold">{severity_breakdown[s.key] ?? 0}</div>
-                            <div className="text-xs font-medium capitalize">{s.label}</div>
-                        </div>
-                    ))}
+                {/* ------------------------------------------------ */}
+                {/*  Charts Row 2: Hazard Risk + Drill Compliance    */}
+                {/* ------------------------------------------------ */}
+                <div className="grid gap-4 lg:grid-cols-2">
+                    {/* Hazard Risk Distribution - Horizontal Bar */}
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                                <Flame className="h-4 w-4 text-muted-foreground" />
+                                Hazard Risk Distribution
+                            </CardTitle>
+                            <Link href="/compliance/hazards" className="text-xs text-muted-foreground hover:text-foreground">
+                                View all <ArrowRight className="ml-0.5 inline h-3 w-3" />
+                            </Link>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={200}>
+                                <BarChart data={hazardChartData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
+                                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
+                                    <YAxis type="category" dataKey="level" tick={{ fontSize: 12 }} width={65} />
+                                    <Tooltip
+                                        contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
+                                        formatter={(value: number) => [`${value} hazards`]}
+                                    />
+                                    <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                                        {hazardChartData.map((entry) => (
+                                            <Cell key={entry.key} fill={HAZARD_COLORS[entry.key] ?? '#94a3b8'} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* Site Drill Compliance */}
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                                <CalendarCheck className="h-4 w-4 text-muted-foreground" />
+                                Site Drill Compliance
+                            </CardTitle>
+                            <Link href="/health-safety/drills" className="text-xs text-muted-foreground hover:text-foreground">
+                                View all <ArrowRight className="ml-0.5 inline h-3 w-3" />
+                            </Link>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead>
+                                        <tr className="border-b text-left text-xs text-muted-foreground">
+                                            <th className="pb-2 font-medium">Site</th>
+                                            <th className="pb-2 font-medium">Last Drill</th>
+                                            <th className="pb-2 text-right font-medium">Days</th>
+                                            <th className="pb-2 text-right font-medium">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {site_drill_compliance.slice(0, 8).map((site) => (
+                                            <tr key={site.id} className="border-b last:border-0">
+                                                <td className="py-2 font-medium">{site.name}</td>
+                                                <td className="py-2 text-muted-foreground">
+                                                    {site.last_drill_date ? formatDate(site.last_drill_date) : (
+                                                        <span className="font-medium text-red-600">Never</span>
+                                                    )}
+                                                </td>
+                                                <td className="py-2 text-right text-muted-foreground">{site.days_since ?? '-'}</td>
+                                                <td className="py-2 text-right">
+                                                    <Badge className={drillStatusBadge(site.status)}>
+                                                        {site.status === 'due_soon' ? 'Due Soon' : site.status.charAt(0).toUpperCase() + site.status.slice(1)}
+                                                    </Badge>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                        {!site_drill_compliance.length && (
+                                            <tr>
+                                                <td colSpan={4} className="py-6 text-center text-muted-foreground">No sites found.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </CardContent>
+                    </Card>
                 </div>
 
-                {/* Site Drill Compliance */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Site Drill Compliance</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="overflow-x-auto">
-                            <table className="w-full text-sm">
-                                <thead>
-                                    <tr className="border-b text-left text-xs text-slate-500">
-                                        <th className="pb-2 font-medium">Site Name</th>
-                                        <th className="pb-2 font-medium">Last Drill Date</th>
-                                        <th className="pb-2 font-medium">Days Since</th>
-                                        <th className="pb-2 font-medium">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {site_drill_compliance.map((site) => (
-                                        <tr key={site.id} className="border-b last:border-0">
-                                            <td className="py-2 font-medium">{site.name}</td>
-                                            <td className="py-2">
-                                                {site.last_drill_date ? (
-                                                    formatDate(site.last_drill_date)
-                                                ) : (
-                                                    <span className="font-medium text-red-600">Never</span>
-                                                )}
-                                            </td>
-                                            <td className="py-2">{site.days_since ?? '-'}</td>
-                                            <td className="py-2">
-                                                <Badge className={drillStatusBadge(site.status)}>
-                                                    {site.status === 'due_soon' ? 'Due Soon' : site.status.charAt(0).toUpperCase() + site.status.slice(1)}
-                                                </Badge>
-                                            </td>
-                                        </tr>
-                                    ))}
-                                    {!site_drill_compliance.length && (
-                                        <tr>
-                                            <td colSpan={4} className="py-4 text-center text-slate-500">No sites found.</td>
-                                        </tr>
-                                    )}
-                                </tbody>
-                            </table>
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Recent Activity */}
-                <div className="grid gap-4 lg:grid-cols-2">
+                {/* ------------------------------------------------ */}
+                {/*  Recent Activity (3-column)                      */}
+                {/* ------------------------------------------------ */}
+                <div className="grid gap-4 lg:grid-cols-3">
                     {/* Recent Incidents */}
                     <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Recent Incidents</CardTitle>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                                <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                                Recent Incidents
+                            </CardTitle>
+                            <Link href="/incidents" className="text-xs text-muted-foreground hover:text-foreground">
+                                View all <ArrowRight className="ml-0.5 inline h-3 w-3" />
+                            </Link>
                         </CardHeader>
-                        <CardContent className="space-y-2">
-                            {recent_incidents.map((inc) => (
-                                <Link key={inc.id} href={`/incidents/${inc.id}`} className="flex items-center justify-between rounded-md border px-3 py-2 hover:bg-muted">
-                                    <div className="flex flex-wrap items-center gap-2">
+                        <CardContent className="space-y-1.5">
+                            {recent_incidents.slice(0, 6).map((inc) => (
+                                <Link
+                                    key={inc.id}
+                                    href={`/incidents/${inc.id}`}
+                                    className="group/item flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors hover:bg-muted/50"
+                                >
+                                    <div className="flex flex-wrap items-center gap-1.5">
                                         <Badge className={severityColor(inc.severity)}>{inc.severity}</Badge>
                                         <span className="text-sm font-medium capitalize">{inc.type.replace(/_/g, ' ')}</span>
-                                        <Badge className={statusColor(inc.status)}>{inc.status.replace(/_/g, ' ')}</Badge>
                                     </div>
-                                    <span className="text-xs text-slate-500">{formatDate(inc.occurred_at)}</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <Badge variant="outline" className={statusColor(inc.status)}>{inc.status.replace(/_/g, ' ')}</Badge>
+                                        <span className="hidden text-xs text-muted-foreground sm:inline">{formatDate(inc.occurred_at)}</span>
+                                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/item:opacity-100" />
+                                    </div>
                                 </Link>
                             ))}
-                            {!recent_incidents.length && <div className="py-4 text-center text-sm text-slate-500">No recent incidents.</div>}
+                            {!recent_incidents.length && (
+                                <div className="py-6 text-center text-sm text-muted-foreground">No recent incidents.</div>
+                            )}
                         </CardContent>
                     </Card>
 
                     {/* Recent Hazards */}
                     <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Recent Hazards</CardTitle>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                                <Flame className="h-4 w-4 text-muted-foreground" />
+                                Recent Hazards
+                            </CardTitle>
+                            <Link href="/compliance/hazards" className="text-xs text-muted-foreground hover:text-foreground">
+                                View all <ArrowRight className="ml-0.5 inline h-3 w-3" />
+                            </Link>
                         </CardHeader>
-                        <CardContent className="space-y-2">
-                            {recent_hazards.map((h) => (
-                                <div key={h.id} className="flex items-center justify-between rounded-md border px-3 py-2">
-                                    <div className="flex flex-wrap items-center gap-2">
+                        <CardContent className="space-y-1.5">
+                            {recent_hazards.slice(0, 6).map((h) => (
+                                <Link
+                                    key={h.id}
+                                    href={`/compliance/hazards/${h.id}`}
+                                    className="group/item flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors hover:bg-muted/50"
+                                >
+                                    <div className="flex flex-wrap items-center gap-1.5">
                                         <Badge className={riskColor(h.risk_rating)}>{h.risk_rating}</Badge>
                                         <span className="text-sm font-medium capitalize">{h.type?.replace(/_/g, ' ') ?? 'Hazard'}</span>
-                                        <Badge className={statusColor(h.status)}>{h.status?.replace(/_/g, ' ')}</Badge>
                                     </div>
-                                    <span className="text-xs text-slate-500">{h.site_name}</span>
-                                </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <Badge variant="outline" className={statusColor(h.status)}>{h.status?.replace(/_/g, ' ')}</Badge>
+                                        <span className="hidden text-xs text-muted-foreground sm:inline">{h.site_name}</span>
+                                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/item:opacity-100" />
+                                    </div>
+                                </Link>
                             ))}
-                            {!recent_hazards.length && <div className="py-4 text-center text-sm text-slate-500">No recent hazards.</div>}
+                            {!recent_hazards.length && (
+                                <div className="py-6 text-center text-sm text-muted-foreground">No recent hazards.</div>
+                            )}
                         </CardContent>
                     </Card>
+
                     {/* Recent Fleet Incidents */}
-                    {recent_fleet_incidents.length > 0 && (
-                        <Card className="lg:col-span-2">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2 text-base">
-                                    <Truck className="h-4 w-4" />
-                                    Recent Fleet Incidents
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-2">
-                                {recent_fleet_incidents.map((fi) => (
-                                    <Link key={fi.id} href={`/fleet-assets/incidents/${fi.id}`} className="flex items-center justify-between rounded-md border px-3 py-2 hover:bg-slate-50">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <Badge className={
-                                                fi.severity === 'critical' ? 'bg-red-100 text-red-700 border-0' :
-                                                fi.severity === 'major' ? 'bg-orange-100 text-orange-700 border-0' :
-                                                fi.severity === 'moderate' ? 'bg-amber-100 text-amber-700 border-0' :
-                                                'bg-slate-100 text-slate-700 border-0'
-                                            }>{fi.severity}</Badge>
-                                            <span className="text-sm font-medium capitalize">{fi.incident_type?.replace(/_/g, ' ')}</span>
-                                            <Badge className={statusColor(fi.status)}>{fi.status?.replace(/_/g, ' ')}</Badge>
-                                        </div>
-                                        <div className="flex items-center gap-3 text-xs text-slate-500">
-                                            {fi.asset && <span>{fi.asset.name}</span>}
-                                            {fi.occurred_at && <span>{formatDate(fi.occurred_at)}</span>}
-                                        </div>
-                                    </Link>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    )}
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                                <Truck className="h-4 w-4 text-muted-foreground" />
+                                Fleet Incidents
+                            </CardTitle>
+                            <Link href="/fleet-assets/incidents" className="text-xs text-muted-foreground hover:text-foreground">
+                                View all <ArrowRight className="ml-0.5 inline h-3 w-3" />
+                            </Link>
+                        </CardHeader>
+                        <CardContent className="space-y-1.5">
+                            {recent_fleet_incidents.slice(0, 6).map((fi) => (
+                                <Link
+                                    key={fi.id}
+                                    href={`/fleet-assets/incidents/${fi.id}`}
+                                    className="group/item flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors hover:bg-muted/50"
+                                >
+                                    <div className="flex flex-wrap items-center gap-1.5">
+                                        <Badge className={severityColor(fi.severity)}>{fi.severity}</Badge>
+                                        <span className="text-sm font-medium capitalize">{fi.incident_type?.replace(/_/g, ' ')}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1.5">
+                                        <Badge variant="outline" className={statusColor(fi.status)}>{fi.status?.replace(/_/g, ' ')}</Badge>
+                                        {fi.asset && <span className="hidden text-xs text-muted-foreground sm:inline">{fi.asset.name}</span>}
+                                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/item:opacity-100" />
+                                    </div>
+                                </Link>
+                            ))}
+                            {!recent_fleet_incidents.length && (
+                                <div className="py-6 text-center text-sm text-muted-foreground">No recent fleet incidents.</div>
+                            )}
+                        </CardContent>
+                    </Card>
                 </div>
 
-                {/* Quick Actions */}
+                {/* ------------------------------------------------ */}
+                {/*  Quick Actions                                   */}
+                {/* ------------------------------------------------ */}
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Quick Actions</CardTitle>
+                    <CardHeader className="pb-3">
+                        <CardTitle className="text-base font-semibold">Quick Actions</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="flex flex-wrap gap-2">
-                            <Link href="/health-safety/incidents/create">
-                                <Button size="sm" variant="outline">
-                                    <AlertTriangle className="mr-1.5 h-4 w-4" />
-                                    Report Incident
-                                </Button>
-                            </Link>
-                            <Link href="/health-safety/incidents/create?type=near_miss">
-                                <Button size="sm" variant="outline">
-                                    <Eye className="mr-1.5 h-4 w-4" />
-                                    Report Near-Miss
-                                </Button>
-                            </Link>
-                            <Link href="/health-safety/hazards/create">
-                                <Button size="sm" variant="outline">
-                                    <Flame className="mr-1.5 h-4 w-4" />
-                                    Report Hazard
-                                </Button>
-                            </Link>
-                            <Link href="/health-safety/first-aid/create">
-                                <Button size="sm" variant="outline">
-                                    <Heart className="mr-1.5 h-4 w-4" />
-                                    Record First Aid
-                                </Button>
-                            </Link>
-                            <Link href="/health-safety/lone-worker/start">
-                                <Button size="sm" variant="outline">
-                                    <Radio className="mr-1.5 h-4 w-4" />
-                                    Start Lone Worker Session
-                                </Button>
-                            </Link>
+                            {QUICK_ACTIONS.map((action) => {
+                                const Icon = action.icon;
+                                return (
+                                    <Link key={action.label} href={action.href}>
+                                        <Button size="sm" variant={action.variant} className="gap-1.5">
+                                            <Icon className="h-4 w-4" />
+                                            {action.label}
+                                        </Button>
+                                    </Link>
+                                );
+                            })}
                         </div>
                     </CardContent>
                 </Card>
