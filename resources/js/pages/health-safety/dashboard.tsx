@@ -25,17 +25,10 @@ import {
     ShieldAlert,
 } from 'lucide-react';
 import {
-    BarChart,
-    Bar,
-    XAxis,
-    YAxis,
-    CartesianGrid,
-    Tooltip,
-    Legend,
-    ResponsiveContainer,
-    PieChart,
-    Pie,
-    Cell,
+    AreaChart, Area, BarChart, Bar, LineChart, Line,
+    XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+    ResponsiveContainer, PieChart, Pie, Cell,
+    RadialBarChart, RadialBar,
 } from 'recharts';
 
 type Props = {
@@ -223,7 +216,7 @@ const TYPE_COLORS: Record<string, string> = {
 const SEVERITY_COLORS: Record<string, string> = {
     critical: '#ef4444',
     high: '#f97316',
-    medium: '#f59e0b',
+    medium: '#eab308',
     low: '#3b82f6',
 };
 
@@ -338,6 +331,55 @@ export default function HealthSafetyDashboard({
         { level: 'Low', count: hazard_summary['low'] ?? 0, key: 'low' },
     ];
 
+    // Radial gauge data for compliance percentages
+    const drillCompliancePct = kpis.drill_compliance_pct ?? 0;
+    const staffCompliancePct = kpis.staff_compliance_pct ?? 0;
+    const resolvedCount = recent_incidents.filter((i) => i.status === 'closed' || i.status === 'resolved').length;
+    const incidentResolutionPct = recent_incidents.length > 0
+        ? Math.round((resolvedCount / recent_incidents.length) * 100)
+        : 100;
+
+    const gaugeColor = (pct: number) => pct > 80 ? '#22c55e' : pct >= 50 ? '#eab308' : '#ef4444';
+
+    const radialGauges = [
+        { label: 'Drill Compliance', value: drillCompliancePct, fill: gaugeColor(drillCompliancePct) },
+        { label: 'Staff Compliance', value: staffCompliancePct, fill: gaugeColor(staffCompliancePct) },
+        { label: 'Resolution Rate', value: incidentResolutionPct, fill: gaugeColor(incidentResolutionPct) },
+    ];
+
+    // Monthly comparison: current month vs previous month
+    const monthlyComparisonData = incident_trends.slice(-2).length === 2
+        ? (() => {
+            const prev = incident_trends[incident_trends.length - 2];
+            const curr = incident_trends[incident_trends.length - 1];
+            const prevTypes = prev.types ?? {};
+            const currTypes = curr.types ?? {};
+            const allKeys = Array.from(new Set([...Object.keys(prevTypes), ...Object.keys(currTypes)]));
+            return allKeys.map((type) => ({
+                type: type.replace(/_/g, ' '),
+                previous: prevTypes[type] ?? 0,
+                current: currTypes[type] ?? 0,
+            }));
+        })()
+        : [];
+
+    // Custom tooltip component
+    const CustomTooltip = ({ active, payload, label }: any) => {
+        if (!active || !payload?.length) return null;
+        return (
+            <div className="rounded-lg border-0 bg-slate-800 px-3 py-2 text-xs text-white shadow-lg">
+                <p className="mb-1 font-medium">{label}</p>
+                {payload.map((p: any, i: number) => (
+                    <p key={i} className="flex items-center gap-1.5">
+                        <span className="inline-block h-2 w-2 rounded-full" style={{ backgroundColor: p.color }} />
+                        <span className="capitalize">{String(p.dataKey).replace(/_/g, ' ')}</span>:
+                        <span className="font-semibold">{p.value}</span>
+                    </p>
+                ))}
+            </div>
+        );
+    };
+
     /* -------------------------------------------------------------- */
     /*  Render                                                        */
     /* -------------------------------------------------------------- */
@@ -417,8 +459,8 @@ export default function HealthSafetyDashboard({
                 {/*  Charts Row 1: Incident Trends + Severity Donut  */}
                 {/* ------------------------------------------------ */}
                 <div className="grid gap-4 lg:grid-cols-3">
-                    {/* Incident Trends - takes 2 cols */}
-                    <Card className="lg:col-span-2">
+                    {/* Incident Trends - Gradient Area Chart */}
+                    <Card className="lg:col-span-2 rounded-xl shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="flex items-center gap-2 text-base font-semibold">
                                 <TrendingUp className="h-4 w-4 text-muted-foreground" />
@@ -431,28 +473,35 @@ export default function HealthSafetyDashboard({
                         <CardContent>
                             {incident_trends.length > 0 ? (
                                 <ResponsiveContainer width="100%" height={300}>
-                                    <BarChart data={trendChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                        <XAxis dataKey="month" tick={{ fontSize: 11 }} className="text-muted-foreground" />
-                                        <YAxis allowDecimals={false} tick={{ fontSize: 11 }} className="text-muted-foreground" />
-                                        <Tooltip
-                                            contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
-                                            labelFormatter={(label) => `Month: ${label}`}
-                                            formatter={(value: number, name: string) => [value, name.replace(/_/g, ' ')]}
-                                        />
+                                    <AreaChart data={trendChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                        <defs>
+                                            {allTypes.map((type) => (
+                                                <linearGradient key={type} id={`gradient-${type}`} x1="0" y1="0" x2="0" y2="1">
+                                                    <stop offset="0%" stopColor={TYPE_COLORS[type] ?? '#94a3b8'} stopOpacity={0.4} />
+                                                    <stop offset="95%" stopColor={TYPE_COLORS[type] ?? '#94a3b8'} stopOpacity={0.02} />
+                                                </linearGradient>
+                                            ))}
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                        <Tooltip content={<CustomTooltip />} />
                                         <Legend
-                                            formatter={(value: string) => <span className="text-xs capitalize">{value.replace(/_/g, ' ')}</span>}
+                                            formatter={(value: string) => <span className="text-xs capitalize text-slate-600">{value.replace(/_/g, ' ')}</span>}
                                         />
                                         {allTypes.map((type) => (
-                                            <Bar
+                                            <Area
                                                 key={type}
+                                                type="monotone"
                                                 dataKey={type}
                                                 stackId="incidents"
-                                                fill={TYPE_COLORS[type] ?? '#94a3b8'}
-                                                radius={type === allTypes[allTypes.length - 1] ? [2, 2, 0, 0] : [0, 0, 0, 0]}
+                                                stroke={TYPE_COLORS[type] ?? '#94a3b8'}
+                                                strokeWidth={2}
+                                                fill={`url(#gradient-${type})`}
+                                                animationDuration={800}
                                             />
                                         ))}
-                                    </BarChart>
+                                    </AreaChart>
                                 </ResponsiveContainer>
                             ) : (
                                 <div className="flex h-[300px] items-center justify-center text-sm text-muted-foreground">
@@ -462,38 +511,53 @@ export default function HealthSafetyDashboard({
                         </CardContent>
                     </Card>
 
-                    {/* Severity Breakdown Donut */}
-                    <Card>
+                    {/* Severity Breakdown - Modern Donut with center text */}
+                    <Card className="rounded-xl shadow-sm">
                         <CardHeader className="pb-2">
                             <CardTitle className="text-base font-semibold">Severity Breakdown</CardTitle>
                         </CardHeader>
                         <CardContent>
                             {totalSeverity > 0 ? (
                                 <div className="flex flex-col items-center">
-                                    <ResponsiveContainer width="100%" height={200}>
+                                    <ResponsiveContainer width="100%" height={220}>
                                         <PieChart>
                                             <Pie
                                                 data={severityData}
                                                 cx="50%"
                                                 cy="50%"
-                                                innerRadius={55}
+                                                innerRadius={60}
                                                 outerRadius={85}
                                                 paddingAngle={3}
                                                 dataKey="value"
                                                 stroke="none"
+                                                animationDuration={800}
                                             >
                                                 {severityData.map((entry) => (
                                                     <Cell key={entry.key} fill={SEVERITY_COLORS[entry.key] ?? '#94a3b8'} />
                                                 ))}
                                             </Pie>
                                             <Tooltip
-                                                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
-                                                formatter={(value: number, name: string) => [`${value} incidents`, name]}
+                                                content={({ active, payload }) => {
+                                                    if (!active || !payload?.length) return null;
+                                                    const d = payload[0];
+                                                    return (
+                                                        <div className="rounded-lg border-0 bg-slate-800 px-3 py-2 text-xs text-white shadow-lg">
+                                                            <span className="font-medium">{d.name}</span>: {d.value} incidents
+                                                        </div>
+                                                    );
+                                                }}
                                             />
+                                            {/* Center label */}
+                                            <text x="50%" y="48%" textAnchor="middle" dominantBaseline="central" className="fill-slate-900 text-2xl font-bold">
+                                                {totalSeverity}
+                                            </text>
+                                            <text x="50%" y="60%" textAnchor="middle" dominantBaseline="central" className="fill-slate-500 text-xs">
+                                                Total
+                                            </text>
                                         </PieChart>
                                     </ResponsiveContainer>
-                                    {/* Legend */}
-                                    <div className="mt-2 grid w-full grid-cols-2 gap-2">
+                                    {/* Legend as colored dots */}
+                                    <div className="mt-1 grid w-full grid-cols-2 gap-2">
                                         {severityData.map((d) => (
                                             <div key={d.key} className="flex items-center gap-2 text-xs">
                                                 <span
@@ -507,7 +571,7 @@ export default function HealthSafetyDashboard({
                                     </div>
                                 </div>
                             ) : (
-                                <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
+                                <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
                                     No incident severity data.
                                 </div>
                             )}
@@ -516,11 +580,48 @@ export default function HealthSafetyDashboard({
                 </div>
 
                 {/* ------------------------------------------------ */}
+                {/*  Radial Progress Gauges                          */}
+                {/* ------------------------------------------------ */}
+                <div className="grid gap-4 sm:grid-cols-3">
+                    {radialGauges.map((gauge) => (
+                        <Card key={gauge.label} className="rounded-xl shadow-sm">
+                            <CardHeader className="pb-0">
+                                <CardTitle className="text-center text-sm font-medium text-muted-foreground">{gauge.label}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="flex flex-col items-center pb-4">
+                                <ResponsiveContainer width="100%" height={150}>
+                                    <RadialBarChart
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius="70%"
+                                        outerRadius="90%"
+                                        barSize={12}
+                                        data={[{ value: gauge.value, fill: gauge.fill }]}
+                                        startAngle={210}
+                                        endAngle={-30}
+                                    >
+                                        <RadialBar
+                                            dataKey="value"
+                                            cornerRadius={6}
+                                            background={{ fill: '#f1f5f9' }}
+                                            animationDuration={800}
+                                        />
+                                        <text x="50%" y="50%" textAnchor="middle" dominantBaseline="central" className="text-xl font-bold" fill={gauge.fill}>
+                                            {gauge.value}%
+                                        </text>
+                                    </RadialBarChart>
+                                </ResponsiveContainer>
+                            </CardContent>
+                        </Card>
+                    ))}
+                </div>
+
+                {/* ------------------------------------------------ */}
                 {/*  Charts Row 2: Hazard Risk + Drill Compliance    */}
                 {/* ------------------------------------------------ */}
                 <div className="grid gap-4 lg:grid-cols-2">
-                    {/* Hazard Risk Distribution - Horizontal Bar */}
-                    <Card>
+                    {/* Hazard Risk Distribution - Horizontal Bar with rounded ends */}
+                    <Card className="rounded-xl shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="flex items-center gap-2 text-base font-semibold">
                                 <Flame className="h-4 w-4 text-muted-foreground" />
@@ -533,14 +634,20 @@ export default function HealthSafetyDashboard({
                         <CardContent>
                             <ResponsiveContainer width="100%" height={200}>
                                 <BarChart data={hazardChartData} layout="vertical" margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-                                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11 }} />
-                                    <YAxis type="category" dataKey="level" tick={{ fontSize: 12 }} width={65} />
+                                    <XAxis type="number" allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                    <YAxis type="category" dataKey="level" tick={{ fontSize: 12, fill: '#64748b' }} width={65} axisLine={false} tickLine={false} />
                                     <Tooltip
-                                        contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))' }}
-                                        formatter={(value: number) => [`${value} hazards`]}
+                                        content={({ active, payload }) => {
+                                            if (!active || !payload?.length) return null;
+                                            const d = payload[0];
+                                            return (
+                                                <div className="rounded-lg border-0 bg-slate-800 px-3 py-2 text-xs text-white shadow-lg">
+                                                    <span className="font-medium">{d.payload?.level}</span>: {d.value} hazards
+                                                </div>
+                                            );
+                                        }}
                                     />
-                                    <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                                    <Bar dataKey="count" radius={[0, 6, 6, 0]} animationDuration={800}>
                                         {hazardChartData.map((entry) => (
                                             <Cell key={entry.key} fill={HAZARD_COLORS[entry.key] ?? '#94a3b8'} />
                                         ))}
@@ -551,7 +658,7 @@ export default function HealthSafetyDashboard({
                     </Card>
 
                     {/* Site Drill Compliance */}
-                    <Card>
+                    <Card className="rounded-xl shadow-sm">
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="flex items-center gap-2 text-base font-semibold">
                                 <CalendarCheck className="h-4 w-4 text-muted-foreground" />
@@ -600,6 +707,55 @@ export default function HealthSafetyDashboard({
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* ------------------------------------------------ */}
+                {/*  Monthly Comparison Mini-Chart                    */}
+                {/* ------------------------------------------------ */}
+                {monthlyComparisonData.length > 0 && (
+                    <Card className="rounded-xl shadow-sm">
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+                                <Activity className="h-4 w-4 text-muted-foreground" />
+                                Monthly Comparison
+                            </CardTitle>
+                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                                <span className="flex items-center gap-1">
+                                    <span className="inline-block h-2 w-6 rounded-full bg-blue-500" /> Current
+                                </span>
+                                <span className="flex items-center gap-1">
+                                    <span className="inline-block h-0.5 w-6 border-t-2 border-dashed border-slate-400" /> Previous
+                                </span>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={150}>
+                                <LineChart data={monthlyComparisonData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                                    <XAxis dataKey="type" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                                    <Tooltip content={<CustomTooltip />} />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="previous"
+                                        stroke="#94a3b8"
+                                        strokeWidth={2}
+                                        strokeDasharray="5 3"
+                                        dot={{ r: 3, fill: '#94a3b8' }}
+                                        animationDuration={800}
+                                    />
+                                    <Line
+                                        type="monotone"
+                                        dataKey="current"
+                                        stroke="#3b82f6"
+                                        strokeWidth={2.5}
+                                        dot={{ r: 4, fill: '#3b82f6', strokeWidth: 0 }}
+                                        animationDuration={800}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* ------------------------------------------------ */}
                 {/*  Recent Activity (3-column)                      */}
