@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HsConsultation extends Model
@@ -25,6 +26,10 @@ class HsConsultation extends Model
         'worker_feedback_summary',
         'outcome',
         'changes_made',
+        'document_path',
+        'document_name',
+        'outcome_document_path',
+        'outcome_document_name',
         'status',
         'created_by',
         'updated_by',
@@ -57,6 +62,11 @@ class HsConsultation extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(HsAttachment::class, 'attachable');
     }
 
     /* ------------------------------------------------------------------ */

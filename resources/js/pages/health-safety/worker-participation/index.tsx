@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -20,7 +21,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, router } from '@inertiajs/react';
 import { useState, useRef } from 'react';
 import {
     Users,
@@ -39,8 +40,12 @@ import {
     Trash2,
     ClipboardList,
     UserPlus,
-    Vote,
     Megaphone,
+    Download,
+    Upload,
+    Calendar,
+    Paperclip,
+    ChevronRight,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -58,6 +63,22 @@ type Representative = {
     status: string;
 };
 
+type ActionItem = {
+    id?: number;
+    description: string;
+    assigned_to?: number | null;
+    assignee_name?: string;
+    due_date?: string | null;
+    status: string;
+};
+
+type Attendee = {
+    id: number;
+    user_id: number;
+    name: string;
+    confirmed: boolean;
+};
+
 type Meeting = {
     id: number;
     committee_name: string;
@@ -67,6 +88,10 @@ type Meeting = {
     status: string;
     action_items_count: number;
     attendees_count?: number;
+    confirmed_attendees?: Attendee[];
+    minutes_document_path?: string | null;
+    minutes_document_name?: string | null;
+    action_items?: ActionItem[];
 };
 
 type Consultation = {
@@ -78,6 +103,13 @@ type Consultation = {
     status: string;
     site?: { id: number; name: string } | null;
     description?: string;
+    document_path?: string | null;
+    document_name?: string | null;
+    outcome_document_path?: string | null;
+    outcome_document_name?: string | null;
+    worker_feedback_summary?: string | null;
+    outcome?: string | null;
+    changes_made?: string | null;
 };
 
 type Props = {
@@ -112,6 +144,10 @@ const statusBadge = (status: string) => {
         case 'in_progress':
         case 'open':
             return <Badge className="bg-amber-100 text-amber-800 border-amber-200">{status}</Badge>;
+        case 'feedback_received':
+            return <Badge className="bg-indigo-100 text-indigo-800 border-indigo-200">feedback received</Badge>;
+        case 'actioned':
+            return <Badge className="bg-teal-100 text-teal-800 border-teal-200">actioned</Badge>;
         case 'inactive':
         case 'expired':
         case 'cancelled':
@@ -187,6 +223,65 @@ const formatDateTime = (d: string) => {
 };
 
 /* ------------------------------------------------------------------ */
+/*  Consultation workflow steps                                        */
+/* ------------------------------------------------------------------ */
+
+const CONSULTATION_STEPS = ['open', 'feedback_received', 'actioned', 'closed'] as const;
+const CONSULTATION_STEP_LABELS: Record<string, string> = {
+    open: 'Open',
+    feedback_received: 'Feedback Received',
+    actioned: 'Actioned',
+    closed: 'Closed',
+};
+
+function ConsultationProgressBar({ status }: { status: string }) {
+    const currentIdx = CONSULTATION_STEPS.indexOf(status as any);
+    return (
+        <div className="flex items-center gap-1">
+            {CONSULTATION_STEPS.map((step, idx) => {
+                const isCompleted = currentIdx > idx;
+                const isCurrent = currentIdx === idx;
+                return (
+                    <div key={step} className="flex items-center gap-1 flex-1">
+                        <div className="flex flex-col items-center flex-1">
+                            <div
+                                className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium transition-colors ${
+                                    isCompleted
+                                        ? 'bg-green-500 text-white'
+                                        : isCurrent
+                                          ? 'bg-blue-500 text-white'
+                                          : 'bg-slate-200 text-slate-500'
+                                }`}
+                            >
+                                {isCompleted ? (
+                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                ) : (
+                                    idx + 1
+                                )}
+                            </div>
+                            <span
+                                className={`mt-1 text-[10px] leading-tight text-center ${
+                                    isCurrent ? 'font-semibold text-blue-700' : 'text-muted-foreground'
+                                }`}
+                            >
+                                {CONSULTATION_STEP_LABELS[step]}
+                            </span>
+                        </div>
+                        {idx < CONSULTATION_STEPS.length - 1 && (
+                            <div
+                                className={`h-0.5 flex-1 rounded-full mb-4 ${
+                                    isCompleted ? 'bg-green-400' : 'bg-slate-200'
+                                }`}
+                            />
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Consultation type card-button options                              */
 /* ------------------------------------------------------------------ */
 
@@ -217,6 +312,19 @@ export default function WorkerParticipationIndex({
     const [meetingOpen, setMeetingOpen] = useState(false);
     const [consultationOpen, setConsultationOpen] = useState(false);
     const [meetingLocationMode, setMeetingLocationMode] = useState<'site' | 'custom'>('site');
+
+    /* Consultation workflow dialogs */
+    const [feedbackDialogId, setFeedbackDialogId] = useState<number | null>(null);
+    const [outcomeDialogId, setOutcomeDialogId] = useState<number | null>(null);
+    const [closeDialogId, setCloseDialogId] = useState<number | null>(null);
+    const [consultDocUploadId, setConsultDocUploadId] = useState<number | null>(null);
+    const [consultDocUploadType, setConsultDocUploadType] = useState<'document' | 'outcome'>('document');
+
+    /* Meeting workflow dialogs */
+    const [completeMeetingId, setCompleteMeetingId] = useState<number | null>(null);
+    const [cancelMeetingId, setCancelMeetingId] = useState<number | null>(null);
+    const [manageMembersId, setManageMembersId] = useState<number | null>(null);
+    const [minutesUploadId, setMinutesUploadId] = useState<number | null>(null);
 
     const tabsRef = useRef<HTMLDivElement>(null);
 
@@ -251,6 +359,48 @@ export default function WorkerParticipationIndex({
         description: '',
     });
 
+    /* Consultation feedback form */
+    const feedbackForm = useForm({
+        status: 'feedback_received',
+        worker_feedback_summary: '',
+        workers_consulted: '',
+    });
+
+    /* Consultation outcome form */
+    const outcomeForm = useForm({
+        status: 'actioned',
+        outcome: '',
+        changes_made: '',
+        document: null as File | null,
+    });
+
+    /* Consultation document upload form */
+    const consultDocForm = useForm({
+        document: null as File | null,
+        type: 'document' as string,
+    });
+
+    /* Meeting complete form */
+    const completeMeetingForm = useForm<{
+        actual_attendee_ids: number[];
+        minutes: string;
+        action_items: Array<{ description: string; assigned_to: string; due_date: string }>;
+    }>({
+        actual_attendee_ids: [],
+        minutes: '',
+        action_items: [],
+    });
+
+    /* Meeting members form */
+    const membersForm = useForm<{ user_ids: string[] }>({
+        user_ids: [],
+    });
+
+    /* Meeting minutes upload form */
+    const minutesForm = useForm({
+        document: null as File | null,
+    });
+
     /* ---- Agenda item helpers ---- */
 
     const addAgendaItem = () => {
@@ -271,6 +421,32 @@ export default function WorkerParticipationIndex({
         const updated = [...meetingForm.data.agenda_items];
         updated[idx] = { ...updated[idx], [field]: value };
         meetingForm.setData('agenda_items', updated);
+    };
+
+    /* ---- Complete meeting action item helpers ---- */
+
+    const addCompleteMeetingActionItem = () => {
+        completeMeetingForm.setData('action_items', [
+            ...completeMeetingForm.data.action_items,
+            { description: '', assigned_to: '', due_date: '' },
+        ]);
+    };
+
+    const removeCompleteMeetingActionItem = (idx: number) => {
+        completeMeetingForm.setData(
+            'action_items',
+            completeMeetingForm.data.action_items.filter((_, i) => i !== idx),
+        );
+    };
+
+    const updateCompleteMeetingActionItem = (
+        idx: number,
+        field: 'description' | 'assigned_to' | 'due_date',
+        value: string,
+    ) => {
+        const updated = [...completeMeetingForm.data.action_items];
+        updated[idx] = { ...updated[idx], [field]: value };
+        completeMeetingForm.setData('action_items', updated);
     };
 
     /* ---- Stat card click ---- */
@@ -310,6 +486,91 @@ export default function WorkerParticipationIndex({
             onSuccess: () => {
                 setConsultationOpen(false);
                 consultationForm.reset();
+            },
+        });
+    };
+
+    const submitFeedback = (consultationId: number) => {
+        feedbackForm.post(`/health-safety/worker-participation/consultations/${consultationId}/status`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setFeedbackDialogId(null);
+                feedbackForm.reset();
+            },
+        });
+    };
+
+    const submitOutcome = (consultationId: number) => {
+        outcomeForm.post(`/health-safety/worker-participation/consultations/${consultationId}/status`, {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => {
+                setOutcomeDialogId(null);
+                outcomeForm.reset();
+            },
+        });
+    };
+
+    const submitClose = (consultationId: number) => {
+        router.post(
+            `/health-safety/worker-participation/consultations/${consultationId}/status`,
+            { status: 'closed' },
+            {
+                preserveScroll: true,
+                onSuccess: () => setCloseDialogId(null),
+            },
+        );
+    };
+
+    const submitConsultDocUpload = (consultationId: number) => {
+        consultDocForm.post(`/health-safety/worker-participation/consultations/${consultationId}/documents`, {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => {
+                setConsultDocUploadId(null);
+                consultDocForm.reset();
+            },
+        });
+    };
+
+    const submitCompleteMeeting = (meetingId: number) => {
+        completeMeetingForm.post(`/health-safety/worker-participation/meetings/${meetingId}/complete`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setCompleteMeetingId(null);
+                completeMeetingForm.reset();
+            },
+        });
+    };
+
+    const submitCancelMeeting = (meetingId: number) => {
+        router.put(
+            `/health-safety/worker-participation/meetings/${meetingId}/cancel`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => setCancelMeetingId(null),
+            },
+        );
+    };
+
+    const submitManageMembers = (meetingId: number) => {
+        membersForm.post(`/health-safety/worker-participation/meetings/${meetingId}/attendees`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setManageMembersId(null);
+                membersForm.reset();
+            },
+        });
+    };
+
+    const submitMinutesUpload = (meetingId: number) => {
+        minutesForm.post(`/health-safety/worker-participation/meetings/${meetingId}/minutes`, {
+            preserveScroll: true,
+            forceFormData: true,
+            onSuccess: () => {
+                setMinutesUploadId(null);
+                minutesForm.reset();
             },
         });
     };
@@ -587,45 +848,183 @@ export default function WorkerParticipationIndex({
                                             </Button>
                                         </div>
                                     ) : (
-                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                        <div className="space-y-4">
                                             {meetings.map((meeting) => (
                                                 <Card
                                                     key={meeting.id}
                                                     className={`border border-l-4 ${meetingStatusBorder(meeting.status)}`}
                                                 >
-                                                    <CardContent className="pt-5 space-y-3">
+                                                    <CardContent className="pt-5 space-y-4">
+                                                        {/* Header row */}
                                                         <div className="flex items-start justify-between">
-                                                            <div className="font-medium text-sm">
-                                                                {meeting.committee_name}
+                                                            <div>
+                                                                <div className="font-medium text-sm">
+                                                                    {meeting.committee_name}
+                                                                </div>
+                                                                <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
+                                                                    <span className="flex items-center gap-1">
+                                                                        <Clock className="h-3.5 w-3.5" />
+                                                                        {formatDateTime(meeting.meeting_date)}
+                                                                    </span>
+                                                                    {meeting.location && (
+                                                                        <span className="flex items-center gap-1">
+                                                                            <MapPin className="h-3.5 w-3.5" />
+                                                                            {meeting.location}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                             {statusBadge(meeting.status)}
                                                         </div>
 
-                                                        <div className="space-y-1.5 text-xs text-muted-foreground">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <Clock className="h-3.5 w-3.5" />
-                                                                {formatDateTime(meeting.meeting_date)}
+                                                        {/* Attendees section */}
+                                                        {meeting.confirmed_attendees && meeting.confirmed_attendees.length > 0 && (
+                                                            <div className="space-y-2">
+                                                                <div className="flex items-center justify-between">
+                                                                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                        Attendees
+                                                                    </h4>
+                                                                </div>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {meeting.confirmed_attendees.map((att) => (
+                                                                        <div
+                                                                            key={att.id}
+                                                                            className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs"
+                                                                        >
+                                                                            {att.confirmed ? (
+                                                                                <CheckCircle2 className="h-3 w-3 text-green-500" />
+                                                                            ) : (
+                                                                                <Clock className="h-3 w-3 text-amber-500" />
+                                                                            )}
+                                                                            {att.name}
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
                                                             </div>
-                                                            {meeting.location && (
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <MapPin className="h-3.5 w-3.5" />
-                                                                    {meeting.location}
-                                                                </div>
-                                                            )}
-                                                        </div>
+                                                        )}
 
-                                                        <div className="flex items-center gap-4 border-t pt-3 text-xs">
-                                                            {typeof meeting.attendees_count === 'number' && (
-                                                                <div className="flex items-center gap-1 text-muted-foreground">
-                                                                    <Users className="h-3.5 w-3.5" />
-                                                                    {meeting.attendees_count} attendee
-                                                                    {meeting.attendees_count !== 1 ? 's' : ''}
+                                                        {/* Minutes document */}
+                                                        {meeting.minutes_document_name && (
+                                                            <div className="flex items-center gap-2 rounded-lg border bg-slate-50 p-2.5 text-xs">
+                                                                <FileText className="h-4 w-4 text-blue-500 shrink-0" />
+                                                                <span className="font-medium truncate flex-1">
+                                                                    {meeting.minutes_document_name}
+                                                                </span>
+                                                                <a
+                                                                    href={`/health-safety/worker-participation/meetings/${meeting.id}/minutes/download`}
+                                                                    className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium shrink-0"
+                                                                >
+                                                                    <Download className="h-3.5 w-3.5" />
+                                                                    Download
+                                                                </a>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Action items (when completed) */}
+                                                        {meeting.status === 'completed' && meeting.action_items && meeting.action_items.length > 0 && (
+                                                            <div className="space-y-2">
+                                                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                                                    Action Items
+                                                                </h4>
+                                                                <div className="space-y-1.5">
+                                                                    {meeting.action_items.map((item, idx) => (
+                                                                        <div
+                                                                            key={item.id ?? idx}
+                                                                            className="flex items-start gap-2 rounded-lg border bg-white p-2.5 text-xs"
+                                                                        >
+                                                                            <CheckCircle2 className={`h-3.5 w-3.5 mt-0.5 shrink-0 ${
+                                                                                item.status === 'completed' ? 'text-green-500' : 'text-slate-300'
+                                                                            }`} />
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <div className="font-medium">{item.description}</div>
+                                                                                <div className="flex items-center gap-3 mt-1 text-muted-foreground">
+                                                                                    {item.assignee_name && (
+                                                                                        <span className="flex items-center gap-1">
+                                                                                            <Users className="h-3 w-3" />
+                                                                                            {item.assignee_name}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {item.due_date && (
+                                                                                        <span className="flex items-center gap-1">
+                                                                                            <Calendar className="h-3 w-3" />
+                                                                                            {formatDate(item.due_date)}
+                                                                                        </span>
+                                                                                    )}
+                                                                                </div>
+                                                                            </div>
+                                                                            {statusBadge(item.status)}
+                                                                        </div>
+                                                                    ))}
                                                                 </div>
-                                                            )}
-                                                            <div className="flex items-center gap-1 text-muted-foreground">
-                                                                <CheckCircle2 className="h-3.5 w-3.5" />
-                                                                {meeting.action_items_count} action item
-                                                                {meeting.action_items_count !== 1 ? 's' : ''}
+                                                            </div>
+                                                        )}
+
+                                                        {/* Footer with counts + actions */}
+                                                        <div className="flex items-center justify-between border-t pt-3">
+                                                            <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                                                                {typeof meeting.attendees_count === 'number' && (
+                                                                    <span className="flex items-center gap-1">
+                                                                        <Users className="h-3.5 w-3.5" />
+                                                                        {meeting.attendees_count} attendee{meeting.attendees_count !== 1 ? 's' : ''}
+                                                                    </span>
+                                                                )}
+                                                                <span className="flex items-center gap-1">
+                                                                    <CheckCircle2 className="h-3.5 w-3.5" />
+                                                                    {meeting.action_items_count} action item{meeting.action_items_count !== 1 ? 's' : ''}
+                                                                </span>
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {meeting.status === 'scheduled' && (
+                                                                    <>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() => setManageMembersId(meeting.id)}
+                                                                        >
+                                                                            <Users className="mr-1.5 h-3.5 w-3.5" />
+                                                                            Manage Members
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            onClick={() => setMinutesUploadId(meeting.id)}
+                                                                        >
+                                                                            <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                                                            Upload Minutes
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            variant="outline"
+                                                                            className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                                                            onClick={() => setCancelMeetingId(meeting.id)}
+                                                                        >
+                                                                            <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                                                                            Cancel
+                                                                        </Button>
+                                                                        <Button
+                                                                            size="sm"
+                                                                            onClick={() => {
+                                                                                completeMeetingForm.reset();
+                                                                                const attendeeIds = (meeting.confirmed_attendees ?? []).map(a => a.user_id);
+                                                                                completeMeetingForm.setData('actual_attendee_ids', attendeeIds);
+                                                                                setCompleteMeetingId(meeting.id);
+                                                                            }}
+                                                                        >
+                                                                            <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                                                            Complete Meeting
+                                                                        </Button>
+                                                                    </>
+                                                                )}
+                                                                {meeting.status === 'completed' && !meeting.minutes_document_name && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="outline"
+                                                                        onClick={() => setMinutesUploadId(meeting.id)}
+                                                                    >
+                                                                        <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                                                        Upload Minutes
+                                                                    </Button>
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </CardContent>
@@ -678,46 +1077,163 @@ export default function WorkerParticipationIndex({
                                             </Button>
                                         </div>
                                     ) : (
-                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                        <div className="space-y-4">
                                             {consultations.map((c) => (
                                                 <Card key={c.id} className="border">
-                                                    <CardContent className="pt-5 space-y-3">
+                                                    <CardContent className="pt-5 space-y-4">
+                                                        {/* Header row */}
                                                         <div className="flex items-start justify-between gap-2">
-                                                            <div className="font-medium text-sm leading-snug">
-                                                                {c.title}
+                                                            <div>
+                                                                <div className="font-medium text-sm leading-snug">
+                                                                    {c.title}
+                                                                </div>
+                                                                <div className="flex items-center gap-2 mt-1.5">
+                                                                    <Badge
+                                                                        className={
+                                                                            consultationTypeColor[c.consultation_type] ??
+                                                                            'bg-slate-100 text-slate-700 border-slate-200'
+                                                                        }
+                                                                    >
+                                                                        {consultationTypeLabel[c.consultation_type] ??
+                                                                            c.consultation_type}
+                                                                    </Badge>
+                                                                    <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                        <Clock className="h-3 w-3" />
+                                                                        {formatDate(c.consultation_date)}
+                                                                    </span>
+                                                                    {c.site && (
+                                                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                                            <MapPin className="h-3 w-3" />
+                                                                            {c.site.name}
+                                                                        </span>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                             {statusBadge(c.status)}
                                                         </div>
 
-                                                        <div className="flex flex-wrap gap-1.5">
-                                                            <Badge
-                                                                className={
-                                                                    consultationTypeColor[c.consultation_type] ??
-                                                                    'bg-slate-100 text-slate-700 border-slate-200'
-                                                                }
-                                                            >
-                                                                {consultationTypeLabel[c.consultation_type] ??
-                                                                    c.consultation_type}
-                                                            </Badge>
-                                                        </div>
+                                                        {/* Workflow progress bar */}
+                                                        <ConsultationProgressBar status={c.status} />
 
-                                                        <div className="space-y-1.5 text-xs text-muted-foreground">
-                                                            <div className="flex items-center gap-1.5">
-                                                                <Clock className="h-3.5 w-3.5" />
-                                                                {formatDate(c.consultation_date)}
+                                                        {/* Description */}
+                                                        {c.description && (
+                                                            <div className="text-xs text-muted-foreground bg-slate-50 rounded-lg p-3">
+                                                                <span className="font-semibold text-slate-700">Description: </span>
+                                                                {c.description}
                                                             </div>
-                                                            {c.site && (
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <MapPin className="h-3.5 w-3.5" />
-                                                                    {c.site.name}
+                                                        )}
+
+                                                        {/* Worker feedback summary */}
+                                                        {c.worker_feedback_summary && (
+                                                            <div className="text-xs bg-indigo-50 rounded-lg p-3">
+                                                                <span className="font-semibold text-indigo-700">Worker Feedback: </span>
+                                                                <span className="text-indigo-900">{c.worker_feedback_summary}</span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Outcome */}
+                                                        {c.outcome && (
+                                                            <div className="text-xs bg-teal-50 rounded-lg p-3">
+                                                                <span className="font-semibold text-teal-700">Outcome: </span>
+                                                                <span className="text-teal-900">{c.outcome}</span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Changes made */}
+                                                        {c.changes_made && (
+                                                            <div className="text-xs bg-green-50 rounded-lg p-3">
+                                                                <span className="font-semibold text-green-700">Changes Made: </span>
+                                                                <span className="text-green-900">{c.changes_made}</span>
+                                                            </div>
+                                                        )}
+
+                                                        {/* Documents section */}
+                                                        <div className="flex flex-wrap gap-2">
+                                                            {c.document_name && (
+                                                                <div className="flex items-center gap-2 rounded-lg border bg-slate-50 px-2.5 py-1.5 text-xs">
+                                                                    <Paperclip className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+                                                                    <span className="font-medium truncate">{c.document_name}</span>
+                                                                    <a
+                                                                        href={`/health-safety/worker-participation/consultations/${c.id}/documents/document`}
+                                                                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium shrink-0"
+                                                                    >
+                                                                        <Download className="h-3 w-3" />
+                                                                        Download
+                                                                    </a>
+                                                                </div>
+                                                            )}
+                                                            {c.outcome_document_name && (
+                                                                <div className="flex items-center gap-2 rounded-lg border bg-teal-50 px-2.5 py-1.5 text-xs">
+                                                                    <FileText className="h-3.5 w-3.5 text-teal-500 shrink-0" />
+                                                                    <span className="font-medium truncate">{c.outcome_document_name}</span>
+                                                                    <a
+                                                                        href={`/health-safety/worker-participation/consultations/${c.id}/documents/outcome`}
+                                                                        className="flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium shrink-0"
+                                                                    >
+                                                                        <Download className="h-3 w-3" />
+                                                                        Download
+                                                                    </a>
                                                                 </div>
                                                             )}
                                                         </div>
 
-                                                        <div className="flex items-center gap-1.5 border-t pt-3 text-xs text-muted-foreground">
-                                                            <Users className="h-3.5 w-3.5" />
-                                                            {c.workers_consulted} worker
-                                                            {c.workers_consulted !== 1 ? 's' : ''} consulted
+                                                        {/* Footer: workers consulted + action buttons */}
+                                                        <div className="flex items-center justify-between border-t pt-3">
+                                                            <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                                                <Users className="h-3.5 w-3.5" />
+                                                                {c.workers_consulted} worker{c.workers_consulted !== 1 ? 's' : ''} consulted
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {/* Upload document button */}
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={() => {
+                                                                        consultDocForm.reset();
+                                                                        consultDocForm.setData('type', 'document');
+                                                                        setConsultDocUploadType('document');
+                                                                        setConsultDocUploadId(c.id);
+                                                                    }}
+                                                                >
+                                                                    <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                                                    Upload Document
+                                                                </Button>
+
+                                                                {/* Workflow action buttons */}
+                                                                {c.status === 'open' && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            feedbackForm.reset();
+                                                                            setFeedbackDialogId(c.id);
+                                                                        }}
+                                                                    >
+                                                                        <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
+                                                                        Record Feedback
+                                                                    </Button>
+                                                                )}
+                                                                {c.status === 'feedback_received' && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={() => {
+                                                                            outcomeForm.reset();
+                                                                            setOutcomeDialogId(c.id);
+                                                                        }}
+                                                                    >
+                                                                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                                                        Record Outcome
+                                                                    </Button>
+                                                                )}
+                                                                {c.status === 'actioned' && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        onClick={() => setCloseDialogId(c.id)}
+                                                                    >
+                                                                        <XCircle className="mr-1.5 h-3.5 w-3.5" />
+                                                                        Close Consultation
+                                                                    </Button>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </CardContent>
                                                 </Card>
@@ -1204,6 +1720,510 @@ export default function WorkerParticipationIndex({
                         <Button disabled={consultationForm.processing} onClick={submitConsultation}>
                             <Megaphone className="mr-1.5 h-4 w-4" />
                             Create Consultation
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ================================================================ */}
+            {/*  RECORD FEEDBACK DIALOG (Consultation: open -> feedback_received) */}
+            {/* ================================================================ */}
+            <Dialog open={feedbackDialogId !== null} onOpenChange={(open) => !open && setFeedbackDialogId(null)}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100">
+                                <MessageSquare className="h-4 w-4 text-indigo-600" />
+                            </div>
+                            Record Worker Feedback
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label>Worker Feedback Summary <span className="text-red-500">*</span></Label>
+                            <Textarea
+                                placeholder="Summarise the feedback received from workers..."
+                                rows={4}
+                                value={feedbackForm.data.worker_feedback_summary}
+                                onChange={(e) => feedbackForm.setData('worker_feedback_summary', e.target.value)}
+                            />
+                            {feedbackForm.errors.worker_feedback_summary && (
+                                <p className="text-xs text-red-600">{feedbackForm.errors.worker_feedback_summary}</p>
+                            )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>Workers Consulted (names, comma-separated)</Label>
+                            <Input
+                                placeholder="e.g. Jane Smith, John Doe, Mary Jones"
+                                value={feedbackForm.data.workers_consulted}
+                                onChange={(e) => feedbackForm.setData('workers_consulted', e.target.value)}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                List the names of workers who provided feedback.
+                            </p>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setFeedbackDialogId(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            disabled={feedbackForm.processing}
+                            onClick={() => feedbackDialogId && submitFeedback(feedbackDialogId)}
+                        >
+                            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                            Record Feedback
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ================================================================ */}
+            {/*  RECORD OUTCOME DIALOG (Consultation: feedback_received -> actioned) */}
+            {/* ================================================================ */}
+            <Dialog open={outcomeDialogId !== null} onOpenChange={(open) => !open && setOutcomeDialogId(null)}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-teal-100">
+                                <CheckCircle2 className="h-4 w-4 text-teal-600" />
+                            </div>
+                            Record Outcome
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label>Outcome <span className="text-red-500">*</span></Label>
+                            <Textarea
+                                placeholder="Describe the outcome of this consultation..."
+                                rows={4}
+                                value={outcomeForm.data.outcome}
+                                onChange={(e) => outcomeForm.setData('outcome', e.target.value)}
+                            />
+                            {outcomeForm.errors.outcome && (
+                                <p className="text-xs text-red-600">{outcomeForm.errors.outcome}</p>
+                            )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>Changes Made</Label>
+                            <Textarea
+                                placeholder="Describe any changes implemented as a result..."
+                                rows={3}
+                                value={outcomeForm.data.changes_made}
+                                onChange={(e) => outcomeForm.setData('changes_made', e.target.value)}
+                            />
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>Outcome Document (optional)</Label>
+                            <Input
+                                type="file"
+                                onChange={(e) => outcomeForm.setData('document', e.target.files?.[0] || null)}
+                            />
+                            <p className="text-xs text-muted-foreground">
+                                Upload a supporting document for the outcome (e.g. updated procedure, risk assessment).
+                            </p>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setOutcomeDialogId(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            disabled={outcomeForm.processing}
+                            onClick={() => outcomeDialogId && submitOutcome(outcomeDialogId)}
+                        >
+                            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                            Record Outcome
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ================================================================ */}
+            {/*  CLOSE CONSULTATION DIALOG (Consultation: actioned -> closed)     */}
+            {/* ================================================================ */}
+            <Dialog open={closeDialogId !== null} onOpenChange={(open) => !open && setCloseDialogId(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100">
+                                <XCircle className="h-4 w-4 text-slate-600" />
+                            </div>
+                            Close Consultation
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <p className="text-sm text-muted-foreground">
+                        Are you sure you want to close this consultation? This indicates that all actions
+                        have been completed and the consultation is finalised.
+                    </p>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCloseDialogId(null)}>
+                            Cancel
+                        </Button>
+                        <Button onClick={() => closeDialogId && submitClose(closeDialogId)}>
+                            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                            Confirm Close
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ================================================================ */}
+            {/*  CONSULTATION DOCUMENT UPLOAD DIALOG                             */}
+            {/* ================================================================ */}
+            <Dialog open={consultDocUploadId !== null} onOpenChange={(open) => !open && setConsultDocUploadId(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
+                                <Upload className="h-4 w-4 text-blue-600" />
+                            </div>
+                            Upload Document
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label>Document Type</Label>
+                            <Select
+                                value={consultDocForm.data.type}
+                                onValueChange={(v) => {
+                                    consultDocForm.setData('type', v);
+                                    setConsultDocUploadType(v as 'document' | 'outcome');
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="document">Supporting Document</SelectItem>
+                                    <SelectItem value="outcome">Outcome Document</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                            <Label>File <span className="text-red-500">*</span></Label>
+                            <Input
+                                type="file"
+                                onChange={(e) => consultDocForm.setData('document', e.target.files?.[0] || null)}
+                            />
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setConsultDocUploadId(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            disabled={consultDocForm.processing || !consultDocForm.data.document}
+                            onClick={() => consultDocUploadId && submitConsultDocUpload(consultDocUploadId)}
+                        >
+                            <Upload className="mr-1.5 h-4 w-4" />
+                            Upload
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ================================================================ */}
+            {/*  COMPLETE MEETING DIALOG                                         */}
+            {/* ================================================================ */}
+            <Dialog open={completeMeetingId !== null} onOpenChange={(open) => !open && setCompleteMeetingId(null)}>
+                <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+                                <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            </div>
+                            Complete Meeting
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-5">
+                        {/* Actual Attendees */}
+                        {(() => {
+                            const meeting = meetings.find((m) => m.id === completeMeetingId);
+                            const attendees = meeting?.confirmed_attendees ?? [];
+                            if (attendees.length === 0) return null;
+                            return (
+                                <div className="space-y-3">
+                                    <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                        Actual Attendees
+                                    </h4>
+                                    <div className="space-y-2">
+                                        {attendees.map((att) => {
+                                            const isChecked = completeMeetingForm.data.actual_attendee_ids.includes(att.user_id);
+                                            return (
+                                                <label
+                                                    key={att.id}
+                                                    className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-slate-50"
+                                                >
+                                                    <Checkbox
+                                                        checked={isChecked}
+                                                        onCheckedChange={(checked) => {
+                                                            const current = completeMeetingForm.data.actual_attendee_ids;
+                                                            if (checked) {
+                                                                completeMeetingForm.setData('actual_attendee_ids', [...current, att.user_id]);
+                                                            } else {
+                                                                completeMeetingForm.setData('actual_attendee_ids', current.filter((id) => id !== att.user_id));
+                                                            }
+                                                        }}
+                                                    />
+                                                    <span className="text-sm">{att.name}</span>
+                                                </label>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })()}
+
+                        {/* Minutes */}
+                        <div className="space-y-1.5">
+                            <Label>Minutes</Label>
+                            <Textarea
+                                placeholder="Record the meeting minutes..."
+                                rows={5}
+                                value={completeMeetingForm.data.minutes}
+                                onChange={(e) => completeMeetingForm.setData('minutes', e.target.value)}
+                            />
+                        </div>
+
+                        {/* Action Items */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Action Items
+                                </h4>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={addCompleteMeetingActionItem}
+                                >
+                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                    Add Action Item
+                                </Button>
+                            </div>
+
+                            {completeMeetingForm.data.action_items.length === 0 && (
+                                <div className="rounded-lg border-2 border-dashed border-slate-200 p-4 text-center text-sm text-muted-foreground">
+                                    No action items. Click "Add Action Item" to add follow-up tasks.
+                                </div>
+                            )}
+
+                            <div className="space-y-3">
+                                {completeMeetingForm.data.action_items.map((item, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="rounded-lg border bg-slate-50/50 p-3 space-y-2"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-medium text-muted-foreground">
+                                                Action Item {idx + 1}
+                                            </span>
+                                            <Button
+                                                type="button"
+                                                variant="ghost"
+                                                size="sm"
+                                                className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                onClick={() => removeCompleteMeetingActionItem(idx)}
+                                            >
+                                                <Trash2 className="h-3.5 w-3.5" />
+                                            </Button>
+                                        </div>
+                                        <Input
+                                            placeholder="Description of the action item"
+                                            value={item.description}
+                                            onChange={(e) =>
+                                                updateCompleteMeetingActionItem(idx, 'description', e.target.value)
+                                            }
+                                        />
+                                        <div className="grid gap-2 sm:grid-cols-2">
+                                            <Select
+                                                value={item.assigned_to || '__none__'}
+                                                onValueChange={(v) =>
+                                                    updateCompleteMeetingActionItem(idx, 'assigned_to', v === '__none__' ? '' : v)
+                                                }
+                                            >
+                                                <SelectTrigger>
+                                                    <SelectValue placeholder="Assign to..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="__none__">Assign to...</SelectItem>
+                                                    {staff.map((s) => (
+                                                        <SelectItem key={s.id} value={String(s.id)}>
+                                                            {s.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            <Input
+                                                type="date"
+                                                value={item.due_date}
+                                                onChange={(e) =>
+                                                    updateCompleteMeetingActionItem(idx, 'due_date', e.target.value)
+                                                }
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCompleteMeetingId(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            disabled={completeMeetingForm.processing}
+                            onClick={() => completeMeetingId && submitCompleteMeeting(completeMeetingId)}
+                        >
+                            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                            Complete Meeting
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ================================================================ */}
+            {/*  CANCEL MEETING DIALOG                                           */}
+            {/* ================================================================ */}
+            <Dialog open={cancelMeetingId !== null} onOpenChange={(open) => !open && setCancelMeetingId(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-100">
+                                <XCircle className="h-4 w-4 text-red-600" />
+                            </div>
+                            Cancel Meeting
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <p className="text-sm text-muted-foreground">
+                        Are you sure you want to cancel this meeting? This action cannot be undone.
+                    </p>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCancelMeetingId(null)}>
+                            Keep Meeting
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={() => cancelMeetingId && submitCancelMeeting(cancelMeetingId)}
+                        >
+                            <XCircle className="mr-1.5 h-4 w-4" />
+                            Cancel Meeting
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ================================================================ */}
+            {/*  MANAGE MEMBERS DIALOG                                           */}
+            {/* ================================================================ */}
+            <Dialog open={manageMembersId !== null} onOpenChange={(open) => !open && setManageMembersId(null)}>
+                <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-blue-100">
+                                <Users className="h-4 w-4 text-blue-600" />
+                            </div>
+                            Manage Meeting Attendees
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-3">
+                        <p className="text-sm text-muted-foreground">
+                            Select staff members to add as attendees for this meeting.
+                        </p>
+                        <div className="space-y-2 max-h-64 overflow-y-auto">
+                            {staff.map((s) => {
+                                const isChecked = membersForm.data.user_ids.includes(String(s.id));
+                                return (
+                                    <label
+                                        key={s.id}
+                                        className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-slate-50"
+                                    >
+                                        <Checkbox
+                                            checked={isChecked}
+                                            onCheckedChange={(checked) => {
+                                                const current = membersForm.data.user_ids;
+                                                if (checked) {
+                                                    membersForm.setData('user_ids', [...current, String(s.id)]);
+                                                } else {
+                                                    membersForm.setData('user_ids', current.filter((id) => id !== String(s.id)));
+                                                }
+                                            }}
+                                        />
+                                        <span className="text-sm">{s.name}</span>
+                                    </label>
+                                );
+                            })}
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setManageMembersId(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            disabled={membersForm.processing || membersForm.data.user_ids.length === 0}
+                            onClick={() => manageMembersId && submitManageMembers(manageMembersId)}
+                        >
+                            <Users className="mr-1.5 h-4 w-4" />
+                            Save Attendees
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ================================================================ */}
+            {/*  UPLOAD MINUTES DIALOG                                           */}
+            {/* ================================================================ */}
+            <Dialog open={minutesUploadId !== null} onOpenChange={(open) => !open && setMinutesUploadId(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
+                                <FileText className="h-4 w-4 text-amber-600" />
+                            </div>
+                            Upload Meeting Minutes
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-1.5">
+                        <Label>Minutes Document <span className="text-red-500">*</span></Label>
+                        <Input
+                            type="file"
+                            onChange={(e) => minutesForm.setData('document', e.target.files?.[0] || null)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                            Upload the meeting minutes document (PDF, Word, etc.).
+                        </p>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setMinutesUploadId(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            disabled={minutesForm.processing || !minutesForm.data.document}
+                            onClick={() => minutesUploadId && submitMinutesUpload(minutesUploadId)}
+                        >
+                            <Upload className="mr-1.5 h-4 w-4" />
+                            Upload Minutes
                         </Button>
                     </DialogFooter>
                 </DialogContent>

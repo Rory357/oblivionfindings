@@ -6,6 +6,7 @@ use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HsCommitteeMeeting extends Model
@@ -26,6 +27,9 @@ class HsCommitteeMeeting extends Model
         'minutes',
         'action_items',
         'safety_concerns_raised',
+        'confirmed_attendees',
+        'minutes_document_path',
+        'minutes_document_name',
         'recorded_by',
         'created_by',
         'updated_by',
@@ -38,6 +42,7 @@ class HsCommitteeMeeting extends Model
         'attendees' => 'array',
         'agenda_items' => 'array',
         'action_items' => 'array',
+        'confirmed_attendees' => 'array',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -62,6 +67,11 @@ class HsCommitteeMeeting extends Model
     public function updater(): BelongsTo
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    public function attachments(): MorphMany
+    {
+        return $this->morphMany(HsAttachment::class, 'attachable');
     }
 
     /* ------------------------------------------------------------------ */

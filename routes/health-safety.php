@@ -102,6 +102,18 @@ Route::middleware(['auth'])->prefix('health-safety')->name('health-safety.')->gr
             // Consultations
             Route::post('/consultations', [WorkerParticipationController::class, 'storeConsultation'])->name('consultations.store');
             Route::put('/consultations/{consultation}', [WorkerParticipationController::class, 'updateConsultation'])->name('consultations.update');
+
+            // Consultation workflow
+            Route::put('/consultations/{consultation}/status', [WorkerParticipationController::class, 'updateConsultationStatus'])->name('consultations.status');
+            Route::post('/consultations/{consultation}/documents', [WorkerParticipationController::class, 'uploadConsultationDocument'])->name('consultations.documents.upload');
+            Route::get('/consultations/{consultation}/documents/{type}', [WorkerParticipationController::class, 'downloadConsultationDocument'])->name('consultations.documents.download');
+
+            // Meeting workflow
+            Route::post('/meetings/{meeting}/attendees', [WorkerParticipationController::class, 'addMeetingAttendees'])->name('meetings.attendees');
+            Route::put('/meetings/{meeting}/complete', [WorkerParticipationController::class, 'completeMeeting'])->name('meetings.complete');
+            Route::put('/meetings/{meeting}/cancel', [WorkerParticipationController::class, 'cancelMeeting'])->name('meetings.cancel');
+            Route::post('/meetings/{meeting}/minutes', [WorkerParticipationController::class, 'uploadMeetingMinutes'])->name('meetings.minutes.upload');
+            Route::get('/meetings/{meeting}/minutes/download', [WorkerParticipationController::class, 'downloadMeetingMinutes'])->name('meetings.minutes.download');
         });
     });
 

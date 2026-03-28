@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\HealthSafety;
 
+use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Http\Controllers\Controller;
 use App\Models\HsCommittee;
 use App\Models\HsCommitteeMeeting;
@@ -11,7 +12,9 @@ use App\Models\Site;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class WorkerParticipationController extends Controller
 {
@@ -159,10 +162,29 @@ class WorkerParticipationController extends Controller
             'attendees.*' => ['exists:users,id'],
         ]);
 
-        $committee->meetings()->create(array_merge($validated, [
+        $meeting = $committee->meetings()->create(array_merge($validated, [
             'status' => 'scheduled',
             'created_by' => $request->user()->id,
         ]));
+
+        // Create calendar events for attendees
+        $attendeeIds = $validated['attendees'] ?? $committee->members ?? [];
+        if (is_array($attendeeIds)) {
+            $scheduledAt = \Carbon\Carbon::parse($validated['scheduled_at']);
+            foreach ($attendeeIds as $userId) {
+                HrCalendarEvent::create([
+                    'tenant_id' => null,
+                    'title' => 'H&S Committee Meeting: ' . $committee->name,
+                    'description' => 'Committee meeting at ' . ($validated['location'] ?? 'TBC'),
+                    'event_type' => 'hs_meeting',
+                    'starts_at' => $scheduledAt,
+                    'ends_at' => $scheduledAt->copy()->addHour(),
+                    'is_all_day' => false,
+                    'location' => $validated['location'] ?? null,
+                    'created_by' => $userId,
+                ]);
+            }
+        }
 
         return redirect()->back()->with('success', 'Meeting scheduled successfully.');
     }
@@ -222,5 +244,189 @@ class WorkerParticipationController extends Controller
         $consultation->update($validated);
 
         return redirect()->back()->with('success', 'Consultation updated successfully.');
+    }
+
+    /* ================================================================== */
+    /*  Consultation Workflow                                              */
+    /* ================================================================== */
+
+    /**
+     * Update a consultation's status with optional feedback/outcome fields.
+     */
+    public function updateConsultationStatus(Request $request, HsConsultation $consultation): RedirectResponse
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'string', 'in:open,feedback_received,actioned,closed'],
+            'worker_feedback_summary' => ['nullable', 'string', 'max:5000'],
+            'outcome' => ['nullable', 'string', 'max:5000'],
+            'changes_made' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $consultation->update($validated);
+
+        return redirect()->back()->with('success', 'Consultation status updated successfully.');
+    }
+
+    /**
+     * Upload a document to a consultation (supporting document or outcome document).
+     */
+    public function uploadConsultationDocument(Request $request, HsConsultation $consultation): RedirectResponse
+    {
+        $request->validate([
+            'document' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xlsx,jpg,png'],
+            'type' => ['required', 'string', 'in:document,outcome'],
+        ]);
+
+        $file = $request->file('document');
+        $storagePath = "health-safety/consultations/{$consultation->id}";
+        $path = $file->store($storagePath, 'private');
+
+        if ($request->input('type') === 'document') {
+            $consultation->update([
+                'document_path' => $path,
+                'document_name' => $file->getClientOriginalName(),
+            ]);
+        } else {
+            $consultation->update([
+                'outcome_document_path' => $path,
+                'outcome_document_name' => $file->getClientOriginalName(),
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Document uploaded successfully.');
+    }
+
+    /**
+     * Download a consultation document.
+     */
+    public function downloadConsultationDocument(HsConsultation $consultation, string $type): StreamedResponse
+    {
+        if ($type === 'document') {
+            $path = $consultation->document_path;
+            $name = $consultation->document_name ?? basename($path);
+        } else {
+            $path = $consultation->outcome_document_path;
+            $name = $consultation->outcome_document_name ?? basename($path);
+        }
+
+        abort_unless($path && Storage::disk('private')->exists($path), 404, 'Document not found.');
+
+        return Storage::disk('private')->download($path, $name);
+    }
+
+    /* ================================================================== */
+    /*  Meeting Workflow                                                   */
+    /* ================================================================== */
+
+    /**
+     * Add attendees to a meeting and create calendar events for new ones.
+     */
+    public function addMeetingAttendees(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
+    {
+        $validated = $request->validate([
+            'user_ids' => ['required', 'array', 'min:1'],
+            'user_ids.*' => ['exists:users,id'],
+        ]);
+
+        $existingAttendees = $meeting->attendees ?? [];
+        $newUserIds = array_diff($validated['user_ids'], $existingAttendees);
+
+        $meeting->update([
+            'attendees' => array_values(array_unique(array_merge($existingAttendees, $validated['user_ids']))),
+        ]);
+
+        // Create calendar events for newly added attendees
+        $committee = $meeting->committee;
+        foreach ($newUserIds as $userId) {
+            HrCalendarEvent::create([
+                'tenant_id' => null,
+                'title' => 'H&S Committee Meeting: ' . ($committee->name ?? 'Meeting'),
+                'description' => 'Committee meeting at ' . ($meeting->location ?? 'TBC'),
+                'event_type' => 'hs_meeting',
+                'starts_at' => $meeting->scheduled_at,
+                'ends_at' => $meeting->scheduled_at->copy()->addHour(),
+                'is_all_day' => false,
+                'location' => $meeting->location,
+                'created_by' => $userId,
+            ]);
+        }
+
+        return redirect()->back()->with('success', 'Attendees added successfully.');
+    }
+
+    /**
+     * Complete a meeting with minutes, action items, and confirmed attendees.
+     */
+    public function completeMeeting(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
+    {
+        $validated = $request->validate([
+            'minutes' => ['nullable', 'string', 'max:10000'],
+            'action_items' => ['nullable', 'array'],
+            'action_items.*.description' => ['required_with:action_items', 'string', 'max:500'],
+            'action_items.*.assigned_to' => ['required_with:action_items', 'exists:users,id'],
+            'action_items.*.due_date' => ['required_with:action_items', 'date'],
+            'confirmed_attendees' => ['nullable', 'array'],
+            'confirmed_attendees.*' => ['exists:users,id'],
+        ]);
+
+        $meeting->update(array_merge($validated, [
+            'status' => 'completed',
+            'ended_at' => now(),
+        ]));
+
+        return redirect()->back()->with('success', 'Meeting completed successfully.');
+    }
+
+    /**
+     * Cancel a meeting and remove associated calendar events.
+     */
+    public function cancelMeeting(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
+    {
+        $meeting->update(['status' => 'cancelled']);
+
+        // Delete associated calendar events
+        $committee = $meeting->committee;
+        if ($committee && $meeting->scheduled_at) {
+            HrCalendarEvent::where('event_type', 'hs_meeting')
+                ->where('starts_at', $meeting->scheduled_at)
+                ->where('title', 'like', '%' . $committee->name . '%')
+                ->delete();
+        }
+
+        return redirect()->back()->with('success', 'Meeting cancelled successfully.');
+    }
+
+    /**
+     * Upload meeting minutes document.
+     */
+    public function uploadMeetingMinutes(Request $request, HsCommitteeMeeting $meeting): RedirectResponse
+    {
+        $request->validate([
+            'document' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx'],
+        ]);
+
+        $file = $request->file('document');
+        $storagePath = "health-safety/meetings/{$meeting->id}";
+        $path = $file->store($storagePath, 'private');
+
+        $meeting->update([
+            'minutes_document_path' => $path,
+            'minutes_document_name' => $file->getClientOriginalName(),
+        ]);
+
+        return redirect()->back()->with('success', 'Meeting minutes uploaded successfully.');
+    }
+
+    /**
+     * Download meeting minutes document.
+     */
+    public function downloadMeetingMinutes(HsCommitteeMeeting $meeting): StreamedResponse
+    {
+        $path = $meeting->minutes_document_path;
+        $name = $meeting->minutes_document_name ?? basename($path ?? '');
+
+        abort_unless($path && Storage::disk('private')->exists($path), 404, 'Minutes document not found.');
+
+        return Storage::disk('private')->download($path, $name);
     }
 }
