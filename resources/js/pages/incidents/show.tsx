@@ -22,6 +22,28 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { useMemo, useState } from 'react';
+import {
+    AlertTriangle,
+    ShieldAlert,
+    Clock,
+    User,
+    MapPin,
+    FileText,
+    CheckCircle2,
+    XCircle,
+    ChevronDown,
+    ChevronUp,
+    Plus,
+    Paperclip,
+    Activity,
+    Search,
+    Download,
+    Trash2,
+    Eye,
+    Send,
+    Lock,
+    RotateCcw,
+} from 'lucide-react';
 
 type Props = {
     incident: any;
@@ -81,6 +103,30 @@ const ROOT_CAUSE_CATEGORIES = [
     'Other',
 ];
 
+const WORKFLOW_STEPS = [
+    { key: 'draft', label: 'Draft', icon: FileText },
+    { key: 'submitted', label: 'Submitted', icon: Send },
+    { key: 'reviewed', label: 'Reviewed', icon: CheckCircle2 },
+    { key: 'closed', label: 'Closed', icon: Lock },
+];
+
+function severityColor(severity: string) {
+    switch (severity) {
+        case 'high': return { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-300', badge: 'destructive' as const, bar: 'bg-red-500' };
+        case 'medium': return { bg: 'bg-amber-100', text: 'text-amber-700', border: 'border-amber-300', badge: 'secondary' as const, bar: 'bg-amber-500' };
+        default: return { bg: 'bg-emerald-100', text: 'text-emerald-700', border: 'border-emerald-300', badge: 'outline' as const, bar: 'bg-emerald-500' };
+    }
+}
+
+function statusBadgeVariant(status: string) {
+    switch (status) {
+        case 'closed': return 'default' as const;
+        case 'reviewed': return 'secondary' as const;
+        case 'submitted': return 'outline' as const;
+        default: return 'outline' as const;
+    }
+}
+
 function FollowupCreator({
     incidentId,
     staff,
@@ -97,10 +143,14 @@ function FollowupCreator({
     const [submitting, setSubmitting] = useState(false);
 
     return (
-        <div className="rounded-md border p-3">
+        <div className="rounded-lg border-2 border-dashed border-muted-foreground/20 p-4 bg-muted/20">
+            <div className="flex items-center gap-2 mb-3">
+                <Plus className="h-4 w-4 text-muted-foreground" />
+                <span className="text-sm font-medium">Add new follow-up</span>
+            </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                <div className="space-y-1">
-                    <Label>Assign to</Label>
+                <div className="space-y-1.5">
+                    <Label className="text-xs">Assign to</Label>
                     <Select
                         value={form.data.assigned_to_user_id}
                         onValueChange={(v) =>
@@ -111,7 +161,6 @@ function FollowupCreator({
                             <SelectValue placeholder="Select staff" />
                         </SelectTrigger>
                         <SelectContent>
-                            {/* Radix Select disallows empty-string values */}
                             <SelectItem value="__unassigned__">
                                 Unassigned
                             </SelectItem>
@@ -124,8 +173,8 @@ function FollowupCreator({
                     </Select>
                 </div>
 
-                <div className="space-y-1">
-                    <Label>Due</Label>
+                <div className="space-y-1.5">
+                    <Label className="text-xs">Due</Label>
                     <Input
                         type="datetime-local"
                         value={form.data.due_at}
@@ -160,16 +209,19 @@ function FollowupCreator({
                             );
                         }}
                     >
+                        <Plus className="mr-1.5 h-4 w-4" />
                         Add follow-up
                     </Button>
                 </div>
             </div>
 
-            <div className="mt-3 space-y-1">
-                <Label>Notes</Label>
+            <div className="mt-3 space-y-1.5">
+                <Label className="text-xs">Notes</Label>
                 <Textarea
                     value={form.data.notes}
                     onChange={(e) => form.setData('notes', e.target.value)}
+                    placeholder="Optional follow-up notes..."
+                    rows={2}
                 />
             </div>
         </div>
@@ -202,40 +254,54 @@ function FollowupList({
         return 'Open';
     };
 
+    const statusStyle = (status: string) => {
+        switch (status) {
+            case 'Completed': return { dot: 'bg-emerald-500', bg: 'bg-emerald-50 border-emerald-200', text: 'text-emerald-700' };
+            case 'Overdue': return { dot: 'bg-red-500', bg: 'bg-red-50 border-red-200', text: 'text-red-700' };
+            default: return { dot: 'bg-blue-500', bg: 'bg-blue-50 border-blue-200', text: 'text-blue-700' };
+        }
+    };
+
     return (
-        <div className="space-y-2">
+        <div className="space-y-3">
             {followups.map((f) => {
                 const status = statusFor(f);
+                const style = statusStyle(status);
                 const canCompleteThis =
                     !f.completed_at &&
                     (canManage ||
                         (canComplete && f.assigned_to_user_id === userId));
 
                 return (
-                    <div key={f.id} className="rounded-md border p-3">
+                    <div key={f.id} className={`rounded-lg border p-4 ${style.bg}`}>
                         <div className="flex flex-wrap items-start justify-between gap-2">
                             <div className="min-w-0">
-                                <div className="text-sm font-medium">
-                                    {status}
+                                <div className="flex items-center gap-2">
+                                    <span className={`h-2 w-2 rounded-full ${style.dot}`} />
+                                    <span className={`text-sm font-semibold ${style.text}`}>{status}</span>
                                     {f.assigned_to?.name ? (
-                                        <span className="text-slate-500">
-                                            {' '}
-                                            • Assigned to {f.assigned_to.name}
+                                        <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                            <User className="h-3 w-3" />
+                                            {f.assigned_to.name}
                                         </span>
                                     ) : (
-                                        <span className="text-slate-500">
-                                            {' '}
-                                            • Unassigned
-                                        </span>
+                                        <span className="text-xs text-muted-foreground">Unassigned</span>
                                     )}
                                 </div>
-                                <div className="mt-1 text-xs text-slate-500">
-                                    {f.due_at
-                                        ? `Due: ${new Date(f.due_at).toLocaleString()}`
-                                        : 'No due date'}
-                                    {f.completed_at
-                                        ? ` • Completed: ${new Date(f.completed_at).toLocaleString()}`
-                                        : ''}
+                                <div className="mt-1.5 flex items-center gap-3 text-xs text-muted-foreground">
+                                    {f.due_at && (
+                                        <span className="flex items-center gap-1">
+                                            <Clock className="h-3 w-3" />
+                                            Due: {new Date(f.due_at).toLocaleString()}
+                                        </span>
+                                    )}
+                                    {!f.due_at && <span>No due date</span>}
+                                    {f.completed_at && (
+                                        <span className="flex items-center gap-1">
+                                            <CheckCircle2 className="h-3 w-3" />
+                                            Completed: {new Date(f.completed_at).toLocaleString()}
+                                        </span>
+                                    )}
                                 </div>
                             </div>
 
@@ -259,26 +325,26 @@ function FollowupList({
                                         );
                                     }}
                                 >
+                                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
                                     Mark complete
                                 </Button>
                             ) : null}
                         </div>
 
                         {f.notes ? (
-                            <div className="mt-2 text-sm whitespace-pre-wrap">
+                            <div className="mt-3 rounded-md bg-white/60 p-2.5 text-sm whitespace-pre-wrap border">
                                 {f.notes}
                             </div>
-                        ) : (
-                            <div className="mt-2 text-sm text-slate-500">
-                                No notes.
-                            </div>
-                        )}
+                        ) : null}
                     </div>
                 );
             })}
 
             {!followups.length ? (
-                <div className="text-sm text-slate-500">No follow-ups yet.</div>
+                <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                    <CheckCircle2 className="h-8 w-8 mb-2 opacity-30" />
+                    <p className="text-sm">No follow-ups yet.</p>
+                </div>
             ) : null}
         </div>
     );
@@ -363,6 +429,7 @@ export default function IncidentShow({
 
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [investigationOpen, setInvestigationOpen] = useState(true);
 
     const normalizedStaff = useMemo(() => (staff || []) as any, [staff]);
 
@@ -395,6 +462,9 @@ export default function IncidentShow({
     );
 
     const isNearMiss = incident.type === 'near_miss';
+    const sev = severityColor(incident.severity);
+
+    const currentStepIndex = WORKFLOW_STEPS.findIndex((s) => s.key === incident.status);
 
     return (
         <AppLayout
@@ -408,117 +478,186 @@ export default function IncidentShow({
         >
             <Head title={`Incident #${incident.id}`} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Incident #{incident.id}
-                        </h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            <Link
-                                className="underline"
-                                href={`/clients/${incident.client_id}`}
-                            >
-                                {clientName}
-                            </Link>
-                            <span className="mx-2">•</span>
-                            {incident.type === 'near_miss' ? 'Near miss' : incident.type} • {incident.severity} •{' '}
-                            {incident.status}
-                            {incident.shift_id ? (
-                                <span className="ml-2">• Shift-linked</span>
-                            ) : (
-                                <span className="ml-2">• Standalone</span>
-                            )}
-                            {incident.is_notifiable && (
-                                <Badge variant="destructive" className="ml-2">WorkSafe notifiable</Badge>
-                            )}
-                        </div>
-                        {!is_editable && !can.review ? (
-                            <div className="mt-1 text-xs text-slate-500">
-                                This incident is read-only for the reporter.
+            <div className="mx-auto max-w-5xl space-y-6 pb-8">
+                {/* Header card with severity bar */}
+                <Card className="overflow-hidden">
+                    <div className={`h-1.5 ${sev.bar}`} />
+                    <CardContent className="pt-5 pb-5">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div className="flex items-start gap-4">
+                                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${sev.bg} ${sev.text}`}>
+                                    <AlertTriangle className="h-6 w-6" />
+                                </div>
+                                <div>
+                                    <div className="flex items-center gap-2 flex-wrap">
+                                        <h1 className="text-xl font-bold tracking-tight">
+                                            Incident #{incident.id}
+                                        </h1>
+                                        <Badge variant={statusBadgeVariant(incident.status)} className="capitalize">
+                                            {incident.status}
+                                        </Badge>
+                                        <Badge variant={sev.badge} className="capitalize">
+                                            {incident.severity}
+                                        </Badge>
+                                        {incident.is_notifiable && (
+                                            <Badge variant="destructive" className="gap-1">
+                                                <ShieldAlert className="h-3 w-3" />
+                                                WorkSafe notifiable
+                                            </Badge>
+                                        )}
+                                    </div>
+                                    <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                                        <Link
+                                            className="font-medium text-primary hover:underline"
+                                            href={`/clients/${incident.client_id}`}
+                                        >
+                                            {clientName}
+                                        </Link>
+                                        <span className="flex items-center gap-1">
+                                            <Activity className="h-3.5 w-3.5" />
+                                            {incident.type === 'near_miss' ? 'Near miss' : incident.type}
+                                        </span>
+                                        {incident.occurred_at && (
+                                            <span className="flex items-center gap-1">
+                                                <Clock className="h-3.5 w-3.5" />
+                                                {new Date(incident.occurred_at).toLocaleString()}
+                                            </span>
+                                        )}
+                                        <span className="flex items-center gap-1">
+                                            {incident.shift_id ? 'Shift-linked' : 'Standalone'}
+                                        </span>
+                                    </div>
+                                    {!is_editable && !can.review ? (
+                                        <div className="mt-1.5 text-xs text-muted-foreground bg-muted rounded px-2 py-1 inline-block">
+                                            This incident is read-only for the reporter.
+                                        </div>
+                                    ) : null}
+                                </div>
                             </div>
-                        ) : null}
-                    </div>
 
-                    <div className="flex flex-wrap items-center gap-2">
-                        {can.templatesManage && (
-                            <Link
-                                href="/incidents/templates"
-                                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                            >
-                                Templates
-                            </Link>
-                        )}
+                            <div className="flex flex-wrap items-center gap-2">
+                                {can.templatesManage && (
+                                    <Link
+                                        href="/incidents/templates"
+                                        className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted transition-colors"
+                                    >
+                                        Templates
+                                    </Link>
+                                )}
 
-                        <Link
-                            href={`/clients/${incident.client_id}/incidents`}
-                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                        >
-                            Client incidents
-                        </Link>
+                                <Link
+                                    href={`/clients/${incident.client_id}/incidents`}
+                                    className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted transition-colors"
+                                >
+                                    Client incidents
+                                </Link>
 
-                        {can.submit && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                    router.post(
-                                        `/incidents/${incident.id}/submit`,
-                                    )
-                                }
-                            >
-                                Submit
-                            </Button>
-                        )}
+                                {can.submit && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            router.post(
+                                                `/incidents/${incident.id}/submit`,
+                                            )
+                                        }
+                                    >
+                                        <Send className="mr-1.5 h-3.5 w-3.5" />
+                                        Submit
+                                    </Button>
+                                )}
 
-                        {can.review && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() =>
-                                    router.post(
-                                        `/incidents/${incident.id}/review`,
-                                        {
-                                            review_notes:
-                                                form.data.review_notes,
-                                        },
-                                    )
-                                }
-                            >
-                                Mark reviewed
-                            </Button>
-                        )}
+                                {can.review && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() =>
+                                            router.post(
+                                                `/incidents/${incident.id}/review`,
+                                                {
+                                                    review_notes:
+                                                        form.data.review_notes,
+                                                },
+                                            )
+                                        }
+                                    >
+                                        <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                        Mark reviewed
+                                    </Button>
+                                )}
 
-                        {can.close && incident.status === 'reviewed' && (
-                            <Button
-                                size="sm"
-                                onClick={() => setCloseOpen(true)}
-                            >
-                                Close incident
-                            </Button>
-                        )}
+                                {can.close && incident.status === 'reviewed' && (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCloseOpen(true)}
+                                    >
+                                        <Lock className="mr-1.5 h-3.5 w-3.5" />
+                                        Close incident
+                                    </Button>
+                                )}
 
-                        {can.reopen && incident.status === 'closed' && (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => setReopenOpen(true)}
-                            >
-                                Reopen incident
-                            </Button>
-                        )}
-                    </div>
-                </div>
+                                {can.reopen && incident.status === 'closed' && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => setReopenOpen(true)}
+                                    >
+                                        <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+                                        Reopen incident
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Details</CardTitle>
+                        {/* Status timeline */}
+                        <div className="mt-6 pt-4 border-t">
+                            <div className="flex items-center justify-between">
+                                {WORKFLOW_STEPS.map((step, index) => {
+                                    const Icon = step.icon;
+                                    const isActive = step.key === incident.status;
+                                    const isPast = index < currentStepIndex;
+                                    const isFuture = index > currentStepIndex;
+
+                                    return (
+                                        <div key={step.key} className="flex items-center flex-1 last:flex-none">
+                                            <div className="flex flex-col items-center gap-1.5">
+                                                <div className={`flex h-9 w-9 items-center justify-center rounded-full border-2 transition-colors ${
+                                                    isActive
+                                                        ? `${sev.bar} border-transparent text-white`
+                                                        : isPast
+                                                            ? 'border-emerald-500 bg-emerald-50 text-emerald-600'
+                                                            : 'border-muted bg-muted/50 text-muted-foreground'
+                                                }`}>
+                                                    {isPast ? <CheckCircle2 className="h-4 w-4" /> : <Icon className="h-4 w-4" />}
+                                                </div>
+                                                <span className={`text-xs font-medium ${isActive ? 'text-foreground' : isFuture ? 'text-muted-foreground' : 'text-muted-foreground'}`}>
+                                                    {step.label}
+                                                </span>
+                                            </div>
+                                            {index < WORKFLOW_STEPS.length - 1 && (
+                                                <div className={`mx-2 h-0.5 flex-1 rounded ${isPast ? 'bg-emerald-400' : 'bg-muted'}`} />
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Details card */}
+                <Card className="overflow-hidden">
+                    <CardHeader className="border-b bg-muted/30 pb-4">
+                        <div className="flex items-center gap-2">
+                            <FileText className="h-4 w-4 text-muted-foreground" />
+                            <CardTitle className="text-base">Incident details</CardTitle>
+                        </div>
                     </CardHeader>
 
-                    <CardContent className="space-y-3">
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                            <div className="space-y-1">
-                                <Label>Type</Label>
+                    <CardContent className="pt-5 space-y-4">
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Type</Label>
                                 <Input
                                     value={form.data.type}
                                     onChange={(e) =>
@@ -528,8 +667,8 @@ export default function IncidentShow({
                                 />
                             </div>
 
-                            <div className="space-y-1">
-                                <Label>Severity</Label>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Severity</Label>
                                 <Select
                                     value={form.data.severity}
                                     onValueChange={(v) =>
@@ -550,8 +689,8 @@ export default function IncidentShow({
                                 </Select>
                             </div>
 
-                            <div className="space-y-1">
-                                <Label>Occurred at</Label>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Occurred at</Label>
                                 <Input
                                     type="datetime-local"
                                     value={form.data.occurred_at}
@@ -566,7 +705,7 @@ export default function IncidentShow({
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
                             <Checkbox
                                 checked={!!form.data.requires_followup}
                                 onCheckedChange={(v) =>
@@ -577,59 +716,69 @@ export default function IncidentShow({
                             <Label>Requires follow-up</Label>
                         </div>
 
-                        <div className="space-y-1">
-                            <Label>Description</Label>
+                        <div className="space-y-1.5">
+                            <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Description</Label>
                             <Textarea
                                 value={form.data.description}
                                 onChange={(e) =>
                                     form.setData('description', e.target.value)
                                 }
                                 disabled={!allowCoreEdit}
+                                rows={4}
                             />
                         </div>
 
-                        <div className="space-y-1">
-                            <Label>Immediate action taken</Label>
-                            <Textarea
-                                value={form.data.immediate_action_taken}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'immediate_action_taken',
-                                        e.target.value,
-                                    )
-                                }
-                                disabled={!allowCoreEdit}
-                            />
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Immediate action taken</Label>
+                                <Textarea
+                                    value={form.data.immediate_action_taken}
+                                    onChange={(e) =>
+                                        form.setData(
+                                            'immediate_action_taken',
+                                            e.target.value,
+                                        )
+                                    }
+                                    disabled={!allowCoreEdit}
+                                    rows={3}
+                                />
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Witnesses</Label>
+                                <Textarea
+                                    value={form.data.witnesses}
+                                    onChange={(e) =>
+                                        form.setData('witnesses', e.target.value)
+                                    }
+                                    disabled={!allowCoreEdit}
+                                    rows={3}
+                                />
+                            </div>
                         </div>
 
-                        <div className="space-y-1">
-                            <Label>Witnesses</Label>
-                            <Textarea
-                                value={form.data.witnesses}
-                                onChange={(e) =>
-                                    form.setData('witnesses', e.target.value)
-                                }
-                                disabled={!allowCoreEdit}
-                            />
-                        </div>
-
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                checked={!!form.data.is_notifiable}
-                                onCheckedChange={(v) =>
-                                    form.setData('is_notifiable', !!v)
-                                }
-                                disabled={!allowCoreEdit && !allowManagerFields}
-                            />
-                            <div>
-                                <Label>Notifiable event</Label>
-                                <div className="text-xs text-slate-500">This incident must be reported to WorkSafe NZ</div>
+                        <div className={`flex items-start gap-4 rounded-lg border p-4 ${form.data.is_notifiable ? 'border-red-200 bg-red-50' : 'bg-muted/30'}`}>
+                            <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${form.data.is_notifiable ? 'bg-red-100 text-red-600' : 'bg-muted text-muted-foreground'}`}>
+                                <ShieldAlert className="h-4 w-4" />
+                            </div>
+                            <div className="flex items-center gap-3 flex-1">
+                                <Checkbox
+                                    checked={!!form.data.is_notifiable}
+                                    onCheckedChange={(v) =>
+                                        form.setData('is_notifiable', !!v)
+                                    }
+                                    disabled={!allowCoreEdit && !allowManagerFields}
+                                />
+                                <div>
+                                    <Label className="font-medium">Notifiable event</Label>
+                                    <div className="text-xs text-muted-foreground">This incident must be reported to WorkSafe NZ</div>
+                                </div>
                             </div>
                         </div>
 
                         {can.review && (
-                            <div className="space-y-1">
-                                <Label>Review notes</Label>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Review notes</Label>
                                 <Textarea
                                     value={form.data.review_notes}
                                     onChange={(e) =>
@@ -638,26 +787,28 @@ export default function IncidentShow({
                                             e.target.value,
                                         )
                                     }
+                                    rows={3}
                                 />
                             </div>
                         )}
 
                         {can.portalManage && (
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-3 rounded-lg border bg-muted/30 p-3">
                                 <Checkbox
                                     checked={!!form.data.portal_visible}
                                     onCheckedChange={(v) =>
                                         form.setData('portal_visible', !!v)
                                     }
                                 />
-                                <Label>
-                                    Visible in portal (only shows once reviewed)
-                                </Label>
+                                <div>
+                                    <Label>Visible in portal</Label>
+                                    <div className="text-xs text-muted-foreground">Only shows once reviewed</div>
+                                </div>
                             </div>
                         )}
 
                         {(allowCoreEdit || allowManagerFields) && (
-                            <div className="flex items-center justify-end">
+                            <div className="flex items-center justify-end border-t pt-4">
                                 <Button
                                     disabled={saving}
                                     onClick={() => {
@@ -672,7 +823,7 @@ export default function IncidentShow({
                                         );
                                     }}
                                 >
-                                    Save
+                                    {saving ? 'Saving...' : 'Save changes'}
                                 </Button>
                             </div>
                         )}
@@ -681,14 +832,17 @@ export default function IncidentShow({
 
                 {/* Near-miss details */}
                 {isNearMiss && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Near-miss details</CardTitle>
+                    <Card className="overflow-hidden border-amber-200">
+                        <CardHeader className="border-b border-amber-200 bg-amber-50 pb-4">
+                            <div className="flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4 text-amber-600" />
+                                <CardTitle className="text-base text-amber-900">Near-miss details</CardTitle>
+                            </div>
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div className="space-y-1">
-                                    <Label>Potential severity</Label>
+                        <CardContent className="bg-amber-50/20 pt-5 space-y-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Potential severity</Label>
                                     <Select
                                         value={form.data.potential_severity || '__none__'}
                                         onValueChange={(v) => form.setData('potential_severity', v === '__none__' ? '' : v)}
@@ -704,17 +858,18 @@ export default function IncidentShow({
                                     </Select>
                                 </div>
                             </div>
-                            <div className="space-y-1">
-                                <Label>Potential consequence</Label>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Potential consequence</Label>
                                 <Textarea
                                     value={form.data.potential_consequence}
                                     onChange={(e) => form.setData('potential_consequence', e.target.value)}
                                     disabled={!allowCoreEdit}
+                                    rows={3}
                                 />
                             </div>
 
                             {allowCoreEdit && (
-                                <div className="flex items-center justify-end">
+                                <div className="flex items-center justify-end border-t border-amber-200 pt-4">
                                     <Button
                                         disabled={saving}
                                         onClick={() => {
@@ -722,7 +877,7 @@ export default function IncidentShow({
                                             router.put(`/incidents/${incident.id}`, form.data, { onFinish: () => setSaving(false) });
                                         }}
                                     >
-                                        Save
+                                        {saving ? 'Saving...' : 'Save changes'}
                                     </Button>
                                 </div>
                             )}
@@ -732,22 +887,25 @@ export default function IncidentShow({
 
                 {/* Injury details */}
                 {(hasInjuryDetails || allowCoreEdit) && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Injury details</CardTitle>
+                    <Card className="overflow-hidden">
+                        <CardHeader className="border-b bg-muted/30 pb-4">
+                            <div className="flex items-center gap-2">
+                                <Activity className="h-4 w-4 text-muted-foreground" />
+                                <CardTitle className="text-base">Injury details</CardTitle>
+                            </div>
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                <div className="space-y-1">
-                                    <Label>Injured person name</Label>
+                        <CardContent className="pt-5 space-y-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Injured person name</Label>
                                     <Input
                                         value={form.data.injured_person_name}
                                         onChange={(e) => form.setData('injured_person_name', e.target.value)}
                                         disabled={!allowCoreEdit}
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label>Role</Label>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Role</Label>
                                     <Select
                                         value={form.data.injured_person_role || '__none__'}
                                         onValueChange={(v) => form.setData('injured_person_role', v === '__none__' ? '' : v)}
@@ -767,8 +925,8 @@ export default function IncidentShow({
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label>Age</Label>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Age</Label>
                                     <Input
                                         type="number"
                                         value={form.data.injured_person_age}
@@ -777,17 +935,17 @@ export default function IncidentShow({
                                     />
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div className="space-y-1">
-                                    <Label>Body part</Label>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Body part</Label>
                                     <Input
                                         value={form.data.injury_body_part}
                                         onChange={(e) => form.setData('injury_body_part', e.target.value)}
                                         disabled={!allowCoreEdit}
                                     />
                                 </div>
-                                <div className="space-y-1">
-                                    <Label>Nature of injury</Label>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Nature of injury</Label>
                                     <Select
                                         value={form.data.injury_nature || '__none__'}
                                         onValueChange={(v) => form.setData('injury_nature', v === '__none__' ? '' : v)}
@@ -803,9 +961,9 @@ export default function IncidentShow({
                                     </Select>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div className="space-y-1">
-                                    <Label>Injury classification</Label>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Injury classification</Label>
                                     <Select
                                         value={form.data.injury_classification || '__none__'}
                                         onValueChange={(v) => form.setData('injury_classification', v === '__none__' ? '' : v)}
@@ -825,8 +983,8 @@ export default function IncidentShow({
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label>Medical treatment</Label>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Medical treatment</Label>
                                     <Select
                                         value={form.data.medical_treatment_type || '__none__'}
                                         onValueChange={(v) => form.setData('medical_treatment_type', v === '__none__' ? '' : v)}
@@ -850,7 +1008,7 @@ export default function IncidentShow({
                             </div>
 
                             {allowCoreEdit && (
-                                <div className="flex items-center justify-end">
+                                <div className="flex items-center justify-end border-t pt-4">
                                     <Button
                                         disabled={saving}
                                         onClick={() => {
@@ -858,7 +1016,7 @@ export default function IncidentShow({
                                             router.put(`/incidents/${incident.id}`, form.data, { onFinish: () => setSaving(false) });
                                         }}
                                     >
-                                        Save
+                                        {saving ? 'Saving...' : 'Save changes'}
                                     </Button>
                                 </div>
                             )}
@@ -868,15 +1026,19 @@ export default function IncidentShow({
 
                 {/* WorkSafe notification */}
                 {incident.is_notifiable && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">WorkSafe NZ notification</CardTitle>
+                    <Card className="overflow-hidden border-red-200">
+                        <div className="h-1.5 bg-red-500" />
+                        <CardHeader className="border-b border-red-100 bg-red-50 pb-4">
+                            <div className="flex items-center gap-2">
+                                <ShieldAlert className="h-4 w-4 text-red-600" />
+                                <CardTitle className="text-base text-red-900">WorkSafe NZ notification</CardTitle>
+                            </div>
                         </CardHeader>
-                        <CardContent className="space-y-3">
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                <div className="space-y-1">
-                                    <Label>Notification status</Label>
-                                    <div className="text-sm">
+                        <CardContent className="bg-red-50/30 pt-5 space-y-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notification status</Label>
+                                    <div>
                                         <Badge variant={
                                             incident.worksafe_notification_status === 'acknowledged' ? 'default' :
                                             incident.worksafe_notification_status === 'notified' ? 'secondary' :
@@ -887,12 +1049,12 @@ export default function IncidentShow({
                                         </Badge>
                                     </div>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label>WorkSafe reference</Label>
-                                    <div className="text-sm">{incident.worksafe_reference || '-'}</div>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">WorkSafe reference</Label>
+                                    <div className="text-sm font-mono">{incident.worksafe_reference || '-'}</div>
                                 </div>
-                                <div className="space-y-1">
-                                    <Label>Notified at</Label>
+                                <div className="space-y-1.5">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Notified at</Label>
                                     <div className="text-sm">
                                         {incident.worksafe_notified_at
                                             ? new Date(incident.worksafe_notified_at).toLocaleString()
@@ -900,14 +1062,14 @@ export default function IncidentShow({
                                     </div>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div className="space-y-1">
-                                    <Label>Site preserved</Label>
-                                    <div className="text-sm">{incident.site_preserved ? 'Yes' : 'No'}</div>
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                <div className="rounded-lg border border-red-200 bg-white p-3 space-y-1">
+                                    <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Site preserved</Label>
+                                    <div className="text-sm font-medium">{incident.site_preserved ? 'Yes' : 'No'}</div>
                                 </div>
                                 {incident.site_preservation_released_at && (
-                                    <div className="space-y-1">
-                                        <Label>Preservation released</Label>
+                                    <div className="rounded-lg border border-red-200 bg-white p-3 space-y-1">
+                                        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Preservation released</Label>
                                         <div className="text-sm">
                                             {new Date(incident.site_preservation_released_at).toLocaleString()}
                                             {incident.site_preservation_released_by && ` by ${incident.site_preservation_released_by}`}
@@ -920,194 +1082,248 @@ export default function IncidentShow({
                 )}
 
                 {/* Investigation */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">
-                            Investigation
-                            {incident.investigation_status && (
-                                <Badge
-                                    variant={investigationStatusVariant(incident.investigation_status)}
-                                    className="ml-2"
-                                >
-                                    {INVESTIGATION_STATUSES.find((s) => s.value === incident.investigation_status)?.label || incident.investigation_status}
-                                </Badge>
-                            )}
-                        </CardTitle>
+                <Card className="overflow-hidden">
+                    <CardHeader
+                        className="border-b bg-muted/30 pb-4 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => setInvestigationOpen(!investigationOpen)}
+                    >
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <Search className="h-4 w-4 text-muted-foreground" />
+                                <CardTitle className="text-base">
+                                    Investigation
+                                </CardTitle>
+                                {incident.investigation_status && (
+                                    <Badge
+                                        variant={investigationStatusVariant(incident.investigation_status) as any}
+                                    >
+                                        {INVESTIGATION_STATUSES.find((s) => s.value === incident.investigation_status)?.label || incident.investigation_status}
+                                    </Badge>
+                                )}
+                            </div>
+                            <div className="text-muted-foreground">
+                                {investigationOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                            </div>
+                        </div>
                     </CardHeader>
-                    <CardContent className="space-y-3">
-                        {(can.update) && (
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <div className="space-y-1">
-                                    <Label>Investigation status</Label>
+                    {investigationOpen && (
+                        <CardContent className="pt-5 space-y-5">
+                            {(can.update) && (
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Investigation status</Label>
+                                        <Select
+                                            value={form.data.investigation_status || '__none__'}
+                                            onValueChange={(v) => form.setData('investigation_status', v === '__none__' ? '' : v)}
+                                        >
+                                            <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">Select...</SelectItem>
+                                                {INVESTIGATION_STATUSES.map((s) => (
+                                                    <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Assigned to</Label>
+                                        <Select
+                                            value={form.data.investigation_assigned_to || '__none__'}
+                                            onValueChange={(v) => form.setData('investigation_assigned_to', v === '__none__' ? '' : v)}
+                                        >
+                                            <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="__none__">Unassigned</SelectItem>
+                                                {normalizedStaff.map((u: StaffUser) => (
+                                                    <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </div>
+                            )}
+
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Root cause category</Label>
+                                {can.update ? (
                                     <Select
-                                        value={form.data.investigation_status || '__none__'}
-                                        onValueChange={(v) => form.setData('investigation_status', v === '__none__' ? '' : v)}
+                                        value={form.data.root_cause_category || '__none__'}
+                                        onValueChange={(v) => form.setData('root_cause_category', v === '__none__' ? '' : v)}
                                     >
                                         <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="__none__">Select...</SelectItem>
-                                            {INVESTIGATION_STATUSES.map((s) => (
-                                                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                            {ROOT_CAUSE_CATEGORIES.map((c) => (
+                                                <SelectItem key={c} value={c}>{c}</SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                </div>
-                                <div className="space-y-1">
-                                    <Label>Assigned to</Label>
-                                    <Select
-                                        value={form.data.investigation_assigned_to || '__none__'}
-                                        onValueChange={(v) => form.setData('investigation_assigned_to', v === '__none__' ? '' : v)}
-                                    >
-                                        <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__none__">Unassigned</SelectItem>
-                                            {normalizedStaff.map((u: StaffUser) => (
-                                                <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                                ) : (
+                                    <div className="text-sm">{incident.root_cause_category || '-'}</div>
+                                )}
                             </div>
-                        )}
 
-                        <div className="space-y-1">
-                            <Label>Root cause category</Label>
-                            {can.update ? (
-                                <Select
-                                    value={form.data.root_cause_category || '__none__'}
-                                    onValueChange={(v) => form.setData('root_cause_category', v === '__none__' ? '' : v)}
-                                >
-                                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="__none__">Select...</SelectItem>
-                                        {ROOT_CAUSE_CATEGORIES.map((c) => (
-                                            <SelectItem key={c} value={c}>{c}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            ) : (
-                                <div className="text-sm">{incident.root_cause_category || '-'}</div>
-                            )}
-                        </div>
-
-                        <div className="space-y-1">
-                            <Label>Root cause description</Label>
-                            <Textarea
-                                value={form.data.root_cause_description}
-                                onChange={(e) => form.setData('root_cause_description', e.target.value)}
-                                disabled={!can.update}
-                            />
-                        </div>
-
-                        <div className="space-y-1">
-                            <Label>Contributing factors</Label>
-                            <Textarea
-                                value={form.data.contributing_factors}
-                                onChange={(e) => form.setData('contributing_factors', e.target.value)}
-                                disabled={!can.update}
-                            />
-                        </div>
-
-                        <div className="space-y-1">
-                            <Label>Lessons learned</Label>
-                            <Textarea
-                                value={form.data.lessons_learned}
-                                onChange={(e) => form.setData('lessons_learned', e.target.value)}
-                                disabled={!can.update}
-                            />
-                        </div>
-
-                        {can.update && (
-                            <div className="flex items-center justify-end">
-                                <Button
-                                    disabled={saving}
-                                    onClick={() => {
-                                        setSaving(true);
-                                        router.put(`/incidents/${incident.id}`, form.data, { onFinish: () => setSaving(false) });
-                                    }}
-                                >
-                                    Save
-                                </Button>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Root cause description</Label>
+                                <Textarea
+                                    value={form.data.root_cause_description}
+                                    onChange={(e) => form.setData('root_cause_description', e.target.value)}
+                                    disabled={!can.update}
+                                    rows={3}
+                                />
                             </div>
-                        )}
 
-                        {/* Corrective actions */}
-                        <div className="space-y-2">
-                            <Label className="text-sm font-medium">Corrective actions</Label>
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Contributing factors</Label>
+                                <Textarea
+                                    value={form.data.contributing_factors}
+                                    onChange={(e) => form.setData('contributing_factors', e.target.value)}
+                                    disabled={!can.update}
+                                    rows={3}
+                                />
+                            </div>
 
-                            {correctiveActions.map((action, index) => (
-                                <div key={index} className="flex items-start justify-between rounded-md border p-3">
-                                    <div className="min-w-0">
-                                        <div className="text-sm font-medium">
-                                            {action.description}
-                                        </div>
-                                        <div className="mt-1 text-xs text-slate-500">
-                                            {action.assigned_to && `Assigned to: ${action.assigned_to}`}
-                                            {action.due_date && ` • Due: ${action.due_date}`}
-                                            {action.completed_at && ` • Completed: ${new Date(action.completed_at).toLocaleDateString()}`}
-                                        </div>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <Badge variant={action.status === 'completed' ? 'default' : 'outline'}>
-                                            {action.status === 'completed' ? 'Completed' : 'Open'}
-                                        </Badge>
-                                        {can.update && action.status !== 'completed' && (
-                                            <Button size="sm" variant="outline" onClick={() => completeCorrectiveAction(index)}>
-                                                Complete
-                                            </Button>
-                                        )}
-                                    </div>
-                                </div>
-                            ))}
-
-                            {!correctiveActions.length && (
-                                <div className="text-sm text-slate-500">No corrective actions.</div>
-                            )}
+                            <div className="space-y-1.5">
+                                <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Lessons learned</Label>
+                                <Textarea
+                                    value={form.data.lessons_learned}
+                                    onChange={(e) => form.setData('lessons_learned', e.target.value)}
+                                    disabled={!can.update}
+                                    rows={3}
+                                />
+                            </div>
 
                             {can.update && (
-                                <div className="rounded-md border p-3 space-y-2">
-                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-                                        <div className="space-y-1">
-                                            <Label>Description</Label>
-                                            <Input
-                                                value={newAction.description}
-                                                onChange={(e) => setNewAction({ ...newAction, description: e.target.value })}
-                                                placeholder="Action required..."
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label>Assigned to</Label>
-                                            <Input
-                                                value={newAction.assigned_to}
-                                                onChange={(e) => setNewAction({ ...newAction, assigned_to: e.target.value })}
-                                                placeholder="Person responsible"
-                                            />
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label>Due date</Label>
-                                            <Input
-                                                type="date"
-                                                value={newAction.due_date}
-                                                onChange={(e) => setNewAction({ ...newAction, due_date: e.target.value })}
-                                            />
-                                        </div>
-                                    </div>
-                                    <div className="flex justify-end">
-                                        <Button size="sm" onClick={addCorrectiveAction} disabled={!newAction.description.trim()}>
-                                            Add corrective action
-                                        </Button>
-                                    </div>
+                                <div className="flex items-center justify-end border-t pt-4">
+                                    <Button
+                                        disabled={saving}
+                                        onClick={() => {
+                                            setSaving(true);
+                                            router.put(`/incidents/${incident.id}`, form.data, { onFinish: () => setSaving(false) });
+                                        }}
+                                    >
+                                        {saving ? 'Saving...' : 'Save changes'}
+                                    </Button>
                                 </div>
                             )}
-                        </div>
-                    </CardContent>
+
+                            {/* Corrective actions */}
+                            <div className="space-y-3 border-t pt-5">
+                                <div className="flex items-center gap-2">
+                                    <CheckCircle2 className="h-4 w-4 text-muted-foreground" />
+                                    <Label className="text-sm font-semibold">Corrective actions</Label>
+                                    <Badge variant="outline" className="ml-auto">{correctiveActions.length}</Badge>
+                                </div>
+
+                                {correctiveActions.map((action, index) => (
+                                    <div key={index} className={`rounded-lg border p-4 ${action.status === 'completed' ? 'bg-emerald-50 border-emerald-200' : 'bg-white'}`}>
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    {action.status === 'completed' ? (
+                                                        <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
+                                                    ) : (
+                                                        <div className="h-4 w-4 rounded-full border-2 border-muted-foreground/30 shrink-0" />
+                                                    )}
+                                                    <span className={`text-sm font-medium ${action.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
+                                                        {action.description}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-1.5 ml-6 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                                    {action.assigned_to && (
+                                                        <span className="flex items-center gap-1">
+                                                            <User className="h-3 w-3" />
+                                                            {action.assigned_to}
+                                                        </span>
+                                                    )}
+                                                    {action.due_date && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Clock className="h-3 w-3" />
+                                                            Due: {action.due_date}
+                                                        </span>
+                                                    )}
+                                                    {action.completed_at && (
+                                                        <span className="flex items-center gap-1">
+                                                            <CheckCircle2 className="h-3 w-3" />
+                                                            Completed: {new Date(action.completed_at).toLocaleDateString()}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            {can.update && action.status !== 'completed' && (
+                                                <Button size="sm" variant="outline" onClick={() => completeCorrectiveAction(index)}>
+                                                    <CheckCircle2 className="mr-1.5 h-3.5 w-3.5" />
+                                                    Complete
+                                                </Button>
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+
+                                {!correctiveActions.length && (
+                                    <div className="flex flex-col items-center justify-center py-6 text-muted-foreground">
+                                        <CheckCircle2 className="h-8 w-8 mb-2 opacity-30" />
+                                        <p className="text-sm">No corrective actions.</p>
+                                    </div>
+                                )}
+
+                                {can.update && (
+                                    <div className="rounded-lg border-2 border-dashed border-muted-foreground/20 p-4 bg-muted/20">
+                                        <div className="flex items-center gap-2 mb-3">
+                                            <Plus className="h-4 w-4 text-muted-foreground" />
+                                            <span className="text-sm font-medium">Add corrective action</span>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs">Description</Label>
+                                                <Input
+                                                    value={newAction.description}
+                                                    onChange={(e) => setNewAction({ ...newAction, description: e.target.value })}
+                                                    placeholder="Action required..."
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs">Assigned to</Label>
+                                                <Input
+                                                    value={newAction.assigned_to}
+                                                    onChange={(e) => setNewAction({ ...newAction, assigned_to: e.target.value })}
+                                                    placeholder="Person responsible"
+                                                />
+                                            </div>
+                                            <div className="space-y-1.5">
+                                                <Label className="text-xs">Due date</Label>
+                                                <Input
+                                                    type="date"
+                                                    value={newAction.due_date}
+                                                    onChange={(e) => setNewAction({ ...newAction, due_date: e.target.value })}
+                                                />
+                                            </div>
+                                        </div>
+                                        <div className="flex justify-end mt-3">
+                                            <Button size="sm" onClick={addCorrectiveAction} disabled={!newAction.description.trim()}>
+                                                <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                                Add action
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    )}
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Follow-ups</CardTitle>
+                {/* Follow-ups */}
+                <Card className="overflow-hidden">
+                    <CardHeader className="border-b bg-muted/30 pb-4">
+                        <div className="flex items-center gap-2">
+                            <Activity className="h-4 w-4 text-muted-foreground" />
+                            <CardTitle className="text-base">Follow-ups</CardTitle>
+                            <Badge variant="outline" className="ml-auto">
+                                {(incident.followups || []).length}
+                            </Badge>
+                        </div>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="pt-5 space-y-4">
                         {can.followupsManage ? (
                             <FollowupCreator
                                 incidentId={incident.id}
@@ -1124,72 +1340,84 @@ export default function IncidentShow({
                     </CardContent>
                 </Card>
 
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Attachments</CardTitle>
+                {/* Attachments */}
+                <Card className="overflow-hidden">
+                    <CardHeader className="border-b bg-muted/30 pb-4">
+                        <div className="flex items-center gap-2">
+                            <Paperclip className="h-4 w-4 text-muted-foreground" />
+                            <CardTitle className="text-base">Attachments</CardTitle>
+                            <Badge variant="outline" className="ml-auto">
+                                {(incident.attachments || []).length}
+                            </Badge>
+                        </div>
                     </CardHeader>
-                    <CardContent className="space-y-3">
+                    <CardContent className="pt-5 space-y-4">
                         {allowCoreEdit ? (
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                                <div className="flex-1 space-y-1">
-                                    <Label>Upload</Label>
-                                    <Input
-                                        type="file"
-                                        onChange={(e) =>
-                                            upload.setData(
-                                                'file',
-                                                e.target.files?.[0] ?? null,
-                                            )
-                                        }
-                                    />
-                                </div>
-                                <Button
-                                    disabled={uploading || !upload.data.file}
-                                    onClick={() => {
-                                        if (!upload.data.file) return;
+                            <div className="rounded-lg border-2 border-dashed border-muted-foreground/20 p-4 bg-muted/20">
+                                <div className="flex flex-col gap-3 sm:flex-row sm:items-end">
+                                    <div className="flex-1 space-y-1.5">
+                                        <Label className="text-xs">Upload a file</Label>
+                                        <Input
+                                            type="file"
+                                            onChange={(e) =>
+                                                upload.setData(
+                                                    'file',
+                                                    e.target.files?.[0] ?? null,
+                                                )
+                                            }
+                                        />
+                                    </div>
+                                    <Button
+                                        disabled={uploading || !upload.data.file}
+                                        onClick={() => {
+                                            if (!upload.data.file) return;
 
-                                        setUploading(true);
-                                        router.post(
-                                            `/incidents/${incident.id}/attachments`,
-                                            { file: upload.data.file },
-                                            {
-                                                forceFormData: true,
-                                                onFinish: () =>
-                                                    setUploading(false),
-                                                onSuccess: () => upload.reset(),
-                                            },
-                                        );
-                                    }}
-                                >
-                                    Upload
-                                </Button>
+                                            setUploading(true);
+                                            router.post(
+                                                `/incidents/${incident.id}/attachments`,
+                                                { file: upload.data.file },
+                                                {
+                                                    forceFormData: true,
+                                                    onFinish: () =>
+                                                        setUploading(false),
+                                                    onSuccess: () => upload.reset(),
+                                                },
+                                            );
+                                        }}
+                                    >
+                                        <Paperclip className="mr-1.5 h-3.5 w-3.5" />
+                                        {uploading ? 'Uploading...' : 'Upload'}
+                                    </Button>
+                                </div>
                             </div>
                         ) : (
-                            <div className="text-sm text-slate-500">
-                                Attachments can only be changed while the
-                                incident is editable.
+                            <div className="text-sm text-muted-foreground bg-muted/30 rounded-lg p-3">
+                                Attachments can only be changed while the incident is editable.
                             </div>
                         )}
 
-                        <div className="space-y-2">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                             {(incident.attachments || []).map((a: any) => (
                                 <div
                                     key={a.id}
-                                    className="flex items-center justify-between rounded-md border p-3"
+                                    className="flex items-center gap-3 rounded-lg border p-3 bg-white hover:bg-muted/30 transition-colors"
                                 >
-                                    <div className="min-w-0">
+                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+                                        <FileText className="h-5 w-5" />
+                                    </div>
+                                    <div className="min-w-0 flex-1">
                                         <div className="truncate text-sm font-medium">
                                             {a.original_name}
                                         </div>
-                                        <div className="mt-1 text-xs text-slate-500">
+                                        <div className="text-xs text-muted-foreground">
                                             {a.size
                                                 ? `${Math.round(a.size / 1024)} KB`
                                                 : ''}
                                         </div>
                                     </div>
-                                    <div className="flex items-center gap-2">
+                                    <div className="flex items-center gap-1.5 shrink-0">
                                         {can.portalManage && (
-                                            <div className="flex items-center gap-2 rounded-md border px-2 py-1">
+                                            <div className="flex items-center gap-1.5 rounded border px-2 py-1">
                                                 <Checkbox
                                                     checked={!!a.portal_visible}
                                                     onCheckedChange={(v) =>
@@ -1205,51 +1433,63 @@ export default function IncidentShow({
                                                         )
                                                     }
                                                 />
-                                                <span className="text-xs text-slate-600">
+                                                <span className="text-xs text-muted-foreground">
                                                     Portal
                                                 </span>
                                             </div>
                                         )}
                                         <Link
                                             href={`/incidents/${incident.id}/attachments/${a.id}/download`}
-                                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                            className="rounded-md border p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+                                            title="Download"
                                         >
-                                            Download
+                                            <Download className="h-4 w-4" />
                                         </Link>
                                         {allowCoreEdit ? (
                                             <button
-                                                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
+                                                className="rounded-md border p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-colors"
                                                 onClick={() =>
                                                     router.delete(
                                                         `/incidents/${incident.id}/attachments/${a.id}`,
                                                     )
                                                 }
+                                                title="Remove"
                                             >
-                                                Remove
+                                                <Trash2 className="h-4 w-4" />
                                             </button>
                                         ) : null}
                                     </div>
                                 </div>
                             ))}
-
-                            {!(incident.attachments || []).length && (
-                                <div className="text-sm text-slate-500">
-                                    No attachments.
-                                </div>
-                            )}
                         </div>
+
+                        {!(incident.attachments || []).length && (
+                            <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
+                                <Paperclip className="h-8 w-8 mb-2 opacity-30" />
+                                <p className="text-sm">No attachments.</p>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
+                {/* Close dialog */}
                 <Dialog open={closeOpen} onOpenChange={setCloseOpen}>
-                    <DialogContent>
+                    <DialogContent className="sm:max-w-md">
                         <DialogHeader>
-                            <DialogTitle>Close incident</DialogTitle>
+                            <div className="flex items-center gap-3">
+                                <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${sev.bg} ${sev.text}`}>
+                                    <Lock className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <DialogTitle>Close incident #{incident.id}</DialogTitle>
+                                    <p className="text-sm text-muted-foreground mt-0.5">This action can be reversed by reopening later.</p>
+                                </div>
+                            </div>
                         </DialogHeader>
 
-                        <div className="space-y-3">
-                            <div className="grid gap-2">
-                                <Label>Outcome</Label>
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1.5">
+                                <Label className="text-sm font-medium">Outcome</Label>
                                 <Input
                                     value={closeForm.data.closed_outcome}
                                     onChange={(e) =>
@@ -1258,10 +1498,11 @@ export default function IncidentShow({
                                             e.target.value,
                                         )
                                     }
+                                    placeholder="e.g. Resolved, No further action required"
                                 />
                             </div>
-                            <div className="grid gap-2">
-                                <Label>Closure notes (optional)</Label>
+                            <div className="space-y-1.5">
+                                <Label className="text-sm font-medium">Closure notes (optional)</Label>
                                 <Textarea
                                     value={closeForm.data.closed_notes}
                                     onChange={(e) =>
@@ -1270,10 +1511,12 @@ export default function IncidentShow({
                                             e.target.value,
                                         )
                                     }
+                                    placeholder="Any final notes or observations..."
+                                    rows={3}
                                 />
                             </div>
-                            <div className="text-xs text-slate-500">
-                                Tip: If this incident required follow-ups, they must be completed before closing.
+                            <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">
+                                If this incident required follow-ups, they must be completed before closing.
                             </div>
                         </div>
 
@@ -1299,21 +1542,31 @@ export default function IncidentShow({
                                     !closeForm.data.closed_outcome?.trim()
                                 }
                             >
-                                Close
+                                <Lock className="mr-1.5 h-3.5 w-3.5" />
+                                Close incident
                             </Button>
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
 
+                {/* Reopen dialog */}
                 <Dialog open={reopenOpen} onOpenChange={setReopenOpen}>
-                    <DialogContent>
+                    <DialogContent className="sm:max-w-md">
                         <DialogHeader>
-                            <DialogTitle>Reopen incident</DialogTitle>
+                            <div className="flex items-center gap-3">
+                                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-600">
+                                    <RotateCcw className="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <DialogTitle>Reopen incident #{incident.id}</DialogTitle>
+                                    <p className="text-sm text-muted-foreground mt-0.5">This action is recorded in the audit trail.</p>
+                                </div>
+                            </div>
                         </DialogHeader>
 
-                        <div className="space-y-3">
-                            <div className="grid gap-2">
-                                <Label>Reason for reopening</Label>
+                        <div className="space-y-4 py-2">
+                            <div className="space-y-1.5">
+                                <Label className="text-sm font-medium">Reason for reopening</Label>
                                 <Textarea
                                     value={reopenForm.data.reopened_reason}
                                     onChange={(e) =>
@@ -1322,10 +1575,12 @@ export default function IncidentShow({
                                             e.target.value,
                                         )
                                     }
+                                    placeholder="Why does this incident need to be reopened?"
+                                    rows={3}
                                 />
-                                <div className="text-xs text-slate-500">
-                                    This action is logged in the audit trail.
-                                </div>
+                            </div>
+                            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                                Reopening will change the incident status back to reviewed, allowing further updates.
                             </div>
                         </div>
 
@@ -1352,6 +1607,7 @@ export default function IncidentShow({
                                     !reopenForm.data.reopened_reason?.trim()
                                 }
                             >
+                                <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
                                 Reopen
                             </Button>
                         </DialogFooter>
