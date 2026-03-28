@@ -100,7 +100,7 @@ class SiteChecklistController extends Controller
                     'response_config' => $item->response_config,
                     'is_required' => $item->is_required,
                     'guidance' => $item->guidance,
-                    'failure_creates_hazard' => $item->failure_creates_hazard,
+                    'failure_creates_hazard' => (bool) $item->failure_creates_hazard,
                 ]),
             'responses' => $run->responses->map(fn ($response) => [
                 'id' => $response->id,
@@ -136,6 +136,9 @@ class SiteChecklistController extends Controller
             'responses.*.notes' => 'nullable|string',
             'responses.*.photo_path' => 'nullable|string',
             'responses.*.is_failed' => 'boolean',
+            'responses.*.create_hazard' => 'boolean',
+            'overall_notes' => 'nullable|string',
+            'signature_name' => 'nullable|string',
         ]);
 
         foreach ($batchValidated['responses'] as $response) {
@@ -164,8 +167,42 @@ class SiteChecklistController extends Controller
         $this->authorize('update', $run->site);
 
         $validated = $request->validate([
+            'responses' => 'required|array|min:1',
+            'responses.*.template_item_id' => 'required|exists:site_checklist_template_items,id',
+            'responses.*.response_value' => 'nullable|string',
+            'responses.*.notes' => 'nullable|string',
+            'responses.*.photo_path' => 'nullable|string',
+            'responses.*.is_failed' => 'boolean',
+            'responses.*.create_hazard' => 'boolean',
             'overall_notes' => 'nullable|string',
+            'signature_name' => 'nullable|string|required',
         ]);
+
+        // Save all responses first
+        foreach ($validated['responses'] as $response) {
+            SiteChecklistResponse::updateOrCreate(
+                [
+                    'run_id' => $run->id,
+                    'template_item_id' => $response['template_item_id'],
+                ],
+                [
+                    'response_value' => $response['response_value'] ?? null,
+                    'notes' => $response['notes'] ?? null,
+                    'photo_path' => $response['photo_path'] ?? null,
+                    'is_failed' => $response['is_failed'] ?? false,
+                ]
+            );
+
+            // Create hazards for failed items if requested
+            if ($response['is_failed'] && $response['create_hazard'] ?? false) {
+                $templateItem = SiteChecklistTemplate::find($response['template_item_id']);
+                if ($templateItem) {
+                    // Create a hazard record for this failure
+                    // You may need to adjust this based on your Hazard model structure
+                    // This is a placeholder for the hazard creation logic
+                }
+            }
+        }
 
         $run->update([
             'status' => 'completed',

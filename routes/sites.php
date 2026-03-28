@@ -31,7 +31,7 @@ use App\Http\Controllers\Sites\{
 Route::middleware(['auth', 'verified'])->group(function () {
 
     // Global Sites Calendar
-    Route::get('/sites/calendar', [SiteCalendarController::class, 'global'])
+    Route::get('/calendar', [SiteCalendarController::class, 'global'])
         ->name('sites.calendar.global')
         ->middleware('permission:calendar.view');
 

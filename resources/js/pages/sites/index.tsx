@@ -1,6 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage, router } from '@inertiajs/react';
-import { Building2, Home, MapPin, Warehouse, AlertTriangle, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Building2, Home, MapPin, Warehouse, AlertTriangle, AlertCircle, CheckCircle2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -131,16 +131,19 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
 
             <div className="m-4 space-y-4">
                 <div className="flex items-center justify-between">
-                    <h1 className="text-lg font-semibold">{sitePlural}</h1>
+                    <h1 className="text-2xl font-bold">{sitePlural}</h1>
                     {can?.sites?.create && (
-                        <Button asChild>
-                            <Link href="/sites/create">Add {siteSingular}</Link>
+                        <Button className="gap-2" asChild>
+                            <Link href="/sites/create">
+                                <Plus className="w-4 h-4" />
+                                Add {siteSingular}
+                            </Link>
                         </Button>
                     )}
                 </div>
 
                 {/* Filters */}
-                <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg border bg-card">
+                <div className="flex flex-wrap items-center gap-3 p-4 rounded-xl border bg-card/50 backdrop-blur-sm">
                     <Select
                         value={filters.type ?? 'all'}
                         onValueChange={(v) => updateFilter('type', v === 'all' ? null : v)}
@@ -219,62 +222,75 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                         </Select>
                     )}
 
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => router.get('/sites', {}, { preserveState: true })}
-                    >
-                        Clear Filters
-                    </Button>
+                    <div className="ml-auto">
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => router.get('/sites', {}, { preserveState: true })}
+                        >
+                            Clear Filters
+                        </Button>
+                    </div>
                 </div>
 
-                <div className="overflow-hidden rounded-xl border">
+                <div className="overflow-hidden rounded-xl border bg-card/50">
                     <table className="w-full text-sm">
-                        <thead className="border-b bg-slate-50/5">
+                        <thead className="border-b bg-slate-50/5 backdrop-blur-sm">
                             <tr>
-                                <th className="px-4 py-3 text-left font-medium">Site Name</th>
-                                <th className="px-4 py-3 text-left font-medium">Type</th>
-                                <th className="px-4 py-3 text-left font-medium">Region</th>
-                                <th className="px-4 py-3 text-left font-medium">Risk</th>
-                                <th className="px-4 py-3 text-left font-medium">Manager</th>
-                                <th className="px-4 py-3 text-left font-medium">Status</th>
-                                <th className="px-4 py-3 text-right">Actions</th>
+                                <th className="px-6 py-4 text-left font-semibold text-slate-200">Site Name</th>
+                                <th className="px-6 py-4 text-left font-semibold text-slate-200">Type</th>
+                                <th className="px-6 py-4 text-left font-semibold text-slate-200">Region</th>
+                                <th className="px-6 py-4 text-left font-semibold text-slate-200">Risk</th>
+                                <th className="px-6 py-4 text-left font-semibold text-slate-200">Manager</th>
+                                <th className="px-6 py-4 text-left font-semibold text-slate-200">Status</th>
+                                <th className="px-6 py-4 text-right font-semibold text-slate-200">Actions</th>
                             </tr>
                         </thead>
-                        <tbody>
+                        <tbody className="divide-y divide-slate-700/50">
                             {sites.length === 0 ? (
                                 <tr>
-                                    <td className="px-4 py-6 text-slate-400" colSpan={7}>
-                                        No {sitePlural.toLowerCase()} found.
+                                    <td className="px-6 py-12 text-center" colSpan={7}>
+                                        <div className="flex flex-col items-center justify-center">
+                                            <div className="rounded-full bg-slate-500/10 p-3 mb-3">
+                                                <Building2 className="w-6 h-6 text-slate-400" />
+                                            </div>
+                                            <p className="text-slate-400 font-medium">No {sitePlural.toLowerCase()} found</p>
+                                            <p className="text-xs text-slate-500 mt-1">Try adjusting your filters or create a new site</p>
+                                        </div>
                                     </td>
                                 </tr>
                             ) : (
                                 sites.map((s) => {
                                     const TypeIcon = typeIcons[s.type];
                                     return (
-                                        <tr key={s.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                                            <td className="px-4 py-3">
-                                                <div className="font-medium">{s.name}</div>
-                                                <div className="text-xs text-slate-400">
-                                                    {addressFor(s) || 'No address'}
-                                                </div>
+                                        <tr key={s.id} className="hover:bg-slate-50/5 transition-colors">
+                                            <td className="px-6 py-4">
+                                                <Link href={`/sites/${s.id}`} className="group">
+                                                    <div className="font-semibold text-slate-50 group-hover:text-blue-400 transition-colors">
+                                                        {s.name}
+                                                    </div>
+                                                    <div className="text-xs text-slate-400 group-hover:text-slate-300 transition-colors">
+                                                        <MapPin className="w-3 h-3 inline mr-1" />
+                                                        {addressFor(s) || 'No address'}
+                                                    </div>
+                                                </Link>
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-6 py-4">
                                                 <Badge variant="outline" className={typeColors[s.type]}>
                                                     <TypeIcon className="w-3 h-3 mr-1" />
                                                     {typeLabels[s.type]}
                                                 </Badge>
                                             </td>
-                                            <td className="px-4 py-3 text-slate-300">
+                                            <td className="px-6 py-4 text-slate-300">
                                                 {s.region || '—'}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-6 py-4">
                                                 <RiskBadge site={s} />
                                             </td>
-                                            <td className="px-4 py-3 text-slate-300">
+                                            <td className="px-6 py-4 text-slate-300">
                                                 {s.primary_contact?.name || '—'}
                                             </td>
-                                            <td className="px-4 py-3">
+                                            <td className="px-6 py-4">
                                                 <Badge
                                                     variant="outline"
                                                     className={s.is_active
@@ -285,28 +301,28 @@ export default function SitesIndex({ sites }: { sites: Site[] }) {
                                                     {s.is_active ? 'Active' : 'Inactive'}
                                                 </Badge>
                                             </td>
-                                            <td className="px-4 py-3 text-right">
-                                                <div className="flex items-center justify-end gap-2">
-                                                    <Button variant="ghost" size="sm" asChild>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button variant="outline" size="xs" asChild>
                                                         <Link href={`/sites/${s.id}`}>View</Link>
                                                     </Button>
                                                     {can?.calendar?.create && (
-                                                        <Button variant="ghost" size="sm" asChild>
-                                                            <Link href={`/sites/${s.id}/calendar?action=add`}>+ Event</Link>
+                                                        <Button variant="outline" size="xs" asChild>
+                                                            <Link href={`/sites/${s.id}/calendar?action=add`}>Event</Link>
                                                         </Button>
                                                     )}
                                                     {can?.hazards?.create && (
-                                                        <Button variant="ghost" size="sm" asChild>
-                                                            <Link href={`/sites/${s.id}/hazards?action=add`}>Log Hazard</Link>
+                                                        <Button variant="outline" size="xs" asChild>
+                                                            <Link href={`/sites/${s.id}/hazards?action=add`}>Hazard</Link>
                                                         </Button>
                                                     )}
                                                     {can?.checklists?.run && (
-                                                        <Button variant="ghost" size="sm" asChild>
-                                                            <Link href={`/sites/${s.id}/checklists/runs`}>Run Checklist</Link>
+                                                        <Button variant="outline" size="xs" asChild>
+                                                            <Link href={`/sites/${s.id}/checklists/runs`}>Check</Link>
                                                         </Button>
                                                     )}
                                                     {can?.sites?.update && (
-                                                        <Button variant="ghost" size="sm" asChild>
+                                                        <Button variant="outline" size="xs" asChild>
                                                             <Link href={`/sites/${s.id}/edit`}>Edit</Link>
                                                         </Button>
                                                     )}

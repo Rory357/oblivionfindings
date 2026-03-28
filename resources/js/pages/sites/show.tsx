@@ -9,7 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
     Building2,
     Home,
@@ -39,6 +39,8 @@ import {
     Star,
     MessageSquare,
     Layers,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -69,7 +71,8 @@ type Site = {
     risk_review_date?: string | null;
     primary_contact?: { id: number; name: string } | null;
     onboarding_completed_at?: string | null;
-    onboarding_progress?: any;
+    onboarding_progress?: Record<string, { completed?: boolean; data?: any; completed_at?: string }>;
+    service_contexts?: Array<{ id: number; name: string; type?: string; is_active: boolean; description?: string }>;
 };
 
 type Contact = {
@@ -183,6 +186,9 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
     // Checklist for onboarding
     const isOnboardingComplete = !!site.onboarding_completed_at;
 
+    // Collapsible setup completeness — default collapsed when 100%, expanded otherwise
+    const [setupExpanded, setSetupExpanded] = useState(!isOnboardingComplete || percent < 100);
+
     return (
         <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: site.name, href: `/sites/${site.id}` }]}>
             <Head title={site.name} />
@@ -243,7 +249,7 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                     </div>
                                 </div>
                                 <Button asChild>
-                                    <Link href={`/sites/${site.id}/onboarding?step=1`}>Continue Onboarding</Link>
+                                    <Link href={`/sites/${site.id}/onboarding`}>Continue Onboarding</Link>
                                 </Button>
                             </CardContent>
                         </Card>
@@ -252,7 +258,7 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
 
                 {/* Setup completeness */}
                 <Card className={isOnboardingComplete ? 'border-emerald-500/30 bg-emerald-500/5' : ''}>
-                    <CardHeader className="pb-3">
+                    <CardHeader className="pb-3 cursor-pointer select-none" onClick={() => setSetupExpanded((v) => !v)}>
                         <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2">
                                 {isOnboardingComplete ? (
@@ -266,82 +272,88 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                             </CardTitle>
                             <div className="flex items-center gap-3">
                                 <span className={`text-sm font-medium ${isOnboardingComplete ? 'text-emerald-400' : 'text-slate-300'}`}>
-                                    {percent}%
+                                    {checklist.filter((c) => c.done).length} of {checklist.length} items ({percent}%)
                                 </span>
                                 {isOnboardingComplete && (
                                     <Badge variant="outline" className="border-emerald-500/30 text-emerald-400 bg-emerald-500/10">
                                         Ready
                                     </Badge>
                                 )}
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="space-y-4">
-                            {/* Progress bar */}
-                            <div className="w-full">
-                                <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
-                                    <div 
-                                        className={`h-full rounded-full transition-all duration-500 ${
-                                            percent === 100 
-                                                ? 'bg-emerald-500' 
-                                                : percent >= 70 
-                                                    ? 'bg-indigo-500' 
-                                                    : percent >= 40 
-                                                        ? 'bg-amber-500' 
-                                                        : 'bg-slate-500'
-                                        }`} 
-                                        style={{ width: `${percent}%` }} 
-                                    />
-                                </div>
-                            </div>
-                            
-                            {/* Checklist items */}
-                            <div className="grid gap-2 sm:grid-cols-2">
-                                {checklist.map((item) => (
-                                    <div 
-                                        key={item.key} 
-                                        className={`flex items-center gap-2 text-sm ${
-                                            item.done ? 'text-emerald-300' : 'text-slate-500'
-                                        }`}
-                                    >
-                                        <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
-                                            item.done 
-                                                ? 'bg-emerald-500/20 text-emerald-400' 
-                                                : 'bg-muted text-muted-foreground'
-                                        }`}>
-                                            {item.done ? (
-                                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                            ) : (
-                                                <Circle className="w-3.5 h-3.5" />
-                                            )}
-                                        </div>
-                                        <span className={item.done ? '' : 'line-through opacity-60'}>
-                                            {item.label}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                            
-                            {/* Summary */}
-                            <div className="pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
-                                <span>
-                                    {checklist.filter((c) => c.done).length} of {checklist.length} items completed
-                                </span>
-                                {isOnboardingComplete && (
-                                    <span className="text-emerald-400 flex items-center gap-1">
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                        Site is fully configured
-                                    </span>
+                                {setupExpanded ? (
+                                    <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                                ) : (
+                                    <ChevronDown className="w-4 h-4 text-muted-foreground" />
                                 )}
                             </div>
                         </div>
-                    </CardContent>
+                        {/* Always-visible progress bar */}
+                        <div className="w-full mt-3">
+                            <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+                                <div
+                                    className={`h-full rounded-full transition-all duration-500 ${
+                                        percent === 100
+                                            ? 'bg-emerald-500'
+                                            : percent >= 70
+                                                ? 'bg-indigo-500'
+                                                : percent >= 40
+                                                    ? 'bg-amber-500'
+                                                    : 'bg-slate-500'
+                                    }`}
+                                    style={{ width: `${percent}%` }}
+                                />
+                            </div>
+                        </div>
+                    </CardHeader>
+                    {setupExpanded && (
+                        <CardContent>
+                            <div className="space-y-4">
+                                {/* Checklist items */}
+                                <div className="grid gap-2 sm:grid-cols-2">
+                                    {checklist.map((item) => (
+                                        <div
+                                            key={item.key}
+                                            className={`flex items-center gap-2 text-sm ${
+                                                item.done ? 'text-emerald-300' : 'text-slate-500'
+                                            }`}
+                                        >
+                                            <div className={`flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center ${
+                                                item.done
+                                                    ? 'bg-emerald-500/20 text-emerald-400'
+                                                    : 'bg-muted text-muted-foreground'
+                                            }`}>
+                                                {item.done ? (
+                                                    <CheckCircle2 className="w-3.5 h-3.5" />
+                                                ) : (
+                                                    <Circle className="w-3.5 h-3.5" />
+                                                )}
+                                            </div>
+                                            <span className={item.done ? '' : 'opacity-70'}>
+                                                {item.label}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Summary */}
+                                <div className="pt-3 border-t flex items-center justify-between text-xs text-muted-foreground">
+                                    <span>
+                                        {checklist.filter((c) => c.done).length} of {checklist.length} items completed
+                                    </span>
+                                    {isOnboardingComplete && (
+                                        <span className="text-emerald-400 flex items-center gap-1">
+                                            <CheckCircle2 className="w-3.5 h-3.5" />
+                                            Site is fully configured
+                                        </span>
+                                    )}
+                                </div>
+                            </div>
+                        </CardContent>
+                    )}
                 </Card>
 
                 {/* Main Tabs */}
                 <Tabs defaultValue="overview" className="space-y-4">
-                    <TabsList className="flex flex-wrap h-auto gap-1">
+                    <TabsList className="flex h-auto gap-1 overflow-x-auto pb-1 scrollbar-hide w-full justify-start">
                         <TabsTrigger value="overview" className="flex items-center gap-1">
                             <LayoutGrid className="w-4 h-4" />
                             Overview
@@ -416,22 +428,26 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                 <CardHeader>
                                     <CardTitle>Contact Information</CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-3 text-sm">
-                                    <div className="grid grid-cols-3 gap-2">
+                                <CardContent className="space-y-0 text-sm">
+                                    <div className="flex items-center justify-between py-3 border-b border-slate-700/50 last:border-0">
                                         <div className="text-slate-400">Phone</div>
-                                        <div className="col-span-2">{site.phone || '—'}</div>
-
+                                        <div>{site.phone || <span className="italic text-slate-500">—</span>}</div>
+                                    </div>
+                                    <div className="flex items-center justify-between py-3 border-b border-slate-700/50 last:border-0">
                                         <div className="text-slate-400">Email</div>
-                                        <div className="col-span-2">{site.email || '—'}</div>
-
+                                        <div>{site.email || <span className="italic text-slate-500">—</span>}</div>
+                                    </div>
+                                    <div className="flex items-center justify-between py-3 border-b border-slate-700/50 last:border-0">
                                         <div className="text-slate-400">Site Lead</div>
-                                        <div className="col-span-2">{site.primary_contact?.name || site.manager_name || '—'}</div>
-
+                                        <div>{site.primary_contact?.name || site.manager_name || <span className="italic text-slate-500">—</span>}</div>
+                                    </div>
+                                    <div className="flex items-center justify-between py-3 border-b border-slate-700/50 last:border-0">
                                         <div className="text-slate-400">Manager Phone</div>
-                                        <div className="col-span-2">{site.manager_phone || '—'}</div>
-
+                                        <div>{site.manager_phone || <span className="italic text-slate-500">—</span>}</div>
+                                    </div>
+                                    <div className="flex items-center justify-between py-3 border-b border-slate-700/50 last:border-0">
                                         <div className="text-slate-400">After hours</div>
-                                        <div className="col-span-2">{site.after_hours_phone || '—'}</div>
+                                        <div>{site.after_hours_phone || <span className="italic text-slate-500">—</span>}</div>
                                     </div>
                                 </CardContent>
                             </Card>
@@ -443,7 +459,7 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                 <CardContent className="space-y-3 text-sm">
                                     <div>
                                         <div className="text-slate-400">Address</div>
-                                        <div className="mt-1">{site.address || '—'}</div>
+                                        <div className="mt-1">{site.address || <span className="italic text-slate-500">—</span>}</div>
                                     </div>
                                     {site.region && (
                                         <div>
@@ -475,11 +491,11 @@ export default function SiteShow({ site, clients, assets, contacts, documents, c
                                 <CardContent className="space-y-3 text-sm">
                                     <div>
                                         <div className="text-slate-400">Emergency plan location</div>
-                                        <div className="mt-1">{site.emergency_plan_location || '—'}</div>
+                                        <div className="mt-1">{site.emergency_plan_location || <span className="italic text-slate-500">—</span>}</div>
                                     </div>
                                     <div>
                                         <div className="text-slate-400">Medication storage location</div>
-                                        <div className="mt-1">{site.medication_storage_location || '—'}</div>
+                                        <div className="mt-1">{site.medication_storage_location || <span className="italic text-slate-500">—</span>}</div>
                                     </div>
                                     {(site.is_high_risk || site.is_high_needs) && (
                                         <>

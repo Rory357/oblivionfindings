@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { LayoutGrid, Plus, ArrowLeft, MapPin } from 'lucide-react';
+import { LayoutGrid, Plus, ArrowLeft, MapPin, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type Site = {
@@ -37,6 +37,8 @@ export default function SiteZones({ site, zones }: Props) {
         description: '',
     });
 
+    const deleteForm = useForm({});
+
     const startEdit = (zone: Zone) => {
         setEditingZone(zone);
         form.setData({
@@ -63,6 +65,12 @@ export default function SiteZones({ site, zones }: Props) {
             form.post(`/sites/${site.id}/zones`, {
                 onSuccess: resetForm,
             });
+        }
+    };
+
+    const handleDeactivate = (zone: Zone) => {
+        if (confirm(`Are you sure you want to deactivate "${zone.name}"?`)) {
+            deleteForm.delete(`/sites/${site.id}/zones/${zone.id}`);
         }
     };
 
@@ -176,7 +184,7 @@ export default function SiteZones({ site, zones }: Props) {
                                     <Card key={zone.id} className="hover:bg-muted/50 transition-colors">
                                         <CardContent className="p-4">
                                             <div className="flex items-start justify-between">
-                                                <div>
+                                                <div className="flex-1">
                                                     <div className="font-medium">{zone.name}</div>
                                                     {zone.zone_type && (
                                                         <Badge variant="outline" className="mt-2">
@@ -188,9 +196,20 @@ export default function SiteZones({ site, zones }: Props) {
                                                         <div className="text-sm text-slate-400 mt-2">{zone.description}</div>
                                                     )}
                                                 </div>
-                                                <Button variant="ghost" size="sm" onClick={() => startEdit(zone)}>
-                                                    Edit
-                                                </Button>
+                                                <div className="flex gap-1 ml-2">
+                                                    <Button variant="ghost" size="sm" onClick={() => startEdit(zone)}>
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                                        onClick={() => handleDeactivate(zone)}
+                                                        disabled={deleteForm.processing}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </CardContent>
                                     </Card>

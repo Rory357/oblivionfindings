@@ -249,9 +249,15 @@ class SiteHazardController extends Controller
             ->orderBy('name')
             ->get();
 
+        $assignees = \App\Models\User::staff()
+            ->select(['id', 'name'])
+            ->orderBy('name')
+            ->get();
+
         return inertia('compliance/hazards/index', [
             'hazards' => $hazards,
             'sites' => $sites,
+            'assignees' => $assignees,
             'filters' => $request->only(['site_id', 'site_type', 'status', 'severity', 'risk_rating', 'assigned_to_me', 'assignee_id', 'due_state']),
             'severityOptions' => collect(SiteHazardRiskCalculator::severities())->map(fn ($severity) => [
                 'key' => $severity,

@@ -5,6 +5,13 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import {
+    Dialog,
+    DialogContent,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -20,9 +27,11 @@ import {
     CheckCircle2,
     Clock,
     Copy,
+    Download,
     ExternalLink,
     Filter,
     MoreVertical,
+    Plus,
     Search,
     ShieldAlert,
     User,
@@ -53,6 +62,11 @@ type Hazard = {
     created_at: string;
 };
 
+type User = {
+    id: number;
+    name: string;
+};
+
 type Props = {
     sites: Site[];
     hazards: Hazard[];
@@ -62,8 +76,11 @@ type Props = {
         status?: string;
         severity?: string;
         risk_rating?: string;
+        assignee_id?: number;
+        due_state?: string;
     };
     severityOptions: Array<{ key: string; label: string }>;
+    assignees?: User[];
 };
 
 const riskBorderColors: Record<string, string> = {
@@ -94,7 +111,7 @@ const statusConfig: Record<string, { bg: string; text: string; icon: typeof Cloc
     closed: { bg: 'bg-green-100', text: 'text-green-700', icon: CheckCircle2 },
 };
 
-export default function GlobalHazards({ sites, hazards, filters, severityOptions }: Props) {
+export default function GlobalHazards({ sites, hazards, filters, severityOptions, assignees = [] }: Props) {
     const ANY = '__any__';
 
     const [searchTerm, setSearchTerm] = useState('');
@@ -103,6 +120,19 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
     const [statusFilter, setStatusFilter] = useState<string>(filters.status || ANY);
     const [severityFilter, setSeverityFilter] = useState<string>(filters.severity || ANY);
     const [riskFilter, setRiskFilter] = useState<string>(filters.risk_rating || ANY);
+    const [assigneeFilter, setAssigneeFilter] = useState<string>(filters.assignee_id?.toString() || ANY);
+    const [dueFilter, setDueFilter] = useState<string>(filters.due_state || ANY);
+    const [logHazardOpen, setLogHazardOpen] = useState(false);
+    const [selectedSiteForHazard, setSelectedSiteForHazard] = useState<string>(ANY);
+
+    const isOverdue = (h: Hazard) => h.due_date && new Date(h.due_date) < new Date() && !['closed', 'mitigated'].includes(h.status);
+    const isDueSoon = (h: Hazard) => {
+        if (!h.due_date || ['closed', 'mitigated'].includes(h.status)) return false;
+        const dueDate = new Date(h.due_date);
+        const now = new Date();
+        const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+        return dueDate >= now && dueDate <= sevenDaysFromNow;
+    };
 
     const filteredHazards = useMemo(() => {
         return hazards.filter(hazard => {
@@ -111,6 +141,13 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
             if (statusFilter !== ANY && hazard.status !== statusFilter) return false;
             if (severityFilter !== ANY && hazard.severity !== severityFilter) return false;
             if (riskFilter !== ANY && hazard.risk_rating !== riskFilter) return false;
+            if (assigneeFilter !== ANY) {
+                const assigneeId = parseInt(assigneeFilter);
+                const assignedToId = hazard.assigned_to_name ? assignees.find(u => u.name === hazard.assigned_to_name)?.id : null;
+                if (assigneeId !== assignedToId) return false;
+            }
+            if (dueFilter === 'overdue' && !isOverdue(hazard)) return false;
+            if (dueFilter === 'due_soon' && !isDueSoon(hazard)) return false;
             if (searchTerm) {
                 const q = searchTerm.toLowerCase();
                 if (
@@ -122,18 +159,54 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
             }
             return true;
         });
-    }, [hazards, siteFilter, typeFilter, statusFilter, severityFilter, riskFilter, searchTerm]);
-
-    const isOverdue = (h: Hazard) => h.due_date && new Date(h.due_date) < new Date() && !['closed', 'mitigated'].includes(h.status);
+    }, [hazards, siteFilter, typeFilter, statusFilter, severityFilter, riskFilter, searchTerm, assigneeFilter, dueFilter, assignees]);
 
     const openHazards = filteredHazards.filter(h => h.status === 'open' || h.status === 'in_progress');
     const criticalOpen = filteredHazards.filter(h => (h.risk_rating === 'extreme' || h.severity === 'critical') && h.status !== 'closed');
     const overdueHazards = filteredHazards.filter(h => isOverdue(h));
     const closedHazards = filteredHazards.filter(h => h.status === 'closed');
 
+    const handleLogHazard = () => {
+        if (selectedSiteForHazard === ANY) {
+            alert('Please select a site');
+            return;
+        }
+        router.visit(`/sites/${selectedSiteForHazard}/hazards/create`);
+    };
+
+    const handleExportCSV = () => {
+        // Create CSV content from filtered hazards
+        const headers = ['Reference #', 'Site', 'Type', 'Severity', 'Status', 'Assigned To', 'Due Date'];
+        const rows = filteredHazards.map(h => [
+            h.reference_number,
+            h.site_name,
+            h.hazard_type.replace(/_/g, ' '),
+            h.severity,
+            h.status.replace(/_/g, ' '),
+            h.assigned_to_name || '-',
+            h.due_date ? new Date(h.due_date).toLocaleDateString() : '-'
+        ]);
+
+        const csvContent = [
+            headers.join(','),
+            ...rows.map(row => row.map(cell => `"${cell}"`).join(','))
+        ].join('\n');
+
+        // Create and download file
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `hazards-${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    };
+
     return (
-        <AppLayout breadcrumbs={[{ title: 'Hazards', href: '/compliance/hazards' }]}>
-            <Head title="Hazard Register" />
+        <AppLayout breadcrumbs={[{ title: 'Compliance', href: '#' }, { title: 'Hazards', href: '/compliance/hazards' }]}>
+            <Head title="Homes and Sites Hazards" />
 
             <div className="space-y-4">
                 {/* Header */}
@@ -143,9 +216,19 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
                             <ShieldAlert className="h-5 w-5 text-orange-600" />
                         </div>
                         <div>
-                            <h1 className="text-lg font-semibold">Hazard Register</h1>
-                            <div className="text-sm text-slate-500">Cross-site hazard overview</div>
+                            <h1 className="text-lg font-semibold">Homes and Sites Hazards</h1>
+                            <div className="text-sm text-slate-500">Cross-site hazard register and management</div>
                         </div>
+                    </div>
+                    <div className="flex gap-2">
+                        <Button onClick={handleExportCSV} variant="outline" size="sm" className="gap-2">
+                            <Download className="h-4 w-4" />
+                            Export CSV
+                        </Button>
+                        <Button onClick={() => setLogHazardOpen(true)} size="sm" className="gap-2">
+                            <Plus className="h-4 w-4" />
+                            Log Hazard
+                        </Button>
                     </div>
                 </div>
 
@@ -176,7 +259,7 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
                             <Filter className="h-4 w-4" />
                             Filters
                         </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-6">
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-6 lg:grid-cols-8">
                             <div className="sm:col-span-2">
                                 <Label className="text-xs text-slate-500">Search</Label>
                                 <div className="relative">
@@ -243,6 +326,33 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
                                                 {opt.label}
                                             </SelectItem>
                                         ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <Label className="text-xs text-slate-500">Assignee</Label>
+                                <Select value={assigneeFilter} onValueChange={setAssigneeFilter}>
+                                    <SelectTrigger><SelectValue placeholder="Assignee" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ANY}>All</SelectItem>
+                                        {assignees.map(u => (
+                                            <SelectItem key={u.id} value={u.id.toString()}>
+                                                {u.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            <div>
+                                <Label className="text-xs text-slate-500">Due/Overdue</Label>
+                                <Select value={dueFilter} onValueChange={setDueFilter}>
+                                    <SelectTrigger><SelectValue placeholder="Status" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ANY}>All</SelectItem>
+                                        <SelectItem value="overdue">Overdue</SelectItem>
+                                        <SelectItem value="due_soon">Due Soon (7 days)</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -385,6 +495,41 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
                         </div>
                     )}
                 </div>
+
+                {/* Log Hazard Dialog */}
+                <Dialog open={logHazardOpen} onOpenChange={setLogHazardOpen}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Log New Hazard</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-4 py-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="site-select">Select Site</Label>
+                                <Select value={selectedSiteForHazard} onValueChange={setSelectedSiteForHazard}>
+                                    <SelectTrigger id="site-select">
+                                        <SelectValue placeholder="Choose a site..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ANY}>-- Select Site --</SelectItem>
+                                        {sites.map(site => (
+                                            <SelectItem key={site.id} value={site.id.toString()}>
+                                                {site.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <DialogFooter>
+                            <Button variant="outline" onClick={() => setLogHazardOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button onClick={handleLogHazard}>
+                                Continue
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </div>
         </AppLayout>
     );

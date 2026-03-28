@@ -15,6 +15,7 @@ class SiteRoomController extends Controller
 
         $rooms = SiteHouseRoom::where('site_id', $site->id)
             ->with('assignedClient:id,first_name,last_name')
+            ->with('history.client:id,first_name,last_name')
             ->orderBy('sort_order')
             ->orderBy('name')
             ->get();
@@ -39,6 +40,19 @@ class SiteRoomController extends Controller
                     'first_name' => $r->assignedClient->first_name,
                     'last_name' => $r->assignedClient->last_name,
                 ] : null,
+                'history' => $r->history->map(fn($h) => [
+                    'id' => $h->id,
+                    'client_id' => $h->client_id,
+                    'client' => $h->client ? [
+                        'id' => $h->client->id,
+                        'first_name' => $h->client->first_name,
+                        'last_name' => $h->client->last_name,
+                    ] : null,
+                    'assigned_from' => $h->assigned_from,
+                    'assigned_until' => $h->assigned_until,
+                    'notes' => $h->notes,
+                    'created_at' => $h->created_at,
+                ]),
             ]),
             'clients' => $clients->map(fn($c) => [
                 'id' => $c->id,

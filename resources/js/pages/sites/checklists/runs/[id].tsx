@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import {
@@ -14,8 +15,15 @@ import {
     Save,
     CheckCircle2,
     ArrowLeft,
+    ChevronDown,
+    ChevronUp,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
+import {
+    Collapsible,
+    CollapsibleContent,
+    CollapsibleTrigger,
+} from '@/components/ui/collapsible';
 
 type Run = {
     id: number;
@@ -41,7 +49,7 @@ type Item = {
     response_config?: { min?: number; max?: number };
     is_required: boolean;
     guidance?: string;
-    failure_creates_hazard?: string;
+    failure_creates_hazard?: boolean;
 };
 
 type Response = {
@@ -51,6 +59,7 @@ type Response = {
     notes: string;
     photo_path?: string;
     is_failed: boolean;
+    create_hazard?: boolean;
 };
 
 type Props = {
@@ -72,22 +81,40 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
         }
     );
     const [overallNotes, setOverallNotes] = useState('');
+    const [signatureName, setSignatureName] = useState('');
+    const [signatureConfirmed, setSignatureConfirmed] = useState(false);
+    const [expandedNotes, setExpandedNotes] = useState<Set<number>>(new Set());
 
-    const progress = useMemo(() => {
-        if (items.length === 0) {
-            return 0;
-        }
+    const requiredItems = useMemo(() => {
+        return items.filter(item => item.is_required);
+    }, [items]);
 
-        const completed = items.filter(item => {
+    const completedCount = useMemo(() => {
+        return requiredItems.filter(item => {
             const resp = currentResponses[item.id];
             return resp?.response_value !== undefined && resp.response_value !== '';
         }).length;
-        return Math.round((completed / items.length) * 100);
-    }, [items, currentResponses]);
+    }, [requiredItems, currentResponses]);
+
+    const progressPercentage = useMemo(() => {
+        if (requiredItems.length === 0) {
+            return 0;
+        }
+        return Math.round((completedCount / requiredItems.length) * 100);
+    }, [requiredItems, completedCount]);
 
     const failedItems = useMemo(() => {
         return items.filter(item => currentResponses[item.id]?.is_failed);
     }, [items, currentResponses]);
+
+    const allRequiredAnswered = useMemo(() => {
+        return requiredItems.every(item => {
+            const resp = currentResponses[item.id];
+            return resp?.response_value !== undefined && resp.response_value !== '';
+        });
+    }, [requiredItems, currentResponses]);
+
+    const canComplete = allRequiredAnswered && signatureConfirmed && signatureName.trim() !== '';
 
     const updateResponse = (itemId: number, updates: Partial<Response>) => {
         setCurrentResponses(prev => ({
@@ -100,14 +127,27 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
         }));
     };
 
+    const toggleNotesExpanded = (itemId: number) => {
+        const newSet = new Set(expandedNotes);
+        if (newSet.has(itemId)) {
+            newSet.delete(itemId);
+        } else {
+            newSet.add(itemId);
+        }
+        setExpandedNotes(newSet);
+    };
+
     const form = useForm({
         responses: [] as Response[],
         overall_notes: '',
+        signature_name: '',
     });
 
     const handleSave = () => {
         form.transform(() => ({
             responses: Object.values(currentResponses),
+            overall_notes: overallNotes,
+            signature_name: signatureName,
         }));
         form.post(`/checklists/runs/${run.id}/responses`, {
             preserveScroll: true,
@@ -116,7 +156,9 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
 
     const handleComplete = () => {
         form.transform(() => ({
+            responses: Object.values(currentResponses),
             overall_notes: overallNotes,
+            signature_name: signatureName,
         }));
         form.post(`/checklists/runs/${run.id}/complete`);
     };
@@ -175,7 +217,7 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                                 type="button"
                                 variant={value === opt ? 'default' : 'outline'}
                                 size="sm"
-                                className={opt === 'fail' && value === opt ? 'bg-red-500 hover:bg-red-600' : ''}
+                                className={opt === 'fail' && value === opt ? 'bg-red-500 hover:bg-red-600' : opt === 'pass' && value === opt ? 'bg-green-600 hover:bg-green-700' : ''}
                                 onClick={() => updateResponse(item.id, {
                                     response_value: opt,
                                     is_failed: opt === 'fail',
@@ -212,18 +254,31 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
 
             case 'photo':
                 return (
-                    <div className="flex items-center gap-2">
-                        <Input
-                            type="file"
-                            accept="image/*"
-                            onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                    updateResponse(item.id, { response_value: 'photo_uploaded' });
-                                }
-                            }}
-                        />
-                        <Camera className="w-5 h-5 text-slate-400" />
+                    <div className="border-2 border-dashed border-slate-500/30 rounded-lg p-6 text-center hover:border-slate-400/50 transition">
+                        <div className="flex flex-col items-center gap-2">
+                            {value ? (
+                                <>
+                                    <Camera className="w-8 h-8 text-green-400" />
+                                    <span className="text-sm text-green-400">Photo uploaded</span>
+                                </>
+                            ) : (
+                                <>
+                                    <Camera className="w-8 h-8 text-slate-400" />
+                                    <span className="text-sm text-slate-400">Click to upload photo</span>
+                                </>
+                            )}
+                            <input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                        updateResponse(item.id, { response_value: 'photo_uploaded' });
+                                    }
+                                }}
+                                className="hidden"
+                            />
+                        </div>
                     </div>
                 );
 
@@ -257,23 +312,29 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                         </h1>
                         <p className="text-sm text-slate-400">{site.name}</p>
                     </div>
-                    <div className="text-right">
-                        <div className="text-sm text-slate-400">Progress</div>
-                        <div className="text-2xl font-bold">{progress}%</div>
-                    </div>
                 </div>
 
-                {/* Progress Bar */}
-                <Progress value={progress} className="h-2" />
+                {/* Progress Indicator */}
+                <Card>
+                    <CardContent className="p-4">
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <span className="text-sm font-medium">Progress</span>
+                                <span className="text-sm font-bold text-blue-400">{completedCount} of {requiredItems.length} items ({progressPercentage}%)</span>
+                            </div>
+                            <Progress value={progressPercentage} className="h-2" />
+                        </div>
+                    </CardContent>
+                </Card>
 
                 {/* Failed Items Warning */}
                 {failedItems.length > 0 && (
                     <Card className="border-red-500/30 bg-red-500/5">
                         <CardContent className="flex items-center gap-3 py-4">
-                            <AlertTriangle className="w-6 h-6 text-red-400" />
+                            <AlertTriangle className="w-6 h-6 text-red-400 flex-shrink-0" />
                             <div>
                                 <div className="font-medium text-red-400">
-                                    {failedItems.length} item(s) failed
+                                    {failedItems.length} item(s) marked as failed
                                 </div>
                                 <div className="text-sm text-slate-400">
                                     Failed items may require hazard creation
@@ -288,23 +349,28 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                     {items.map((item, index) => {
                         const response = currentResponses[item.id];
                         const isFailed = response?.is_failed;
+                        const isNotesExpanded = expandedNotes.has(item.id);
 
                         return (
                             <Card
                                 key={item.id}
-                                className={isFailed ? 'border-red-500/30' : ''}
+                                className={isFailed ? 'border-red-500/30 bg-red-500/5' : ''}
                             >
                                 <CardContent className="p-4">
                                     <div className="flex items-start gap-3">
-                                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-sm text-muted-foreground">
+                                        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-muted flex items-center justify-center text-sm font-medium text-muted-foreground">
                                             {index + 1}
                                         </div>
                                         <div className="flex-1 space-y-3">
+                                            {/* Question Header */}
                                             <div>
-                                                <div className="font-medium">
-                                                    {item.question}
+                                                <div className="font-medium flex items-center gap-2">
+                                                    <span>{item.question}</span>
                                                     {item.is_required && (
-                                                        <span className="text-red-400 ml-1">*</span>
+                                                        <span className="text-red-400 text-sm">*</span>
+                                                    )}
+                                                    {isFailed && (
+                                                        <Badge variant="destructive" className="text-xs">Failed</Badge>
                                                     )}
                                                 </div>
                                                 {item.guidance && (
@@ -314,25 +380,53 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                                                 )}
                                             </div>
 
+                                            {/* Response Input */}
                                             {getResponseInput(item)}
 
-                                            <Textarea
-                                                placeholder="Notes (optional)"
-                                                value={response?.notes || ''}
-                                                onChange={(e) => updateResponse(item.id, { notes: e.target.value })}
-                                                rows={2}
-                                                className="text-sm"
-                                            />
+                                            {/* Notes Collapsible */}
+                                            <Collapsible>
+                                                <CollapsibleTrigger asChild>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-auto p-0 text-slate-400 hover:text-slate-200"
+                                                    >
+                                                        {isNotesExpanded ? (
+                                                            <ChevronUp className="w-4 h-4 mr-1" />
+                                                        ) : (
+                                                            <ChevronDown className="w-4 h-4 mr-1" />
+                                                        )}
+                                                        Notes {response?.notes ? '(added)' : '(optional)'}
+                                                    </Button>
+                                                </CollapsibleTrigger>
+                                                <CollapsibleContent className="mt-2">
+                                                    <Textarea
+                                                        placeholder="Add any notes for this item..."
+                                                        value={response?.notes || ''}
+                                                        onChange={(e) => updateResponse(item.id, { notes: e.target.value })}
+                                                        rows={2}
+                                                        className="text-sm"
+                                                    />
+                                                </CollapsibleContent>
+                                            </Collapsible>
 
+                                            {/* Create Hazard Option */}
                                             {isFailed && item.failure_creates_hazard && (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    className="border-red-500/30 text-red-400"
-                                                >
-                                                    <AlertTriangle className="w-4 h-4 mr-1" />
-                                                    Create Hazard
-                                                </Button>
+                                                <div className="flex items-center gap-2 p-2 rounded border border-orange-500/30 bg-orange-500/5">
+                                                    <Checkbox
+                                                        id={`hazard-${item.id}`}
+                                                        checked={response?.create_hazard || false}
+                                                        onCheckedChange={(checked) =>
+                                                            updateResponse(item.id, { create_hazard: !!checked })
+                                                        }
+                                                    />
+                                                    <Label
+                                                        htmlFor={`hazard-${item.id}`}
+                                                        className="flex-1 cursor-pointer text-sm text-orange-400"
+                                                    >
+                                                        Create hazard for this failure
+                                                    </Label>
+                                                </div>
                                             )}
                                         </div>
                                     </div>
@@ -351,14 +445,49 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                         <Textarea
                             value={overallNotes}
                             onChange={(e) => setOverallNotes(e.target.value)}
-                            placeholder="Add any overall observations or notes..."
+                            placeholder="Add any overall observations or notes about the checklist..."
                             rows={4}
                         />
                     </CardContent>
                 </Card>
 
+                {/* Signature Section */}
+                <Card className="border-slate-600">
+                    <CardHeader>
+                        <CardTitle className="text-sm">Completion Confirmation</CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                        <div>
+                            <Label htmlFor="signature-name" className="mb-2 block">
+                                Signature / Name *
+                            </Label>
+                            <Input
+                                id="signature-name"
+                                type="text"
+                                value={signatureName}
+                                onChange={(e) => setSignatureName(e.target.value)}
+                                placeholder="Enter your name or signature"
+                                className="font-medium"
+                            />
+                        </div>
+                        <div className="flex items-center gap-3 p-3 rounded border border-slate-600 bg-slate-900/50">
+                            <Checkbox
+                                id="confirm-accuracy"
+                                checked={signatureConfirmed}
+                                onCheckedChange={(checked) => setSignatureConfirmed(!!checked)}
+                            />
+                            <Label
+                                htmlFor="confirm-accuracy"
+                                className="flex-1 cursor-pointer text-sm"
+                            >
+                                I confirm this checklist has been completed accurately and honestly
+                            </Label>
+                        </div>
+                    </CardContent>
+                </Card>
+
                 {/* Actions */}
-                <div className="flex justify-between pt-4">
+                <div className="flex justify-between gap-2 pt-4">
                     <Button
                         variant="outline"
                         onClick={handleSave}
@@ -369,12 +498,35 @@ export default function ChecklistRun({ site, template, run, items, responses }: 
                     </Button>
                     <Button
                         onClick={handleComplete}
-                        disabled={form.processing || progress < 100}
+                        disabled={form.processing || !canComplete}
+                        className={!canComplete ? 'opacity-50 cursor-not-allowed' : ''}
                     >
                         <CheckCircle2 className="w-4 h-4 mr-1" />
                         Complete Checklist
                     </Button>
                 </div>
+
+                {/* Completion Requirements */}
+                {!canComplete && (
+                    <Card className="border-yellow-500/30 bg-yellow-500/5">
+                        <CardContent className="p-3">
+                            <div className="text-sm text-yellow-400">
+                                <p className="font-medium mb-2">To complete this checklist:</p>
+                                <ul className="space-y-1 text-xs ml-4 list-disc">
+                                    {!allRequiredAnswered && (
+                                        <li>Answer all {requiredItems.length} required items ({completedCount} completed)</li>
+                                    )}
+                                    {!signatureName.trim() && (
+                                        <li>Enter your name or signature</li>
+                                    )}
+                                    {!signatureConfirmed && (
+                                        <li>Confirm the completion accuracy</li>
+                                    )}
+                                </ul>
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
             </div>
         </AppLayout>
     );

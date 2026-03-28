@@ -249,7 +249,9 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.sites?.types?.facilityView) items.push({ title: 'Facilities', href: '/sites?type=facility', icon: Building2 });
     if (can?.calendar?.viewAny) items.push({ title: 'Calendars', href: '/calendar', icon: CalendarDays });
     if (can?.checklists?.view) items.push({ title: 'Checklists', href: '/checklists', icon: ClipboardCheck });
+    if (can?.checklists?.view) items.push({ title: 'Inspections & Maintenance', href: '/sites/inspections', icon: ClipboardList });
     if (can?.hazards?.view) items.push({ title: 'Hazards', href: '/hazards', icon: ShieldAlert });
+    if (can?.reports?.sitesView) items.push({ title: 'Reports', href: '/sites/reports', icon: BarChart3 });
     if (can?.vendors?.view) items.push({ title: 'Vendors', href: '/vendors', icon: Package });
     if (can?.siteHardware?.view) items.push({ title: 'Site Hardware', href: '/site-hardware', icon: Settings });
     if (can?.unifi?.manage) items.push({ title: 'UniFi', href: '/unifi', icon: Settings });

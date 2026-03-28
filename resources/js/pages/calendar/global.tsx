@@ -11,7 +11,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { CalendarDays, Plus, Filter, List, Grid3X3 } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { CalendarDays, Plus, Filter, List, Calendar } from 'lucide-react';
 import { useState, useMemo } from 'react';
 
 type Site = {
@@ -52,20 +53,106 @@ const typeColors: Record<string, string> = {
     facility: 'bg-amber-500/10 text-amber-400 border-amber-500/30',
 };
 
+type CalendarViewProps = {
+    currentDate: Date;
+    setCurrentDate: (date: Date) => void;
+    events: CalendarEvent[];
+    getEventTypeColor: (type: string) => string;
+    typeColors: Record<string, string>;
+};
+
+function CalendarView({ currentDate, setCurrentDate, events, getEventTypeColor, typeColors }: CalendarViewProps) {
+    const monthName = currentDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
+    const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1).getDay();
+
+    const prevMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1));
+    const nextMonth = () => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1));
+
+    const getEventsForDay = (day: number) => {
+        const dateStr = new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
+        return events.filter(e => new Date(e.start_at).toDateString() === dateStr);
+    };
+
+    return (
+        <div className="space-y-4">
+            <div className="flex items-center justify-between mb-4">
+                <Button variant="outline" size="sm" onClick={prevMonth}>
+                    Previous
+                </Button>
+                <span className="font-medium">{monthName}</span>
+                <Button variant="outline" size="sm" onClick={nextMonth}>
+                    Next
+                </Button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1">
+                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                    <div key={day} className="text-center text-sm font-medium text-slate-400 py-2">
+                        {day}
+                    </div>
+                ))}
+
+                {Array.from({ length: firstDayOfMonth }).map((_, i) => (
+                    <div key={`empty-${i}`} className="min-h-[100px]" />
+                ))}
+
+                {Array.from({ length: daysInMonth }).map((_, i) => {
+                    const day = i + 1;
+                    const dayEvents = getEventsForDay(day);
+                    const isToday = new Date().toDateString() === new Date(currentDate.getFullYear(), currentDate.getMonth(), day).toDateString();
+
+                    return (
+                        <div
+                            key={day}
+                            className={`min-h-[100px] border rounded-lg p-2 ${
+                                isToday ? 'bg-indigo-500/10 border-indigo-500/30' : 'border-slate-700'
+                            }`}
+                        >
+                            <div className={`text-sm font-medium mb-1 ${isToday ? 'text-indigo-400' : 'text-slate-400'}`}>
+                                {day}
+                            </div>
+                            <div className="space-y-1">
+                                {dayEvents.slice(0, 3).map(event => (
+                                    <div
+                                        key={event.id}
+                                        className="text-xs p-1 rounded truncate text-white"
+                                        style={{ backgroundColor: getEventTypeColor(event.event_type) }}
+                                        title={event.title}
+                                    >
+                                        {event.title}
+                                    </div>
+                                ))}
+                                {dayEvents.length > 3 && (
+                                    <div className="text-xs text-slate-500">+{dayEvents.length - 3} more</div>
+                                )}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
 export default function GlobalCalendar({ sites, events, filters, eventTypes }: Props) {
-    const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
-    const [siteFilter, setSiteFilter] = useState<string>(filters.site_type || 'all');
+    const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
+    const [selectedSites, setSelectedSites] = useState<number[]>(filters.site_ids || []);
+    const [siteTypeFilter, setSiteTypeFilter] = useState<string>(filters.site_type || 'all');
     const [typeFilter, setTypeFilter] = useState<string>((filters.event_types?.[0]) || 'all');
     const [statusFilter, setStatusFilter] = useState<string>(filters.status || 'all');
+    const [myEventsOnly, setMyEventsOnly] = useState<boolean>(filters.my_events_only || false);
+    const [currentDate, setCurrentDate] = useState(new Date());
 
     const filteredEvents = useMemo(() => {
         return events.filter(event => {
-            if (siteFilter !== 'all' && event.site_type !== siteFilter) return false;
+            if (selectedSites.length > 0 && !selectedSites.includes(event.site_id)) return false;
+            if (siteTypeFilter !== 'all' && event.site_type !== siteTypeFilter) return false;
             if (typeFilter !== 'all' && event.event_type !== typeFilter) return false;
             if (statusFilter !== 'all' && event.status !== statusFilter) return false;
             return true;
         });
-    }, [events, siteFilter, typeFilter, statusFilter]);
+    }, [events, selectedSites, siteTypeFilter, typeFilter, statusFilter]);
 
     const getEventTypeColor = (type: string) => {
         const eventType = eventTypes.find(t => t.key === type);
@@ -78,7 +165,7 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Calendar', href: '/sites/calendar' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Calendar', href: '/calendar' }]}>
             <Head title="Global Calendar" />
 
             <div className="m-4 space-y-4">
@@ -94,9 +181,9 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                         </p>
                     </div>
                     <Button asChild>
-                        <Link href="/sites">
+                        <Link href="/calendar?action=add">
                             <Plus className="w-4 h-4 mr-1" />
-                            Add Event
+                            New Event
                         </Link>
                     </Button>
                 </div>
@@ -110,68 +197,107 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid gap-4 sm:grid-cols-4">
-                            <div>
-                                <Label className="text-xs">Site Type</Label>
-                                <Select value={siteFilter} onValueChange={setSiteFilter}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Types</SelectItem>
-                                        <SelectItem value="head_office">Head Office</SelectItem>
-                                        <SelectItem value="house">Houses</SelectItem>
-                                        <SelectItem value="facility">Facilities</SelectItem>
-                                    </SelectContent>
-                                </Select>
+                        <div className="space-y-4">
+                            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                <div>
+                                    <Label className="text-xs">Sites</Label>
+                                    <div className="border rounded-md p-2 max-h-[200px] overflow-y-auto space-y-2">
+                                        {sites.length === 0 ? (
+                                            <p className="text-xs text-slate-500">No sites available</p>
+                                        ) : (
+                                            sites.map(site => (
+                                                <label key={site.id} className="flex items-center gap-2 text-xs cursor-pointer">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedSites.includes(site.id)}
+                                                        onChange={(e) => {
+                                                            if (e.target.checked) {
+                                                                setSelectedSites([...selectedSites, site.id]);
+                                                            } else {
+                                                                setSelectedSites(selectedSites.filter(id => id !== site.id));
+                                                            }
+                                                        }}
+                                                        className="rounded"
+                                                    />
+                                                    <span>{site.name}</span>
+                                                </label>
+                                            ))
+                                        )}
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label className="text-xs">Site Type</Label>
+                                    <Select value={siteTypeFilter} onValueChange={setSiteTypeFilter}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Types</SelectItem>
+                                            <SelectItem value="head_office">Head Office</SelectItem>
+                                            <SelectItem value="house">Houses</SelectItem>
+                                            <SelectItem value="facility">Facilities</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label className="text-xs">Event Type</Label>
+                                    <Select value={typeFilter} onValueChange={setTypeFilter}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Types</SelectItem>
+                                            {eventTypes.map(type => (
+                                                <SelectItem key={type.key} value={type.key}>
+                                                    {type.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label className="text-xs">Status</Label>
+                                    <Select value={statusFilter} onValueChange={setStatusFilter}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="all">All Status</SelectItem>
+                                            <SelectItem value="draft">Draft</SelectItem>
+                                            <SelectItem value="pending">Pending</SelectItem>
+                                            <SelectItem value="approved">Approved</SelectItem>
+                                            <SelectItem value="completed">Completed</SelectItem>
+                                            <SelectItem value="cancelled">Cancelled</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
-                            <div>
-                                <Label className="text-xs">Event Type</Label>
-                                <Select value={typeFilter} onValueChange={setTypeFilter}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Types</SelectItem>
-                                        {eventTypes.map(type => (
-                                            <SelectItem key={type.key} value={type.key}>
-                                                {type.label}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div>
-                                <Label className="text-xs">Status</Label>
-                                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                    <SelectTrigger>
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">All Status</SelectItem>
-                                        <SelectItem value="draft">Draft</SelectItem>
-                                        <SelectItem value="pending">Pending</SelectItem>
-                                        <SelectItem value="approved">Approved</SelectItem>
-                                        <SelectItem value="completed">Completed</SelectItem>
-                                        <SelectItem value="cancelled">Cancelled</SelectItem>
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="flex items-end">
+
+                            <div className="flex items-center justify-between pt-2 border-t">
+                                <div className="flex items-center gap-2">
+                                    <Switch
+                                        checked={myEventsOnly}
+                                        onCheckedChange={setMyEventsOnly}
+                                    />
+                                    <Label className="text-xs cursor-pointer">Show only my events</Label>
+                                </div>
+
                                 <div className="flex gap-1">
                                     <Button
                                         variant={viewMode === 'list' ? 'default' : 'outline'}
                                         size="sm"
                                         onClick={() => setViewMode('list')}
+                                        title="List view"
                                     >
                                         <List className="w-4 h-4" />
                                     </Button>
                                     <Button
-                                        variant={viewMode === 'grid' ? 'default' : 'outline'}
+                                        variant={viewMode === 'calendar' ? 'default' : 'outline'}
                                         size="sm"
-                                        onClick={() => setViewMode('grid')}
+                                        onClick={() => setViewMode('calendar')}
+                                        title="Calendar view"
                                     >
-                                        <Grid3X3 className="w-4 h-4" />
+                                        <Calendar className="w-4 h-4" />
                                     </Button>
                                 </div>
                             </div>
@@ -179,11 +305,11 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                     </CardContent>
                 </Card>
 
-                {/* Events List */}
+                {/* Events Display */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">
-                            Upcoming Events ({filteredEvents.length})
+                            Events ({filteredEvents.length})
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -194,17 +320,17 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                             </div>
                         ) : viewMode === 'list' ? (
                             <div className="space-y-2">
-                                {filteredEvents.map(event => (
+                                {filteredEvents.sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()).map(event => (
                                     <div
                                         key={event.id}
-                                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50"
+                                        className="flex items-start justify-between p-3 rounded-lg border hover:bg-slate-500/10 transition-colors"
                                     >
-                                        <div className="flex items-center gap-3">
+                                        <div className="flex items-start gap-3 flex-1">
                                             <div
-                                                className="w-3 h-3 rounded-full"
+                                                className="w-3 h-3 rounded-full mt-1 flex-shrink-0"
                                                 style={{ backgroundColor: getEventTypeColor(event.event_type) }}
                                             />
-                                            <div>
+                                            <div className="flex-1">
                                                 <div className="font-medium">{event.title}</div>
                                                 <div className="text-sm text-slate-400">
                                                     {event.site_name} - {getEventTypeLabel(event.event_type)}
@@ -215,45 +341,18 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                                                 </div>
                                             </div>
                                         </div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 ml-4">
                                             <Badge variant="outline" className={typeColors[event.site_type]}>
-                                                {event.site_type === 'head_office' ? 'Head Office' : 
+                                                {event.site_type === 'head_office' ? 'Head Office' :
                                                  event.site_type === 'house' ? 'House' : 'Facilities'}
                                             </Badge>
                                             <Badge variant="outline">{event.status}</Badge>
-                                            <Button asChild variant="ghost" size="sm">
-                                                <Link href={`/sites/${event.site_id}/calendar`}>
-                                                    View
-                                                </Link>
-                                            </Button>
                                         </div>
                                     </div>
                                 ))}
                             </div>
                         ) : (
-                            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                                {filteredEvents.map(event => (
-                                    <Card key={event.id} className="hover:bg-muted/50 transition-colors">
-                                        <CardContent className="p-4">
-                                            <div
-                                                className="w-full h-1 rounded-full mb-3"
-                                                style={{ backgroundColor: getEventTypeColor(event.event_type) }}
-                                            />
-                                            <div className="font-medium mb-1">{event.title}</div>
-                                            <div className="text-sm text-slate-400 mb-2">{event.site_name}</div>
-                                            <div className="text-xs text-slate-500 mb-3">
-                                                {new Date(event.start_at).toLocaleString()}
-                                            </div>
-                                            <div className="flex gap-1">
-                                                <Badge variant="outline" className="text-xs">
-                                                    {getEventTypeLabel(event.event_type)}
-                                                </Badge>
-                                                <Badge variant="outline" className="text-xs">{event.status}</Badge>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                ))}
-                            </div>
+                            <CalendarView currentDate={currentDate} setCurrentDate={setCurrentDate} events={filteredEvents} getEventTypeColor={getEventTypeColor} typeColors={typeColors} />
                         )}
                     </CardContent>
                 </Card>

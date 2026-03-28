@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/dialog';
 import { TabsRoot, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Head, useForm, router } from '@inertiajs/react';
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
     Users,
     Building2,
@@ -46,6 +46,7 @@ import {
     Calendar,
     Paperclip,
     ChevronRight,
+    Pencil,
 } from 'lucide-react';
 
 /* ------------------------------------------------------------------ */
@@ -328,6 +329,11 @@ export default function WorkerParticipationIndex({
     const [meetingSuccessMessage, setMeetingSuccessMessage] = useState<string | null>(null);
     const [committeeDialogOpen, setCommitteeDialogOpen] = useState(false);
 
+    /* Edit dialogs */
+    const [editingConsultation, setEditingConsultation] = useState<Consultation | null>(null);
+    const [editingMeeting, setEditingMeeting] = useState<Meeting | null>(null);
+    const [editMeetingLocationMode, setEditMeetingLocationMode] = useState<'site' | 'custom'>('site');
+
     const tabsRef = useRef<HTMLDivElement>(null);
 
     /* ---- Forms ---- */
@@ -411,6 +417,56 @@ export default function WorkerParticipationIndex({
         document: null as File | null,
     });
 
+    /* Edit consultation form */
+    const editConsultationForm = useForm({
+        title: '',
+        consultation_type: '',
+        description: '',
+        site_id: '',
+        consultation_date: '',
+    });
+
+    /* Edit meeting form */
+    const editMeetingForm = useForm<{
+        meeting_date: string;
+        location: string;
+        agenda_items: Array<{ title: string; notes: string }>;
+    }>({
+        meeting_date: '',
+        location: '',
+        agenda_items: [{ title: '', notes: '' }],
+    });
+
+    /* ---- Pre-fill edit forms when editing item changes ---- */
+
+    useEffect(() => {
+        if (editingConsultation) {
+            editConsultationForm.setData({
+                title: editingConsultation.title || '',
+                consultation_type: editingConsultation.consultation_type || '',
+                description: editingConsultation.description || '',
+                site_id: String(editingConsultation.site?.id || ''),
+                consultation_date: editingConsultation.consultation_date || '',
+            });
+        }
+    }, [editingConsultation]);
+
+    useEffect(() => {
+        if (editingMeeting) {
+            const loc = editingMeeting.location || '';
+            const isSiteLocation = sites.some((s) => s.name === loc);
+            setEditMeetingLocationMode(loc && !isSiteLocation ? 'custom' : 'site');
+            editMeetingForm.setData({
+                meeting_date: editingMeeting.meeting_date ? editingMeeting.meeting_date.slice(0, 16) : '',
+                location: loc,
+                agenda_items:
+                    (editingMeeting as any).agenda_items?.length > 0
+                        ? (editingMeeting as any).agenda_items.map((a: any) => ({ title: a.title || '', notes: a.notes || '' }))
+                        : [{ title: '', notes: '' }],
+            });
+        }
+    }, [editingMeeting]);
+
     /* ---- Agenda item helpers ---- */
 
     const addAgendaItem = () => {
@@ -431,6 +487,28 @@ export default function WorkerParticipationIndex({
         const updated = [...meetingForm.data.agenda_items];
         updated[idx] = { ...updated[idx], [field]: value };
         meetingForm.setData('agenda_items', updated);
+    };
+
+    /* ---- Edit meeting agenda item helpers ---- */
+
+    const addEditAgendaItem = () => {
+        editMeetingForm.setData('agenda_items', [
+            ...editMeetingForm.data.agenda_items,
+            { title: '', notes: '' },
+        ]);
+    };
+
+    const removeEditAgendaItem = (idx: number) => {
+        editMeetingForm.setData(
+            'agenda_items',
+            editMeetingForm.data.agenda_items.filter((_, i) => i !== idx),
+        );
+    };
+
+    const updateEditAgendaItem = (idx: number, field: 'title' | 'notes', value: string) => {
+        const updated = [...editMeetingForm.data.agenda_items];
+        updated[idx] = { ...updated[idx], [field]: value };
+        editMeetingForm.setData('agenda_items', updated);
     };
 
     /* ---- Complete meeting action item helpers ---- */
@@ -597,6 +675,26 @@ export default function WorkerParticipationIndex({
             onSuccess: () => {
                 setCommitteeDialogOpen(false);
                 committeeForm.reset();
+            },
+        });
+    };
+
+    const submitEditConsultation = (consultationId: number) => {
+        editConsultationForm.put(`/health-safety/worker-participation/consultations/${consultationId}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setEditingConsultation(null);
+                editConsultationForm.reset();
+            },
+        });
+    };
+
+    const submitEditMeeting = (meetingId: number) => {
+        editMeetingForm.put(`/health-safety/worker-participation/meetings/${meetingId}`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setEditingMeeting(null);
+                editMeetingForm.reset();
             },
         });
     };
@@ -944,7 +1042,19 @@ export default function WorkerParticipationIndex({
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            {statusBadge(meeting.status)}
+                                                            <div className="flex items-center gap-2">
+                                                                {meeting.status === 'scheduled' && (
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                                                        onClick={() => setEditingMeeting(meeting)}
+                                                                    >
+                                                                        <Pencil className="h-3.5 w-3.5" />
+                                                                    </Button>
+                                                                )}
+                                                                {statusBadge(meeting.status)}
+                                                            </div>
                                                         </div>
 
                                                         {/* Attendees section */}
@@ -1179,7 +1289,17 @@ export default function WorkerParticipationIndex({
                                                                     )}
                                                                 </div>
                                                             </div>
-                                                            {statusBadge(c.status)}
+                                                            <div className="flex items-center gap-2">
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-7 w-7 p-0 text-muted-foreground hover:text-foreground"
+                                                                    onClick={() => setEditingConsultation(c)}
+                                                                >
+                                                                    <Pencil className="h-3.5 w-3.5" />
+                                                                </Button>
+                                                                {statusBadge(c.status)}
+                                                            </div>
                                                         </div>
 
                                                         {/* Workflow progress bar */}
@@ -2462,6 +2582,302 @@ export default function WorkerParticipationIndex({
                         <Button disabled={committeeForm.processing} onClick={submitCommittee}>
                             <Building2 className="mr-1.5 h-4 w-4" />
                             Create Committee
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ================================================================ */}
+            {/*  EDIT CONSULTATION DIALOG                                        */}
+            {/* ================================================================ */}
+            <Dialog open={editingConsultation !== null} onOpenChange={(open) => !open && setEditingConsultation(null)}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-purple-100">
+                                <Pencil className="h-4 w-4 text-purple-600" />
+                            </div>
+                            Edit Consultation
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-5">
+                        {/* Title */}
+                        <div className="space-y-1.5">
+                            <Label>Title <span className="text-red-500">*</span></Label>
+                            <Input
+                                placeholder="Brief description of the consultation topic"
+                                value={editConsultationForm.data.title}
+                                onChange={(e) => editConsultationForm.setData('title', e.target.value)}
+                            />
+                            {editConsultationForm.errors.title && (
+                                <p className="text-xs text-red-600">{editConsultationForm.errors.title}</p>
+                            )}
+                        </div>
+
+                        {/* Type */}
+                        <div className="space-y-1.5">
+                            <Label>Consultation Type <span className="text-red-500">*</span></Label>
+                            <Select
+                                value={editConsultationForm.data.consultation_type || '__none__'}
+                                onValueChange={(v) =>
+                                    editConsultationForm.setData('consultation_type', v === '__none__' ? '' : v)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select type" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__none__">Select type...</SelectItem>
+                                    {consultationTypes.map((ct) => (
+                                        <SelectItem key={ct.value} value={ct.value}>
+                                            {ct.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                            {editConsultationForm.errors.consultation_type && (
+                                <p className="text-xs text-red-600">{editConsultationForm.errors.consultation_type}</p>
+                            )}
+                        </div>
+
+                        {/* Description */}
+                        <div className="space-y-1.5">
+                            <Label>Description</Label>
+                            <Textarea
+                                placeholder="Provide details about what was discussed and any outcomes..."
+                                rows={4}
+                                value={editConsultationForm.data.description}
+                                onChange={(e) =>
+                                    editConsultationForm.setData('description', e.target.value)
+                                }
+                            />
+                        </div>
+
+                        {/* Date & Site */}
+                        <div className="grid gap-3 sm:grid-cols-2">
+                            <div className="space-y-1.5">
+                                <Label>Site / Location</Label>
+                                <Select
+                                    value={editConsultationForm.data.site_id || '__none__'}
+                                    onValueChange={(v) =>
+                                        editConsultationForm.setData('site_id', v === '__none__' ? '' : v)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select site" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__none__">All sites</SelectItem>
+                                        {sites.map((s) => (
+                                            <SelectItem key={s.id} value={String(s.id)}>
+                                                {s.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-1.5">
+                                <Label>Consultation Date <span className="text-red-500">*</span></Label>
+                                <Input
+                                    type="date"
+                                    value={editConsultationForm.data.consultation_date}
+                                    onChange={(e) =>
+                                        editConsultationForm.setData('consultation_date', e.target.value)
+                                    }
+                                />
+                                {editConsultationForm.errors.consultation_date && (
+                                    <p className="text-xs text-red-600">
+                                        {editConsultationForm.errors.consultation_date}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditingConsultation(null)}>
+                            Cancel
+                        </Button>
+                        <Button
+                            disabled={editConsultationForm.processing}
+                            onClick={() => editingConsultation && submitEditConsultation(editingConsultation.id)}
+                        >
+                            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                            Save Changes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ================================================================ */}
+            {/*  EDIT MEETING DIALOG                                             */}
+            {/* ================================================================ */}
+            <Dialog
+                open={editingMeeting !== null}
+                onOpenChange={(open) => {
+                    if (!open) {
+                        setEditingMeeting(null);
+                        setEditMeetingLocationMode('site');
+                    }
+                }}
+            >
+                <DialogContent className="sm:max-w-lg max-h-[85vh] overflow-y-auto">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-amber-100">
+                                <Pencil className="h-4 w-4 text-amber-600" />
+                            </div>
+                            Edit Meeting
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-5">
+                        {/* Date/Time */}
+                        <div className="space-y-1.5">
+                            <Label>Date & Time <span className="text-red-500">*</span></Label>
+                            <Input
+                                type="datetime-local"
+                                value={editMeetingForm.data.meeting_date}
+                                onChange={(e) => editMeetingForm.setData('meeting_date', e.target.value)}
+                            />
+                            {editMeetingForm.errors.meeting_date && (
+                                <p className="text-xs text-red-600">{editMeetingForm.errors.meeting_date}</p>
+                            )}
+                        </div>
+
+                        {/* Location */}
+                        <div className="space-y-1.5">
+                            <Label>Location <span className="text-red-500">*</span></Label>
+                            <Select
+                                value={
+                                    editMeetingLocationMode === 'custom'
+                                        ? '__custom__'
+                                        : editMeetingForm.data.location || '__none__'
+                                }
+                                onValueChange={(v) => {
+                                    if (v === '__custom__') {
+                                        setEditMeetingLocationMode('custom');
+                                        editMeetingForm.setData('location', '');
+                                    } else if (v === '__none__') {
+                                        setEditMeetingLocationMode('site');
+                                        editMeetingForm.setData('location', '');
+                                    } else {
+                                        setEditMeetingLocationMode('site');
+                                        editMeetingForm.setData('location', v);
+                                    }
+                                }}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select location" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__none__">Select location...</SelectItem>
+                                    {sites.map((s) => (
+                                        <SelectItem key={s.id} value={s.name}>
+                                            {s.name}
+                                        </SelectItem>
+                                    ))}
+                                    <SelectItem value="__custom__">Other / Custom Location</SelectItem>
+                                </SelectContent>
+                            </Select>
+
+                            {editMeetingLocationMode === 'custom' && (
+                                <Input
+                                    className="mt-2"
+                                    placeholder="Enter custom location"
+                                    value={editMeetingForm.data.location}
+                                    onChange={(e) => editMeetingForm.setData('location', e.target.value)}
+                                />
+                            )}
+
+                            {editMeetingForm.errors.location && (
+                                <p className="text-xs text-red-600">{editMeetingForm.errors.location}</p>
+                            )}
+                        </div>
+
+                        {/* Agenda Items */}
+                        <div className="space-y-3">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                    Agenda Items
+                                </h4>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={addEditAgendaItem}
+                                >
+                                    <Plus className="mr-1 h-3.5 w-3.5" />
+                                    Add Item
+                                </Button>
+                            </div>
+
+                            {editMeetingForm.data.agenda_items.length === 0 && (
+                                <div className="rounded-lg border-2 border-dashed border-slate-200 p-4 text-center text-sm text-muted-foreground">
+                                    No agenda items yet. Click "Add Item" to start building your agenda.
+                                </div>
+                            )}
+
+                            <div className="space-y-3">
+                                {editMeetingForm.data.agenda_items.map((item, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="rounded-lg border bg-slate-50/50 p-3 space-y-2"
+                                    >
+                                        <div className="flex items-center justify-between">
+                                            <span className="text-xs font-medium text-muted-foreground">
+                                                Item {idx + 1}
+                                            </span>
+                                            {editMeetingForm.data.agenda_items.length > 1 && (
+                                                <Button
+                                                    type="button"
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-7 w-7 p-0 text-red-500 hover:text-red-700 hover:bg-red-50"
+                                                    onClick={() => removeEditAgendaItem(idx)}
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            )}
+                                        </div>
+                                        <Input
+                                            placeholder="Agenda item title"
+                                            value={item.title}
+                                            onChange={(e) =>
+                                                updateEditAgendaItem(idx, 'title', e.target.value)
+                                            }
+                                        />
+                                        <Textarea
+                                            placeholder="Notes or talking points (optional)"
+                                            rows={2}
+                                            value={item.notes}
+                                            onChange={(e) =>
+                                                updateEditAgendaItem(idx, 'notes', e.target.value)
+                                            }
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => {
+                                setEditingMeeting(null);
+                                setEditMeetingLocationMode('site');
+                            }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            disabled={editMeetingForm.processing}
+                            onClick={() => editingMeeting && submitEditMeeting(editingMeeting.id)}
+                        >
+                            <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                            Save Changes
                         </Button>
                     </DialogFooter>
                 </DialogContent>

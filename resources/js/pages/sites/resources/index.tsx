@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { DoorOpen, Plus, ArrowLeft, Users, Calendar } from 'lucide-react';
+import { DoorOpen, Plus, ArrowLeft, Users, Calendar, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type Site = {
@@ -63,6 +63,8 @@ export default function SiteResources({ site, resources }: Props) {
         amenities: '',
     });
 
+    const deleteForm = useForm({});
+
     const startEdit = (resource: Resource) => {
         setEditingResource(resource);
         form.setData({
@@ -91,6 +93,12 @@ export default function SiteResources({ site, resources }: Props) {
             form.post(`/sites/${site.id}/resources`, {
                 onSuccess: resetForm,
             });
+        }
+    };
+
+    const handleDeactivate = (resource: Resource) => {
+        if (confirm(`Are you sure you want to deactivate "${resource.name}"?`)) {
+            deleteForm.delete(`/sites/${site.id}/resources/${resource.id}`);
         }
     };
 
@@ -237,7 +245,7 @@ export default function SiteResources({ site, resources }: Props) {
                                     <Card key={resource.id} className="hover:bg-muted/50 transition-colors">
                                         <CardContent className="p-4">
                                             <div className="flex items-start justify-between">
-                                                <div>
+                                                <div className="flex-1">
                                                     <div className="font-medium">{resource.name}</div>
                                                     <Badge className={`mt-2 ${typeColors[resource.resource_type]}`}>
                                                         {typeLabels[resource.resource_type]}
@@ -266,9 +274,20 @@ export default function SiteResources({ site, resources }: Props) {
                                                         </div>
                                                     )}
                                                 </div>
-                                                <Button variant="ghost" size="sm" onClick={() => startEdit(resource)}>
-                                                    Edit
-                                                </Button>
+                                                <div className="flex gap-1 ml-2">
+                                                    <Button variant="ghost" size="sm" onClick={() => startEdit(resource)}>
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                                        onClick={() => handleDeactivate(resource)}
+                                                        disabled={deleteForm.processing}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </CardContent>
                                     </Card>

@@ -268,72 +268,83 @@ function ManagerDashboard({ props }: { props: Props }) {
     ];
 
     return (
-        <div className="space-y-6">
-            {/* Row 1: KPI cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <KpiCard
-                    label="Staff Active Today"
-                    value={summary?.staffWorkingTodayCount ?? 0}
-                    icon={Users}
-                    sparklineData={summary?.staffSparkline}
-                    href="/shifts"
-                />
-                <KpiCard
-                    label="Pending Timesheets"
-                    value={summary?.timesheetsPendingCount ?? 0}
-                    icon={ClipboardList}
-                    href="/timesheets"
-                />
-                <KpiCard
-                    label="Shifts Today"
-                    value={summary?.shiftsTodayCount ?? 0}
-                    icon={Clock}
-                    href="/shifts"
-                />
-                <KpiCard
-                    label="Incidents (30d)"
-                    value={incidents?.incidentsLast30 ?? 0}
-                    icon={ShieldAlert}
-                    href="/incidents"
-                    trend={
-                        incidents && incidents.incidentsHighLast30 > 0
-                            ? {
-                                  value: incidents.incidentsHighLast30,
-                                  label: 'high severity',
-                                  direction: 'up',
-                              }
-                            : undefined
-                    }
-                />
+        <div className="space-y-8">
+            {/* Section: Overview */}
+            <div>
+                <div className="mb-4">
+                    <h2 className="text-lg font-semibold">Overview</h2>
+                    <div className="mt-2 h-0.5 w-12 bg-gradient-to-r from-primary to-transparent rounded-full"></div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <KpiCard
+                        label="Staff Active Today"
+                        value={summary?.staffWorkingTodayCount ?? 0}
+                        icon={Users}
+                        sparklineData={summary?.staffSparkline}
+                        href="/shifts"
+                    />
+                    <KpiCard
+                        label="Pending Timesheets"
+                        value={summary?.timesheetsPendingCount ?? 0}
+                        icon={ClipboardList}
+                        href="/timesheets"
+                    />
+                    <KpiCard
+                        label="Shifts Today"
+                        value={summary?.shiftsTodayCount ?? 0}
+                        icon={Clock}
+                        href="/shifts"
+                    />
+                    <KpiCard
+                        label="Incidents (30d)"
+                        value={incidents?.incidentsLast30 ?? 0}
+                        icon={ShieldAlert}
+                        href="/incidents"
+                        trend={
+                            incidents && incidents.incidentsHighLast30 > 0
+                                ? {
+                                      value: incidents.incidentsHighLast30,
+                                      label: 'high severity',
+                                      direction: 'up',
+                                  }
+                                : undefined
+                        }
+                    />
+                </div>
             </div>
 
             {/* HR widgets if available */}
             {props.hrWidgets && (
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <KpiCard
-                        label="Pending Leave"
-                        value={props.hrWidgets.pending_leave}
-                        icon={CalendarDays}
-                        href="/hr/leave"
-                    />
-                    <KpiCard
-                        label="Expiring Compliance"
-                        value={props.hrWidgets.expiring_compliance}
-                        icon={FileWarning}
-                        href="/hr/compliance"
-                    />
-                    <KpiCard
-                        label="Pending Signatures"
-                        value={props.hrWidgets.pending_signatures}
-                        icon={ClipboardList}
-                        href="/hr/signatures/pending"
-                    />
-                    <KpiCard
-                        label="Due Attestations"
-                        value={props.hrWidgets.due_attestations}
-                        icon={CheckCircle2}
-                        href="/hr/my/policies"
-                    />
+                <div>
+                    <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Human Resources</h3>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <KpiCard
+                            label="Pending Leave"
+                            value={props.hrWidgets.pending_leave}
+                            icon={CalendarDays}
+                            href="/hr/leave"
+                        />
+                        <KpiCard
+                            label="Expiring Compliance"
+                            value={props.hrWidgets.expiring_compliance}
+                            icon={FileWarning}
+                            href="/hr/compliance"
+                        />
+                        <KpiCard
+                            label="Pending Signatures"
+                            value={props.hrWidgets.pending_signatures}
+                            icon={ClipboardList}
+                            href="/hr/signatures/pending"
+                        />
+                        <KpiCard
+                            label="Due Attestations"
+                            value={props.hrWidgets.due_attestations}
+                            icon={CheckCircle2}
+                            href="/hr/my/policies"
+                        />
+                    </div>
                 </div>
             )}
 
@@ -376,137 +387,147 @@ function ManagerDashboard({ props }: { props: Props }) {
             )}
 
             {/* Row 2: Charts */}
-            <div className="grid gap-4 lg:grid-cols-5">
-                {/* Weekly shifts bar chart */}
-                <Card className="lg:col-span-3">
-                    <CardHeader>
-                        <CardTitle className="text-sm">Weekly Shifts</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {barData.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={260}>
-                                <BarChart data={barData}>
-                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                    <XAxis
-                                        dataKey="name"
-                                        tick={{ fontSize: 11 }}
-                                        className="fill-muted-foreground"
-                                    />
-                                    <YAxis
-                                        tick={{ fontSize: 11 }}
-                                        className="fill-muted-foreground"
-                                    />
-                                    <RechartsTooltip
-                                        contentStyle={{
-                                            backgroundColor: 'hsl(var(--card))',
-                                            border: '1px solid hsl(var(--border))',
-                                            borderRadius: '0.75rem',
-                                            fontSize: 12,
-                                        }}
-                                    />
-                                    <Bar
-                                        dataKey="shifts"
-                                        fill="var(--primary)"
-                                        radius={[4, 4, 0, 0]}
-                                    />
-                                </BarChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
-                                No shift data available.
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+            <div>
+                <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-muted-foreground">Analytics</h3>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-5">
+                    {/* Weekly shifts bar chart */}
+                    <Card className="lg:col-span-3 border-primary/10 bg-gradient-to-br from-card via-card to-primary/5 shadow-sm hover:shadow-md transition-shadow">
+                        <CardHeader>
+                            <CardTitle className="text-sm">Weekly Shifts</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {barData.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={260}>
+                                    <BarChart data={barData}>
+                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                        <XAxis
+                                            dataKey="name"
+                                            tick={{ fontSize: 11 }}
+                                            className="fill-muted-foreground"
+                                        />
+                                        <YAxis
+                                            tick={{ fontSize: 11 }}
+                                            className="fill-muted-foreground"
+                                        />
+                                        <RechartsTooltip
+                                            contentStyle={{
+                                                backgroundColor: 'hsl(var(--card))',
+                                                border: '1px solid hsl(var(--border))',
+                                                borderRadius: '0.75rem',
+                                                fontSize: 12,
+                                            }}
+                                        />
+                                        <Bar
+                                            dataKey="shifts"
+                                            fill="var(--primary)"
+                                            radius={[4, 4, 0, 0]}
+                                        />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
+                                    No shift data available.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
 
-                {/* Incident severity donut */}
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle className="text-sm">Incident Severity (30d)</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-center">
-                        {severityTotal > 0 ? (
-                            <DonutChart
-                                data={severityDonut}
-                                size={160}
-                                thickness={24}
-                                centerValue={severityTotal}
-                                centerLabel="incidents"
-                            />
-                        ) : (
-                            <div className="text-sm text-muted-foreground">
-                                No incidents in the last 30 days.
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                    {/* Incident severity donut */}
+                    <Card className="lg:col-span-2 border-amber/10 bg-gradient-to-br from-card via-card to-amber/5 shadow-sm hover:shadow-md transition-shadow">
+                        <CardHeader>
+                            <CardTitle className="text-sm">Incident Severity (30d)</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex items-center justify-center">
+                            {severityTotal > 0 ? (
+                                <DonutChart
+                                    data={severityDonut}
+                                    size={160}
+                                    thickness={24}
+                                    centerValue={severityTotal}
+                                    centerLabel="incidents"
+                                />
+                            ) : (
+                                <div className="text-sm text-muted-foreground">
+                                    No incidents in the last 30 days.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
 
             {/* Row 3: Upcoming shifts + My Day */}
-            <div className="grid gap-4 lg:grid-cols-3">
-                <div className="lg:col-span-2 space-y-4">
-                    {/* Filters */}
-                    <div className="flex flex-wrap items-end gap-3 rounded-xl border p-4">
-                        <div>
-                            <div className="text-xs text-muted-foreground">Range</div>
-                            <Select
-                                value={filters.range ?? 'week'}
-                                onValueChange={(v) => updateFilters({ range: v as any })}
-                            >
-                                <SelectTrigger className="mt-1 w-[160px]">
-                                    <SelectValue placeholder="Range" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="today">Today</SelectItem>
-                                    <SelectItem value="week">Next 7 days</SelectItem>
-                                </SelectContent>
-                            </Select>
+            <div>
+                <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-muted-foreground">Schedule & Tasks</h3>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-3">
+                    <div className="lg:col-span-2 space-y-4">
+                        {/* Filters */}
+                        <div className="flex flex-wrap items-end gap-3 rounded-lg border border-primary/20 bg-gradient-to-r from-primary/5 to-transparent p-4 backdrop-blur-sm">
+                            <div>
+                                <div className="text-xs text-muted-foreground">Range</div>
+                                <Select
+                                    value={filters.range ?? 'week'}
+                                    onValueChange={(v) => updateFilters({ range: v as any })}
+                                >
+                                    <SelectTrigger className="mt-1 w-[160px]">
+                                        <SelectValue placeholder="Range" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="today">Today</SelectItem>
+                                        <SelectItem value="week">Next 7 days</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div>
+                                <div className="text-xs text-muted-foreground">Status</div>
+                                <Select
+                                    value={filters.status ?? 'all'}
+                                    onValueChange={(v) => updateFilters({ status: v })}
+                                >
+                                    <SelectTrigger className="mt-1 w-[180px]">
+                                        <SelectValue placeholder="Status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All</SelectItem>
+                                        <SelectItem value="scheduled">Scheduled</SelectItem>
+                                        <SelectItem value="in_progress">In progress</SelectItem>
+                                        <SelectItem value="completed">Completed</SelectItem>
+                                        <SelectItem value="cancelled">Cancelled</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="ml-auto text-xs text-muted-foreground">
+                                Showing {shiftsForWorkTab.length} shift
+                                {shiftsForWorkTab.length === 1 ? '' : 's'}
+                            </div>
                         </div>
-                        <div>
-                            <div className="text-xs text-muted-foreground">Status</div>
-                            <Select
-                                value={filters.status ?? 'all'}
-                                onValueChange={(v) => updateFilters({ status: v })}
-                            >
-                                <SelectTrigger className="mt-1 w-[180px]">
-                                    <SelectValue placeholder="Status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="all">All</SelectItem>
-                                    <SelectItem value="scheduled">Scheduled</SelectItem>
-                                    <SelectItem value="in_progress">In progress</SelectItem>
-                                    <SelectItem value="completed">Completed</SelectItem>
-                                    <SelectItem value="cancelled">Cancelled</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="ml-auto text-xs text-muted-foreground">
-                            Showing {shiftsForWorkTab.length} shift
-                            {shiftsForWorkTab.length === 1 ? '' : 's'}
-                        </div>
+
+                        {/* Upcoming shifts */}
+                        <ShiftTimeline
+                            title="Upcoming Shifts"
+                            shifts={shiftsForWorkTab}
+                            mode="manager"
+                            emptyText="No shifts scheduled."
+                        />
                     </div>
 
-                    {/* Upcoming shifts */}
-                    <ShiftTimeline
-                        title="Upcoming Shifts"
-                        shifts={shiftsForWorkTab}
-                        mode="manager"
-                        emptyText="No shifts scheduled."
-                    />
-                </div>
+                    <div className="lg:col-span-1 space-y-4">
+                        <MyDayList
+                            title="My Day"
+                            items={props.myDayItems ?? []}
+                            emptyLabel="No tasks or follow-ups due."
+                        />
 
-                <div className="lg:col-span-1 space-y-4">
-                    <MyDayList
-                        title="My Day"
-                        items={props.myDayItems ?? []}
-                        emptyLabel="No tasks or follow-ups due."
-                    />
-
-                    <ActivityTimeline
-                        title="Activity"
-                        events={props.upcomingEvents ?? []}
-                        emptyText="No upcoming activity."
-                    />
+                        <ActivityTimeline
+                            title="Activity"
+                            events={props.upcomingEvents ?? []}
+                            emptyText="No upcoming activity."
+                        />
+                    </div>
                 </div>
             </div>
 
@@ -545,174 +566,193 @@ function StaffDashboard({ props }: { props: Props }) {
     ];
 
     return (
-        <div className="space-y-6">
-            {/* Row 1: KPI cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <KpiCard
-                    label="My Shifts Today"
-                    value={kpis?.myShiftsToday ?? props.todayShifts?.length ?? 0}
-                    icon={Clock}
-                    href="/shifts"
-                />
-                <KpiCard
-                    label="Leave Balance"
-                    value={kpis?.leaveBalance != null ? `${kpis.leaveBalance}h` : '--'}
-                    icon={CalendarDays}
-                    href="/hr/leave"
-                />
-                <KpiCard
-                    label="Compliance"
-                    value={kpis?.compliancePercent != null ? `${kpis.compliancePercent}%` : '--'}
-                    icon={CheckCircle2}
-                    trend={
-                        kpis?.compliancePercent != null
-                            ? {
-                                  value: kpis.compliancePercent,
-                                  label: 'complete',
-                                  direction:
-                                      kpis.compliancePercent >= 90
-                                          ? 'up'
-                                          : kpis.compliancePercent >= 70
-                                            ? 'neutral'
-                                            : 'down',
-                              }
-                            : undefined
-                    }
-                />
-                <KpiCard
-                    label="Pending Tasks"
-                    value={kpis?.pendingTasks ?? props.myDayItems?.length ?? 0}
-                    icon={ListTodo}
-                />
-            </div>
-
-            {/* HR widgets if available */}
-            {props.hrWidgets && (
+        <div className="space-y-8">
+            {/* Section: Today's Summary */}
+            <div>
+                <div className="mb-4">
+                    <h2 className="text-lg font-semibold">Today's Summary</h2>
+                    <div className="mt-2 h-0.5 w-12 bg-gradient-to-r from-primary to-transparent rounded-full"></div>
+                </div>
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <KpiCard
-                        label="Pending Leave"
-                        value={props.hrWidgets.pending_leave}
+                        label="My Shifts Today"
+                        value={kpis?.myShiftsToday ?? props.todayShifts?.length ?? 0}
+                        icon={Clock}
+                        href="/shifts"
+                    />
+                    <KpiCard
+                        label="Leave Balance"
+                        value={kpis?.leaveBalance != null ? `${kpis.leaveBalance}h` : '--'}
                         icon={CalendarDays}
                         href="/hr/leave"
                     />
                     <KpiCard
-                        label="Expiring Compliance"
-                        value={props.hrWidgets.expiring_compliance}
-                        icon={FileWarning}
-                        href="/hr/compliance"
-                    />
-                    <KpiCard
-                        label="Pending Signatures"
-                        value={props.hrWidgets.pending_signatures}
-                        icon={ClipboardList}
-                        href="/hr/signatures/pending"
-                    />
-                    <KpiCard
-                        label="Due Attestations"
-                        value={props.hrWidgets.due_attestations}
+                        label="Compliance"
+                        value={kpis?.compliancePercent != null ? `${kpis.compliancePercent}%` : '--'}
                         icon={CheckCircle2}
-                        href="/hr/my/policies"
+                        trend={
+                            kpis?.compliancePercent != null
+                                ? {
+                                      value: kpis.compliancePercent,
+                                      label: 'complete',
+                                      direction:
+                                          kpis.compliancePercent >= 90
+                                              ? 'up'
+                                              : kpis.compliancePercent >= 70
+                                                ? 'neutral'
+                                                : 'down',
+                                  }
+                                : undefined
+                        }
                     />
+                    <KpiCard
+                        label="Pending Tasks"
+                        value={kpis?.pendingTasks ?? props.myDayItems?.length ?? 0}
+                        icon={ListTodo}
+                    />
+                </div>
+            </div>
+
+            {/* HR widgets if available */}
+            {props.hrWidgets && (
+                <div>
+                    <div className="mb-4">
+                        <h3 className="text-sm font-semibold text-muted-foreground">Human Resources</h3>
+                    </div>
+                    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                        <KpiCard
+                            label="Pending Leave"
+                            value={props.hrWidgets.pending_leave}
+                            icon={CalendarDays}
+                            href="/hr/leave"
+                        />
+                        <KpiCard
+                            label="Expiring Compliance"
+                            value={props.hrWidgets.expiring_compliance}
+                            icon={FileWarning}
+                            href="/hr/compliance"
+                        />
+                        <KpiCard
+                            label="Pending Signatures"
+                            value={props.hrWidgets.pending_signatures}
+                            icon={ClipboardList}
+                            href="/hr/signatures/pending"
+                        />
+                        <KpiCard
+                            label="Due Attestations"
+                            value={props.hrWidgets.due_attestations}
+                            icon={CheckCircle2}
+                            href="/hr/my/policies"
+                        />
+                    </div>
                 </div>
             )}
 
             {/* Row 2: Schedule + Check-in */}
-            <div className="grid gap-4 lg:grid-cols-3">
-                <div className="lg:col-span-2">
-                    <ShiftTimeline
-                        title="Today's Schedule"
-                        shifts={shiftsForWorkTab}
-                        mode="staff"
-                        emptyText="No shifts scheduled for today."
-                    />
+            <div>
+                <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-muted-foreground">Schedule & Wellness</h3>
                 </div>
+                <div className="grid gap-4 lg:grid-cols-3">
+                    <div className="lg:col-span-2">
+                        <ShiftTimeline
+                            title="Today's Schedule"
+                            shifts={shiftsForWorkTab}
+                            mode="staff"
+                            emptyText="No shifts scheduled for today."
+                        />
+                    </div>
 
-                <div className="lg:col-span-1">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-sm">Daily Check-in</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="text-sm text-muted-foreground">
-                                How are you feeling today?
-                            </div>
-                            <div className="flex gap-2">
-                                {['Great', 'Good', 'Okay', 'Tired'].map((mood) => (
-                                    <Button
-                                        key={mood}
-                                        size="sm"
-                                        variant="outline"
-                                        className="flex-1"
-                                    >
-                                        {mood}
-                                    </Button>
-                                ))}
-                            </div>
+                    <div className="lg:col-span-1">
+                        <Card className="border-primary/10 bg-gradient-to-br from-card via-card to-primary/5 shadow-sm">
+                            <CardHeader>
+                                <CardTitle className="text-sm">Daily Check-in</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="text-sm text-muted-foreground">
+                                    How are you feeling today?
+                                </div>
+                                <div className="flex gap-2">
+                                    {['Great', 'Good', 'Okay', 'Tired'].map((mood) => (
+                                        <Button
+                                            key={mood}
+                                            size="sm"
+                                            variant="outline"
+                                            className="flex-1 transition-all hover:bg-primary/10 hover:border-primary/30"
+                                        >
+                                            {mood}
+                                        </Button>
+                                    ))}
+                                </div>
 
-                            <div className="border-t pt-4">
-                                <div className="text-xs font-medium text-muted-foreground">
-                                    Quick Actions
+                                <div className="border-t pt-4">
+                                    <div className="text-xs font-medium text-muted-foreground">
+                                        Quick Actions
+                                    </div>
+                                    <div className="mt-2 flex flex-wrap gap-2">
+                                        <Button asChild size="sm" variant="outline" className="transition-all hover:bg-primary/10">
+                                            <Link href="/hr/leave/create">Submit Leave</Link>
+                                        </Button>
+                                        <Button asChild size="sm" variant="outline" className="transition-all hover:bg-primary/10">
+                                            <Link href="/timesheets">View Timesheets</Link>
+                                        </Button>
+                                    </div>
                                 </div>
-                                <div className="mt-2 flex flex-wrap gap-2">
-                                    <Button asChild size="sm" variant="outline">
-                                        <Link href="/hr/leave/create">Submit Leave</Link>
-                                    </Button>
-                                    <Button asChild size="sm" variant="outline">
-                                        <Link href="/timesheets">View Timesheets</Link>
-                                    </Button>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                            </CardContent>
+                        </Card>
+                    </div>
                 </div>
             </div>
 
             {/* Row 3: Tasks + Quick Actions */}
-            <div className="grid gap-4 lg:grid-cols-3">
-                <div className="lg:col-span-2">
-                    <MyDayList
-                        title="My Tasks / Follow-ups"
-                        items={props.myDayItems ?? []}
-                        emptyLabel="No tasks or follow-ups due."
-                    />
+            <div>
+                <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-muted-foreground">Tasks & Actions</h3>
                 </div>
+                <div className="grid gap-4 lg:grid-cols-3">
+                    <div className="lg:col-span-2">
+                        <MyDayList
+                            title="My Tasks / Follow-ups"
+                            items={props.myDayItems ?? []}
+                            emptyLabel="No tasks or follow-ups due."
+                        />
+                    </div>
 
-                <div className="lg:col-span-1">
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-sm">Quick Actions</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="grid grid-cols-2 gap-2">
-                                <Button asChild size="sm" variant="outline" className="justify-start">
-                                    <Link href="/hr/leave/create">
-                                        <CalendarDays className="mr-2 h-4 w-4" />
-                                        Submit Leave
-                                    </Link>
-                                </Button>
-                                <Button asChild size="sm" variant="outline" className="justify-start">
-                                    <Link href="/timesheets">
-                                        <Timer className="mr-2 h-4 w-4" />
-                                        View Timesheets
-                                    </Link>
-                                </Button>
-                                <Button asChild size="sm" variant="outline" className="justify-start">
-                                    <Link href="/hr/my/training">
-                                        <CheckCircle2 className="mr-2 h-4 w-4" />
-                                        My Training
-                                    </Link>
-                                </Button>
-                                <Button asChild size="sm" variant="outline" className="justify-start">
-                                    <Link href="/hr/my/policies">
-                                        <ClipboardList className="mr-2 h-4 w-4" />
-                                        My Policies
-                                    </Link>
-                                </Button>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <div className="lg:col-span-1 space-y-4">
+                        <Card className="border-emerald/10 bg-gradient-to-br from-card via-card to-emerald/5 shadow-sm">
+                            <CardHeader>
+                                <CardTitle className="text-sm">Quick Actions</CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <Button asChild size="sm" variant="outline" className="justify-start transition-all hover:bg-emerald/10 hover:border-emerald/30">
+                                        <Link href="/hr/leave/create">
+                                            <CalendarDays className="mr-2 h-4 w-4" />
+                                            Submit Leave
+                                        </Link>
+                                    </Button>
+                                    <Button asChild size="sm" variant="outline" className="justify-start transition-all hover:bg-emerald/10 hover:border-emerald/30">
+                                        <Link href="/timesheets">
+                                            <Timer className="mr-2 h-4 w-4" />
+                                            View Timesheets
+                                        </Link>
+                                    </Button>
+                                    <Button asChild size="sm" variant="outline" className="justify-start transition-all hover:bg-emerald/10 hover:border-emerald/30">
+                                        <Link href="/hr/my/training">
+                                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                                            My Training
+                                        </Link>
+                                    </Button>
+                                    <Button asChild size="sm" variant="outline" className="justify-start transition-all hover:bg-emerald/10 hover:border-emerald/30">
+                                        <Link href="/hr/my/policies">
+                                            <ClipboardList className="mr-2 h-4 w-4" />
+                                            My Policies
+                                        </Link>
+                                    </Button>
+                                </div>
+                            </CardContent>
+                        </Card>
 
-                    <div className="mt-4">
                         <ActivityTimeline
                             title="Activity"
                             events={props.upcomingEvents ?? []}
@@ -746,199 +786,215 @@ function HrAdminDashboard({ props }: { props: Props }) {
     const deptTotal = deptDonut.reduce((s, d) => s + d.value, 0);
 
     return (
-        <div className="space-y-6">
-            {/* Row 1: KPI cards */}
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                <KpiCard
-                    label="Total Headcount"
-                    value={hr?.headcount ?? 0}
-                    icon={Users}
-                    sparklineData={hr?.headcountTrend}
-                    href="/hr/employees"
-                />
-                <KpiCard
-                    label="Open Vacancies"
-                    value={hr?.vacancies ?? 0}
-                    icon={Briefcase}
-                    href="/hr/positions"
-                />
-                <KpiCard
-                    label="Pending Leave"
-                    value={hr?.pendingLeave ?? 0}
-                    icon={CalendarDays}
-                    href="/hr/leave"
-                />
-                <KpiCard
-                    label="Compliance Score"
-                    value={hr?.complianceScore != null ? `${hr.complianceScore}%` : '--'}
-                    icon={CheckCircle2}
-                    trend={
-                        hr?.complianceScore != null
-                            ? {
-                                  value: hr.complianceScore,
-                                  label: 'compliant',
-                                  direction:
-                                      hr.complianceScore >= 90
-                                          ? 'up'
-                                          : hr.complianceScore >= 70
-                                            ? 'neutral'
-                                            : 'down',
-                              }
-                            : undefined
-                    }
-                    href="/hr/compliance"
-                />
+        <div className="space-y-8">
+            {/* Section: HR Metrics */}
+            <div>
+                <div className="mb-4">
+                    <h2 className="text-lg font-semibold">HR Metrics</h2>
+                    <div className="mt-2 h-0.5 w-12 bg-gradient-to-r from-primary to-transparent rounded-full"></div>
+                </div>
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <KpiCard
+                        label="Total Headcount"
+                        value={hr?.headcount ?? 0}
+                        icon={Users}
+                        sparklineData={hr?.headcountTrend}
+                        href="/hr/employees"
+                    />
+                    <KpiCard
+                        label="Open Vacancies"
+                        value={hr?.vacancies ?? 0}
+                        icon={Briefcase}
+                        href="/hr/positions"
+                    />
+                    <KpiCard
+                        label="Pending Leave"
+                        value={hr?.pendingLeave ?? 0}
+                        icon={CalendarDays}
+                        href="/hr/leave"
+                    />
+                    <KpiCard
+                        label="Compliance Score"
+                        value={hr?.complianceScore != null ? `${hr.complianceScore}%` : '--'}
+                        icon={CheckCircle2}
+                        trend={
+                            hr?.complianceScore != null
+                                ? {
+                                      value: hr.complianceScore,
+                                      label: 'compliant',
+                                      direction:
+                                          hr.complianceScore >= 90
+                                              ? 'up'
+                                              : hr.complianceScore >= 70
+                                                ? 'neutral'
+                                                : 'down',
+                                  }
+                                : undefined
+                        }
+                        href="/hr/compliance"
+                    />
+                </div>
             </div>
 
             {/* Row 2: Charts */}
-            <div className="grid gap-4 lg:grid-cols-5">
-                {/* Headcount trend line chart */}
-                <Card className="lg:col-span-3">
-                    <CardHeader>
-                        <CardTitle className="text-sm">Headcount Trend (12 months)</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {headcountSeries.length > 0 ? (
-                            <ResponsiveContainer width="100%" height={260}>
-                                <LineChart data={headcountSeries}>
-                                    <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                    <XAxis
-                                        dataKey="name"
-                                        tick={{ fontSize: 11 }}
-                                        className="fill-muted-foreground"
-                                    />
-                                    <YAxis
-                                        tick={{ fontSize: 11 }}
-                                        className="fill-muted-foreground"
-                                    />
-                                    <RechartsTooltip
-                                        contentStyle={{
-                                            backgroundColor: 'hsl(var(--card))',
-                                            border: '1px solid hsl(var(--border))',
-                                            borderRadius: '0.75rem',
-                                            fontSize: 12,
-                                        }}
-                                    />
-                                    <Line
-                                        type="monotone"
-                                        dataKey="headcount"
-                                        stroke="var(--primary)"
-                                        strokeWidth={2}
-                                        dot={{ r: 3, fill: 'var(--primary)' }}
-                                    />
-                                </LineChart>
-                            </ResponsiveContainer>
-                        ) : (
-                            <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
-                                No headcount data available.
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+            <div>
+                <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-muted-foreground">Workforce Analytics</h3>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-5">
+                    {/* Headcount trend line chart */}
+                    <Card className="lg:col-span-3 border-blue/10 bg-gradient-to-br from-card via-card to-blue/5 shadow-sm hover:shadow-md transition-shadow">
+                        <CardHeader>
+                            <CardTitle className="text-sm">Headcount Trend (12 months)</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {headcountSeries.length > 0 ? (
+                                <ResponsiveContainer width="100%" height={260}>
+                                    <LineChart data={headcountSeries}>
+                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                        <XAxis
+                                            dataKey="name"
+                                            tick={{ fontSize: 11 }}
+                                            className="fill-muted-foreground"
+                                        />
+                                        <YAxis
+                                            tick={{ fontSize: 11 }}
+                                            className="fill-muted-foreground"
+                                        />
+                                        <RechartsTooltip
+                                            contentStyle={{
+                                                backgroundColor: 'hsl(var(--card))',
+                                                border: '1px solid hsl(var(--border))',
+                                                borderRadius: '0.75rem',
+                                                fontSize: 12,
+                                            }}
+                                        />
+                                        <Line
+                                            type="monotone"
+                                            dataKey="headcount"
+                                            stroke="var(--primary)"
+                                            strokeWidth={2}
+                                            dot={{ r: 3, fill: 'var(--primary)' }}
+                                        />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            ) : (
+                                <div className="flex h-[260px] items-center justify-center text-sm text-muted-foreground">
+                                    No headcount data available.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
 
-                {/* Department breakdown donut */}
-                <Card className="lg:col-span-2">
-                    <CardHeader>
-                        <CardTitle className="text-sm">Department Breakdown</CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex items-center justify-center">
-                        {deptTotal > 0 ? (
-                            <DonutChart
-                                data={deptDonut}
-                                size={160}
-                                thickness={24}
-                                centerValue={deptTotal}
-                                centerLabel="employees"
-                            />
-                        ) : (
-                            <div className="text-sm text-muted-foreground">
-                                No department data available.
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                    {/* Department breakdown donut */}
+                    <Card className="lg:col-span-2 border-purple/10 bg-gradient-to-br from-card via-card to-purple/5 shadow-sm hover:shadow-md transition-shadow">
+                        <CardHeader>
+                            <CardTitle className="text-sm">Department Breakdown</CardTitle>
+                        </CardHeader>
+                        <CardContent className="flex items-center justify-center">
+                            {deptTotal > 0 ? (
+                                <DonutChart
+                                    data={deptDonut}
+                                    size={160}
+                                    thickness={24}
+                                    centerValue={deptTotal}
+                                    centerLabel="employees"
+                                />
+                            ) : (
+                                <div className="text-sm text-muted-foreground">
+                                    No department data available.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
 
             {/* Row 3: Recent activity + Expiring compliance */}
-            <div className="grid gap-4 lg:grid-cols-2">
-                {/* Recent activity feed */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-sm">Recent Activity</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {hr?.recentFeedPosts?.length ? (
-                            <div className="space-y-3">
-                                {hr.recentFeedPosts.map((post) => (
-                                    <div
-                                        key={post.id}
-                                        className="flex items-start gap-3 rounded-lg border p-3"
-                                    >
-                                        <Activity className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm font-medium">
-                                                    {post.user?.name ?? 'System'}
-                                                </span>
-                                                <Badge variant="secondary" className="text-[10px]">
-                                                    {post.post_type}
-                                                </Badge>
-                                            </div>
-                                            <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                                                {post.content}
-                                            </div>
-                                            <div className="mt-1 text-xs text-muted-foreground">
-                                                {formatShortDate(post.created_at)}
+            <div>
+                <div className="mb-4">
+                    <h3 className="text-sm font-semibold text-muted-foreground">Activity & Alerts</h3>
+                </div>
+                <div className="grid gap-4 lg:grid-cols-2">
+                    {/* Recent activity feed */}
+                    <Card className="border-cyan/10 bg-gradient-to-br from-card via-card to-cyan/5 shadow-sm">
+                        <CardHeader>
+                            <CardTitle className="text-sm">Recent Activity</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            {hr?.recentFeedPosts?.length ? (
+                                <div className="space-y-3">
+                                    {hr.recentFeedPosts.map((post) => (
+                                        <div
+                                            key={post.id}
+                                            className="flex items-start gap-3 rounded-lg border border-primary/10 bg-primary/5 p-3 transition-colors hover:bg-primary/10"
+                                        >
+                                            <Activity className="mt-0.5 h-4 w-4 shrink-0 text-primary/60" />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-medium">
+                                                        {post.user?.name ?? 'System'}
+                                                    </span>
+                                                    <Badge variant="secondary" className="text-[10px]">
+                                                        {post.post_type}
+                                                    </Badge>
+                                                </div>
+                                                <div className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                                                    {post.content}
+                                                </div>
+                                                <div className="mt-1 text-xs text-muted-foreground">
+                                                    {formatShortDate(post.created_at)}
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-sm text-muted-foreground">
-                                No recent activity.
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-sm text-muted-foreground">
+                                    No recent activity.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
 
-                {/* Expiring compliance */}
-                <Card>
-                    <CardHeader className="flex flex-row items-center justify-between">
-                        <CardTitle className="text-sm">Expiring Compliance</CardTitle>
-                        <Button asChild size="sm" variant="outline">
-                            <Link href="/hr/compliance">View all</Link>
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        {hr?.expiringCompliance?.length ? (
-                            <div className="space-y-2">
-                                {hr.expiringCompliance.map((item, i) => (
-                                    <div
-                                        key={`${item.user_id}-${i}`}
-                                        className="flex items-center justify-between gap-3 rounded-lg border p-3"
-                                    >
-                                        <div className="min-w-0">
-                                            <div className="text-sm font-medium">
-                                                {item.user_name}
+                    {/* Expiring compliance */}
+                    <Card className="border-red/10 bg-gradient-to-br from-card via-card to-red/5 shadow-sm">
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <CardTitle className="text-sm">Expiring Compliance</CardTitle>
+                            <Button asChild size="sm" variant="outline" className="transition-all hover:border-red/30 hover:bg-red/5">
+                                <Link href="/hr/compliance">View all</Link>
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            {hr?.expiringCompliance?.length ? (
+                                <div className="space-y-2">
+                                    {hr.expiringCompliance.map((item, i) => (
+                                        <div
+                                            key={`${item.user_id}-${i}`}
+                                            className="flex items-center justify-between gap-3 rounded-lg border border-red/10 bg-red/5 p-3 transition-colors hover:bg-red/10"
+                                        >
+                                            <div className="min-w-0">
+                                                <div className="text-sm font-medium">
+                                                    {item.user_name}
+                                                </div>
+                                                <div className="text-xs text-muted-foreground">
+                                                    {item.requirement_name}
+                                                </div>
                                             </div>
-                                            <div className="text-xs text-muted-foreground">
-                                                {item.requirement_name}
-                                            </div>
+                                            <Badge variant="destructive" className="shrink-0 text-[10px]">
+                                                Expires {formatShortDate(item.expires_at)}
+                                            </Badge>
                                         </div>
-                                        <Badge variant="destructive" className="shrink-0 text-[10px]">
-                                            Expires {formatShortDate(item.expires_at)}
-                                        </Badge>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <div className="text-sm text-muted-foreground">
-                                No items expiring soon.
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="text-sm text-muted-foreground">
+                                    No items expiring soon.
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         </div>
     );

@@ -6,8 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { BedDouble, Plus, ArrowLeft, User } from 'lucide-react';
+import { BedDouble, Plus, ArrowLeft, User, Trash2, History } from 'lucide-react';
 import { useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 type Site = {
     id: number;
@@ -26,6 +27,17 @@ type Room = {
     notes?: string;
     is_active: boolean;
     assigned_client?: Client | null;
+    history?: RoomHistory[];
+};
+
+type RoomHistory = {
+    id: number;
+    client_id?: number;
+    client?: Client;
+    assigned_from?: string;
+    assigned_until?: string;
+    notes?: string;
+    created_at?: string;
 };
 
 type Props = {
@@ -37,12 +49,15 @@ type Props = {
 export default function SiteRooms({ site, rooms, clients }: Props) {
     const [showForm, setShowForm] = useState(false);
     const [editingRoom, setEditingRoom] = useState<Room | null>(null);
+    const [showHistory, setShowHistory] = useState<Room | null>(null);
 
     const form = useForm({
         name: '',
         notes: '',
         assigned_client_id: '',
     });
+
+    const deleteForm = useForm({});
 
     const startEdit = (room: Room) => {
         setEditingRoom(room);
@@ -69,6 +84,14 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
         } else {
             form.post(`/sites/${site.id}/rooms`, {
                 onSuccess: resetForm,
+            });
+        }
+    };
+
+    const handleDeactivate = (room: Room) => {
+        if (confirm(`Are you sure you want to deactivate "${room.name}"?`)) {
+            deleteForm.delete(`/sites/${site.id}/rooms/${room.id}`, {
+                onSuccess: () => setShowHistory(null),
             });
         }
     };
@@ -196,7 +219,7 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                                     <Card key={room.id} className="hover:bg-muted/50 transition-colors">
                                         <CardContent className="p-4">
                                             <div className="flex items-start justify-between">
-                                                <div>
+                                                <div className="flex-1">
                                                     <div className="font-medium">{room.name}</div>
                                                     {room.assigned_client ? (
                                                         <Badge className="mt-2 bg-indigo-500/20 text-indigo-300 border-indigo-500/30">
@@ -212,9 +235,56 @@ export default function SiteRooms({ site, rooms, clients }: Props) {
                                                         <div className="text-sm text-slate-400 mt-2">{room.notes}</div>
                                                     )}
                                                 </div>
-                                                <Button variant="ghost" size="sm" onClick={() => startEdit(room)}>
-                                                    Edit
-                                                </Button>
+                                                <div className="flex gap-1 ml-2">
+                                                    {room.history && room.history.length > 0 && (
+                                                        <Dialog open={showHistory?.id === room.id} onOpenChange={(open) => setShowHistory(open ? room : null)}>
+                                                            <DialogTrigger asChild>
+                                                                <Button variant="ghost" size="sm" title="View assignment history">
+                                                                    <History className="w-4 h-4" />
+                                                                </Button>
+                                                            </DialogTrigger>
+                                                            <DialogContent>
+                                                                <DialogHeader>
+                                                                    <DialogTitle>Assignment History - {room.name}</DialogTitle>
+                                                                </DialogHeader>
+                                                                <div className="space-y-3 max-h-96 overflow-y-auto">
+                                                                    {room.history?.map((entry, idx) => (
+                                                                        <Card key={idx} className="bg-muted/50">
+                                                                            <CardContent className="p-3 text-sm">
+                                                                                {entry.client ? (
+                                                                                    <div>
+                                                                                        <div className="font-medium">
+                                                                                            {entry.client.first_name} {entry.client.last_name}
+                                                                                        </div>
+                                                                                        <div className="text-xs text-slate-400 mt-1">
+                                                                                            {entry.assigned_from && `From: ${entry.assigned_from}`}
+                                                                                            {entry.assigned_until && ` • To: ${entry.assigned_until}`}
+                                                                                        </div>
+                                                                                        {entry.notes && <div className="text-xs mt-1 text-slate-300">{entry.notes}</div>}
+                                                                                    </div>
+                                                                                ) : (
+                                                                                    <div className="text-slate-400">No assignment data</div>
+                                                                                )}
+                                                                            </CardContent>
+                                                                        </Card>
+                                                                    ))}
+                                                                </div>
+                                                            </DialogContent>
+                                                        </Dialog>
+                                                    )}
+                                                    <Button variant="ghost" size="sm" onClick={() => startEdit(room)}>
+                                                        Edit
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                                        onClick={() => handleDeactivate(room)}
+                                                        disabled={deleteForm.processing}
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </Button>
+                                                </div>
                                             </div>
                                         </CardContent>
                                     </Card>
