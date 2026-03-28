@@ -337,7 +337,7 @@ function MedicationFormFields({
             {form.data.is_prn && (
                 <div className="rounded-md border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-950/30">
                     <p className="mb-3 text-sm font-medium text-blue-700 dark:text-blue-400">PRN Details</p>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-1.5">
                             <Label htmlFor={`${idPrefix}_prn_reason`}>PRN Reason</Label>
                             <Input

@@ -4,6 +4,8 @@ namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinVendor;
+use App\Domain\Finance\Http\Requests\StoreVendorRequest;
+use App\Domain\Finance\Http\Requests\UpdateVendorRequest;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -64,33 +66,9 @@ class VendorController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreVendorRequest $request)
     {
-        $this->authorize('create', FinVendor::class);
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'trading_name' => ['nullable', 'string', 'max:255'],
-            'vendor_type' => ['required', 'in:supplier,contractor,utility,government,other'],
-            'gst_number' => ['nullable', 'string', 'max:50'],
-            'bank_account_number' => ['nullable', 'string'],
-            'email' => ['nullable', 'email'],
-            'phone' => ['nullable', 'string'],
-            'address_line_1' => ['nullable', 'string', 'max:255'],
-            'address_line_2' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'region' => ['nullable', 'string', 'max:255'],
-            'postal_code' => ['nullable', 'string', 'max:20'],
-            'payment_terms_days' => ['nullable', 'integer', 'min:0'],
-            'default_expense_account_id' => ['nullable', 'exists:fin_accounts,id'],
-            'notes' => ['nullable', 'string'],
-            'contacts' => ['nullable', 'array'],
-            'contacts.*.name' => ['required', 'string', 'max:255'],
-            'contacts.*.role' => ['nullable', 'string', 'max:255'],
-            'contacts.*.email' => ['nullable', 'email'],
-            'contacts.*.phone' => ['nullable', 'string'],
-            'contacts.*.is_primary' => ['boolean'],
-        ]);
+        $validated = $request->validated();
 
         $vendor = FinVendor::create([
             'organization_id' => $request->user()->organization_id,
@@ -189,35 +167,9 @@ class VendorController extends Controller
         ]);
     }
 
-    public function update(Request $request, FinVendor $vendor)
+    public function update(UpdateVendorRequest $request, FinVendor $vendor)
     {
-        $this->authorize('update', $vendor);
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'trading_name' => ['nullable', 'string', 'max:255'],
-            'vendor_type' => ['required', 'in:supplier,contractor,utility,government,other'],
-            'gst_number' => ['nullable', 'string', 'max:50'],
-            'bank_account_number' => ['nullable', 'string'],
-            'email' => ['nullable', 'email'],
-            'phone' => ['nullable', 'string'],
-            'address_line_1' => ['nullable', 'string', 'max:255'],
-            'address_line_2' => ['nullable', 'string', 'max:255'],
-            'city' => ['nullable', 'string', 'max:255'],
-            'region' => ['nullable', 'string', 'max:255'],
-            'postal_code' => ['nullable', 'string', 'max:20'],
-            'payment_terms_days' => ['nullable', 'integer', 'min:0'],
-            'default_expense_account_id' => ['nullable', 'exists:fin_accounts,id'],
-            'is_active' => ['boolean'],
-            'notes' => ['nullable', 'string'],
-            'contacts' => ['nullable', 'array'],
-            'contacts.*.id' => ['nullable', 'integer'],
-            'contacts.*.name' => ['required', 'string', 'max:255'],
-            'contacts.*.role' => ['nullable', 'string', 'max:255'],
-            'contacts.*.email' => ['nullable', 'email'],
-            'contacts.*.phone' => ['nullable', 'string'],
-            'contacts.*.is_primary' => ['boolean'],
-        ]);
+        $validated = $request->validated();
 
         $vendor->update([
             'name' => $validated['name'],

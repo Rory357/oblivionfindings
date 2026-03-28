@@ -120,7 +120,7 @@ function NewOrderDialog({ clients }: { clients: Props['clients'] }) {
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-1.5">
                             <Label htmlFor="prescriber_name">Prescriber Name *</Label>
                             <Input
@@ -163,7 +163,7 @@ function NewOrderDialog({ clients }: { clients: Props['clients'] }) {
                         {form.errors.medication_name && <p className="text-xs text-red-600">{form.errors.medication_name}</p>}
                     </div>
 
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div className="space-y-1.5">
                             <Label htmlFor="dose">Dose *</Label>
                             <Input id="dose" value={form.data.dose} onChange={(e) => form.setData('dose', e.target.value)} />

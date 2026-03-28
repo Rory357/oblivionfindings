@@ -94,5 +94,33 @@ return [
         'Control Room' => [
             'controlroom.alert',
         ],
+
+        // --- Cross-Domain ---
+        'Cross-Module Notifications' => [
+            'cross_domain.hr_compliance_concern_created',
+            'cross_domain.finance_budget_threshold_exceeded',
+            'cross_domain.roadmap_initiative_requires_governance_decision',
+        ],
+    ],
+
+    'cross_domain' => [
+        'label' => 'Cross-Module Notifications',
+        'events' => [
+            'hr_compliance_concern_created' => [
+                'label' => 'HR compliance concern escalated to governance',
+                'description' => 'When an HR compliance issue requires governance attention',
+                'channels' => ['database', 'mail'],
+            ],
+            'finance_budget_threshold_exceeded' => [
+                'label' => 'Budget threshold exceeded',
+                'description' => 'When spending exceeds budget threshold, notify governance',
+                'channels' => ['database', 'mail'],
+            ],
+            'roadmap_initiative_requires_governance_decision' => [
+                'label' => 'Initiative requires governance decision',
+                'description' => 'When a roadmap initiative needs board/governance approval',
+                'channels' => ['database', 'mail'],
+            ],
+        ],
     ],
 ];

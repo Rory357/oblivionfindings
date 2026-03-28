@@ -9,6 +9,7 @@ use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Services\HrWebhookService;
 use App\Domain\Hr\Services\LeaveService;
+use App\Http\Requests\Hr\StoreLeaveRequestFormRequest;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -240,22 +241,12 @@ class LeaveController extends Controller
     /*  Store — submit a leave request                                     */
     /* ------------------------------------------------------------------ */
 
-    public function store(Request $request)
+    public function store(StoreLeaveRequestFormRequest $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.leave.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $validated = $request->validate([
-            'user_id'         => ['nullable', 'integer', 'exists:users,id'],
-            'leave_type'      => ['required', 'string', Rule::in(LeaveService::LEAVE_TYPES)],
-            'starts_at'       => ['required', 'date', 'after_or_equal:today'],
-            'ends_at'         => ['required', 'date', 'after_or_equal:starts_at'],
-            'hours_requested' => ['nullable', 'numeric', 'min:0.5', 'max:999'],
-            'reason'          => ['nullable', 'string', 'max:2000'],
-            'supporting_doc'  => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png,doc,docx', 'max:5120'],
-        ]);
-
+        $validated = $request->validated();
         $data = $validated;
 
         if ($request->hasFile('supporting_doc')) {

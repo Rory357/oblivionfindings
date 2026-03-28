@@ -10,6 +10,8 @@ use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinPurchaseOrder;
 use App\Domain\Finance\Models\FinPurchaseOrderLine;
 use App\Domain\Finance\Models\FinVendor;
+use App\Domain\Finance\Http\Requests\StorePurchaseOrderRequest;
+use App\Domain\Finance\Http\Requests\UpdatePurchaseOrderRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -71,24 +73,9 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StorePurchaseOrderRequest $request)
     {
-        $this->authorize('create', FinPurchaseOrder::class);
-
-        $validated = $request->validate([
-            'vendor_id' => 'required|exists:fin_vendors,id',
-            'order_date' => 'required|date',
-            'expected_date' => 'nullable|date',
-            'notes' => 'nullable|string',
-            'cost_centre_id' => 'nullable|exists:fin_cost_centres,id',
-            'funding_stream_id' => 'nullable|exists:fin_funding_streams,id',
-            'lines' => 'required|array|min:1',
-            'lines.*.description' => 'required|string',
-            'lines.*.quantity' => 'required|numeric|min:0.01',
-            'lines.*.unit_price' => 'required|numeric|min:0',
-            'lines.*.gst_rate' => 'nullable|numeric',
-            'lines.*.account_id' => 'nullable|exists:fin_accounts,id',
-        ]);
+        $validated = $request->validated();
 
         $orgId = $request->user()->organization_id;
         $poNumber = $this->generatePoNumber($orgId);
@@ -187,29 +174,14 @@ class PurchaseOrderController extends Controller
         ]);
     }
 
-    public function update(Request $request, FinPurchaseOrder $purchaseOrder)
+    public function update(UpdatePurchaseOrderRequest $request, FinPurchaseOrder $purchaseOrder)
     {
-        $this->authorize('update', $purchaseOrder);
-
         if ($purchaseOrder->status !== 'draft') {
             return redirect()->route('finance.purchase-orders.show', $purchaseOrder)
                 ->with('error', 'Only draft purchase orders can be edited.');
         }
 
-        $validated = $request->validate([
-            'vendor_id' => 'required|exists:fin_vendors,id',
-            'order_date' => 'required|date',
-            'expected_date' => 'nullable|date',
-            'notes' => 'nullable|string',
-            'cost_centre_id' => 'nullable|exists:fin_cost_centres,id',
-            'funding_stream_id' => 'nullable|exists:fin_funding_streams,id',
-            'lines' => 'required|array|min:1',
-            'lines.*.description' => 'required|string',
-            'lines.*.quantity' => 'required|numeric|min:0.01',
-            'lines.*.unit_price' => 'required|numeric|min:0',
-            'lines.*.gst_rate' => 'nullable|numeric',
-            'lines.*.account_id' => 'nullable|exists:fin_accounts,id',
-        ]);
+        $validated = $request->validated();
 
         DB::transaction(function () use ($validated, $purchaseOrder) {
             $purchaseOrder->lines()->delete();

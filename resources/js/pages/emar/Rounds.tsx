@@ -319,7 +319,7 @@ export default function Rounds({ rounds, templates, date, staff, lastGenerated }
                                         </div>
                                         <Progress value={completionPct} className="h-2" />
                                     </div>
-                                    <div className="grid grid-cols-4 gap-2 text-center text-xs">
+                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
                                         <div>
                                             <p className="font-bold text-green-600">{round.administered_count}</p>
                                             <p className="text-muted-foreground">Given</p>

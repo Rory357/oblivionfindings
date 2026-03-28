@@ -144,6 +144,7 @@ return [
     */
 
     'features' => [
+        // PRODUCTION: Consider disabling public registration and using admin-invite workflow
         Features::registration(),
         Features::resetPasswords(),
         Features::emailVerification(),

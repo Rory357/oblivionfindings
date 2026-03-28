@@ -68,6 +68,20 @@ class AppServiceProvider extends ServiceProvider
             ]);
         });
 
+        // Cross-domain event listeners
+        Event::listen(
+            \App\Domain\Finance\Events\JournalPosted::class,
+            \App\Listeners\Finance\LogJournalPosted::class
+        );
+        Event::listen(
+            \App\Domain\Roadmap\Events\InitiativeScored::class,
+            \App\Listeners\Roadmap\LogInitiativeScored::class
+        );
+        Event::listen(
+            \App\Domain\Roadmap\Events\QuarterlyPlanPublished::class,
+            \App\Listeners\Governance\LogQuarterlyPlanPublished::class
+        );
+
         // Treat password setup/reset as email verification if user is not verified yet.
         Event::listen(PasswordReset::class, function (PasswordReset $event): void {
             $user = $event->user;
@@ -114,6 +128,16 @@ class AppServiceProvider extends ServiceProvider
         // Authentication endpoints
         RateLimiter::for('auth', function (Request $request) {
             return Limit::perMinute(5)->by($request->ip());
+        });
+
+        // Password reset (strict)
+        RateLimiter::for('password-reset', function (Request $request) {
+            return Limit::perMinutes(15, 3)->by($request->ip());
+        });
+
+        // Registration
+        RateLimiter::for('registration', function (Request $request) {
+            return Limit::perHour(5)->by($request->ip());
         });
     }
 }

@@ -10,6 +10,8 @@ use App\Domain\Finance\Models\FinPurchaseOrder;
 use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Services\AccountsPayableService;
+use App\Domain\Finance\Http\Requests\StoreBillRequest;
+use App\Domain\Finance\Http\Requests\UpdateBillRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -124,27 +126,9 @@ class BillController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreBillRequest $request)
     {
-        $this->authorize('create', FinBill::class);
-
-        $validated = $request->validate([
-            'vendor_id' => 'required|exists:fin_vendors,id',
-            'bill_number' => 'nullable|string|max:50',
-            'vendor_reference' => 'nullable|string|max:255',
-            'bill_date' => 'required|date',
-            'due_date' => 'required|date',
-            'notes' => 'nullable|string|max:2000',
-            'purchase_order_id' => 'nullable|exists:fin_purchase_orders,id',
-            'lines' => 'required|array|min:1',
-            'lines.*.description' => 'required|string|max:500',
-            'lines.*.quantity' => 'required|numeric|min:0.01',
-            'lines.*.unit_price' => 'required|numeric|min:0',
-            'lines.*.gst_rate' => 'nullable|numeric',
-            'lines.*.account_id' => 'required|exists:fin_accounts,id',
-            'lines.*.cost_centre_id' => 'nullable|exists:fin_cost_centres,id',
-            'lines.*.funding_stream_id' => 'nullable|exists:fin_funding_streams,id',
-        ]);
+        $validated = $request->validated();
 
         $bill = $this->service->createBill($request->user()->organization_id, $validated);
 
@@ -230,31 +214,14 @@ class BillController extends Controller
         ]);
     }
 
-    public function update(Request $request, FinBill $bill)
+    public function update(UpdateBillRequest $request, FinBill $bill)
     {
-        $this->authorize('update', $bill);
-
         if ($bill->status !== 'draft') {
             return redirect()->route('finance.bills.show', $bill)
                 ->with('error', 'Only draft bills can be updated.');
         }
 
-        $validated = $request->validate([
-            'vendor_id' => 'required|exists:fin_vendors,id',
-            'vendor_reference' => 'nullable|string|max:255',
-            'bill_date' => 'required|date',
-            'due_date' => 'required|date',
-            'notes' => 'nullable|string|max:2000',
-            'purchase_order_id' => 'nullable|exists:fin_purchase_orders,id',
-            'lines' => 'required|array|min:1',
-            'lines.*.description' => 'required|string|max:500',
-            'lines.*.quantity' => 'required|numeric|min:0.01',
-            'lines.*.unit_price' => 'required|numeric|min:0',
-            'lines.*.gst_rate' => 'nullable|numeric',
-            'lines.*.account_id' => 'required|exists:fin_accounts,id',
-            'lines.*.cost_centre_id' => 'nullable|exists:fin_cost_centres,id',
-            'lines.*.funding_stream_id' => 'nullable|exists:fin_funding_streams,id',
-        ]);
+        $validated = $request->validated();
 
         try {
             $this->service->updateBill($bill, $validated);

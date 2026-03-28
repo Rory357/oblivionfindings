@@ -379,7 +379,7 @@ export default function MedicationsAudit({ filters, logs }: Props) {
                     </DialogHeader>
                     {selectedLog && (
                         <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                                 <div>
                                     <span className="text-muted-foreground">Action:</span>
                                     <div className="mt-1"><ActionBadge action={selectedLog.action} /></div>

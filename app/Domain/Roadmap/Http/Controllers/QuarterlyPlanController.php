@@ -4,6 +4,7 @@ namespace App\Domain\Roadmap\Http\Controllers;
 
 use App\Domain\Roadmap\Models\QuarterlyRoadmapPlan;
 use App\Domain\Roadmap\Services\QuarterlyRoadmapPlannerService;
+use App\Domain\Roadmap\Http\Requests\StoreQuarterlyPlanRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
@@ -29,14 +30,9 @@ class QuarterlyPlanController extends Controller
         ]);
     }
 
-    public function generate(Request $request)
+    public function generate(StoreQuarterlyPlanRequest $request)
     {
-        $data = $request->validate([
-            'fiscal_year' => ['required', 'integer', 'min:2000', 'max:3000'],
-            'quarter' => ['required', 'integer', 'min:1', 'max:4'],
-            'preset' => ['nullable', 'string', 'max:32'],
-            'tenant_id' => ['nullable', 'integer'],
-        ]);
+        $data = $request->validated();
 
         $plan = $this->plannerService->generateDraft(
             (int) $data['fiscal_year'],

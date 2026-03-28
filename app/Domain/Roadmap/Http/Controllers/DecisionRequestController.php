@@ -4,6 +4,7 @@ namespace App\Domain\Roadmap\Http\Controllers;
 
 use App\Domain\Roadmap\Models\DecisionRequest;
 use App\Domain\Roadmap\Services\RoadmapDecisionService;
+use App\Domain\Roadmap\Http\Requests\UpdateDecisionRequestRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
@@ -31,14 +32,11 @@ class DecisionRequestController extends Controller
         ]);
     }
 
-    public function resolve(Request $request, DecisionRequest $decisionRequest)
+    public function resolve(UpdateDecisionRequestRequest $request, DecisionRequest $decisionRequest)
     {
         $this->assertTenant($request, $decisionRequest->tenant_id);
 
-        $data = $request->validate([
-            'status' => ['required', 'in:approved,rejected,withdrawn,expired'],
-            'notes' => ['nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $this->decisionService->resolveRequest(
             $decisionRequest,

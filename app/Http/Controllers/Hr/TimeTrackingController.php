@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Hr\StoreTimesheetRequest;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Models\HrTimesheet;
 use App\Domain\Hr\Services\TimeTrackingService;
@@ -141,20 +142,11 @@ class TimeTrackingController extends Controller
     /*  Store — manual time entry                                          */
     /* ------------------------------------------------------------------ */
 
-    public function store(Request $request)
+    public function store(StoreTimesheetRequest $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.time.manage'), 403);
 
-        $validated = $request->validate([
-            'user_id' => ['nullable', 'exists:users,id'],
-            'clock_in' => ['required', 'date'],
-            'clock_out' => ['required', 'date', 'after:clock_in'],
-            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
-            'notes' => ['nullable', 'string', 'max:500'],
-            'project_code' => ['nullable', 'string', 'max:50'],
-            'cost_centre' => ['nullable', 'string', 'max:50'],
-        ]);
+        $validated = $request->validated();
 
         $this->timeTrackingService->createManualEntry($user, $validated);
 

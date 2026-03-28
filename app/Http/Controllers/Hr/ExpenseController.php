@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Hr\StoreExpenseClaimRequest;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Services\ExpenseService;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class ExpenseController extends Controller
@@ -85,23 +85,11 @@ class ExpenseController extends Controller
     /*  Store — persist new expense claim                                   */
     /* ------------------------------------------------------------------ */
 
-    public function store(Request $request)
+    public function store(StoreExpenseClaimRequest $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.manage'), 403);
 
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'notes' => ['nullable', 'string', 'max:2000'],
-            'currency' => ['nullable', 'string', 'max:3'],
-            'items' => ['required', 'array', 'min:1'],
-            'items.*.description' => ['required', 'string', 'max:500'],
-            'items.*.category' => ['required', 'string', Rule::in(ExpenseService::CATEGORIES)],
-            'items.*.amount' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
-            'items.*.expense_date' => ['required', 'date'],
-            'items.*.tax_amount' => ['nullable', 'numeric', 'min:0'],
-            'items.*.notes' => ['nullable', 'string', 'max:500'],
-        ]);
+        $validated = $request->validated();
 
         try {
             $claim = $this->expenseService->createClaim($user, $validated);

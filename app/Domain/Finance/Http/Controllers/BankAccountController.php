@@ -4,6 +4,8 @@ namespace App\Domain\Finance\Http\Controllers;
 
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBankAccount;
+use App\Domain\Finance\Http\Requests\StoreBankAccountRequest;
+use App\Domain\Finance\Http\Requests\UpdateBankAccountRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -61,20 +63,9 @@ class BankAccountController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreBankAccountRequest $request)
     {
-        $this->authorize('create', FinBankAccount::class);
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'bank_name' => ['required', 'string', 'max:255'],
-            'account_number' => ['required', 'string', 'max:50'],
-            'account_type' => ['required', 'in:cheque,savings,term_deposit,credit_card'],
-            'gl_account_id' => ['required', 'exists:fin_accounts,id'],
-            'opening_balance' => ['required', 'numeric'],
-            'is_primary' => ['boolean'],
-            'is_active' => ['boolean'],
-        ]);
+        $validated = $request->validated();
 
         $validated['organization_id'] = $request->user()->organization_id;
         $validated['current_balance'] = $validated['opening_balance'];
@@ -175,19 +166,9 @@ class BankAccountController extends Controller
         ]);
     }
 
-    public function update(Request $request, FinBankAccount $bankAccount)
+    public function update(UpdateBankAccountRequest $request, FinBankAccount $bankAccount)
     {
-        $this->authorize('update', $bankAccount);
-
-        $validated = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
-            'bank_name' => ['required', 'string', 'max:255'],
-            'account_number' => ['required', 'string', 'max:50'],
-            'account_type' => ['required', 'in:cheque,savings,term_deposit,credit_card'],
-            'gl_account_id' => ['required', 'exists:fin_accounts,id'],
-            'is_primary' => ['boolean'],
-            'is_active' => ['boolean'],
-        ]);
+        $validated = $request->validated();
 
         $bankAccount->update($validated);
 

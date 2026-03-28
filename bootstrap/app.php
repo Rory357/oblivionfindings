@@ -28,6 +28,10 @@ return Application::configure(basePath: dirname(__DIR__))
             PreventSearchIndexing::class,
         ]);
 
+        $middleware->api(prepend: [
+            \Illuminate\Routing\Middleware\ThrottleRequests::class . ':api',
+        ]);
+
         $middleware->alias([
             'role' => \App\Http\Middleware\EnsureRole::class,
             'permission' => \App\Http\Middleware\EnsurePermission::class,

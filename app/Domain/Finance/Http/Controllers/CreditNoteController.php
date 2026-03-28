@@ -6,6 +6,7 @@ use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinCreditNote;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Services\AccountsPayableService;
+use App\Domain\Finance\Http\Requests\StoreCreditNoteRequest;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use Illuminate\Http\Request;
@@ -74,23 +75,9 @@ class CreditNoteController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreCreditNoteRequest $request)
     {
-        $this->authorize('create', FinCreditNote::class);
-
-        $validated = $request->validate([
-            'type' => 'required|in:payable,receivable',
-            'vendor_id' => 'nullable|required_if:type,payable|exists:fin_vendors,id',
-            'client_id' => 'nullable|required_if:type,receivable|exists:clients,id',
-            'credit_date' => 'required|date',
-            'reason' => 'nullable|string|max:2000',
-            'lines' => 'required|array|min:1',
-            'lines.*.description' => 'required|string|max:500',
-            'lines.*.quantity' => 'required|numeric|min:0.01',
-            'lines.*.unit_price' => 'required|numeric|min:0',
-            'lines.*.gst_rate' => 'nullable|numeric',
-            'lines.*.account_id' => 'required|exists:fin_accounts,id',
-        ]);
+        $validated = $request->validated();
 
         $creditNote = $this->service->createCreditNote($request->user()->organization_id, $validated);
 

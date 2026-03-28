@@ -8,6 +8,8 @@ use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Services\InvoicePdfService;
+use App\Domain\Finance\Http\Requests\StoreInvoiceRequest;
+use App\Domain\Finance\Http\Requests\UpdateInvoiceRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -90,28 +92,9 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreInvoiceRequest $request)
     {
-        $validated = $request->validate([
-            'invoice_number' => 'nullable|string|max:50',
-            'invoice_date' => 'required|date',
-            'due_date' => 'required|date|after_or_equal:invoice_date',
-            'client_name' => 'required|string|max:255',
-            'client_email' => 'nullable|email|max:255',
-            'client_address' => 'nullable|string|max:2000',
-            'bill_id' => 'nullable|exists:fin_bills,id',
-            'currency_code' => 'nullable|string|size:3',
-            'notes' => 'nullable|string|max:2000',
-            'terms' => 'nullable|string|max:2000',
-            'email_subject' => 'nullable|string|max:255',
-            'email_body' => 'nullable|string|max:5000',
-            'lines' => 'required|array|min:1',
-            'lines.*.description' => 'required|string|max:500',
-            'lines.*.quantity' => 'required|numeric|min:0.01',
-            'lines.*.unit_price' => 'required|numeric|min:0',
-            'lines.*.tax_rate_id' => 'nullable|exists:fin_tax_rates,id',
-            'lines.*.account_id' => 'nullable|exists:fin_accounts,id',
-        ]);
+        $validated = $request->validated();
 
         $orgId = $request->user()->organization_id;
 
@@ -241,32 +224,14 @@ class InvoiceController extends Controller
         ]);
     }
 
-    public function update(Request $request, FinInvoice $invoice)
+    public function update(UpdateInvoiceRequest $request, FinInvoice $invoice)
     {
         if ($invoice->status !== 'draft') {
             return redirect()->route('finance.invoices.show', $invoice)
                 ->with('error', 'Only draft invoices can be updated.');
         }
 
-        $validated = $request->validate([
-            'invoice_date' => 'required|date',
-            'due_date' => 'required|date|after_or_equal:invoice_date',
-            'client_name' => 'required|string|max:255',
-            'client_email' => 'nullable|email|max:255',
-            'client_address' => 'nullable|string|max:2000',
-            'bill_id' => 'nullable|exists:fin_bills,id',
-            'currency_code' => 'nullable|string|size:3',
-            'notes' => 'nullable|string|max:2000',
-            'terms' => 'nullable|string|max:2000',
-            'email_subject' => 'nullable|string|max:255',
-            'email_body' => 'nullable|string|max:5000',
-            'lines' => 'required|array|min:1',
-            'lines.*.description' => 'required|string|max:500',
-            'lines.*.quantity' => 'required|numeric|min:0.01',
-            'lines.*.unit_price' => 'required|numeric|min:0',
-            'lines.*.tax_rate_id' => 'nullable|exists:fin_tax_rates,id',
-            'lines.*.account_id' => 'nullable|exists:fin_accounts,id',
-        ]);
+        $validated = $request->validated();
 
         DB::transaction(function () use ($invoice, $validated) {
             $lines = [];
