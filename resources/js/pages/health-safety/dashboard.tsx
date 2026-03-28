@@ -8,6 +8,7 @@ import {
     Shield,
     AlertTriangle,
     Activity,
+    Car,
     Clock,
     Flame,
     Heart,
@@ -20,6 +21,7 @@ import {
     HardHat,
     Siren,
     Radio,
+    Truck,
 } from 'lucide-react';
 
 type Props = {
@@ -40,6 +42,15 @@ type Props = {
         severity: string;
         status: string;
         occurred_at: string;
+    }>;
+    recent_fleet_incidents?: Array<{
+        id: number;
+        incident_type: string;
+        severity: string;
+        status: string;
+        occurred_at: string;
+        location: string | null;
+        asset: { id: number; name: string } | null;
     }>;
     recent_hazards: Array<{
         id: number;
@@ -66,6 +77,8 @@ const KPI_CONFIG: Array<{
     { key: 'drill_compliance_pct', label: 'Drill Compliance %', icon: CalendarCheck, color: (v) => (v >= 90 ? 'text-green-600' : v >= 70 ? 'text-amber-600' : 'text-red-600') },
     { key: 'active_alerts', label: 'Active Alerts', icon: Bell, color: () => 'text-slate-700' },
     { key: 'open_safeguarding', label: 'Open Safeguarding', icon: Shield, color: () => 'text-purple-600' },
+    { key: 'fleet_incidents_30d', label: 'Fleet Incidents (30d)', icon: Truck, color: () => 'text-slate-700' },
+    { key: 'fleet_unresolved', label: 'Fleet Unresolved', icon: Car, color: (v) => (v > 0 ? 'text-amber-600' : 'text-green-600') },
     { key: 'staff_compliance_pct', label: 'Staff Compliance %', icon: Users, color: () => 'text-slate-700' },
 ];
 
@@ -135,6 +148,7 @@ export default function HealthSafetyDashboard({
     site_drill_compliance,
     recent_incidents,
     recent_hazards,
+    recent_fleet_incidents = [],
 }: Props) {
     const maxTrendCount = Math.max(...incident_trends.map((t) => t.count), 1);
 
@@ -335,6 +349,37 @@ export default function HealthSafetyDashboard({
                             {!recent_hazards.length && <div className="py-4 text-center text-sm text-slate-500">No recent hazards.</div>}
                         </CardContent>
                     </Card>
+                    {/* Recent Fleet Incidents */}
+                    {recent_fleet_incidents.length > 0 && (
+                        <Card className="lg:col-span-2">
+                            <CardHeader>
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Truck className="h-4 w-4" />
+                                    Recent Fleet Incidents
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                {recent_fleet_incidents.map((fi) => (
+                                    <Link key={fi.id} href={`/fleet-assets/incidents/${fi.id}`} className="flex items-center justify-between rounded-md border px-3 py-2 hover:bg-slate-50">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <Badge className={
+                                                fi.severity === 'critical' ? 'bg-red-100 text-red-700 border-0' :
+                                                fi.severity === 'major' ? 'bg-orange-100 text-orange-700 border-0' :
+                                                fi.severity === 'moderate' ? 'bg-amber-100 text-amber-700 border-0' :
+                                                'bg-slate-100 text-slate-700 border-0'
+                                            }>{fi.severity}</Badge>
+                                            <span className="text-sm font-medium capitalize">{fi.incident_type?.replace(/_/g, ' ')}</span>
+                                            <Badge className={statusColor(fi.status)}>{fi.status?.replace(/_/g, ' ')}</Badge>
+                                        </div>
+                                        <div className="flex items-center gap-3 text-xs text-slate-500">
+                                            {fi.asset && <span>{fi.asset.name}</span>}
+                                            {fi.occurred_at && <span>{formatDate(fi.occurred_at)}</span>}
+                                        </div>
+                                    </Link>
+                                ))}
+                            </CardContent>
+                        </Card>
+                    )}
                 </div>
 
                 {/* Quick Actions */}

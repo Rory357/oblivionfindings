@@ -398,6 +398,7 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const incidents: NavItem[] = [];
     if (can?.incidents?.viewAny || can?.incidents?.viewAssigned) incidents.push({ title: 'Incidents', href: '/incidents', icon: ShieldAlert });
     if (can?.incidents?.viewAny || can?.incidents?.viewAssigned) incidents.push({ title: 'Near Misses', href: '/incidents?type=near_miss', icon: AlertTriangle });
+    incidents.push({ title: 'Fleet Incidents', href: '/fleet-assets/incidents', icon: Truck });
     if (can?.safeguarding?.viewAny || can?.safeguarding?.create) incidents.push({ title: 'Safeguarding', href: '/safeguarding', icon: Shield });
     if (incidents.length > 0) groups.push({ label: 'Incidents & Safeguarding', items: incidents });
 

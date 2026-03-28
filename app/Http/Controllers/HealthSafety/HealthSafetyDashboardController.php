@@ -5,6 +5,7 @@ namespace App\Http\Controllers\HealthSafety;
 use App\Http\Controllers\Controller;
 use App\Models\ClientIncident;
 use App\Models\EmergencyDrill;
+use App\Models\FleetIncident;
 use App\Models\LoneWorkerAlert;
 use App\Models\SafeguardingConcern;
 use App\Models\Site;
@@ -65,6 +66,10 @@ class HealthSafetyDashboardController extends Controller
 
         $openSafeguarding = SafeguardingConcern::whereIn('status', ['open', 'investigating', 'new'])->count();
 
+        // Fleet incidents
+        $fleetIncidents30d = FleetIncident::where('occurred_at', '>=', $thirtyDaysAgo)->count();
+        $fleetUnresolved = FleetIncident::whereIn('status', ['reported', 'investigating'])->count();
+
         $kpis = [
             'incidents_30d' => $totalIncidents30d,
             'near_misses_30d' => $nearMisses30d,
@@ -76,6 +81,8 @@ class HealthSafetyDashboardController extends Controller
             'drill_compliance_pct' => $drillCompliancePct,
             'active_alerts' => $activeAlerts,
             'open_safeguarding' => $openSafeguarding,
+            'fleet_incidents_30d' => $fleetIncidents30d,
+            'fleet_unresolved' => $fleetUnresolved,
             'staff_compliance_pct' => 0,
         ];
 
@@ -174,6 +181,11 @@ class HealthSafetyDashboardController extends Controller
             'site_drill_compliance' => $siteDrillCompliance,
             'recent_incidents' => $recentIncidents,
             'recent_hazards' => $recentHazards,
+            'recent_fleet_incidents' => FleetIncident::with('asset:id,name')
+                ->select('id', 'incident_type', 'severity', 'status', 'occurred_at', 'location')
+                ->orderByDesc('occurred_at')
+                ->limit(5)
+                ->get(),
         ]);
     }
 
