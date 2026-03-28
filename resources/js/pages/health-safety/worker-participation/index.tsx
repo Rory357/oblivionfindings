@@ -325,6 +325,8 @@ export default function WorkerParticipationIndex({
     const [cancelMeetingId, setCancelMeetingId] = useState<number | null>(null);
     const [manageMembersId, setManageMembersId] = useState<number | null>(null);
     const [minutesUploadId, setMinutesUploadId] = useState<number | null>(null);
+    const [meetingSuccessMessage, setMeetingSuccessMessage] = useState<string | null>(null);
+    const [committeeDialogOpen, setCommitteeDialogOpen] = useState(false);
 
     const tabsRef = useRef<HTMLDivElement>(null);
 
@@ -344,11 +346,13 @@ export default function WorkerParticipationIndex({
         meeting_date: string;
         location: string;
         agenda_items: Array<{ title: string; notes: string }>;
+        attendees: number[];
     }>({
         committee_id: '',
         meeting_date: '',
         location: '',
         agenda_items: [{ title: '', notes: '' }],
+        attendees: [],
     });
 
     const consultationForm = useForm({
@@ -363,7 +367,7 @@ export default function WorkerParticipationIndex({
     const feedbackForm = useForm({
         status: 'feedback_received',
         worker_feedback_summary: '',
-        workers_consulted: '',
+        workers_consulted: [] as number[],
     });
 
     /* Consultation outcome form */
@@ -382,11 +386,11 @@ export default function WorkerParticipationIndex({
 
     /* Meeting complete form */
     const completeMeetingForm = useForm<{
-        actual_attendee_ids: number[];
+        confirmed_attendees: number[];
         minutes: string;
-        action_items: Array<{ description: string; assigned_to: string; due_date: string }>;
+        action_items: Array<{ description: string; assigned_to: string; due_date: string; status: string }>;
     }>({
-        actual_attendee_ids: [],
+        confirmed_attendees: [],
         minutes: '',
         action_items: [],
     });
@@ -394,6 +398,12 @@ export default function WorkerParticipationIndex({
     /* Meeting members form */
     const membersForm = useForm<{ user_ids: string[] }>({
         user_ids: [],
+    });
+
+    /* Committee creation form */
+    const committeeForm = useForm({
+        name: '',
+        site_id: '',
     });
 
     /* Meeting minutes upload form */
@@ -428,7 +438,7 @@ export default function WorkerParticipationIndex({
     const addCompleteMeetingActionItem = () => {
         completeMeetingForm.setData('action_items', [
             ...completeMeetingForm.data.action_items,
-            { description: '', assigned_to: '', due_date: '' },
+            { description: '', assigned_to: '', due_date: '', status: 'open' },
         ]);
     };
 
@@ -441,7 +451,7 @@ export default function WorkerParticipationIndex({
 
     const updateCompleteMeetingActionItem = (
         idx: number,
-        field: 'description' | 'assigned_to' | 'due_date',
+        field: 'description' | 'assigned_to' | 'due_date' | 'status',
         value: string,
     ) => {
         const updated = [...completeMeetingForm.data.action_items];
@@ -469,13 +479,19 @@ export default function WorkerParticipationIndex({
     };
 
     const submitMeeting = () => {
+        if (committees.length === 0) return;
         const committeeId = meetingForm.data.committee_id || (committees[0]?.id ?? 0);
+        const attendeeCount = meetingForm.data.attendees.length;
         meetingForm.post(`/health-safety/worker-participation/committees/${committeeId}/meetings`, {
             preserveScroll: true,
             onSuccess: () => {
                 setMeetingOpen(false);
+                setMeetingSuccessMessage(
+                    `Meeting scheduled. Calendar events created for ${attendeeCount} attendee${attendeeCount !== 1 ? 's' : ''}.`,
+                );
                 meetingForm.reset();
                 setMeetingLocationMode('site');
+                setTimeout(() => setMeetingSuccessMessage(null), 5000);
             },
         });
     };
@@ -571,6 +587,16 @@ export default function WorkerParticipationIndex({
             onSuccess: () => {
                 setMinutesUploadId(null);
                 minutesForm.reset();
+            },
+        });
+    };
+
+    const submitCommittee = () => {
+        committeeForm.post('/health-safety/worker-participation/committees', {
+            preserveScroll: true,
+            onSuccess: () => {
+                setCommitteeDialogOpen(false);
+                committeeForm.reset();
             },
         });
     };
@@ -818,14 +844,58 @@ export default function WorkerParticipationIndex({
                                             <CalendarDays className="h-5 w-5 text-amber-600" />
                                             Committee Meetings
                                         </CardTitle>
-                                        <Button size="sm" onClick={() => setMeetingOpen(true)}>
+                                        <Button
+                                            size="sm"
+                                            onClick={() => {
+                                                if (committees.length === 0) {
+                                                    setCommitteeDialogOpen(true);
+                                                } else {
+                                                    setMeetingOpen(true);
+                                                }
+                                            }}
+                                        >
                                             <Plus className="mr-1.5 h-4 w-4" />
                                             Schedule Meeting
                                         </Button>
                                     </div>
                                 </CardHeader>
                                 <CardContent>
-                                    {meetings.length === 0 ? (
+                                    {/* Success notification */}
+                                    {meetingSuccessMessage && (
+                                        <div className="mb-4 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                                            <CheckCircle2 className="h-4 w-4 shrink-0" />
+                                            {meetingSuccessMessage}
+                                            <button
+                                                type="button"
+                                                className="ml-auto text-green-600 hover:text-green-800"
+                                                onClick={() => setMeetingSuccessMessage(null)}
+                                            >
+                                                <XCircle className="h-4 w-4" />
+                                            </button>
+                                        </div>
+                                    )}
+
+                                    {/* No committee warning */}
+                                    {committees.length === 0 && (
+                                        <div className="mb-4 flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-amber-200 bg-amber-50 py-8 text-center">
+                                            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 mb-4">
+                                                <Building2 className="h-7 w-7 text-amber-600" />
+                                            </div>
+                                            <h3 className="text-sm font-semibold text-slate-800">
+                                                You need to create an H&S Committee before scheduling meetings
+                                            </h3>
+                                            <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+                                                An H&S committee is required under the HSWA to facilitate meetings
+                                                between workers and management on health and safety matters.
+                                            </p>
+                                            <Button size="sm" className="mt-4" onClick={() => setCommitteeDialogOpen(true)}>
+                                                <Plus className="mr-1.5 h-4 w-4" />
+                                                Create Committee
+                                            </Button>
+                                        </div>
+                                    )}
+
+                                    {committees.length > 0 && meetings.length === 0 ? (
                                         <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-slate-200 py-12 text-center">
                                             <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 mb-4">
                                                 <CalendarDays className="h-7 w-7 text-amber-500" />
@@ -920,8 +990,8 @@ export default function WorkerParticipationIndex({
                                                             </div>
                                                         )}
 
-                                                        {/* Action items (when completed) */}
-                                                        {meeting.status === 'completed' && meeting.action_items && meeting.action_items.length > 0 && (
+                                                        {/* Action items */}
+                                                        {meeting.action_items && meeting.action_items.length > 0 && (
                                                             <div className="space-y-2">
                                                                 <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                                                                     Action Items
@@ -1006,7 +1076,7 @@ export default function WorkerParticipationIndex({
                                                                             onClick={() => {
                                                                                 completeMeetingForm.reset();
                                                                                 const attendeeIds = (meeting.confirmed_attendees ?? []).map(a => a.user_id);
-                                                                                completeMeetingForm.setData('actual_attendee_ids', attendeeIds);
+                                                                                completeMeetingForm.setData('confirmed_attendees', attendeeIds);
                                                                                 setCompleteMeetingId(meeting.id);
                                                                             }}
                                                                         >
@@ -1148,31 +1218,53 @@ export default function WorkerParticipationIndex({
                                                         )}
 
                                                         {/* Documents section */}
-                                                        <div className="flex flex-wrap gap-2">
-                                                            {c.document_name && (
-                                                                <div className="flex items-center gap-2 rounded-lg border bg-slate-50 px-2.5 py-1.5 text-xs">
-                                                                    <Paperclip className="h-3.5 w-3.5 text-blue-500 shrink-0" />
-                                                                    <span className="font-medium truncate">{c.document_name}</span>
-                                                                    <a
-                                                                        href={`/health-safety/worker-participation/consultations/${c.id}/documents/document`}
-                                                                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium shrink-0"
-                                                                    >
-                                                                        <Download className="h-3 w-3" />
-                                                                        Download
-                                                                    </a>
+                                                        <div className="space-y-2">
+                                                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+                                                                <Paperclip className="h-3.5 w-3.5" />
+                                                                Documents
+                                                            </h4>
+                                                            {!c.document_name && !c.outcome_document_name ? (
+                                                                <div className="rounded-lg border-2 border-dashed border-slate-200 p-3 text-center text-xs text-muted-foreground">
+                                                                    No documents yet
                                                                 </div>
-                                                            )}
-                                                            {c.outcome_document_name && (
-                                                                <div className="flex items-center gap-2 rounded-lg border bg-teal-50 px-2.5 py-1.5 text-xs">
-                                                                    <FileText className="h-3.5 w-3.5 text-teal-500 shrink-0" />
-                                                                    <span className="font-medium truncate">{c.outcome_document_name}</span>
-                                                                    <a
-                                                                        href={`/health-safety/worker-participation/consultations/${c.id}/documents/outcome`}
-                                                                        className="flex items-center gap-1 text-teal-600 hover:text-teal-800 font-medium shrink-0"
-                                                                    >
-                                                                        <Download className="h-3 w-3" />
-                                                                        Download
-                                                                    </a>
+                                                            ) : (
+                                                                <div className="space-y-2">
+                                                                    {c.document_name && (
+                                                                        <div className="flex items-center gap-3 rounded-lg border bg-slate-50 p-3">
+                                                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-100 shrink-0">
+                                                                                <FileText className="h-4.5 w-4.5 text-blue-600" />
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <div className="text-xs font-medium truncate">{c.document_name}</div>
+                                                                                <div className="text-[10px] text-muted-foreground">Supporting Document</div>
+                                                                            </div>
+                                                                            <a
+                                                                                href={`/health-safety/worker-participation/consultations/${c.id}/documents/document`}
+                                                                                className="flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 transition-colors shrink-0"
+                                                                            >
+                                                                                <Download className="h-3.5 w-3.5" />
+                                                                                Download
+                                                                            </a>
+                                                                        </div>
+                                                                    )}
+                                                                    {c.outcome_document_name && (
+                                                                        <div className="flex items-center gap-3 rounded-lg border bg-teal-50 p-3">
+                                                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-100 shrink-0">
+                                                                                <FileText className="h-4.5 w-4.5 text-teal-600" />
+                                                                            </div>
+                                                                            <div className="flex-1 min-w-0">
+                                                                                <div className="text-xs font-medium truncate">{c.outcome_document_name}</div>
+                                                                                <div className="text-[10px] text-muted-foreground">Outcome Document</div>
+                                                                            </div>
+                                                                            <a
+                                                                                href={`/health-safety/worker-participation/consultations/${c.id}/documents/outcome`}
+                                                                                className="flex items-center gap-1.5 rounded-md border bg-white px-3 py-1.5 text-xs font-medium text-teal-600 hover:text-teal-800 hover:bg-teal-50 transition-colors shrink-0"
+                                                                            >
+                                                                                <Download className="h-3.5 w-3.5" />
+                                                                                Download
+                                                                            </a>
+                                                                        </div>
+                                                                    )}
                                                                 </div>
                                                             )}
                                                         </div>
@@ -1419,6 +1511,31 @@ export default function WorkerParticipationIndex({
                     </DialogHeader>
 
                     <div className="space-y-5">
+                        {committees.length === 0 ? (
+                            <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-amber-200 bg-amber-50 py-8 text-center">
+                                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 mb-4">
+                                    <Building2 className="h-7 w-7 text-amber-600" />
+                                </div>
+                                <h3 className="text-sm font-semibold text-slate-800">
+                                    Create a committee first before scheduling a meeting
+                                </h3>
+                                <p className="mt-1.5 max-w-sm text-sm text-muted-foreground">
+                                    An H&S committee is required to schedule meetings.
+                                </p>
+                                <Button
+                                    size="sm"
+                                    className="mt-4"
+                                    onClick={() => {
+                                        setMeetingOpen(false);
+                                        setCommitteeDialogOpen(true);
+                                    }}
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Create Committee
+                                </Button>
+                            </div>
+                        ) : (
+                        <>
                         {/* Section: Meeting Details */}
                         <div className="space-y-3">
                             <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -1426,32 +1543,30 @@ export default function WorkerParticipationIndex({
                             </h4>
 
                             {/* Committee select */}
-                            {committees.length > 0 && (
-                                <div className="space-y-1.5">
-                                    <Label>Committee <span className="text-red-500">*</span></Label>
-                                    <Select
-                                        value={meetingForm.data.committee_id || '__none__'}
-                                        onValueChange={(v) =>
-                                            meetingForm.setData('committee_id', v === '__none__' ? '' : v)
-                                        }
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select committee" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="__none__">Select committee...</SelectItem>
-                                            {committees.map((c) => (
-                                                <SelectItem key={c.id} value={String(c.id)}>
-                                                    {c.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {meetingForm.errors.committee_id && (
-                                        <p className="text-xs text-red-600">{meetingForm.errors.committee_id}</p>
-                                    )}
-                                </div>
-                            )}
+                            <div className="space-y-1.5">
+                                <Label>Committee <span className="text-red-500">*</span></Label>
+                                <Select
+                                    value={meetingForm.data.committee_id || '__none__'}
+                                    onValueChange={(v) =>
+                                        meetingForm.setData('committee_id', v === '__none__' ? '' : v)
+                                    }
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue placeholder="Select committee" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__none__">Select committee...</SelectItem>
+                                        {committees.map((c) => (
+                                            <SelectItem key={c.id} value={String(c.id)}>
+                                                {c.name}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                {meetingForm.errors.committee_id && (
+                                    <p className="text-xs text-red-600">{meetingForm.errors.committee_id}</p>
+                                )}
+                            </div>
 
                             {/* Date/time */}
                             <div className="space-y-1.5">
@@ -1581,6 +1696,44 @@ export default function WorkerParticipationIndex({
                                 ))}
                             </div>
                         </div>
+
+                        {/* Section: Attendees */}
+                        <div className="space-y-3">
+                            <h4 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                                Attendees
+                            </h4>
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {staff.map((s) => {
+                                    const isChecked = meetingForm.data.attendees.includes(s.id);
+                                    return (
+                                        <label
+                                            key={s.id}
+                                            className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-slate-50"
+                                        >
+                                            <Checkbox
+                                                checked={isChecked}
+                                                onCheckedChange={(checked) => {
+                                                    const current = meetingForm.data.attendees;
+                                                    if (checked) {
+                                                        meetingForm.setData('attendees', [...current, s.id]);
+                                                    } else {
+                                                        meetingForm.setData('attendees', current.filter((id) => id !== s.id));
+                                                    }
+                                                }}
+                                            />
+                                            <span className="text-sm">{s.name}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                            {meetingForm.data.attendees.length > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    {meetingForm.data.attendees.length} attendee{meetingForm.data.attendees.length !== 1 ? 's' : ''} selected
+                                </p>
+                            )}
+                        </div>
+                        </>
+                        )}
                     </div>
 
                     <DialogFooter>
@@ -1594,7 +1747,10 @@ export default function WorkerParticipationIndex({
                         >
                             Cancel
                         </Button>
-                        <Button disabled={meetingForm.processing} onClick={submitMeeting}>
+                        <Button
+                            disabled={meetingForm.processing || committees.length === 0}
+                            onClick={submitMeeting}
+                        >
                             <CalendarDays className="mr-1.5 h-4 w-4" />
                             Schedule Meeting
                         </Button>
@@ -1754,15 +1910,36 @@ export default function WorkerParticipationIndex({
                         </div>
 
                         <div className="space-y-1.5">
-                            <Label>Workers Consulted (names, comma-separated)</Label>
-                            <Input
-                                placeholder="e.g. Jane Smith, John Doe, Mary Jones"
-                                value={feedbackForm.data.workers_consulted}
-                                onChange={(e) => feedbackForm.setData('workers_consulted', e.target.value)}
-                            />
-                            <p className="text-xs text-muted-foreground">
-                                List the names of workers who provided feedback.
-                            </p>
+                            <Label>Workers Consulted</Label>
+                            <div className="space-y-2 max-h-48 overflow-y-auto">
+                                {staff.map((s) => {
+                                    const isChecked = feedbackForm.data.workers_consulted.includes(s.id);
+                                    return (
+                                        <label
+                                            key={s.id}
+                                            className="flex items-center gap-2 rounded-lg border p-2.5 cursor-pointer hover:bg-slate-50"
+                                        >
+                                            <Checkbox
+                                                checked={isChecked}
+                                                onCheckedChange={(checked) => {
+                                                    const current = feedbackForm.data.workers_consulted;
+                                                    if (checked) {
+                                                        feedbackForm.setData('workers_consulted', [...current, s.id]);
+                                                    } else {
+                                                        feedbackForm.setData('workers_consulted', current.filter((id) => id !== s.id));
+                                                    }
+                                                }}
+                                            />
+                                            <span className="text-sm">{s.name}</span>
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                            {feedbackForm.data.workers_consulted.length > 0 && (
+                                <p className="text-xs text-muted-foreground">
+                                    {feedbackForm.data.workers_consulted.length} worker{feedbackForm.data.workers_consulted.length !== 1 ? 's' : ''} selected
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -1962,7 +2139,7 @@ export default function WorkerParticipationIndex({
                                     </h4>
                                     <div className="space-y-2">
                                         {attendees.map((att) => {
-                                            const isChecked = completeMeetingForm.data.actual_attendee_ids.includes(att.user_id);
+                                            const isChecked = completeMeetingForm.data.confirmed_attendees.includes(att.user_id);
                                             return (
                                                 <label
                                                     key={att.id}
@@ -1971,11 +2148,11 @@ export default function WorkerParticipationIndex({
                                                     <Checkbox
                                                         checked={isChecked}
                                                         onCheckedChange={(checked) => {
-                                                            const current = completeMeetingForm.data.actual_attendee_ids;
+                                                            const current = completeMeetingForm.data.confirmed_attendees;
                                                             if (checked) {
-                                                                completeMeetingForm.setData('actual_attendee_ids', [...current, att.user_id]);
+                                                                completeMeetingForm.setData('confirmed_attendees', [...current, att.user_id]);
                                                             } else {
-                                                                completeMeetingForm.setData('actual_attendee_ids', current.filter((id) => id !== att.user_id));
+                                                                completeMeetingForm.setData('confirmed_attendees', current.filter((id) => id !== att.user_id));
                                                             }
                                                         }}
                                                     />
@@ -2224,6 +2401,67 @@ export default function WorkerParticipationIndex({
                         >
                             <Upload className="mr-1.5 h-4 w-4" />
                             Upload Minutes
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ================================================================ */}
+            {/*  CREATE COMMITTEE DIALOG                                         */}
+            {/* ================================================================ */}
+            <Dialog open={committeeDialogOpen} onOpenChange={setCommitteeDialogOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-green-100">
+                                <Building2 className="h-4 w-4 text-green-600" />
+                            </div>
+                            Create H&S Committee
+                        </DialogTitle>
+                    </DialogHeader>
+
+                    <div className="space-y-4">
+                        <div className="space-y-1.5">
+                            <Label>Committee Name <span className="text-red-500">*</span></Label>
+                            <Input
+                                placeholder="e.g. Health & Safety Committee"
+                                value={committeeForm.data.name}
+                                onChange={(e) => committeeForm.setData('name', e.target.value)}
+                            />
+                            {committeeForm.errors.name && (
+                                <p className="text-xs text-red-600">{committeeForm.errors.name}</p>
+                            )}
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Site</Label>
+                            <Select
+                                value={committeeForm.data.site_id || '__none__'}
+                                onValueChange={(v) =>
+                                    committeeForm.setData('site_id', v === '__none__' ? '' : v)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select site (optional)" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__none__">All sites</SelectItem>
+                                    {sites.map((s) => (
+                                        <SelectItem key={s.id} value={String(s.id)}>
+                                            {s.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCommitteeDialogOpen(false)}>
+                            Cancel
+                        </Button>
+                        <Button disabled={committeeForm.processing} onClick={submitCommittee}>
+                            <Building2 className="mr-1.5 h-4 w-4" />
+                            Create Committee
                         </Button>
                     </DialogFooter>
                 </DialogContent>

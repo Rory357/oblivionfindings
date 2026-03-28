@@ -157,7 +157,6 @@ class WorkerParticipationController extends Controller
             'scheduled_at' => ['required', 'date'],
             'location' => ['nullable', 'string', 'max:255'],
             'agenda_items' => ['nullable', 'array'],
-            'agenda_items.*' => ['string', 'max:500'],
             'attendees' => ['nullable', 'array'],
             'attendees.*' => ['exists:users,id'],
         ]);
@@ -170,10 +169,11 @@ class WorkerParticipationController extends Controller
         // Create calendar events for attendees
         $attendeeIds = $validated['attendees'] ?? $committee->members ?? [];
         if (is_array($attendeeIds)) {
+            $tenantId = $request->user()->tenant_id ?? 1;
             $scheduledAt = \Carbon\Carbon::parse($validated['scheduled_at']);
             foreach ($attendeeIds as $userId) {
                 HrCalendarEvent::create([
-                    'tenant_id' => null,
+                    'tenant_id' => $tenantId,
                     'title' => 'H&S Committee Meeting: ' . $committee->name,
                     'description' => 'Committee meeting at ' . ($validated['location'] ?? 'TBC'),
                     'event_type' => 'hs_meeting',
@@ -260,6 +260,7 @@ class WorkerParticipationController extends Controller
             'worker_feedback_summary' => ['nullable', 'string', 'max:5000'],
             'outcome' => ['nullable', 'string', 'max:5000'],
             'changes_made' => ['nullable', 'string', 'max:5000'],
+            'workers_consulted' => ['nullable', 'array'],
         ]);
 
         $consultation->update($validated);
@@ -337,9 +338,10 @@ class WorkerParticipationController extends Controller
 
         // Create calendar events for newly added attendees
         $committee = $meeting->committee;
+        $tenantId = $request->user()->tenant_id ?? 1;
         foreach ($newUserIds as $userId) {
             HrCalendarEvent::create([
-                'tenant_id' => null,
+                'tenant_id' => $tenantId,
                 'title' => 'H&S Committee Meeting: ' . ($committee->name ?? 'Meeting'),
                 'description' => 'Committee meeting at ' . ($meeting->location ?? 'TBC'),
                 'event_type' => 'hs_meeting',
@@ -362,12 +364,17 @@ class WorkerParticipationController extends Controller
         $validated = $request->validate([
             'minutes' => ['nullable', 'string', 'max:10000'],
             'action_items' => ['nullable', 'array'],
-            'action_items.*.description' => ['required_with:action_items', 'string', 'max:500'],
-            'action_items.*.assigned_to' => ['required_with:action_items', 'exists:users,id'],
-            'action_items.*.due_date' => ['required_with:action_items', 'date'],
             'confirmed_attendees' => ['nullable', 'array'],
             'confirmed_attendees.*' => ['exists:users,id'],
+            'actual_attendee_ids' => ['nullable', 'array'],
+            'actual_attendee_ids.*' => ['exists:users,id'],
         ]);
+
+        // Normalise: frontend may send actual_attendee_ids instead of confirmed_attendees
+        if (! empty($validated['actual_attendee_ids']) && empty($validated['confirmed_attendees'])) {
+            $validated['confirmed_attendees'] = $validated['actual_attendee_ids'];
+        }
+        unset($validated['actual_attendee_ids']);
 
         $meeting->update(array_merge($validated, [
             'status' => 'completed',
