@@ -1,14 +1,12 @@
-import PageHeader from '@/components/page-header';
+import AppLayout from '@/layouts/app-layout';
 import PageShell from '@/components/page-shell';
+import { Head, Link, router } from '@inertiajs/react';
+import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardDescription,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Progress } from '@/components/ui/progress';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import {
     Select,
@@ -18,33 +16,39 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
 import {
-    ArrowLeft,
-    ArrowDown,
-    ArrowUp,
-    Camera,
-    CheckCircle,
-    ChevronDown,
-    ChevronRight,
+    AlertTriangle,
+    ArrowUpRight,
+    BookOpen,
+    Check,
+    CheckCircle2,
     Clock,
-    File,
+    Eye,
+    ExternalLink,
     FileText,
-    History,
-    Mail,
     MapPin,
     MessageSquare,
+    Package,
     Phone,
+    Mail,
     Play,
+    Search,
+    Send,
+    Shield,
+    ShieldAlert,
     SkipForward,
-    Timer,
-    TrendingUp,
+    Upload,
     User,
-    Video,
+    UserCheck,
+    UserMinus,
+    Users,
     XCircle,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface FleetSignal {
     id: number;
@@ -126,17 +130,6 @@ interface SlaData {
     resolution_breached: boolean;
 }
 
-interface ClientRef {
-    id: number;
-    name: string;
-}
-
-interface LocationData {
-    lat: number;
-    lng: number;
-    description: string | null;
-}
-
 interface Alert {
     id: number;
     source: string;
@@ -174,757 +167,1360 @@ interface Props {
     evidence_packs: EvidencePack[];
     communications: Communication[];
     sla: SlaData | null;
-    client: ClientRef | null;
-    location: LocationData | null;
+    client: { id: number; name: string } | null;
+    location: { lat: number; lng: number; description: string | null } | null;
     audit_logs: AuditLogEntry[];
-    can: {
-        manage: boolean;
-        assign: boolean;
-        escalate: boolean;
-    };
+    can: { manage: boolean; assign: boolean; escalate: boolean };
     staff: { id: number; name: string; email: string }[];
 }
 
-const severityColors: Record<string, string> = {
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const SEVERITY_BORDER: Record<string, string> = {
+    critical: 'border-l-red-600',
+    high: 'border-l-orange-500',
+    medium: 'border-l-yellow-500',
+    low: 'border-l-blue-500',
+};
+
+const SEVERITY_BADGE: Record<string, string> = {
     critical: 'bg-red-600 text-white',
     high: 'bg-orange-500 text-white',
     medium: 'bg-yellow-500 text-black',
     low: 'bg-blue-500 text-white',
 };
 
-const statusColors: Record<string, string> = {
-    open: 'bg-red-100 text-red-800 border-red-200',
-    ack: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    triaging: 'bg-blue-100 text-blue-800 border-blue-200',
-    resolved: 'bg-green-100 text-green-800 border-green-200',
-    closed: 'bg-gray-100 text-gray-800 border-gray-200',
+const STATUS_BADGE: Record<string, string> = {
+    open: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    acknowledged: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+    triaging: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    resolved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    closed: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
 };
 
-const actionLabels: Record<string, string> = {
-    'controlRoom.alert.view': 'Viewed alert',
-    'controlRoom.alert.acknowledge': 'Acknowledged alert',
-    'controlRoom.alert.triage': 'Started triage',
-    'controlRoom.alert.resolve': 'Resolved alert',
-    'controlRoom.alert.close': 'Closed alert',
-    'controlRoom.alert.assign': 'Assigned alert',
-    'controlRoom.alert.unassign': 'Unassigned alert',
-    'controlRoom.alert.escalate': 'Escalated alert',
-    'controlRoom.alert.addNote': 'Added note',
-    'controlRoom.alert.create': 'Created alert',
-};
+const WORKFLOW_STEPS = ['open', 'acknowledged', 'triaging', 'resolved', 'closed'] as const;
 
-const stepStatusColors: Record<string, string> = {
-    pending: 'bg-gray-100 text-gray-700',
-    in_progress: 'bg-blue-100 text-blue-800',
-    completed: 'bg-green-100 text-green-800',
-    skipped: 'bg-yellow-100 text-yellow-800',
-    failed: 'bg-red-100 text-red-800',
-};
-
-const channelColors: Record<string, string> = {
-    in_app: 'bg-blue-100 text-blue-800',
-    sms: 'bg-green-100 text-green-800',
-    email: 'bg-purple-100 text-purple-800',
-    phone: 'bg-orange-100 text-orange-800',
-};
-
-const channelIcons: Record<string, typeof MessageSquare> = {
-    in_app: MessageSquare,
-    sms: Phone,
-    email: Mail,
-    phone: Phone,
-};
-
-const evidenceTypeIcons: Record<string, typeof File> = {
-    photo: Camera,
-    document: File,
-    cctv_bookmark: Video,
-    note: FileText,
-};
-
-function formatCountdown(deadline: string | null): string {
-    if (!deadline) return '-';
-    const diff = new Date(deadline).getTime() - Date.now();
-    if (diff <= 0) return 'EXPIRED';
-    const hrs = Math.floor(diff / 3600000);
-    const mins = Math.floor((diff % 3600000) / 60000);
-    const secs = Math.floor((diff % 60000) / 1000);
-    if (hrs > 0) return `${hrs}h ${mins}m ${secs}s`;
-    if (mins > 0) return `${mins}m ${secs}s`;
-    return `${secs}s`;
+function fmtDate(d: string | null): string {
+    if (!d) return '\u2014';
+    return new Date(d).toLocaleString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
-function formatDateTime(isoString: string | null): string {
-    if (!isoString) return '-';
-    return new Date(isoString).toLocaleString();
+function fmtShortDate(d: string | null): string {
+    if (!d) return '';
+    return new Date(d).toLocaleString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
-function formatRelativeTime(isoString: string): string {
-    const date = new Date(isoString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMins / 60);
-    const diffDays = Math.floor(diffHours / 24);
-
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
-    return date.toLocaleDateString();
+function timeAgo(d: string | null): string {
+    if (!d) return '';
+    const diff = Date.now() - new Date(d).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ${mins % 60}m ago`;
+    const days = Math.floor(hrs / 24);
+    return `${days}d ${hrs % 24}h ago`;
 }
 
-export default function ControlRoomShow({ alert, playbook_run, evidence_packs, communications, sla, client, location, audit_logs, can, staff }: Props) {
-    const [notes, setNotes] = useState('');
-    const [assignTo, setAssignTo] = useState(
-        alert.assigned_to_user_id?.toString() || '',
-    );
-    const [escalationReason, setEscalationReason] = useState('');
-    const [processing, setProcessing] = useState(false);
-    const [expandedPacks, setExpandedPacks] = useState<Record<number, boolean>>({});
-    const [, setTick] = useState(0);
-
-    // Live SLA countdown ticker
+function useCountdown(deadline: string | null, breached: boolean): string {
+    const [now, setNow] = useState(Date.now());
     useEffect(() => {
-        if (!sla) return;
-        const hasActive = [sla.acknowledge_deadline, sla.response_deadline, sla.resolution_deadline].some(
-            (d) => d && new Date(d).getTime() > Date.now(),
-        );
-        if (!hasActive) return;
-        const interval = setInterval(() => setTick((t) => t + 1), 1000);
-        return () => clearInterval(interval);
-    }, [sla]);
+        if (!deadline || breached) return;
+        const id = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(id);
+    }, [deadline, breached]);
 
-    const togglePack = (id: number) => {
-        setExpandedPacks((prev) => ({ ...prev, [id]: !prev[id] }));
-    };
+    if (!deadline) return '\u2014';
+    if (breached) return 'BREACHED';
+    const remaining = new Date(deadline).getTime() - now;
+    if (remaining <= 0) return 'BREACHED';
+    const h = Math.floor(remaining / 3600000);
+    const m = Math.floor((remaining % 3600000) / 60000);
+    const s = Math.floor((remaining % 60000) / 1000);
+    if (h > 0) return `${h}h ${m}m ${s}s`;
+    if (m > 0) return `${m}m ${s}s`;
+    return `${s}s`;
+}
 
-    const handleAction = (
-        action: string,
-        data: Record<string, any> = {},
-    ) => {
-        setProcessing(true);
-        router.post(
-            `/control-room/alerts/${alert.id}/${action}`,
-            data,
-            {
-                preserveScroll: true,
-                onFinish: () => setProcessing(false),
-            },
-        );
-    };
+function getStepTimestamp(alert: Alert, step: string): string | null {
+    switch (step) {
+        case 'open': return alert.triggered_at;
+        case 'acknowledged': return alert.acknowledged_at;
+        case 'triaging': return alert.context?.triaging_at ?? null;
+        case 'resolved': return alert.resolved_at;
+        case 'closed': return alert.closed_at;
+        default: return null;
+    }
+}
 
-    const handleAssign = () => {
-        if (!assignTo) return;
-        handleAction('assign', { assigned_to_user_id: parseInt(assignTo) });
-    };
+function stepIndex(status: string): number {
+    const idx = WORKFLOW_STEPS.indexOf(status as (typeof WORKFLOW_STEPS)[number]);
+    return idx >= 0 ? idx : 0;
+}
 
-    const handleEscalate = () => {
-        if (!escalationReason.trim()) return;
-        handleAction('escalate', { escalation_reason: escalationReason });
-        setEscalationReason('');
-    };
+function channelIcon(ch: Communication['channel']) {
+    switch (ch) {
+        case 'email': return <Mail className="h-4 w-4" />;
+        case 'sms': return <MessageSquare className="h-4 w-4" />;
+        case 'phone': return <Phone className="h-4 w-4" />;
+        default: return <Send className="h-4 w-4" />;
+    }
+}
 
-    const handleAddNote = () => {
-        if (!notes.trim()) return;
-        handleAction('note', { note: notes });
-        setNotes('');
-    };
+function initial(name: string): string {
+    return name
+        .split(' ')
+        .map((w) => w[0])
+        .join('')
+        .toUpperCase()
+        .slice(0, 2);
+}
 
-    const isClosed = alert.status === 'closed' || alert.status === 'resolved';
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
 
-    // Filter out view actions from audit trail for cleaner display
-    const significantAuditLogs = audit_logs.filter(
-        (log) => log.action !== 'controlRoom.alert.view',
-    );
+function StatusStepper({ alert }: { alert: Alert }) {
+    const currentIdx = stepIndex(alert.status);
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                { title: 'Control Room', href: '/control-room' },
-                { title: `Alert #${alert.id}`, href: '#' },
-            ]}
-        >
+        <div className="flex items-start justify-between gap-0 mt-5">
+            {WORKFLOW_STEPS.map((step, i) => {
+                const completed = i < currentIdx;
+                const current = i === currentIdx;
+                const ts = getStepTimestamp(alert, step);
+
+                return (
+                    <div key={step} className="flex flex-1 items-start">
+                        <div className="flex flex-col items-center min-w-[72px]">
+                            <div
+                                className={`flex h-8 w-8 items-center justify-center rounded-full border-2 text-xs font-semibold transition-colors ${
+                                    completed
+                                        ? 'border-green-500 bg-green-500 text-white'
+                                        : current
+                                          ? 'border-primary bg-primary text-primary-foreground'
+                                          : 'border-muted-foreground/30 bg-muted text-muted-foreground'
+                                }`}
+                            >
+                                {completed ? <Check className="h-4 w-4" /> : i + 1}
+                            </div>
+                            <span
+                                className={`mt-1.5 text-xs font-medium capitalize ${
+                                    completed
+                                        ? 'text-green-600 dark:text-green-400'
+                                        : current
+                                          ? 'text-foreground'
+                                          : 'text-muted-foreground'
+                                }`}
+                            >
+                                {step}
+                            </span>
+                            {ts && (
+                                <span className="text-[10px] text-muted-foreground">
+                                    {fmtShortDate(ts)}
+                                </span>
+                            )}
+                        </div>
+                        {i < WORKFLOW_STEPS.length - 1 && (
+                            <div className="flex-1 pt-4 px-1">
+                                <div
+                                    className={`h-0.5 w-full rounded ${
+                                        i < currentIdx
+                                            ? 'bg-green-500'
+                                            : 'bg-muted-foreground/20'
+                                    }`}
+                                />
+                            </div>
+                        )}
+                    </div>
+                );
+            })}
+        </div>
+    );
+}
+
+function SlaGauge({
+    label,
+    deadline,
+    breached,
+    met,
+}: {
+    label: string;
+    deadline: string | null;
+    breached: boolean;
+    met: boolean;
+}) {
+    const countdown = useCountdown(deadline, breached);
+
+    const now = Date.now();
+    let pct = 100;
+    let colorCls = 'bg-green-500';
+    let textCls = 'text-green-600 dark:text-green-400';
+    let statusLabel = 'On Track';
+
+    if (breached || (deadline && new Date(deadline).getTime() <= now)) {
+        pct = 100;
+        colorCls = 'bg-red-500';
+        textCls = 'text-red-600 dark:text-red-400';
+        statusLabel = 'Breached';
+    } else if (met) {
+        pct = 100;
+        colorCls = 'bg-green-500';
+        textCls = 'text-green-600 dark:text-green-400';
+        statusLabel = 'Met';
+    } else if (deadline) {
+        const deadlineMs = new Date(deadline).getTime();
+        const remaining = Math.max(0, deadlineMs - now);
+        // Use 1hr as reference window for the progress bar
+        pct = Math.min(100, Math.max(5, 100 - (remaining / (remaining + 3600000)) * 100));
+        if (remaining < 900000) {
+            // < 15 min
+            colorCls = 'bg-red-500';
+            textCls = 'text-red-600 dark:text-red-400';
+            statusLabel = 'At Risk';
+        } else if (remaining < 3600000) {
+            // < 1hr
+            colorCls = 'bg-yellow-500';
+            textCls = 'text-yellow-600 dark:text-yellow-400';
+            statusLabel = 'At Risk';
+        }
+    }
+
+    return (
+        <div className="space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+                <span className="font-medium">{label}</span>
+                <span className={`font-semibold ${textCls}`}>{statusLabel}</span>
+            </div>
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-muted">
+                <div
+                    className={`h-full rounded-full transition-all duration-500 ${colorCls}`}
+                    style={{ width: `${pct}%` }}
+                />
+            </div>
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground">
+                <span>{deadline ? fmtShortDate(deadline) : 'No SLA'}</span>
+                <span className={`font-mono font-semibold ${textCls}`}>{countdown}</span>
+            </div>
+        </div>
+    );
+}
+
+function MetaRow({ label, value }: { label: string; value: React.ReactNode }) {
+    return (
+        <div className="flex flex-col gap-0.5">
+            <span className="text-xs text-muted-foreground">{label}</span>
+            <span className="font-medium">{value}</span>
+        </div>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Main Component
+// ---------------------------------------------------------------------------
+
+export default function ControlRoomAlertShow({
+    alert,
+    audit_logs,
+    can,
+    staff,
+    playbook_run,
+    evidence_packs,
+    communications,
+    sla,
+    client,
+    location,
+}: Props) {
+    const [resolveOpen, setResolveOpen] = useState(false);
+    const [resolveNotes, setResolveNotes] = useState('');
+    const [escalateOpen, setEscalateOpen] = useState(false);
+    const [escalateReason, setEscalateReason] = useState('');
+    const [newNote, setNewNote] = useState('');
+    const [assigneeId, setAssigneeId] = useState<string>('');
+    const [processing, setProcessing] = useState(false);
+    const notesEndRef = useRef<HTMLDivElement>(null);
+
+    const activityLog: Array<{
+        content: string;
+        user?: string;
+        timestamp?: string;
+        is_self?: boolean;
+    }> = alert.context?.activity_log ?? [];
+
+    useEffect(() => {
+        notesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [activityLog.length]);
+
+    function doAction(action: string, data: Record<string, any> = {}) {
+        setProcessing(true);
+        router.post(`/control-room/alerts/${alert.id}/${action}`, data, {
+            preserveScroll: true,
+            onFinish: () => setProcessing(false),
+        });
+    }
+
+    function handleResolve() {
+        if (!resolveNotes.trim()) return;
+        doAction('resolve', { notes: resolveNotes });
+        setResolveOpen(false);
+        setResolveNotes('');
+    }
+
+    function handleEscalate() {
+        if (!escalateReason.trim()) return;
+        doAction('escalate', { reason: escalateReason });
+        setEscalateOpen(false);
+        setEscalateReason('');
+    }
+
+    function handleAddNote() {
+        if (!newNote.trim()) return;
+        doAction('note', { content: newNote });
+        setNewNote('');
+    }
+
+    function handleAssign(staffId: string) {
+        doAction('assign', { staff_id: staffId });
+        setAssigneeId('');
+    }
+
+    const breadcrumbs = [
+        { title: 'Control Room', href: '/control-room' },
+        { title: `Alert #${alert.id}`, href: '#' },
+    ];
+
+    const ackMet = !!alert.acknowledged_at;
+    const resMet = !!alert.resolved_at;
+
+    return (
+        <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Alert #${alert.id}`} />
             <PageShell>
-                <PageHeader
-                    title={
+                {/* ============================================================ */}
+                {/* HERO BANNER                                                  */}
+                {/* ============================================================ */}
+                <div
+                    className={`rounded-xl border border-l-4 bg-card p-6 shadow-sm ${
+                        SEVERITY_BORDER[alert.severity] ?? 'border-l-gray-400'
+                    }`}
+                >
+                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        {/* Left side */}
+                        <div className="space-y-1">
+                            <h1 className="text-2xl font-bold tracking-tight">
+                                {alert.alert_type
+                                    .replace(/_/g, ' ')
+                                    .replace(/\b\w/g, (c) => c.toUpperCase())}
+                            </h1>
+                            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                                <span className="font-mono text-xs">#{alert.id}</span>
+                                <Badge variant="outline" className="text-xs capitalize">
+                                    {alert.source}
+                                </Badge>
+                                <span className="flex items-center gap-1">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    {fmtDate(alert.triggered_at)}
+                                </span>
+                                {alert.triggered_at && (
+                                    <span className="text-xs text-muted-foreground">
+                                        ({timeAgo(alert.triggered_at)})
+                                    </span>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Right side */}
                         <div className="flex items-center gap-3">
-                            <span>{alert.alert_type}</span>
-                            <Badge className={severityColors[alert.severity]}>
-                                {alert.severity}
-                            </Badge>
                             <Badge
-                                variant="outline"
-                                className={statusColors[alert.status]}
+                                className={`px-3 py-1 text-sm font-semibold capitalize ${
+                                    STATUS_BADGE[alert.status] ?? ''
+                                }`}
                             >
                                 {alert.status}
                             </Badge>
+                            <Badge
+                                className={`px-3 py-1 text-sm font-semibold capitalize ${
+                                    SEVERITY_BADGE[alert.severity] ?? 'bg-gray-500 text-white'
+                                }`}
+                            >
+                                {alert.severity}
+                            </Badge>
                             {alert.escalation_level > 0 && (
                                 <Badge
-                                    variant="outline"
-                                    className="border-orange-300 text-orange-600"
+                                    variant="destructive"
+                                    className="px-3 py-1 text-sm font-semibold"
                                 >
-                                    Escalation L{alert.escalation_level}
+                                    <ShieldAlert className="mr-1 h-3.5 w-3.5" />
+                                    L{alert.escalation_level}
                                 </Badge>
                             )}
                         </div>
-                    }
-                    description={`Alert #${alert.id} | Source: ${alert.source}`}
-                    actions={
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href="/control-room">
-                                <ArrowLeft className="mr-2 h-4 w-4" />
-                                Back to Dashboard
-                            </Link>
-                        </Button>
-                    }
-                />
+                    </div>
 
-                <div className="grid gap-4 lg:grid-cols-3">
-                    {/* Main Content */}
-                    <div className="space-y-4 lg:col-span-2">
-                        {/* Alert Details */}
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Alert Details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    <div>
-                                        <Label className="text-xs text-muted-foreground">
-                                            Triggered At
-                                        </Label>
-                                        <p className="font-medium">
-                                            {formatDateTime(alert.triggered_at)}
-                                        </p>
-                                    </div>
-                                    <div>
-                                        <Label className="text-xs text-muted-foreground">
-                                            Source
-                                        </Label>
-                                        <p className="font-medium">
-                                            {alert.source}
-                                        </p>
-                                    </div>
-                                    {alert.acknowledged_at && (
-                                        <div>
-                                            <Label className="text-xs text-muted-foreground">
-                                                Acknowledged
-                                            </Label>
-                                            <p className="font-medium">
-                                                {formatDateTime(alert.acknowledged_at)}
-                                            </p>
-                                            {alert.acknowledged_by && (
-                                                <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                    <User className="h-3 w-3" />
-                                                    by {alert.acknowledged_by.name}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-                                    {alert.resolved_at && (
-                                        <div>
-                                            <Label className="text-xs text-muted-foreground">
-                                                Resolved
-                                            </Label>
-                                            <p className="font-medium">
-                                                {formatDateTime(alert.resolved_at)}
-                                            </p>
-                                            {alert.resolved_by && (
-                                                <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                    <User className="h-3 w-3" />
-                                                    by {alert.resolved_by.name}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-                                    {alert.closed_at && (
-                                        <div>
-                                            <Label className="text-xs text-muted-foreground">
-                                                Closed
-                                            </Label>
-                                            <p className="font-medium">
-                                                {formatDateTime(alert.closed_at)}
-                                            </p>
-                                            {alert.closed_by && (
-                                                <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                    <User className="h-3 w-3" />
-                                                    by {alert.closed_by.name}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-                                    {alert.escalated_at && (
-                                        <div>
-                                            <Label className="text-xs text-muted-foreground">
-                                                Escalated to L{alert.escalation_level}
-                                            </Label>
-                                            <p className="font-medium">
-                                                {formatDateTime(alert.escalated_at)}
-                                            </p>
-                                            {alert.escalated_by && (
-                                                <p className="flex items-center gap-1 text-xs text-muted-foreground">
-                                                    <User className="h-3 w-3" />
-                                                    by {alert.escalated_by.name}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-                                    {alert.assigned_to && (
-                                        <div>
-                                            <Label className="text-xs text-muted-foreground">
-                                                Assigned To
-                                            </Label>
-                                            <p className="flex items-center gap-1 font-medium">
-                                                <User className="h-4 w-4" />
-                                                {alert.assigned_to.name}
-                                            </p>
-                                            {alert.assigned_by && alert.assigned_at && (
-                                                <p className="text-xs text-muted-foreground">
-                                                    by {alert.assigned_by.name} at{' '}
-                                                    {formatDateTime(alert.assigned_at)}
-                                                </p>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
+                    {/* Status Stepper */}
+                    <StatusStepper alert={alert} />
+                </div>
 
+                {/* ============================================================ */}
+                {/* MAIN GRID: Content + Sidebar                                 */}
+                {/* ============================================================ */}
+                <div className="grid gap-6 lg:grid-cols-3">
+                    {/* ---- Left: Tabbed Content ---- */}
+                    <div className="lg:col-span-2 space-y-4">
+                        <Tabs defaultValue="details">
+                            <TabsList className="w-full justify-start flex-wrap h-auto gap-1 bg-transparent p-0 border-b rounded-none">
+                                <TabsTrigger
+                                    value="details"
+                                    className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none data-[state=active]:shadow-none"
+                                >
+                                    Details
+                                </TabsTrigger>
+                                {playbook_run && (
+                                    <TabsTrigger
+                                        value="playbook"
+                                        className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none data-[state=active]:shadow-none"
+                                    >
+                                        <BookOpen className="mr-1.5 h-3.5 w-3.5" />
+                                        Playbook
+                                    </TabsTrigger>
+                                )}
+                                <TabsTrigger
+                                    value="evidence"
+                                    className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none data-[state=active]:shadow-none"
+                                >
+                                    Evidence
+                                    {evidence_packs.length > 0 && (
+                                        <Badge
+                                            variant="secondary"
+                                            className="ml-1.5 h-5 min-w-[20px] px-1 text-[10px]"
+                                        >
+                                            {evidence_packs.length}
+                                        </Badge>
+                                    )}
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="comms"
+                                    className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none data-[state=active]:shadow-none"
+                                >
+                                    Communications
+                                    {communications.length > 0 && (
+                                        <Badge
+                                            variant="secondary"
+                                            className="ml-1.5 h-5 min-w-[20px] px-1 text-[10px]"
+                                        >
+                                            {communications.length}
+                                        </Badge>
+                                    )}
+                                </TabsTrigger>
+                                <TabsTrigger
+                                    value="audit"
+                                    className="data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none data-[state=active]:shadow-none"
+                                >
+                                    Audit Trail
+                                </TabsTrigger>
+                            </TabsList>
+
+                            {/* ====== Tab: Details ====== */}
+                            <TabsContent value="details" className="space-y-6 pt-4">
+                                {/* Metadata Grid */}
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base">Alert Information</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 text-sm">
+                                            <MetaRow
+                                                label="Triggered"
+                                                value={fmtDate(alert.triggered_at)}
+                                            />
+                                            <MetaRow
+                                                label="Source"
+                                                value={
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="capitalize text-xs"
+                                                    >
+                                                        {alert.source}
+                                                    </Badge>
+                                                }
+                                            />
+                                            <MetaRow
+                                                label="Acknowledged by"
+                                                value={
+                                                    alert.acknowledged_by
+                                                        ? `${alert.acknowledged_by.name} \u2014 ${fmtDate(alert.acknowledged_at)}`
+                                                        : '\u2014'
+                                                }
+                                            />
+                                            <MetaRow
+                                                label="Resolved by"
+                                                value={
+                                                    alert.resolved_by
+                                                        ? `${alert.resolved_by.name} \u2014 ${fmtDate(alert.resolved_at)}`
+                                                        : '\u2014'
+                                                }
+                                            />
+                                            <MetaRow
+                                                label="Closed by"
+                                                value={
+                                                    alert.closed_by
+                                                        ? `${alert.closed_by.name} \u2014 ${fmtDate(alert.closed_at)}`
+                                                        : '\u2014'
+                                                }
+                                            />
+                                            {alert.escalation_level > 0 && (
+                                                <MetaRow
+                                                    label="Escalated"
+                                                    value={
+                                                        <>
+                                                            L{alert.escalation_level}
+                                                            {alert.escalated_by &&
+                                                                ` by ${alert.escalated_by.name}`}
+                                                            {alert.escalated_at &&
+                                                                ` \u2014 ${fmtDate(alert.escalated_at)}`}
+                                                        </>
+                                                    }
+                                                />
+                                            )}
+                                            {alert.created_by && (
+                                                <MetaRow
+                                                    label="Created by"
+                                                    value={alert.created_by.name}
+                                                />
+                                            )}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+
+                                {/* Asset */}
                                 {alert.asset && (
-                                    <div>
-                                        <Label className="text-xs text-muted-foreground">
-                                            Related Asset
-                                        </Label>
-                                        <p>
+                                    <Card>
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-base flex items-center gap-2">
+                                                <Package className="h-4 w-4" />
+                                                Linked Asset
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
                                             <Link
-                                                href={`/assets/${alert.asset.id}`}
-                                                className="font-medium text-primary hover:underline"
+                                                href={`/fleet-assets/assets/${alert.asset.id}`}
+                                                className="text-sm font-medium text-primary hover:underline"
                                             >
-                                                {alert.asset.name}
-                                            </Link>
-                                            {alert.asset.asset_tag && (
-                                                <span className="ml-2 text-muted-foreground">
+                                                {alert.asset.name}{' '}
+                                                <span className="text-muted-foreground">
                                                     ({alert.asset.asset_tag})
                                                 </span>
-                                            )}
-                                        </p>
-                                    </div>
+                                            </Link>
+                                        </CardContent>
+                                    </Card>
                                 )}
 
-                                {alert.notes && (
-                                    <div>
-                                        <Label className="text-xs text-muted-foreground">
-                                            Notes
-                                        </Label>
-                                        <p className="whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">
-                                            {alert.notes}
-                                        </p>
+                                {/* Client */}
+                                {client && (
+                                    <Card>
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-base flex items-center gap-2">
+                                                <User className="h-4 w-4" />
+                                                Linked Client
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <Link
+                                                href={`/clients/${client.id}`}
+                                                className="text-sm font-medium text-primary hover:underline"
+                                            >
+                                                {client.name}
+                                            </Link>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* Fleet Signal */}
+                                {alert.fleet_signal && (
+                                    <Card>
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-base flex items-center gap-2">
+                                                <AlertTriangle className="h-4 w-4" />
+                                                Fleet Signal
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="text-sm space-y-1">
+                                            <div>
+                                                <span className="text-muted-foreground">Type:</span>{' '}
+                                                <span className="font-medium capitalize">
+                                                    {alert.fleet_signal.signal_type.replace(
+                                                        /_/g,
+                                                        ' ',
+                                                    )}
+                                                </span>
+                                            </div>
+                                            <div>
+                                                <span className="text-muted-foreground">
+                                                    Severity Hint:
+                                                </span>{' '}
+                                                <Badge
+                                                    className={`capitalize text-xs ${
+                                                        SEVERITY_BADGE[
+                                                            alert.fleet_signal.severity_hint
+                                                        ] ?? ''
+                                                    }`}
+                                                >
+                                                    {alert.fleet_signal.severity_hint}
+                                                </Badge>
+                                            </div>
+                                            {alert.fleet_signal.occurred_at && (
+                                                <div>
+                                                    <span className="text-muted-foreground">
+                                                        Occurred:
+                                                    </span>{' '}
+                                                    {fmtDate(alert.fleet_signal.occurred_at)}
+                                                </div>
+                                            )}
+                                            {alert.fleet_signal.payload &&
+                                                Object.keys(alert.fleet_signal.payload).length >
+                                                    0 && (
+                                                    <div className="mt-2 rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
+                                                        {JSON.stringify(
+                                                            alert.fleet_signal.payload,
+                                                            null,
+                                                            2,
+                                                        )}
+                                                    </div>
+                                                )}
+                                        </CardContent>
+                                    </Card>
+                                )}
+
+                                {/* Notes / Activity */}
+                                <Card>
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base flex items-center gap-2">
+                                            <MessageSquare className="h-4 w-4" />
+                                            Notes &amp; Activity
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="max-h-80 space-y-3 overflow-y-auto pr-1">
+                                            {activityLog.length === 0 && (
+                                                <p className="text-sm text-muted-foreground italic">
+                                                    No activity notes yet.
+                                                </p>
+                                            )}
+                                            {activityLog.map((entry, i) => (
+                                                <div
+                                                    key={i}
+                                                    className={`flex ${
+                                                        entry.is_self
+                                                            ? 'justify-end'
+                                                            : 'justify-start'
+                                                    }`}
+                                                >
+                                                    <div
+                                                        className={`max-w-[80%] rounded-xl px-4 py-2.5 text-sm ${
+                                                            entry.is_self
+                                                                ? 'bg-primary text-primary-foreground rounded-br-sm'
+                                                                : 'bg-muted rounded-bl-sm'
+                                                        }`}
+                                                    >
+                                                        {entry.user && (
+                                                            <div
+                                                                className={`text-xs font-semibold mb-0.5 ${
+                                                                    entry.is_self
+                                                                        ? 'text-primary-foreground/80'
+                                                                        : 'text-muted-foreground'
+                                                                }`}
+                                                            >
+                                                                {entry.user}
+                                                            </div>
+                                                        )}
+                                                        <p>{entry.content}</p>
+                                                        {entry.timestamp && (
+                                                            <div
+                                                                className={`text-[10px] mt-1 ${
+                                                                    entry.is_self
+                                                                        ? 'text-primary-foreground/60'
+                                                                        : 'text-muted-foreground'
+                                                                }`}
+                                                            >
+                                                                {fmtShortDate(entry.timestamp)}
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            <div ref={notesEndRef} />
+                                        </div>
+
+                                        {/* Add Note */}
+                                        {can.manage && (
+                                            <div className="mt-4 flex gap-2">
+                                                <Textarea
+                                                    value={newNote}
+                                                    onChange={(e) => setNewNote(e.target.value)}
+                                                    placeholder="Add a note..."
+                                                    className="min-h-[40px] resize-none text-sm"
+                                                    rows={1}
+                                                    onKeyDown={(e) => {
+                                                        if (
+                                                            e.key === 'Enter' &&
+                                                            !e.shiftKey
+                                                        ) {
+                                                            e.preventDefault();
+                                                            handleAddNote();
+                                                        }
+                                                    }}
+                                                />
+                                                <Button
+                                                    size="sm"
+                                                    onClick={handleAddNote}
+                                                    disabled={!newNote.trim() || processing}
+                                                >
+                                                    <Send className="h-4 w-4" />
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </TabsContent>
+
+                            {/* ====== Tab: Playbook ====== */}
+                            {playbook_run && (
+                                <TabsContent value="playbook" className="space-y-4 pt-4">
+                                    <Card>
+                                        <CardHeader className="pb-3">
+                                            <CardTitle className="text-base flex items-center justify-between">
+                                                <span className="flex items-center gap-2">
+                                                    <BookOpen className="h-4 w-4" />
+                                                    {playbook_run.playbook.name}
+                                                </span>
+                                                <Badge
+                                                    variant="outline"
+                                                    className="capitalize text-xs"
+                                                >
+                                                    {playbook_run.status}
+                                                </Badge>
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent className="space-y-4">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                                    <span>Progress</span>
+                                                    <span>
+                                                        {playbook_run.completed_steps}/
+                                                        {playbook_run.total_steps} steps
+                                                    </span>
+                                                </div>
+                                                <Progress
+                                                    value={playbook_run.completed_steps}
+                                                    max={playbook_run.total_steps}
+                                                    className="h-2.5"
+                                                />
+                                            </div>
+
+                                            <div className="divide-y">
+                                                {playbook_run.steps.map((step, i) => (
+                                                    <div
+                                                        key={step.id}
+                                                        className="flex items-center gap-3 py-3"
+                                                    >
+                                                        <div className="flex-shrink-0">
+                                                            {step.status === 'completed' ? (
+                                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-green-500 text-white">
+                                                                    <Check className="h-4 w-4" />
+                                                                </div>
+                                                            ) : step.status === 'skipped' ? (
+                                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gray-400 text-white">
+                                                                    <SkipForward className="h-4 w-4" />
+                                                                </div>
+                                                            ) : step.status === 'failed' ? (
+                                                                <div className="flex h-7 w-7 items-center justify-center rounded-full bg-red-500 text-white">
+                                                                    <XCircle className="h-4 w-4" />
+                                                                </div>
+                                                            ) : step.status === 'in_progress' ? (
+                                                                <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-primary bg-primary/10 text-primary">
+                                                                    <Play className="h-3.5 w-3.5" />
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex h-7 w-7 items-center justify-center rounded-full border-2 border-muted-foreground/30 text-muted-foreground text-xs">
+                                                                    {i + 1}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium truncate">
+                                                                {step.title}
+                                                            </p>
+                                                            {step.notes && (
+                                                                <p className="text-xs text-muted-foreground truncate">
+                                                                    {step.notes}
+                                                                </p>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <Badge
+                                                                variant="outline"
+                                                                className={`text-[10px] capitalize ${
+                                                                    step.status === 'completed'
+                                                                        ? 'border-green-500 text-green-600'
+                                                                        : step.status === 'failed'
+                                                                          ? 'border-red-500 text-red-600'
+                                                                          : step.status ===
+                                                                              'in_progress'
+                                                                            ? 'border-primary text-primary'
+                                                                            : ''
+                                                                }`}
+                                                            >
+                                                                {step.status.replace('_', ' ')}
+                                                            </Badge>
+                                                            {can.manage &&
+                                                                (step.status === 'pending' ||
+                                                                    step.status ===
+                                                                        'in_progress') && (
+                                                                    <>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-7 w-7"
+                                                                            title="Complete step"
+                                                                            disabled={processing}
+                                                                            onClick={() =>
+                                                                                doAction(
+                                                                                    'playbook-step',
+                                                                                    {
+                                                                                        step_id:
+                                                                                            step.id,
+                                                                                        action: 'complete',
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                                                        </Button>
+                                                                        <Button
+                                                                            variant="ghost"
+                                                                            size="icon"
+                                                                            className="h-7 w-7"
+                                                                            title="Skip step"
+                                                                            disabled={processing}
+                                                                            onClick={() =>
+                                                                                doAction(
+                                                                                    'playbook-step',
+                                                                                    {
+                                                                                        step_id:
+                                                                                            step.id,
+                                                                                        action: 'skip',
+                                                                                    },
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            <SkipForward className="h-4 w-4 text-muted-foreground" />
+                                                                        </Button>
+                                                                    </>
+                                                                )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </TabsContent>
+                            )}
+
+                            {/* ====== Tab: Evidence ====== */}
+                            <TabsContent value="evidence" className="space-y-4 pt-4">
+                                {evidence_packs.length === 0 ? (
+                                    <Card>
+                                        <CardContent className="py-12 text-center">
+                                            <Package className="mx-auto h-10 w-10 text-muted-foreground/40" />
+                                            <p className="mt-2 text-sm text-muted-foreground">
+                                                No evidence packs attached.
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    evidence_packs.map((pack) => (
+                                        <Card key={pack.id}>
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-sm flex items-center justify-between">
+                                                    <span>{pack.title}</span>
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="capitalize text-xs"
+                                                    >
+                                                        {pack.status}
+                                                    </Badge>
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {pack.items.length === 0 ? (
+                                                    <p className="text-xs text-muted-foreground italic">
+                                                        No items in this pack.
+                                                    </p>
+                                                ) : (
+                                                    <div className="space-y-2">
+                                                        {pack.items.map((item) => (
+                                                            <div
+                                                                key={item.id}
+                                                                className="flex items-center gap-3 rounded-lg bg-muted/50 px-3 py-2"
+                                                            >
+                                                                <FileText className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                                                                <div className="flex-1 min-w-0">
+                                                                    <p className="text-sm font-medium truncate">
+                                                                        {item.title}
+                                                                    </p>
+                                                                    <p className="text-[10px] text-muted-foreground capitalize">
+                                                                        {item.type}
+                                                                        {item.created_at &&
+                                                                            ` \u2014 ${fmtShortDate(item.created_at)}`}
+                                                                    </p>
+                                                                </div>
+                                                                {item.file_path && (
+                                                                    <Button
+                                                                        variant="ghost"
+                                                                        size="icon"
+                                                                        className="h-7 w-7"
+                                                                        asChild
+                                                                    >
+                                                                        <a
+                                                                            href={item.file_path}
+                                                                            target="_blank"
+                                                                            rel="noreferrer"
+                                                                        >
+                                                                            <ExternalLink className="h-3.5 w-3.5" />
+                                                                        </a>
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {can.manage && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="mt-3"
+                                                        onClick={() =>
+                                                            doAction('evidence-upload', {
+                                                                pack_id: pack.id,
+                                                            })
+                                                        }
+                                                        disabled={processing}
+                                                    >
+                                                        <Upload className="mr-1.5 h-3.5 w-3.5" />
+                                                        Upload Evidence
+                                                    </Button>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    ))
+                                )}
+                            </TabsContent>
+
+                            {/* ====== Tab: Communications ====== */}
+                            <TabsContent value="comms" className="space-y-4 pt-4">
+                                {communications.length === 0 ? (
+                                    <Card>
+                                        <CardContent className="py-12 text-center">
+                                            <MessageSquare className="mx-auto h-10 w-10 text-muted-foreground/40" />
+                                            <p className="mt-2 text-sm text-muted-foreground">
+                                                No communications logged.
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    <Card>
+                                        <CardContent className="pt-6">
+                                            <div className="relative space-y-0">
+                                                {communications.map((comm, idx) => (
+                                                    <div
+                                                        key={comm.id}
+                                                        className="relative flex gap-4 pb-6 last:pb-0"
+                                                    >
+                                                        {/* Timeline line */}
+                                                        {idx < communications.length - 1 && (
+                                                            <div className="absolute left-[15px] top-8 bottom-0 w-px bg-border" />
+                                                        )}
+                                                        {/* Icon */}
+                                                        <div
+                                                            className={`relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full ${
+                                                                comm.direction === 'outbound'
+                                                                    ? 'bg-primary/10 text-primary'
+                                                                    : 'bg-muted text-muted-foreground'
+                                                            }`}
+                                                        >
+                                                            {channelIcon(comm.channel)}
+                                                        </div>
+                                                        {/* Content */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <Badge
+                                                                    variant="outline"
+                                                                    className="capitalize text-[10px]"
+                                                                >
+                                                                    {comm.channel}
+                                                                </Badge>
+                                                                <Badge
+                                                                    variant={
+                                                                        comm.direction ===
+                                                                        'outbound'
+                                                                            ? 'default'
+                                                                            : 'secondary'
+                                                                    }
+                                                                    className="text-[10px]"
+                                                                >
+                                                                    {comm.direction}
+                                                                </Badge>
+                                                                {comm.purpose && (
+                                                                    <span className="text-xs text-muted-foreground">
+                                                                        {comm.purpose}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {comm.target_user_name && (
+                                                                <p className="text-xs text-muted-foreground mt-0.5">
+                                                                    To: {comm.target_user_name}
+                                                                </p>
+                                                            )}
+                                                            {comm.content && (
+                                                                <p className="mt-1 text-sm">
+                                                                    {comm.content}
+                                                                </p>
+                                                            )}
+                                                            <p className="mt-1 text-[10px] text-muted-foreground">
+                                                                {fmtDate(
+                                                                    comm.sent_at ??
+                                                                        comm.created_at,
+                                                                )}
+                                                            </p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </TabsContent>
+
+                            {/* ====== Tab: Audit Trail ====== */}
+                            <TabsContent value="audit" className="space-y-4 pt-4">
+                                {audit_logs.length === 0 ? (
+                                    <Card>
+                                        <CardContent className="py-12 text-center">
+                                            <Shield className="mx-auto h-10 w-10 text-muted-foreground/40" />
+                                            <p className="mt-2 text-sm text-muted-foreground">
+                                                No audit entries recorded.
+                                            </p>
+                                        </CardContent>
+                                    </Card>
+                                ) : (
+                                    <Card>
+                                        <CardContent className="pt-6">
+                                            <div className="relative space-y-0">
+                                                {audit_logs.map((log, idx) => (
+                                                    <div
+                                                        key={log.id}
+                                                        className="relative flex gap-4 pb-5 last:pb-0"
+                                                    >
+                                                        {idx < audit_logs.length - 1 && (
+                                                            <div className="absolute left-[15px] top-8 bottom-0 w-px bg-border" />
+                                                        )}
+                                                        <div className="relative z-10 flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                                                            <Clock className="h-4 w-4" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0">
+                                                            <p className="text-sm font-medium capitalize">
+                                                                {log.action.replace(/_/g, ' ')}
+                                                            </p>
+                                                            <p className="text-xs text-muted-foreground">
+                                                                {log.user?.name ?? 'System'}{' '}
+                                                                &middot;{' '}
+                                                                {fmtDate(log.created_at)}
+                                                            </p>
+                                                            {log.meta &&
+                                                                Object.keys(log.meta).length >
+                                                                    0 && (
+                                                                    <div className="mt-1 rounded bg-muted/50 px-2 py-1 text-[11px] font-mono text-muted-foreground">
+                                                                        {Object.entries(
+                                                                            log.meta,
+                                                                        ).map(([k, v]) => (
+                                                                            <div key={k}>
+                                                                                <span className="font-semibold">
+                                                                                    {k}:
+                                                                                </span>{' '}
+                                                                                {typeof v ===
+                                                                                'object'
+                                                                                    ? JSON.stringify(
+                                                                                          v,
+                                                                                      )
+                                                                                    : String(v)}
+                                                                            </div>
+                                                                        ))}
+                                                                    </div>
+                                                                )}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+                            </TabsContent>
+                        </Tabs>
+                    </div>
+
+                    {/* ---- Right: Sidebar ---- */}
+                    <div className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+                        {/* SLA Status */}
+                        {sla && (
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <Clock className="h-4 w-4" />
+                                        SLA Status
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    <SlaGauge
+                                        label="Acknowledge"
+                                        deadline={sla.acknowledge_deadline}
+                                        breached={sla.acknowledge_breached}
+                                        met={ackMet}
+                                    />
+                                    <SlaGauge
+                                        label="Response"
+                                        deadline={sla.response_deadline}
+                                        breached={sla.response_breached}
+                                        met={false}
+                                    />
+                                    <SlaGauge
+                                        label="Resolution"
+                                        deadline={sla.resolution_deadline}
+                                        breached={sla.resolution_breached}
+                                        met={resMet}
+                                    />
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Quick Actions */}
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base">Quick Actions</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-2">
+                                {/* Acknowledge */}
+                                <Button
+                                    className="w-full justify-start gap-3 h-auto py-3 bg-yellow-500/10 text-yellow-700 border border-yellow-500/30 hover:bg-yellow-500/20 dark:text-yellow-400"
+                                    variant="outline"
+                                    disabled={
+                                        alert.status !== 'open' || !can.manage || processing
+                                    }
+                                    onClick={() => doAction('acknowledge')}
+                                >
+                                    <Eye className="h-5 w-5 flex-shrink-0" />
+                                    <div className="text-left">
+                                        <div className="font-semibold text-sm">Acknowledge</div>
+                                        <div className="text-[11px] font-normal opacity-70">
+                                            Mark as seen
+                                        </div>
                                     </div>
+                                </Button>
+
+                                {/* Start Triage */}
+                                <Button
+                                    className="w-full justify-start gap-3 h-auto py-3 bg-blue-500/10 text-blue-700 border border-blue-500/30 hover:bg-blue-500/20 dark:text-blue-400"
+                                    variant="outline"
+                                    disabled={
+                                        !['open', 'acknowledged'].includes(alert.status) ||
+                                        !can.manage ||
+                                        processing
+                                    }
+                                    onClick={() => doAction('triage')}
+                                >
+                                    <Search className="h-5 w-5 flex-shrink-0" />
+                                    <div className="text-left">
+                                        <div className="font-semibold text-sm">Start Triage</div>
+                                        <div className="text-[11px] font-normal opacity-70">
+                                            Begin investigation
+                                        </div>
+                                    </div>
+                                </Button>
+
+                                {/* Resolve */}
+                                <Button
+                                    className="w-full justify-start gap-3 h-auto py-3 bg-green-500/10 text-green-700 border border-green-500/30 hover:bg-green-500/20 dark:text-green-400"
+                                    variant="outline"
+                                    disabled={
+                                        alert.status === 'resolved' ||
+                                        alert.status === 'closed' ||
+                                        !can.manage ||
+                                        processing
+                                    }
+                                    onClick={() => setResolveOpen(true)}
+                                >
+                                    <CheckCircle2 className="h-5 w-5 flex-shrink-0" />
+                                    <div className="text-left">
+                                        <div className="font-semibold text-sm">Resolve</div>
+                                        <div className="text-[11px] font-normal opacity-70">
+                                            Mark resolved
+                                        </div>
+                                    </div>
+                                </Button>
+
+                                {/* Close */}
+                                <Button
+                                    className="w-full justify-start gap-3 h-auto py-3 bg-gray-500/10 text-gray-700 border border-gray-500/30 hover:bg-gray-500/20 dark:text-gray-400"
+                                    variant="outline"
+                                    disabled={
+                                        alert.status !== 'resolved' || !can.manage || processing
+                                    }
+                                    onClick={() => doAction('close')}
+                                >
+                                    <XCircle className="h-5 w-5 flex-shrink-0" />
+                                    <div className="text-left">
+                                        <div className="font-semibold text-sm">Close</div>
+                                        <div className="text-[11px] font-normal opacity-70">
+                                            Close permanently
+                                        </div>
+                                    </div>
+                                </Button>
+
+                                {/* Escalate */}
+                                <Button
+                                    className="w-full justify-start gap-3 h-auto py-3 bg-red-500/10 text-red-700 border border-red-500/30 hover:bg-red-500/20 dark:text-red-400"
+                                    variant="outline"
+                                    disabled={
+                                        alert.status === 'closed' ||
+                                        !can.escalate ||
+                                        processing
+                                    }
+                                    onClick={() => setEscalateOpen(true)}
+                                >
+                                    <ArrowUpRight className="h-5 w-5 flex-shrink-0" />
+                                    <div className="text-left">
+                                        <div className="font-semibold text-sm">Escalate</div>
+                                        <div className="text-[11px] font-normal opacity-70">
+                                            Raise to L{alert.escalation_level + 1}
+                                        </div>
+                                    </div>
+                                </Button>
+                            </CardContent>
+                        </Card>
+
+                        {/* Assignment */}
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base flex items-center gap-2">
+                                    <Users className="h-4 w-4" />
+                                    Assignment
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {/* Current assignee */}
+                                <div className="flex items-center gap-3">
+                                    <div
+                                        className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-bold ${
+                                            alert.assigned_to
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'bg-muted text-muted-foreground'
+                                        }`}
+                                    >
+                                        {alert.assigned_to
+                                            ? initial(alert.assigned_to.name)
+                                            : '?'}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-medium truncate">
+                                            {alert.assigned_to?.name ?? 'Unassigned'}
+                                        </p>
+                                        {alert.assigned_to?.email && (
+                                            <p className="text-xs text-muted-foreground truncate">
+                                                {alert.assigned_to.email}
+                                            </p>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {can.assign && (
+                                    <>
+                                        <Button
+                                            variant="default"
+                                            size="sm"
+                                            className="w-full"
+                                            disabled={processing}
+                                            onClick={() => doAction('assign-me')}
+                                        >
+                                            <UserCheck className="mr-1.5 h-4 w-4" />
+                                            Assign to Me
+                                        </Button>
+
+                                        <div className="flex gap-2">
+                                            <Select
+                                                value={assigneeId}
+                                                onValueChange={(val) => handleAssign(val)}
+                                            >
+                                                <SelectTrigger className="flex-1 text-sm">
+                                                    <SelectValue placeholder="Assign to..." />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {staff.map((s) => (
+                                                        <SelectItem
+                                                            key={s.id}
+                                                            value={String(s.id)}
+                                                        >
+                                                            {s.name}
+                                                        </SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+
+                                        {alert.assigned_to && (
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                className="w-full text-muted-foreground"
+                                                disabled={processing}
+                                                onClick={() => doAction('unassign')}
+                                            >
+                                                <UserMinus className="mr-1.5 h-4 w-4" />
+                                                Unassign
+                                            </Button>
+                                        )}
+                                    </>
                                 )}
                             </CardContent>
                         </Card>
 
-                        {/* Fleet Signal Details */}
-                        {alert.fleet_signal && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Fleet Signal</CardTitle>
-                                    <CardDescription>
-                                        Signal that triggered this alert
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        <div>
-                                            <Label className="text-xs text-muted-foreground">
-                                                Signal Type
-                                            </Label>
-                                            <p className="font-medium">
-                                                {alert.fleet_signal.signal_type}
-                                            </p>
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs text-muted-foreground">
-                                                Occurred At
-                                            </Label>
-                                            <p className="font-medium">
-                                                {formatDateTime(
-                                                    alert.fleet_signal
-                                                        .occurred_at,
-                                                )}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    {alert.fleet_signal.payload && (
-                                        <div>
-                                            <Label className="text-xs text-muted-foreground">
-                                                Payload
-                                            </Label>
-                                            <pre className="mt-1 overflow-auto rounded-md bg-muted p-3 text-xs">
-                                                {JSON.stringify(
-                                                    alert.fleet_signal.payload,
-                                                    null,
-                                                    2,
-                                                )}
-                                            </pre>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Playbook Execution */}
-                        {playbook_run && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <Play className="h-5 w-5" />
-                                        Playbook: {playbook_run.playbook.name}
-                                    </CardTitle>
-                                    <CardDescription>
-                                        {playbook_run.playbook.category} &middot; {playbook_run.completed_steps}/{playbook_run.total_steps} steps completed
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-4">
-                                    {/* Progress bar */}
-                                    <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
-                                        <div
-                                            className="h-full rounded-full bg-primary transition-all"
-                                            style={{ width: `${playbook_run.total_steps > 0 ? (playbook_run.completed_steps / playbook_run.total_steps) * 100 : 0}%` }}
-                                        />
-                                    </div>
-                                    {/* Steps list */}
-                                    <div className="space-y-2">
-                                        {playbook_run.steps.map((step) => (
-                                            <div key={step.id} className="flex items-center justify-between rounded-md border p-3">
-                                                <div className="flex items-center gap-3">
-                                                    {step.status === 'completed' ? (
-                                                        <CheckCircle className="h-4 w-4 text-green-500" />
-                                                    ) : step.status === 'in_progress' ? (
-                                                        <Clock className="h-4 w-4 text-blue-500" />
-                                                    ) : step.status === 'failed' ? (
-                                                        <XCircle className="h-4 w-4 text-red-500" />
-                                                    ) : step.status === 'skipped' ? (
-                                                        <SkipForward className="h-4 w-4 text-yellow-500" />
-                                                    ) : (
-                                                        <div className="h-4 w-4 rounded-full border-2 border-gray-300" />
-                                                    )}
-                                                    <div>
-                                                        <p className="text-sm font-medium">{step.title}</p>
-                                                        {step.completed_at && (
-                                                            <p className="text-xs text-muted-foreground">
-                                                                Completed {formatRelativeTime(step.completed_at)}
-                                                            </p>
-                                                        )}
-                                                        {step.notes && (
-                                                            <p className="text-xs text-muted-foreground">{step.notes}</p>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Badge className={stepStatusColors[step.status] || 'bg-gray-100 text-gray-700'}>
-                                                        {step.status.replace('_', ' ')}
-                                                    </Badge>
-                                                    {step.status === 'in_progress' && can.manage && (
-                                                        <div className="flex gap-1">
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                onClick={() => handleAction('playbook-step-complete', { step_id: step.id })}
-                                                                disabled={processing}
-                                                            >
-                                                                Complete
-                                                            </Button>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                onClick={() => handleAction('playbook-step-skip', { step_id: step.id })}
-                                                                disabled={processing}
-                                                            >
-                                                                Skip
-                                                            </Button>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Evidence Packs */}
-                        {evidence_packs.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="flex items-center gap-2">
-                                            <File className="h-5 w-5" />
-                                            Evidence
-                                        </CardTitle>
-                                        {can.manage && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => handleAction('evidence-pack-create')}
-                                                disabled={processing}
-                                            >
-                                                Create Evidence Pack
-                                            </Button>
-                                        )}
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                    {evidence_packs.map((pack) => (
-                                        <div key={pack.id} className="rounded-md border">
-                                            <button
-                                                type="button"
-                                                className="flex w-full items-center justify-between p-3 text-left hover:bg-muted/50"
-                                                onClick={() => togglePack(pack.id)}
-                                            >
-                                                <div className="flex items-center gap-2">
-                                                    {expandedPacks[pack.id] ? (
-                                                        <ChevronDown className="h-4 w-4" />
-                                                    ) : (
-                                                        <ChevronRight className="h-4 w-4" />
-                                                    )}
-                                                    <span className="text-sm font-medium">{pack.title}</span>
-                                                    <Badge variant="secondary" className="text-xs">
-                                                        {pack.item_count} items
-                                                    </Badge>
-                                                    <Badge variant="outline" className="text-xs">
-                                                        {pack.status}
-                                                    </Badge>
-                                                </div>
-                                            </button>
-                                            {expandedPacks[pack.id] && pack.items.length > 0 && (
-                                                <div className="border-t px-3 pb-3 pt-2">
-                                                    <div className="space-y-1">
-                                                        {pack.items.map((item) => {
-                                                            const IconComponent = evidenceTypeIcons[item.type] || File;
-                                                            return (
-                                                                <div key={item.id} className="flex items-center gap-2 rounded px-2 py-1 text-sm hover:bg-muted/50">
-                                                                    <IconComponent className="h-4 w-4 text-muted-foreground" />
-                                                                    <span>{item.title}</span>
-                                                                    {item.created_at && (
-                                                                        <span className="ml-auto text-xs text-muted-foreground">
-                                                                            {formatRelativeTime(item.created_at)}
-                                                                        </span>
-                                                                    )}
-                                                                </div>
-                                                            );
-                                                        })}
-                                                    </div>
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Communication Log */}
-                        {communications.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <MessageSquare className="h-5 w-5" />
-                                        Communications
-                                    </CardTitle>
-                                    <CardDescription>
-                                        {communications.length} message{communications.length !== 1 ? 's' : ''}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="relative">
-                                        <div className="absolute left-3 top-0 h-full w-px bg-border" />
-                                        <div className="space-y-4">
-                                            {communications.map((comm) => {
-                                                const ChannelIcon = channelIcons[comm.channel] || MessageSquare;
-                                                return (
-                                                    <div key={comm.id} className="relative flex gap-4 pl-8">
-                                                        <div className="absolute left-1.5 top-1 h-3 w-3 rounded-full border-2 border-primary bg-background" />
-                                                        <div className="flex-1 space-y-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <Badge className={channelColors[comm.channel] || 'bg-gray-100 text-gray-700'}>
-                                                                    <ChannelIcon className="mr-1 h-3 w-3" />
-                                                                    {comm.channel.replace('_', ' ')}
-                                                                </Badge>
-                                                                {comm.direction === 'outbound' ? (
-                                                                    <ArrowUp className="h-3 w-3 text-blue-500" />
-                                                                ) : (
-                                                                    <ArrowDown className="h-3 w-3 text-green-500" />
-                                                                )}
-                                                                <span className="text-xs text-muted-foreground">
-                                                                    {comm.direction}
-                                                                </span>
-                                                                {comm.purpose && (
-                                                                    <Badge variant="outline" className="text-xs">
-                                                                        {comm.purpose}
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                            {comm.content && (
-                                                                <p className="text-sm">{comm.content}</p>
-                                                            )}
-                                                            <p className="text-xs text-muted-foreground">
-                                                                {comm.target_user_name && <span>To: {comm.target_user_name} &middot; </span>}
-                                                                {formatDateTime(comm.sent_at || comm.created_at)}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Activity Log (Notes) */}
-                        {(alert.context?.activity_log?.length ?? 0) > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle>Notes</CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="space-y-3">
-                                        {alert.context!.activity_log.map(
-                                            (entry: any, i: number) => (
-                                                <div
-                                                    key={i}
-                                                    className="flex gap-3 border-l-2 border-muted pl-3"
-                                                >
-                                                    <MessageSquare className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                                                    <div>
-                                                        <p className="text-sm">
-                                                            {entry.content}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {entry.user_name} -{' '}
-                                                            {formatDateTime(
-                                                                entry.created_at,
-                                                            )}
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                            ),
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Audit Trail */}
-                        {significantAuditLogs.length > 0 && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2">
-                                        <History className="h-5 w-5" />
-                                        Audit Trail
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Complete history of actions on this alert
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="relative">
-                                        <div className="absolute left-3 top-0 h-full w-px bg-border" />
-                                        <div className="space-y-4">
-                                            {significantAuditLogs.map((log) => (
-                                                <div
-                                                    key={log.id}
-                                                    className="relative flex gap-4 pl-8"
-                                                >
-                                                    <div className="absolute left-1.5 top-1 h-3 w-3 rounded-full border-2 border-primary bg-background" />
-                                                    <div className="flex-1">
-                                                        <p className="text-sm font-medium">
-                                                            {actionLabels[log.action] ||
-                                                                log.action.split('.').pop()}
-                                                        </p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {log.user?.name || 'System'} -{' '}
-                                                            {formatRelativeTime(log.created_at)}
-                                                        </p>
-                                                        {log.meta && Object.keys(log.meta).length > 0 && (
-                                                            <div className="mt-1 text-xs text-muted-foreground">
-                                                                {log.meta.escalation_level && (
-                                                                    <span>Level: {log.meta.escalation_level}</span>
-                                                                )}
-                                                                {log.meta.assigned_to && (
-                                                                    <span>Assigned to ID: {log.meta.assigned_to}</span>
-                                                                )}
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {new Date(log.created_at).toLocaleTimeString()}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-                    </div>
-
-                    {/* Actions Sidebar */}
-                    <div className="space-y-4">
-                        {/* SLA Status */}
-                        {sla && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-base">
-                                        <Timer className="h-4 w-4" />
-                                        SLA Status
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {[
-                                        { label: 'Acknowledge', deadline: sla.acknowledge_deadline, breached: sla.acknowledge_breached, met: !!alert.acknowledged_at },
-                                        { label: 'Response', deadline: sla.response_deadline, breached: sla.response_breached, met: alert.status === 'triaging' || alert.status === 'resolved' || alert.status === 'closed' },
-                                        { label: 'Resolution', deadline: sla.resolution_deadline, breached: sla.resolution_breached, met: alert.status === 'resolved' || alert.status === 'closed' },
-                                    ].map((row) => (
-                                        <div key={row.label} className="flex items-center justify-between">
-                                            <span className="text-sm font-medium">{row.label}</span>
-                                            <div className="text-right">
-                                                {row.breached ? (
-                                                    <span className="text-sm font-bold text-red-600">BREACHED</span>
-                                                ) : row.met ? (
-                                                    <span className="text-sm font-bold text-green-600">MET</span>
-                                                ) : row.deadline ? (
-                                                    <div>
-                                                        <span className="text-sm font-mono font-medium">
-                                                            {formatCountdown(row.deadline)}
-                                                        </span>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {new Date(row.deadline).toLocaleTimeString()}
-                                                        </p>
-                                                    </div>
-                                                ) : (
-                                                    <span className="text-xs text-muted-foreground">N/A</span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Related Client */}
+                        {/* Client Quick View */}
                         {client && (
                             <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">Related Client</CardTitle>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base flex items-center gap-2">
+                                        <User className="h-4 w-4" />
+                                        Client
+                                    </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <Link
                                         href={`/clients/${client.id}`}
-                                        className="flex items-center gap-2 font-medium text-primary hover:underline"
+                                        className="text-sm font-medium text-primary hover:underline inline-flex items-center gap-1"
                                     >
-                                        <User className="h-4 w-4" />
                                         {client.name}
+                                        <ExternalLink className="h-3 w-3" />
                                     </Link>
                                 </CardContent>
                             </Card>
@@ -933,261 +1529,122 @@ export default function ControlRoomShow({ alert, playbook_run, evidence_packs, c
                         {/* Location */}
                         {location && (
                             <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center gap-2 text-base">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base flex items-center gap-2">
                                         <MapPin className="h-4 w-4" />
                                         Location
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
-                                    <div className="flex aspect-video items-center justify-center rounded-md bg-muted text-sm text-muted-foreground">
-                                        <div className="text-center">
-                                            <MapPin className="mx-auto h-8 w-8 mb-1" />
-                                            <p className="font-mono text-xs">{location.lat.toFixed(6)}, {location.lng.toFixed(6)}</p>
-                                        </div>
-                                    </div>
                                     {location.description && (
-                                        <p className="text-sm text-muted-foreground">{location.description}</p>
+                                        <p className="text-sm">{location.description}</p>
                                     )}
-                                    <Button variant="outline" size="sm" className="w-full" asChild>
+                                    <p className="text-xs text-muted-foreground font-mono">
+                                        {location.lat.toFixed(6)}, {location.lng.toFixed(6)}
+                                    </p>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="w-full"
+                                        asChild
+                                    >
                                         <a
                                             href={`https://www.google.com/maps?q=${location.lat},${location.lng}`}
                                             target="_blank"
-                                            rel="noopener noreferrer"
+                                            rel="noreferrer"
                                         >
-                                            <MapPin className="mr-2 h-3 w-3" />
-                                            View on Map
+                                            <MapPin className="mr-1.5 h-3.5 w-3.5" />
+                                            Open in Google Maps
                                         </a>
                                     </Button>
                                 </CardContent>
                             </Card>
                         )}
-
-                        {/* Quick Actions */}
-                        {can.manage && !isClosed && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Quick Actions
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                    {alert.status === 'open' && (
-                                        <Button
-                                            className="w-full"
-                                            variant="outline"
-                                            onClick={() =>
-                                                handleAction('acknowledge')
-                                            }
-                                            disabled={processing}
-                                        >
-                                            <CheckCircle className="mr-2 h-4 w-4" />
-                                            Acknowledge
-                                        </Button>
-                                    )}
-                                    {(alert.status === 'open' ||
-                                        alert.status === 'ack') && (
-                                        <Button
-                                            className="w-full"
-                                            variant="outline"
-                                            onClick={() =>
-                                                handleAction('triage')
-                                            }
-                                            disabled={processing}
-                                        >
-                                            <Clock className="mr-2 h-4 w-4" />
-                                            Start Triage
-                                        </Button>
-                                    )}
-                                    {alert.status !== 'resolved' &&
-                                        alert.status !== 'closed' && (
-                                            <Button
-                                                className="w-full"
-                                                variant="default"
-                                                onClick={() => {
-                                                    const resNotes =
-                                                        prompt(
-                                                            'Enter resolution notes:',
-                                                        );
-                                                    if (resNotes) {
-                                                        handleAction('resolve', {
-                                                            resolution_notes:
-                                                                resNotes,
-                                                        });
-                                                    }
-                                                }}
-                                                disabled={processing}
-                                            >
-                                                <CheckCircle className="mr-2 h-4 w-4" />
-                                                Resolve
-                                            </Button>
-                                        )}
-                                    {alert.status === 'resolved' && (
-                                        <Button
-                                            className="w-full"
-                                            variant="secondary"
-                                            onClick={() =>
-                                                handleAction('close')
-                                            }
-                                            disabled={processing}
-                                        >
-                                            <XCircle className="mr-2 h-4 w-4" />
-                                            Close
-                                        </Button>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Assignment */}
-                        {can.assign && !isClosed && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Assignment
-                                    </CardTitle>
-                                    {alert.assigned_to && (
-                                        <CardDescription>
-                                            Currently assigned to{' '}
-                                            {alert.assigned_to.name}
-                                        </CardDescription>
-                                    )}
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <Select
-                                        value={assignTo}
-                                        onValueChange={setAssignTo}
-                                    >
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select assignee" />
-                                        </SelectTrigger>
-                                        <SelectContent>
-                                            {staff.map((s) => (
-                                                <SelectItem
-                                                    key={s.id}
-                                                    value={s.id.toString()}
-                                                >
-                                                    {s.name}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            onClick={handleAssign}
-                                            disabled={!assignTo || processing}
-                                            className="flex-1"
-                                        >
-                                            <User className="mr-2 h-4 w-4" />
-                                            Assign
-                                        </Button>
-                                        {alert.assigned_to && (
-                                            <Button
-                                                variant="outline"
-                                                onClick={() =>
-                                                    handleAction('unassign')
-                                                }
-                                                disabled={processing}
-                                            >
-                                                Unassign
-                                            </Button>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Escalation */}
-                        {can.escalate && !isClosed && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Escalation
-                                    </CardTitle>
-                                    <CardDescription>
-                                        Current level: {alert.escalation_level}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <Textarea
-                                        placeholder="Escalation reason..."
-                                        value={escalationReason}
-                                        onChange={(e) =>
-                                            setEscalationReason(e.target.value)
-                                        }
-                                        rows={2}
-                                    />
-                                    <Button
-                                        className="w-full"
-                                        variant="destructive"
-                                        onClick={handleEscalate}
-                                        disabled={
-                                            !escalationReason.trim() ||
-                                            processing
-                                        }
-                                    >
-                                        <TrendingUp className="mr-2 h-4 w-4" />
-                                        Escalate to L
-                                        {(alert.escalation_level || 0) + 1}
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Add Note */}
-                        {can.manage && (
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Add Note
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <Textarea
-                                        placeholder="Add a note..."
-                                        value={notes}
-                                        onChange={(e) =>
-                                            setNotes(e.target.value)
-                                        }
-                                        rows={3}
-                                    />
-                                    <Button
-                                        className="w-full"
-                                        variant="secondary"
-                                        onClick={handleAddNote}
-                                        disabled={!notes.trim() || processing}
-                                    >
-                                        <MessageSquare className="mr-2 h-4 w-4" />
-                                        Add Note
-                                    </Button>
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        {/* Alert Closed */}
-                        {isClosed && (
-                            <Card>
-                                <CardContent className="pt-6">
-                                    <div className="flex items-center gap-2 text-muted-foreground">
-                                        <CheckCircle className="h-5 w-5 text-green-500" />
-                                        <span>
-                                            This alert has been{' '}
-                                            {alert.status === 'closed'
-                                                ? 'closed'
-                                                : 'resolved'}
-                                            {alert.status === 'resolved' && alert.resolved_by && (
-                                                <> by {alert.resolved_by.name}</>
-                                            )}
-                                            {alert.status === 'closed' && alert.closed_by && (
-                                                <> by {alert.closed_by.name}</>
-                                            )}
-                                        </span>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        )}
                     </div>
                 </div>
+
+                {/* ============================================================ */}
+                {/* DIALOGS                                                      */}
+                {/* ============================================================ */}
+
+                {/* Resolve Dialog */}
+                <Dialog open={resolveOpen} onOpenChange={setResolveOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Resolve Alert #{alert.id}</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3 py-2">
+                            <Label htmlFor="resolve-notes">Resolution Notes</Label>
+                            <Textarea
+                                id="resolve-notes"
+                                value={resolveNotes}
+                                onChange={(e) => setResolveNotes(e.target.value)}
+                                placeholder="Describe how this alert was resolved..."
+                                rows={4}
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => setResolveOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleResolve}
+                                disabled={!resolveNotes.trim() || processing}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                                Resolve
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+
+                {/* Escalate Dialog */}
+                <Dialog open={escalateOpen} onOpenChange={setEscalateOpen}>
+                    <DialogContent>
+                        <DialogHeader>
+                            <DialogTitle>Escalate Alert #{alert.id}</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3 py-2">
+                            <div className="flex items-center gap-3 rounded-lg bg-muted p-3">
+                                <div className="text-sm">
+                                    <span className="text-muted-foreground">Current level:</span>{' '}
+                                    <Badge variant="destructive" className="ml-1">
+                                        L{alert.escalation_level}
+                                    </Badge>
+                                </div>
+                                <span className="text-muted-foreground">&rarr;</span>
+                                <div className="text-sm">
+                                    <span className="text-muted-foreground">Escalate to:</span>{' '}
+                                    <Badge variant="destructive" className="ml-1">
+                                        L{alert.escalation_level + 1}
+                                    </Badge>
+                                </div>
+                            </div>
+                            <Label htmlFor="escalate-reason">Escalation Reason</Label>
+                            <Textarea
+                                id="escalate-reason"
+                                value={escalateReason}
+                                onChange={(e) => setEscalateReason(e.target.value)}
+                                placeholder="Why does this alert need escalation?"
+                                rows={4}
+                            />
+                        </div>
+                        <DialogFooter>
+                            <Button variant="ghost" onClick={() => setEscalateOpen(false)}>
+                                Cancel
+                            </Button>
+                            <Button
+                                onClick={handleEscalate}
+                                disabled={!escalateReason.trim() || processing}
+                                variant="destructive"
+                            >
+                                <ArrowUpRight className="mr-1.5 h-4 w-4" />
+                                Escalate to L{alert.escalation_level + 1}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
             </PageShell>
         </AppLayout>
     );
