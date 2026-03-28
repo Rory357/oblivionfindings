@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Requests\Hr\StoreDisciplinaryActionRequest;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCaseEvent;
 use App\Domain\Hr\Models\HrDisciplinaryAction;
@@ -153,28 +154,13 @@ class DisciplinaryController extends Controller
     /**
      * Store a new disciplinary action linked to an HR case.
      */
-    public function store(Request $request, HrCase $case)
+    public function store(StoreDisciplinaryActionRequest $request, HrCase $case)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.disciplinary.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
         $this->assertHrTenantAccess($tenantId, $case->tenant_id);
-        $tenantStaffIds = $this->hrStaffUserIdsForTenant($tenantId);
-        $employeeRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
-        $investigatorRule = $tenantStaffIds !== [] ? Rule::in($tenantStaffIds) : Rule::exists('users', 'id');
 
-        $data = $request->validate([
-            'employee_user_id' => ['required', 'integer', $employeeRule],
-            'action_type' => ['required', 'string', 'in:verbal_warning,written_warning,final_warning,suspension,dismissal,other'],
-            'allegation_summary' => ['required', 'string', 'max:10000'],
-            'investigation_notes' => ['nullable', 'string', 'max:10000'],
-            'investigator_user_id' => ['nullable', 'integer', $investigatorRule],
-            'meeting_scheduled_at' => ['nullable', 'date'],
-            'meeting_location' => ['nullable', 'string', 'max:255'],
-            'support_person_advised' => ['boolean'],
-            'response_deadline' => ['nullable', 'date'],
-            'good_faith_checklist' => ['nullable', 'array'],
-        ]);
+        $data = $request->validated();
 
         $action = HrDisciplinaryAction::create([
             'tenant_id' => $tenantId,

@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Hr\StoreTrainingCourseRequest;
 use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrCourseSession;
@@ -96,25 +97,11 @@ class TrainingController extends Controller
     /**
      * Store a new course.
      */
-    public function storeCourse(Request $request)
+    public function storeCourse(StoreTrainingCourseRequest $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.training.manage'), 403);
 
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50'],
-            'description' => ['nullable', 'string', 'max:5000'],
-            'category' => ['nullable', 'string', 'max:255'],
-            'delivery_method' => ['required', 'string', 'in:online,in_person,blended,self_paced'],
-            'duration_hours' => ['required', 'numeric', 'min:0'],
-            'provider' => ['nullable', 'string', 'max:255'],
-            'cost' => ['nullable', 'numeric', 'min:0'],
-            'is_mandatory' => ['sometimes', 'boolean'],
-            'compliance_requirement_id' => ['nullable', 'integer', 'exists:hr_compliance_requirements,id'],
-            'max_participants' => ['nullable', 'integer', 'min:1'],
-            'is_active' => ['sometimes', 'boolean'],
-        ]);
+        $data = $request->validated();
 
         $this->trainingService->createCourse([
             'tenant_id' => $user->tenant_id,

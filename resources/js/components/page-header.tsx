@@ -30,7 +30,7 @@ export default function PageHeader({
                     </Link>
                 ) : null}
 
-                <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+                <h1 className="mt-1 text-xl md:text-2xl font-semibold tracking-tight">
                     {title}
                 </h1>
                 {description ? (

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
+use App\Domain\Governance\Http\Requests\StoreActionItemRequest;
 use App\Domain\Governance\Models\ActionItem;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -69,19 +70,9 @@ class ActionItemController extends Controller
         return redirect()->back()->with('success', 'Action item completed.');
     }
 
-    public function store(Request $request)
+    public function store(StoreActionItemRequest $request)
     {
-        $this->authorize('create', ActionItem::class);
-
-        $validated = $request->validate([
-            'source_type' => 'required|string',
-            'source_id' => 'required|integer',
-            'description' => 'required|string',
-            'assigned_to' => 'required|exists:users,id',
-            'due_date' => 'required|date|after:today',
-            'priority' => 'required|in:low,medium,high,critical',
-            'evidence_required' => 'boolean',
-        ]);
+        $validated = $request->validated();
 
         ActionItem::create([
             ...$validated,

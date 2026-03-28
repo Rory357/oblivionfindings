@@ -6,6 +6,8 @@ use App\Domain\Governance\Models\BoardMember;
 use App\Domain\Governance\Models\GovernanceMeeting;
 use App\Domain\Governance\Models\Resolution;
 use App\Domain\Governance\Services\VotingService;
+use App\Domain\Governance\Http\Requests\StoreResolutionRequest;
+use App\Domain\Governance\Http\Requests\UpdateResolutionRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -71,15 +73,9 @@ class ResolutionController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreResolutionRequest $request)
     {
-        $validated = $request->validate([
-            'title' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'type' => 'nullable|string|in:ordinary,special,unanimous',
-            'voting_deadline' => 'nullable|date|after:now',
-            'meeting_id' => 'nullable|exists:governance_meetings,id',
-        ]);
+        $validated = $request->validated();
 
         $votingThreshold = match ($validated['type'] ?? 'ordinary') {
             'special' => 'two_thirds',
@@ -103,15 +99,9 @@ class ResolutionController extends Controller
             ->with('success', 'Resolution created.');
     }
 
-    public function update(Request $request, Resolution $resolution)
+    public function update(UpdateResolutionRequest $request, Resolution $resolution)
     {
-        $this->authorize('update', $resolution);
-
-        $validated = $request->validate([
-            'title' => 'sometimes|string|max:255',
-            'context' => 'sometimes|string|min:50',
-            'recommendation' => 'nullable|string',
-        ]);
+        $validated = $request->validated();
 
         $resolution->update($validated);
 

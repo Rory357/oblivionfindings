@@ -7,6 +7,8 @@ use App\Domain\Roadmap\Models\InitiativeCategory;
 use App\Domain\Roadmap\Services\RoadmapChangeLogService;
 use App\Domain\Roadmap\Services\RoadmapDecisionService;
 use App\Domain\Roadmap\Services\RoadmapScoringService;
+use App\Domain\Roadmap\Http\Requests\StoreInitiativeRequest;
+use App\Domain\Roadmap\Http\Requests\UpdateInitiativeRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 
@@ -46,31 +48,12 @@ class InitiativeController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreInitiativeRequest $request)
     {
         $user = $request->user();
         $tenantId = $this->tenantId($request);
 
-        $data = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'summary' => ['nullable', 'string'],
-            'category_id' => ['nullable', 'integer', 'exists:roadmap_initiative_categories,id'],
-            'category_key' => ['nullable', 'string', 'max:64'],
-            'stream' => ['nullable', 'string', 'max:32'],
-            'status' => ['nullable', 'string', 'max:32'],
-            'owner_user_id' => ['nullable', 'integer', 'exists:users,id'],
-            'sponsor_user_id' => ['nullable', 'integer', 'exists:users,id'],
-            'next_decision' => ['nullable', 'string', 'max:64'],
-            'decision_due_at' => ['nullable', 'date'],
-            'target_fiscal_year' => ['nullable', 'integer', 'min:2000', 'max:3000'],
-            'target_quarter' => ['nullable', 'integer', 'min:1', 'max:4'],
-            'cost_estimate_low' => ['nullable', 'numeric', 'min:0'],
-            'cost_estimate_high' => ['nullable', 'numeric', 'min:0'],
-            'benefit_summary' => ['nullable', 'string'],
-            'risk_summary' => ['nullable', 'string'],
-            'dependency_summary' => ['nullable', 'string'],
-            'impact_profile' => ['nullable', 'array'],
-        ]);
+        $data = $request->validated();
 
         $categoryId = $data['category_id'] ?? null;
         if (! $categoryId && ! empty($data['category_key'])) {
@@ -156,30 +139,11 @@ class InitiativeController extends Controller
         ]);
     }
 
-    public function update(Request $request, Initiative $initiative)
+    public function update(UpdateInitiativeRequest $request, Initiative $initiative)
     {
         $this->assertTenant($request, $initiative->tenant_id);
 
-        $data = $request->validate([
-            'title' => ['sometimes', 'string', 'max:255'],
-            'summary' => ['sometimes', 'nullable', 'string'],
-            'status' => ['sometimes', 'string', 'max:32'],
-            'stream' => ['sometimes', 'string', 'max:32'],
-            'owner_user_id' => ['sometimes', 'integer', 'exists:users,id'],
-            'sponsor_user_id' => ['sometimes', 'nullable', 'integer', 'exists:users,id'],
-            'next_decision' => ['sometimes', 'nullable', 'string', 'max:64'],
-            'decision_due_at' => ['sometimes', 'nullable', 'date'],
-            'target_fiscal_year' => ['sometimes', 'nullable', 'integer', 'min:2000', 'max:3000'],
-            'target_quarter' => ['sometimes', 'nullable', 'integer', 'min:1', 'max:4'],
-            'cost_estimate_low' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'cost_estimate_high' => ['sometimes', 'nullable', 'numeric', 'min:0'],
-            'benefit_summary' => ['sometimes', 'nullable', 'string'],
-            'risk_summary' => ['sometimes', 'nullable', 'string'],
-            'dependency_summary' => ['sometimes', 'nullable', 'string'],
-            'impact_profile' => ['sometimes', 'nullable', 'array'],
-            'manual_priority_override' => ['sometimes', 'boolean'],
-            'manual_priority_reason' => ['sometimes', 'nullable', 'string'],
-        ]);
+        $data = $request->validated();
 
         $before = $initiative->only(array_keys($data));
 

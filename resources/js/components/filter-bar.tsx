@@ -33,6 +33,7 @@ interface FilterBarProps {
     isPending?: boolean;
     className?: string;
     showReset?: boolean;
+    activeCount?: number;
 }
 
 const widthClasses = {
@@ -51,6 +52,7 @@ export function FilterBar({
     isPending = false,
     className,
     showReset = true,
+    activeCount,
 }: FilterBarProps) {
     const handleReset = () => {
         if (onReset) {
@@ -62,6 +64,7 @@ export function FilterBar({
 
     return (
         <div
+            aria-label="Search filters"
             className={cn(
                 'flex flex-wrap items-end gap-3 rounded-xl border bg-card p-4',
                 className
@@ -80,10 +83,11 @@ export function FilterBar({
                                         {field.label}
                                     </Label>
                                 )}
-                                <div className="relative mt-1">
+                                <div role="search" className="relative mt-1">
                                     <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                                     <Input
                                         placeholder={field.placeholder ?? 'Search...'}
+                                        aria-label={field.label || field.placeholder || 'Search'}
                                         value={value || ''}
                                         onChange={(e) => onChange(field.key, e.target.value)}
                                         className="pl-9"
@@ -198,16 +202,23 @@ export function FilterBar({
             })}
 
             {showReset && onReset && (
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleReset}
-                    disabled={isPending}
-                    className="ml-auto"
-                >
-                    <RotateCcw className="mr-2 h-4 w-4" />
-                    Reset
-                </Button>
+                <div className="ml-auto flex items-center gap-2">
+                    {activeCount != null && activeCount > 0 && (
+                        <span className="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            {activeCount} active
+                        </span>
+                    )}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleReset}
+                        disabled={isPending}
+                        aria-label="Clear all filters"
+                    >
+                        <RotateCcw className="mr-2 h-4 w-4" />
+                        Clear all
+                    </Button>
+                </div>
             )}
         </div>
     );

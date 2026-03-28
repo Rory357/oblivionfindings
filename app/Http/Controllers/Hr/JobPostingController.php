@@ -3,10 +3,10 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Hr\StoreJobPostingRequest;
 use App\Domain\Hr\Models\HrJobPosting;
 use App\Domain\Hr\Models\HrPosition;
 use Illuminate\Http\Request;
-use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class JobPostingController extends Controller
@@ -80,24 +80,11 @@ class JobPostingController extends Controller
     /*  Store — save posting                                               */
     /* ------------------------------------------------------------------ */
 
-    public function store(Request $request)
+    public function store(StoreJobPostingRequest $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
 
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'position_id' => ['nullable', 'integer', 'exists:hr_positions,id'],
-            'department' => ['nullable', 'string', 'max:255'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'employment_type' => ['required', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term'])],
-            'description' => ['required', 'string', 'max:50000'],
-            'requirements' => ['nullable', 'string', 'max:50000'],
-            'salary_range_min' => ['nullable', 'numeric', 'min:0'],
-            'salary_range_max' => ['nullable', 'numeric', 'min:0'],
-            'show_salary' => ['boolean'],
-            'closes_at' => ['nullable', 'date', 'after_or_equal:today'],
-        ]);
+        $validated = $request->validated();
 
         $validated['tenant_id'] = $user->tenant_id;
         $validated['created_by'] = $user->id;
@@ -170,24 +157,11 @@ class JobPostingController extends Controller
     /*  Update                                                             */
     /* ------------------------------------------------------------------ */
 
-    public function update(Request $request, HrJobPosting $posting)
+    public function update(StoreJobPostingRequest $request, HrJobPosting $posting)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
 
-        $validated = $request->validate([
-            'title' => ['required', 'string', 'max:255'],
-            'position_id' => ['nullable', 'integer', 'exists:hr_positions,id'],
-            'department' => ['nullable', 'string', 'max:255'],
-            'location' => ['nullable', 'string', 'max:255'],
-            'employment_type' => ['required', 'string', Rule::in(['full_time', 'part_time', 'casual', 'fixed_term'])],
-            'description' => ['required', 'string', 'max:50000'],
-            'requirements' => ['nullable', 'string', 'max:50000'],
-            'salary_range_min' => ['nullable', 'numeric', 'min:0'],
-            'salary_range_max' => ['nullable', 'numeric', 'min:0'],
-            'show_salary' => ['boolean'],
-            'closes_at' => ['nullable', 'date'],
-        ]);
+        $validated = $request->validated();
 
         $posting->update($validated);
 

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
+use App\Domain\Governance\Http\Requests\StoreComplianceObligationRequest;
 use App\Domain\Governance\Models\ComplianceObligation;
 use App\Domain\Governance\Services\ComplianceEngineService;
 use App\Http\Controllers\Controller;
@@ -57,18 +58,9 @@ class ComplianceController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreComplianceObligationRequest $request)
     {
-        $validated = $request->validate([
-            'framework' => 'required|string',
-            'obligation_reference' => 'nullable|string|max:50',
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'requirements' => 'nullable|string',
-            'due_date' => 'nullable|date',
-            'owner_id' => 'nullable|exists:users,id',
-            'priority' => 'nullable|string|in:low,medium,high,critical',
-        ]);
+        $validated = $request->validated();
 
         $owner = $validated['owner_id'] ? \App\Models\User::find($validated['owner_id']) : null;
         $dueDate = $validated['due_date'] ? Carbon::parse($validated['due_date']) : null;

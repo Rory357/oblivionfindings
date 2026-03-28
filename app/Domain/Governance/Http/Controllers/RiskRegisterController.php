@@ -2,6 +2,8 @@
 
 namespace App\Domain\Governance\Http\Controllers;
 
+use App\Domain\Governance\Http\Requests\StoreRiskRegisterRequest;
+use App\Domain\Governance\Http\Requests\UpdateRiskRegisterRequest;
 use App\Domain\Governance\Models\RiskAcceptance;
 use App\Domain\Governance\Models\RiskRegisterEntry;
 use App\Domain\Governance\Models\RiskTreatment;
@@ -76,19 +78,9 @@ class RiskRegisterController extends Controller
         ]);
     }
 
-    public function store(Request $request)
+    public function store(StoreRiskRegisterRequest $request)
     {
-        $validated = $request->validate([
-            'category' => 'required|string',
-            'title' => 'required|string|max:255',
-            'description' => 'required|string',
-            'likelihood_score' => 'nullable|integer|min:1|max:5',
-            'impact_score' => 'nullable|integer|min:1|max:5',
-            'control_effectiveness' => 'nullable|in:none,weak,moderate,strong',
-            'risk_owner_id' => 'nullable|exists:users,id',
-            'mitigation_strategy' => 'nullable|in:treat,transfer,terminate,tolerate',
-            'review_frequency' => 'nullable|in:monthly,quarterly,annual',
-        ]);
+        $validated = $request->validated();
 
         $inherentScore = $this->riskService->calculateInherentScore(
             $validated['likelihood_score'],
@@ -131,19 +123,9 @@ class RiskRegisterController extends Controller
             ->with('success', 'Risk registered successfully.');
     }
 
-    public function update(Request $request, RiskRegisterEntry $risk)
+    public function update(UpdateRiskRegisterRequest $request, RiskRegisterEntry $risk)
     {
-        $this->authorize('update', $risk);
-
-        $validated = $request->validate([
-            'title' => 'sometimes|string|max:255',
-            'description' => 'sometimes|string',
-            'likelihood_score' => 'sometimes|integer|min:1|max:5',
-            'impact_score' => 'sometimes|integer|min:1|max:5',
-            'control_effectiveness' => 'sometimes|in:none,weak,moderate,strong',
-            'risk_owner_id' => 'sometimes|exists:users,id',
-            'mitigation_strategy' => 'sometimes|in:treat,transfer,terminate,tolerate',
-        ]);
+        $validated = $request->validated();
 
         $risk->update($validated);
 

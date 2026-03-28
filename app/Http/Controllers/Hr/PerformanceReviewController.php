@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Requests\Hr\StorePerformanceReviewRequest;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Models\User;
@@ -123,26 +124,12 @@ class PerformanceReviewController extends Controller
     /**
      * Store a new performance review.
      */
-    public function store(Request $request)
+    public function store(StorePerformanceReviewRequest $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
-        $data = $request->validate([
-            'employee_user_id' => ['required', 'integer', 'exists:users,id'],
-            'review_type' => ['required', 'string', 'in:annual,mid_year,quarterly,ad_hoc'],
-            'review_period_start' => ['required', 'date'],
-            'review_period_end' => ['required', 'date', 'after:review_period_start'],
-            'overall_rating' => ['nullable', 'integer', 'min:1', 'max:5'],
-            'strengths' => ['nullable', 'string', 'max:5000'],
-            'development_areas' => ['nullable', 'string', 'max:5000'],
-            'goals' => ['nullable', 'array'],
-            'goals.*' => ['string', 'max:500'],
-            'training_recommendations' => ['nullable', 'array'],
-            'training_recommendations.*' => ['string', 'max:500'],
-            'next_review_date' => ['nullable', 'date'],
-        ]);
+        $data = $request->validated();
 
         HrPerformanceReview::create([
             'tenant_id' => $tenantId,

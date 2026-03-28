@@ -201,7 +201,7 @@ export default function ComplianceIndex({ kpis, controlRoom, charts }: Props) {
                         </div>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid grid-cols-3 gap-4 mb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                             <div className="text-center p-3 rounded-lg bg-red-50 border border-red-100">
                                 <div className="flex items-center justify-center gap-1 text-red-600 mb-1">
                                     <Bell className="h-4 w-4" />
