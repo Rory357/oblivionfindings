@@ -71,10 +71,22 @@ class HealthSafetyDemoSeeder extends Seeder
 
         // ── 5. Fleet Incidents ───────────────────────────────────────
         if (!DB::table('fleet_incidents')->where('description', 'like', '%' . self::DEMO_MARKER . '%')->exists()) {
-            $this->command->info('Seeding Fleet Incidents...');
-            $this->seedFleetIncidents($assetIds, $userIds, $now);
+            try {
+                $this->command->info('Seeding Fleet Incidents...');
+                $this->seedFleetIncidents($assetIds, $userIds, $now);
+            } catch (\Throwable $e) {
+                $this->command->warn('Fleet Incidents skipped: ' . $e->getMessage());
+            }
         } else {
             $this->command->info('Fleet Incidents already seeded, skipping.');
+        }
+
+        // ── 6. Worker Participation ─────────────────────────────────
+        if (!DB::table('hs_committee_meetings')->exists()) {
+            $this->command->info('Seeding Worker Participation (meetings + consultations)...');
+            $this->seedWorkerParticipation($siteIds, $userIds, $now);
+        } else {
+            $this->command->info('Worker Participation already seeded, skipping.');
         }
 
         $this->command->info('Health & Safety demo data seeded successfully.');
@@ -721,5 +733,172 @@ class HealthSafetyDemoSeeder extends Seeder
         }
 
         return $this->weightedRandom(['draft' => 40, 'submitted' => 35, 'reviewed' => 15, 'closed' => 10]);
+    }
+
+    /* ==================================================================
+     *  6. WORKER PARTICIPATION (committees, reps, meetings, consultations)
+     * ================================================================== */
+
+    private function seedWorkerParticipation(array $siteIds, array $userIds, Carbon $now): void
+    {
+        // Pick some staff as H&S reps
+        $repUserIds = array_slice($userIds, 0, min(4, count($userIds)));
+
+        // ── H&S Representatives (skip if exist) ──
+        if (DB::table('hs_representatives')->count() > 0) {
+            $this->command->info('  -> H&S representatives already exist, skipping.');
+        } else {
+        $reps = [];
+        $methods = ['elected', 'appointed', 'volunteered'];
+        foreach ($repUserIds as $i => $userId) {
+            $electedAt = $now->copy()->subMonths(rand(3, 12));
+            $reps[] = [
+                'user_id'                      => $userId,
+                'site_id'                      => $siteIds[$i % count($siteIds)],
+                'work_group'                   => ['Day Shift', 'Night Shift', 'Community Support', 'Kitchen/Facilities'][$i % 4],
+                'election_method'              => $methods[array_rand($methods)],
+                'elected_at'                   => $electedAt->toDateString(),
+                'term_expires_at'              => $electedAt->copy()->addYears(2)->toDateString(),
+                'status'                       => 'active',
+                'training_days_completed'      => rand(0, 5),
+                'initial_training_completed_at' => rand(0, 1) ? $electedAt->copy()->addDays(rand(14, 60))->toDateString() : null,
+                'notes'                        => null,
+                'created_by'                   => $userIds[array_rand($userIds)],
+                'created_at'                   => $electedAt,
+                'updated_at'                   => $electedAt,
+            ];
+        }
+        DB::table('hs_representatives')->insert($reps);
+        $this->command->info('  -> ' . count($reps) . ' H&S representatives created.');
+        } // end reps skip check
+
+        // ── Committees (skip if exist) ──
+        $committeeIds = DB::table('hs_committees')->pluck('id')->toArray();
+        if (count($committeeIds) > 0) {
+            $this->command->info('  -> Committees already exist (' . count($committeeIds) . '), skipping creation.');
+        } else {
+        $committees = [];
+        $committeeNames = ['Health & Safety Committee - Kauri House', 'Health & Safety Committee - Harbour Respite'];
+        foreach ($committeeNames as $i => $name) {
+            $established = $now->copy()->subMonths(rand(6, 18));
+            $members = array_map(fn ($uid) => [
+                'user_id' => $uid,
+                'role'    => $uid === $repUserIds[0] ? 'chair' : ($uid === $repUserIds[1] ? 'secretary' : (rand(0, 1) ? 'worker_rep' : 'employer_rep')),
+                'joined_at' => $established->toDateString(),
+            ], array_slice($userIds, 0, min(6, count($userIds))));
+
+            $committees[] = [
+                'name'               => $name . ' ' . self::DEMO_MARKER,
+                'site_id'            => $siteIds[$i % count($siteIds)],
+                'meeting_frequency'  => 'monthly',
+                'terms_of_reference' => 'Review workplace hazards, investigate incidents, recommend improvements, monitor H&S compliance, ensure worker engagement per HSWA 2015.',
+                'established_at'     => $established->toDateString(),
+                'status'             => 'active',
+                'members'            => json_encode($members),
+                'created_by'         => $userIds[0],
+                'created_at'         => $established,
+                'updated_at'         => $established,
+            ];
+        }
+        DB::table('hs_committees')->insert($committees);
+        $committeeIds = DB::table('hs_committees')->pluck('id')->toArray();
+        $this->command->info('  -> ' . count($committees) . ' committees created.');
+        } // end committees skip check
+
+        // ── Committee Meetings ──
+        $meetings = [];
+        $agendaTemplates = [
+            [['title' => 'Review of open hazards', 'notes' => 'Walk through current hazard register'], ['title' => 'Incident review', 'notes' => 'Review incidents since last meeting'], ['title' => 'Training update', 'notes' => 'Staff training compliance status']],
+            [['title' => 'Emergency drill debrief', 'notes' => 'Discuss outcomes from recent fire drill'], ['title' => 'PPE audit results', 'notes' => 'Review PPE condition and replacements needed'], ['title' => 'Policy review', 'notes' => 'Manual handling procedure update']],
+            [['title' => 'Workplace inspection findings', 'notes' => 'Monthly inspection walk-through results'], ['title' => 'Worker feedback', 'notes' => 'Concerns raised by staff'], ['title' => 'Action items follow-up', 'notes' => 'Review previous meeting actions']],
+        ];
+
+        foreach ($committeeIds as $cId) {
+            // 3-4 meetings per committee over last 6 months
+            for ($m = 0; $m < rand(3, 4); $m++) {
+                $scheduledAt = $now->copy()->subMonths($m + 1)->addDays(rand(1, 10));
+                $isCompleted = $scheduledAt->lt($now);
+                $agenda = $agendaTemplates[array_rand($agendaTemplates)];
+                $attendeeList = array_slice($userIds, 0, rand(4, 8));
+
+                $actionItems = $isCompleted ? [
+                    ['description' => 'Replace worn floor mats in B-wing corridor', 'assigned_to' => $userIds[array_rand($userIds)], 'due_date' => $scheduledAt->copy()->addDays(14)->toDateString(), 'status' => rand(0, 1) ? 'completed' : 'open'],
+                    ['description' => 'Schedule refresher training for manual handling', 'assigned_to' => $userIds[array_rand($userIds)], 'due_date' => $scheduledAt->copy()->addDays(30)->toDateString(), 'status' => 'open'],
+                ] : null;
+
+                $meetings[] = [
+                    'hs_committee_id'        => $cId,
+                    'scheduled_at'           => $scheduledAt,
+                    'started_at'             => $isCompleted ? $scheduledAt : null,
+                    'ended_at'               => $isCompleted ? $scheduledAt->copy()->addMinutes(rand(45, 90)) : null,
+                    'location'               => ['Kauri House - Meeting Room', 'Harbour Respite - Staff Room', 'Main Office - Board Room'][rand(0, 2)],
+                    'status'                 => $isCompleted ? 'completed' : 'scheduled',
+                    'attendees'              => json_encode($attendeeList),
+                    'confirmed_attendees'    => $isCompleted ? json_encode(array_map(fn ($uid) => ['user_id' => $uid, 'confirmed' => (bool) rand(0, 1), 'confirmed_at' => $scheduledAt->toIso8601String()], $attendeeList)) : null,
+                    'agenda_items'           => json_encode($agenda),
+                    'minutes'                => $isCompleted ? "Meeting commenced at {$scheduledAt->format('g:i A')}. All agenda items were discussed. Key concerns raised about slip hazards in wet weather. Action items assigned. Meeting closed." : null,
+                    'action_items'           => $isCompleted ? json_encode($actionItems) : null,
+                    'safety_concerns_raised' => $isCompleted ? 'Wet weather creating slip hazards at main entrance. Night shift staffing concerns affecting lone worker safety.' : null,
+                    'recorded_by'            => $isCompleted ? $userIds[array_rand($userIds)] : null,
+                    'created_by'             => $userIds[0],
+                    'created_at'             => $scheduledAt->copy()->subDays(7),
+                    'updated_at'             => $isCompleted ? $scheduledAt : $scheduledAt->copy()->subDays(7),
+                ];
+            }
+        }
+        // One future scheduled meeting
+        $futureMeeting = $now->copy()->addDays(rand(7, 21));
+        $meetings[] = [
+            'hs_committee_id'        => $committeeIds[0],
+            'scheduled_at'           => $futureMeeting,
+            'started_at'             => null,
+            'ended_at'               => null,
+            'location'               => 'Kauri House - Meeting Room',
+            'status'                 => 'scheduled',
+            'attendees'              => json_encode(array_slice($userIds, 0, 6)),
+            'confirmed_attendees'    => null,
+            'agenda_items'           => json_encode($agendaTemplates[0]),
+            'minutes'                => null,
+            'action_items'           => null,
+            'safety_concerns_raised' => null,
+            'recorded_by'            => null,
+            'created_by'             => $userIds[0],
+            'created_at'             => $now,
+            'updated_at'             => $now,
+        ];
+        DB::table('hs_committee_meetings')->insert($meetings);
+        $this->command->info('  -> ' . count($meetings) . ' committee meetings created.');
+
+        // ── Consultations ──
+        $consultations = [];
+        $consultationData = [
+            ['title' => 'Manual Handling Procedure Update', 'type' => 'procedure_change', 'desc' => 'Consultation with staff on proposed changes to manual handling procedures following incident review. New two-person lift policy for residents over 80kg.', 'status' => 'closed', 'feedback' => 'Staff generally supportive. Concerns about time impact on shift schedules. Suggested additional training sessions.', 'outcome' => 'Procedure updated and approved. Training sessions scheduled for all care staff over next 4 weeks.', 'changes' => 'Two-person lift threshold lowered from 100kg to 80kg. New hoist training mandatory. Shift handover updated to include mobility status.'],
+            ['title' => 'New Chemical Storage Proposal', 'type' => 'hazard_identified', 'desc' => 'Consulting workers on relocating chemical storage from laundry to dedicated locked cupboard in utility room. HSNO compliance requirement.', 'status' => 'actioned', 'feedback' => 'Laundry staff agree current location is unsuitable. Suggested lockable wall cabinet with SDS holder.', 'outcome' => 'Wall cabinet ordered and installation scheduled. SDS folder to be mounted alongside.', 'changes' => null],
+            ['title' => 'Night Shift Lone Worker Policy', 'type' => 'policy_change', 'desc' => 'Proposed new check-in procedure for lone workers on night shift. Includes 30-minute check-in intervals and duress alarm trial.', 'status' => 'feedback_received', 'feedback' => 'Night staff prefer 60-minute intervals as 30 is too frequent. Support duress alarm trial. Want training on the app.', 'outcome' => null, 'changes' => null],
+            ['title' => 'New Hoist Equipment Assessment', 'type' => 'equipment_change', 'desc' => 'Consulting care staff on proposed replacement of ceiling hoists in bedrooms 4-8. New model includes electronic controls and weight display.', 'status' => 'open', 'feedback' => null, 'outcome' => null, 'changes' => null],
+        ];
+
+        foreach ($consultationData as $i => $cd) {
+            $createdAt = $now->copy()->subMonths(4 - $i)->addDays(rand(1, 15));
+            $consultations[] = [
+                'title'                    => $cd['title'],
+                'consultation_type'        => $cd['type'],
+                'description'              => $cd['desc'] . ' ' . self::DEMO_MARKER,
+                'site_id'                  => $siteIds[$i % count($siteIds)],
+                'initiated_by'             => $userIds[array_rand($userIds)],
+                'consultation_date'        => $createdAt->toDateString(),
+                'workers_consulted'        => json_encode(array_slice($userIds, 0, rand(3, 8))),
+                'worker_feedback_summary'  => $cd['feedback'],
+                'outcome'                  => $cd['outcome'],
+                'changes_made'             => $cd['changes'],
+                'status'                   => $cd['status'],
+                'created_by'               => $userIds[0],
+                'updated_by'               => $cd['status'] !== 'open' ? $userIds[array_rand($userIds)] : null,
+                'created_at'               => $createdAt,
+                'updated_at'               => $cd['status'] !== 'open' ? $createdAt->copy()->addDays(rand(7, 30)) : $createdAt,
+            ];
+        }
+        DB::table('hs_consultations')->insert($consultations);
+        $this->command->info('  -> ' . count($consultations) . ' consultations created.');
     }
 }
