@@ -31,6 +31,7 @@ import {
 type Props = {
     filters: {
         q: string;
+        type: string | null;
         status: string | null;
         severity: string | null;
         client_id: string | number | null;
@@ -97,9 +98,17 @@ export default function IncidentsIndex({ filters, incidents, clients }: Props) {
                             <ShieldAlert className="h-5 w-5 text-red-600" />
                         </div>
                         <div>
-                            <h1 className="text-lg font-semibold">Incidents</h1>
+                            <h1 className="text-lg font-semibold">
+                                {filters.type === 'near_miss' ? 'Near Misses' : 'Incidents'}
+                                {filters.type && filters.type !== 'near_miss' && (
+                                    <span className="ml-2 text-sm font-normal text-slate-500 capitalize">({filters.type.replace(/_/g, ' ')})</span>
+                                )}
+                            </h1>
                             <div className="text-sm text-slate-500">
-                                {can.viewAny ? 'All incidents' : 'Incidents for assigned clients'}
+                                {filters.type
+                                    ? <span>Filtered by type &middot; <button className="text-primary underline" onClick={() => onFilter({ type: null })}>Clear filter</button></span>
+                                    : (can.viewAny ? 'All incidents' : 'Incidents for assigned clients')
+                                }
                             </div>
                         </div>
                     </div>
@@ -179,6 +188,33 @@ export default function IncidentsIndex({ filters, incidents, clients }: Props) {
                                     </Select>
                                 </div>
                             ) : null}
+
+                            <div>
+                                <Label className="text-xs text-slate-500">Type</Label>
+                                <Select
+                                    value={filters.type ?? ANY}
+                                    onValueChange={(v) => onFilter({ type: v === ANY ? null : v })}
+                                >
+                                    <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ANY}>Any</SelectItem>
+                                        {[
+                                            { value: 'injury', label: 'Injury' },
+                                            { value: 'fall', label: 'Fall' },
+                                            { value: 'behaviour', label: 'Behaviour' },
+                                            { value: 'medication', label: 'Medication' },
+                                            { value: 'safeguarding', label: 'Safeguarding' },
+                                            { value: 'near_miss', label: 'Near miss' },
+                                            { value: 'property_damage', label: 'Property damage' },
+                                            { value: 'missing_person', label: 'Missing person' },
+                                            { value: 'complaint', label: 'Complaint' },
+                                            { value: 'other', label: 'Other' },
+                                        ].map((t) => (
+                                            <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
 
                             <div>
                                 <Label className="text-xs text-slate-500">Status</Label>

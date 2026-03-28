@@ -19,6 +19,7 @@ class IncidentController extends Controller
         abort_unless($user && ($user->canDo('incidents.viewAny') || $user->canDo('incidents.viewAssigned')), 403);
 
         $q = trim((string) $request->get('q', ''));
+        $type = $request->get('type');
         $status = $request->get('status');
         $severity = $request->get('severity');
         $clientId = $request->get('client_id');
@@ -39,6 +40,7 @@ class IncidentController extends Controller
                         ->orWhere('title', 'like', $searchTerm);
                 });
             })
+            ->when($type, fn($query) => $query->where('type', $type))
             ->when($status, fn($query) => $query->where('status', $status))
             ->when($severity, fn($query) => $query->where('severity', $severity))
             ->when($clientId, fn($query) => $query->where('client_id', $clientId))
@@ -59,6 +61,7 @@ class IncidentController extends Controller
         return inertia('incidents/index', [
             'filters' => [
                 'q' => $q,
+                'type' => $type,
                 'status' => $status,
                 'severity' => $severity,
                 'client_id' => $clientId,
