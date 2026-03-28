@@ -9,6 +9,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
+/**
+ * @property string $type e.g. injury, behaviour, medication, safeguarding, near_miss
+ */
 class ClientIncident extends Model
 {
     use AuditableChanges;
@@ -54,6 +57,39 @@ class ClientIncident extends Model
         'reopened_by',
         'reopened_at',
         'reopened_reason',
+
+        // Near-miss fields
+        'potential_severity',
+        'potential_consequence',
+
+        // WorkSafe notification fields
+        'is_notifiable',
+        'worksafe_notification_status',
+        'worksafe_notified_at',
+        'worksafe_reference',
+        'site_preserved',
+        'site_preservation_released_at',
+        'site_preservation_released_by',
+
+        // Injury details
+        'injured_person_name',
+        'injured_person_role',
+        'injured_person_age',
+        'injury_body_part',
+        'injury_nature',
+        'injury_classification',
+        'medical_treatment_type',
+
+        // Investigation fields
+        'investigation_status',
+        'investigation_assigned_to',
+        'investigation_started_at',
+        'investigation_completed_at',
+        'root_cause_category',
+        'root_cause_description',
+        'contributing_factors',
+        'corrective_actions',
+        'lessons_learned',
     ];
 
     protected $casts = [
@@ -64,6 +100,14 @@ class ClientIncident extends Model
         'reviewed_at' => 'datetime',
         'closed_at' => 'datetime',
         'reopened_at' => 'datetime',
+        'is_notifiable' => 'boolean',
+        'worksafe_notified_at' => 'datetime',
+        'site_preserved' => 'boolean',
+        'site_preservation_released_at' => 'datetime',
+        'injured_person_age' => 'integer',
+        'investigation_started_at' => 'datetime',
+        'investigation_completed_at' => 'datetime',
+        'corrective_actions' => 'array',
     ];
 
     public function client(): BelongsTo
@@ -84,6 +128,11 @@ class ClientIncident extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(IncidentTemplate::class, 'template_id');
+    }
+
+    public function investigator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'investigation_assigned_to');
     }
 
     public function attachments(): HasMany

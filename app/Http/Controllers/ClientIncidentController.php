@@ -63,6 +63,22 @@ class ClientIncidentController extends Controller
             'requires_followup' => ['sometimes', 'boolean'],
             'immediate_action_taken' => ['nullable', 'string'],
             'witnesses' => ['nullable', 'string'],
+
+            // Near-miss fields
+            'potential_severity' => ['nullable', 'in:low,medium,high,critical'],
+            'potential_consequence' => ['nullable', 'string'],
+
+            // Injury details
+            'injured_person_name' => ['nullable', 'string', 'max:255'],
+            'injured_person_role' => ['nullable', 'in:staff,client,visitor,contractor'],
+            'injured_person_age' => ['nullable', 'integer', 'min:0', 'max:150'],
+            'injury_body_part' => ['nullable', 'string', 'max:255'],
+            'injury_nature' => ['nullable', 'in:fracture,burn,laceration,sprain,bruising,concussion,poisoning,other'],
+            'injury_classification' => ['nullable', 'in:minor,moderate,serious,notifiable'],
+            'medical_treatment_type' => ['nullable', 'in:none,first_aid,medical_centre,hospital,ambulance'],
+
+            // WorkSafe
+            'is_notifiable' => ['sometimes', 'boolean'],
         ]);
 
         $incident = ClientIncident::create([
@@ -79,6 +95,22 @@ class ClientIncidentController extends Controller
             'immediate_action_taken' => $data['immediate_action_taken'] ?? null,
             'witnesses' => $data['witnesses'] ?? null,
             'title' => $data['type'] . ' incident',
+
+            // Near-miss
+            'potential_severity' => $data['potential_severity'] ?? null,
+            'potential_consequence' => $data['potential_consequence'] ?? null,
+
+            // Injury details
+            'injured_person_name' => $data['injured_person_name'] ?? null,
+            'injured_person_role' => $data['injured_person_role'] ?? null,
+            'injured_person_age' => $data['injured_person_age'] ?? null,
+            'injury_body_part' => $data['injury_body_part'] ?? null,
+            'injury_nature' => $data['injury_nature'] ?? null,
+            'injury_classification' => $data['injury_classification'] ?? null,
+            'medical_treatment_type' => $data['medical_treatment_type'] ?? null,
+
+            // WorkSafe
+            'is_notifiable' => (bool)($data['is_notifiable'] ?? false),
         ]);
 
         // Timeline event (client history)

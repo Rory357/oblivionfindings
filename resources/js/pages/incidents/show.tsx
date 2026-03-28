@@ -1,3 +1,4 @@
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -54,6 +55,31 @@ type Followup = {
     notes: string | null;
     assigned_to?: { id: number; name: string } | null;
 };
+
+type CorrectiveAction = {
+    description: string;
+    assigned_to: string;
+    due_date: string;
+    status: string;
+    completed_at: string | null;
+};
+
+const INVESTIGATION_STATUSES = [
+    { value: 'not_required', label: 'Not required' },
+    { value: 'pending', label: 'Pending' },
+    { value: 'in_progress', label: 'In progress' },
+    { value: 'completed', label: 'Completed' },
+];
+
+const ROOT_CAUSE_CATEGORIES = [
+    'Human factors',
+    'Equipment / environment',
+    'Process / procedure',
+    'Training / competency',
+    'Communication',
+    'Supervision',
+    'Other',
+];
 
 function FollowupCreator({
     incidentId,
@@ -258,6 +284,15 @@ function FollowupList({
     );
 }
 
+function investigationStatusVariant(status: string | null) {
+    switch (status) {
+        case 'completed': return 'default';
+        case 'in_progress': return 'secondary';
+        case 'pending': return 'outline';
+        default: return 'outline';
+    }
+}
+
 export default function IncidentShow({
     incident,
     staff,
@@ -291,6 +326,26 @@ export default function IncidentShow({
         witnesses: incident.witnesses || '',
         review_notes: incident.review_notes || '',
         portal_visible: !!incident.portal_visible,
+        // Near-miss
+        potential_severity: incident.potential_severity || '',
+        potential_consequence: incident.potential_consequence || '',
+        // Injury
+        injured_person_name: incident.injured_person_name || '',
+        injured_person_role: incident.injured_person_role || '',
+        injured_person_age: incident.injured_person_age || '',
+        injury_body_part: incident.injury_body_part || '',
+        injury_nature: incident.injury_nature || '',
+        injury_classification: incident.injury_classification || '',
+        medical_treatment_type: incident.medical_treatment_type || '',
+        // WorkSafe
+        is_notifiable: !!incident.is_notifiable,
+        // Investigation
+        investigation_status: incident.investigation_status || '',
+        investigation_assigned_to: incident.investigation_assigned_to ? String(incident.investigation_assigned_to) : '',
+        root_cause_category: incident.root_cause_category || '',
+        root_cause_description: incident.root_cause_description || '',
+        contributing_factors: incident.contributing_factors || '',
+        lessons_learned: incident.lessons_learned || '',
     });
 
     const upload = useForm<{ file: File | null }>({ file: null });
@@ -306,11 +361,40 @@ export default function IncidentShow({
     });
     const [reopenOpen, setReopenOpen] = useState(false);
 
-
     const [saving, setSaving] = useState(false);
     const [uploading, setUploading] = useState(false);
 
     const normalizedStaff = useMemo(() => (staff || []) as any, [staff]);
+
+    // Corrective actions state
+    const correctiveActions: CorrectiveAction[] = incident.corrective_actions || [];
+    const [newAction, setNewAction] = useState({ description: '', assigned_to: '', due_date: '' });
+
+    const addCorrectiveAction = () => {
+        if (!newAction.description.trim()) return;
+        const updated = [...correctiveActions, { ...newAction, status: 'open', completed_at: null }];
+        router.put(`/incidents/${incident.id}`, { corrective_actions: updated }, { preserveScroll: true });
+        setNewAction({ description: '', assigned_to: '', due_date: '' });
+    };
+
+    const completeCorrectiveAction = (index: number) => {
+        const updated = correctiveActions.map((a, i) =>
+            i === index ? { ...a, status: 'completed', completed_at: new Date().toISOString() } : a,
+        );
+        router.put(`/incidents/${incident.id}`, { corrective_actions: updated }, { preserveScroll: true });
+    };
+
+    const hasInjuryDetails = !!(
+        incident.injured_person_name ||
+        incident.injured_person_role ||
+        incident.injured_person_age ||
+        incident.injury_body_part ||
+        incident.injury_nature ||
+        incident.injury_classification ||
+        incident.medical_treatment_type
+    );
+
+    const isNearMiss = incident.type === 'near_miss';
 
     return (
         <AppLayout
@@ -338,12 +422,15 @@ export default function IncidentShow({
                                 {clientName}
                             </Link>
                             <span className="mx-2">•</span>
-                            {incident.type} • {incident.severity} •{' '}
+                            {incident.type === 'near_miss' ? 'Near miss' : incident.type} • {incident.severity} •{' '}
                             {incident.status}
                             {incident.shift_id ? (
                                 <span className="ml-2">• Shift-linked</span>
                             ) : (
                                 <span className="ml-2">• Standalone</span>
+                            )}
+                            {incident.is_notifiable && (
+                                <Badge variant="destructive" className="ml-2">WorkSafe notifiable</Badge>
                             )}
                         </div>
                         {!is_editable && !can.review ? (
@@ -526,6 +613,20 @@ export default function IncidentShow({
                             />
                         </div>
 
+                        <div className="flex items-center gap-2">
+                            <Checkbox
+                                checked={!!form.data.is_notifiable}
+                                onCheckedChange={(v) =>
+                                    form.setData('is_notifiable', !!v)
+                                }
+                                disabled={!allowCoreEdit && !allowManagerFields}
+                            />
+                            <div>
+                                <Label>Notifiable event</Label>
+                                <div className="text-xs text-slate-500">This incident must be reported to WorkSafe NZ</div>
+                            </div>
+                        </div>
+
                         {can.review && (
                             <div className="space-y-1">
                                 <Label>Review notes</Label>
@@ -575,6 +676,430 @@ export default function IncidentShow({
                                 </Button>
                             </div>
                         )}
+                    </CardContent>
+                </Card>
+
+                {/* Near-miss details */}
+                {isNearMiss && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Near-miss details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div className="space-y-1">
+                                    <Label>Potential severity</Label>
+                                    <Select
+                                        value={form.data.potential_severity || '__none__'}
+                                        onValueChange={(v) => form.setData('potential_severity', v === '__none__' ? '' : v)}
+                                        disabled={!allowCoreEdit}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">Select...</SelectItem>
+                                            {['low','medium','high','critical'].map((s) => (
+                                                <SelectItem key={s} value={s}>{s}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div className="space-y-1">
+                                <Label>Potential consequence</Label>
+                                <Textarea
+                                    value={form.data.potential_consequence}
+                                    onChange={(e) => form.setData('potential_consequence', e.target.value)}
+                                    disabled={!allowCoreEdit}
+                                />
+                            </div>
+
+                            {allowCoreEdit && (
+                                <div className="flex items-center justify-end">
+                                    <Button
+                                        disabled={saving}
+                                        onClick={() => {
+                                            setSaving(true);
+                                            router.put(`/incidents/${incident.id}`, form.data, { onFinish: () => setSaving(false) });
+                                        }}
+                                    >
+                                        Save
+                                    </Button>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Injury details */}
+                {(hasInjuryDetails || allowCoreEdit) && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">Injury details</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <div className="space-y-1">
+                                    <Label>Injured person name</Label>
+                                    <Input
+                                        value={form.data.injured_person_name}
+                                        onChange={(e) => form.setData('injured_person_name', e.target.value)}
+                                        disabled={!allowCoreEdit}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Role</Label>
+                                    <Select
+                                        value={form.data.injured_person_role || '__none__'}
+                                        onValueChange={(v) => form.setData('injured_person_role', v === '__none__' ? '' : v)}
+                                        disabled={!allowCoreEdit}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">Select...</SelectItem>
+                                            {[
+                                                { value: 'staff', label: 'Staff' },
+                                                { value: 'client', label: 'Client' },
+                                                { value: 'visitor', label: 'Visitor' },
+                                                { value: 'contractor', label: 'Contractor' },
+                                            ].map((r) => (
+                                                <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Age</Label>
+                                    <Input
+                                        type="number"
+                                        value={form.data.injured_person_age}
+                                        onChange={(e) => form.setData('injured_person_age', e.target.value)}
+                                        disabled={!allowCoreEdit}
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div className="space-y-1">
+                                    <Label>Body part</Label>
+                                    <Input
+                                        value={form.data.injury_body_part}
+                                        onChange={(e) => form.setData('injury_body_part', e.target.value)}
+                                        disabled={!allowCoreEdit}
+                                    />
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Nature of injury</Label>
+                                    <Select
+                                        value={form.data.injury_nature || '__none__'}
+                                        onValueChange={(v) => form.setData('injury_nature', v === '__none__' ? '' : v)}
+                                        disabled={!allowCoreEdit}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">Select...</SelectItem>
+                                            {['fracture','burn','laceration','sprain','bruising','concussion','poisoning','other'].map((n) => (
+                                                <SelectItem key={n} value={n}>{n}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div className="space-y-1">
+                                    <Label>Injury classification</Label>
+                                    <Select
+                                        value={form.data.injury_classification || '__none__'}
+                                        onValueChange={(v) => form.setData('injury_classification', v === '__none__' ? '' : v)}
+                                        disabled={!allowCoreEdit}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">Select...</SelectItem>
+                                            {[
+                                                { value: 'minor', label: 'Minor' },
+                                                { value: 'moderate', label: 'Moderate' },
+                                                { value: 'serious', label: 'Serious' },
+                                                { value: 'notifiable', label: 'Notifiable' },
+                                            ].map((c) => (
+                                                <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Medical treatment</Label>
+                                    <Select
+                                        value={form.data.medical_treatment_type || '__none__'}
+                                        onValueChange={(v) => form.setData('medical_treatment_type', v === '__none__' ? '' : v)}
+                                        disabled={!allowCoreEdit}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">Select...</SelectItem>
+                                            {[
+                                                { value: 'none', label: 'None' },
+                                                { value: 'first_aid', label: 'First aid' },
+                                                { value: 'medical_centre', label: 'Medical centre' },
+                                                { value: 'hospital', label: 'Hospital' },
+                                                { value: 'ambulance', label: 'Ambulance' },
+                                            ].map((m) => (
+                                                <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+
+                            {allowCoreEdit && (
+                                <div className="flex items-center justify-end">
+                                    <Button
+                                        disabled={saving}
+                                        onClick={() => {
+                                            setSaving(true);
+                                            router.put(`/incidents/${incident.id}`, form.data, { onFinish: () => setSaving(false) });
+                                        }}
+                                    >
+                                        Save
+                                    </Button>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* WorkSafe notification */}
+                {incident.is_notifiable && (
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="text-base">WorkSafe NZ notification</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                <div className="space-y-1">
+                                    <Label>Notification status</Label>
+                                    <div className="text-sm">
+                                        <Badge variant={
+                                            incident.worksafe_notification_status === 'acknowledged' ? 'default' :
+                                            incident.worksafe_notification_status === 'notified' ? 'secondary' :
+                                            incident.worksafe_notification_status === 'pending' ? 'outline' :
+                                            'outline'
+                                        }>
+                                            {incident.worksafe_notification_status || 'Not started'}
+                                        </Badge>
+                                    </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>WorkSafe reference</Label>
+                                    <div className="text-sm">{incident.worksafe_reference || '-'}</div>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Notified at</Label>
+                                    <div className="text-sm">
+                                        {incident.worksafe_notified_at
+                                            ? new Date(incident.worksafe_notified_at).toLocaleString()
+                                            : '-'}
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div className="space-y-1">
+                                    <Label>Site preserved</Label>
+                                    <div className="text-sm">{incident.site_preserved ? 'Yes' : 'No'}</div>
+                                </div>
+                                {incident.site_preservation_released_at && (
+                                    <div className="space-y-1">
+                                        <Label>Preservation released</Label>
+                                        <div className="text-sm">
+                                            {new Date(incident.site_preservation_released_at).toLocaleString()}
+                                            {incident.site_preservation_released_by && ` by ${incident.site_preservation_released_by}`}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Investigation */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">
+                            Investigation
+                            {incident.investigation_status && (
+                                <Badge
+                                    variant={investigationStatusVariant(incident.investigation_status)}
+                                    className="ml-2"
+                                >
+                                    {INVESTIGATION_STATUSES.find((s) => s.value === incident.investigation_status)?.label || incident.investigation_status}
+                                </Badge>
+                            )}
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                        {(can.update) && (
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <div className="space-y-1">
+                                    <Label>Investigation status</Label>
+                                    <Select
+                                        value={form.data.investigation_status || '__none__'}
+                                        onValueChange={(v) => form.setData('investigation_status', v === '__none__' ? '' : v)}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">Select...</SelectItem>
+                                            {INVESTIGATION_STATUSES.map((s) => (
+                                                <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-1">
+                                    <Label>Assigned to</Label>
+                                    <Select
+                                        value={form.data.investigation_assigned_to || '__none__'}
+                                        onValueChange={(v) => form.setData('investigation_assigned_to', v === '__none__' ? '' : v)}
+                                    >
+                                        <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">Unassigned</SelectItem>
+                                            {normalizedStaff.map((u: StaffUser) => (
+                                                <SelectItem key={u.id} value={String(u.id)}>{u.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="space-y-1">
+                            <Label>Root cause category</Label>
+                            {can.update ? (
+                                <Select
+                                    value={form.data.root_cause_category || '__none__'}
+                                    onValueChange={(v) => form.setData('root_cause_category', v === '__none__' ? '' : v)}
+                                >
+                                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="__none__">Select...</SelectItem>
+                                        {ROOT_CAUSE_CATEGORIES.map((c) => (
+                                            <SelectItem key={c} value={c}>{c}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            ) : (
+                                <div className="text-sm">{incident.root_cause_category || '-'}</div>
+                            )}
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label>Root cause description</Label>
+                            <Textarea
+                                value={form.data.root_cause_description}
+                                onChange={(e) => form.setData('root_cause_description', e.target.value)}
+                                disabled={!can.update}
+                            />
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label>Contributing factors</Label>
+                            <Textarea
+                                value={form.data.contributing_factors}
+                                onChange={(e) => form.setData('contributing_factors', e.target.value)}
+                                disabled={!can.update}
+                            />
+                        </div>
+
+                        <div className="space-y-1">
+                            <Label>Lessons learned</Label>
+                            <Textarea
+                                value={form.data.lessons_learned}
+                                onChange={(e) => form.setData('lessons_learned', e.target.value)}
+                                disabled={!can.update}
+                            />
+                        </div>
+
+                        {can.update && (
+                            <div className="flex items-center justify-end">
+                                <Button
+                                    disabled={saving}
+                                    onClick={() => {
+                                        setSaving(true);
+                                        router.put(`/incidents/${incident.id}`, form.data, { onFinish: () => setSaving(false) });
+                                    }}
+                                >
+                                    Save
+                                </Button>
+                            </div>
+                        )}
+
+                        {/* Corrective actions */}
+                        <div className="space-y-2">
+                            <Label className="text-sm font-medium">Corrective actions</Label>
+
+                            {correctiveActions.map((action, index) => (
+                                <div key={index} className="flex items-start justify-between rounded-md border p-3">
+                                    <div className="min-w-0">
+                                        <div className="text-sm font-medium">
+                                            {action.description}
+                                        </div>
+                                        <div className="mt-1 text-xs text-slate-500">
+                                            {action.assigned_to && `Assigned to: ${action.assigned_to}`}
+                                            {action.due_date && ` • Due: ${action.due_date}`}
+                                            {action.completed_at && ` • Completed: ${new Date(action.completed_at).toLocaleDateString()}`}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <Badge variant={action.status === 'completed' ? 'default' : 'outline'}>
+                                            {action.status === 'completed' ? 'Completed' : 'Open'}
+                                        </Badge>
+                                        {can.update && action.status !== 'completed' && (
+                                            <Button size="sm" variant="outline" onClick={() => completeCorrectiveAction(index)}>
+                                                Complete
+                                            </Button>
+                                        )}
+                                    </div>
+                                </div>
+                            ))}
+
+                            {!correctiveActions.length && (
+                                <div className="text-sm text-slate-500">No corrective actions.</div>
+                            )}
+
+                            {can.update && (
+                                <div className="rounded-md border p-3 space-y-2">
+                                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                                        <div className="space-y-1">
+                                            <Label>Description</Label>
+                                            <Input
+                                                value={newAction.description}
+                                                onChange={(e) => setNewAction({ ...newAction, description: e.target.value })}
+                                                placeholder="Action required..."
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label>Assigned to</Label>
+                                            <Input
+                                                value={newAction.assigned_to}
+                                                onChange={(e) => setNewAction({ ...newAction, assigned_to: e.target.value })}
+                                                placeholder="Person responsible"
+                                            />
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label>Due date</Label>
+                                            <Input
+                                                type="date"
+                                                value={newAction.due_date}
+                                                onChange={(e) => setNewAction({ ...newAction, due_date: e.target.value })}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-end">
+                                        <Button size="sm" onClick={addCorrectiveAction} disabled={!newAction.description.trim()}>
+                                            Add corrective action
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
                     </CardContent>
                 </Card>
 
@@ -778,7 +1303,7 @@ export default function IncidentShow({
                             </Button>
                         </DialogFooter>
                     </DialogContent>
-                
+                </Dialog>
 
                 <Dialog open={reopenOpen} onOpenChange={setReopenOpen}>
                     <DialogContent>
@@ -832,7 +1357,6 @@ export default function IncidentShow({
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-</Dialog>
             </div>
         </AppLayout>
     );

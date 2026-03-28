@@ -62,6 +62,7 @@ import {
     Shield,
     ShieldAlert,
     ShieldCheck,
+    Siren,
     Smartphone,
     Target,
     Trash2,
@@ -72,6 +73,12 @@ import {
     UserSearch,
     Wrench,
     X,
+    HardHat,
+    HeartPulse,
+    FlaskConical,
+    Flame,
+    PersonStanding,
+    Clipboard,
     type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -195,10 +202,10 @@ function buildIconNavItems({
         items.push({ id: 'emar', icon: Pill, label: 'eMAR', subPanel: true });
     }
 
-    // Compliance & Safety
-    const hasSafety = can?.incidents?.viewAny || can?.incidents?.viewAssigned || can?.compliance?.view || can?.hazards?.view;
+    // Health & Safety
+    const hasSafety = can?.incidents?.viewAny || can?.incidents?.viewAssigned || can?.compliance?.view || can?.hazards?.view || can?.['health-safety']?.view;
     if (hasSafety) {
-        items.push({ id: 'safety', icon: ShieldAlert, label: 'Compliance & Safety', subPanel: true });
+        items.push({ id: 'safety', icon: ShieldCheck, label: 'Health & Safety', subPanel: true });
     }
 
     // Fleet & Assets
@@ -379,14 +386,51 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 }
 
 function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
-    const items: NavItem[] = [];
-    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned) items.push({ title: 'Incidents', href: '/incidents', icon: ShieldAlert });
-    if (can?.safeguarding?.viewAny || can?.safeguarding?.create) items.push({ title: 'Safeguarding', href: '/safeguarding', icon: Shield });
-    if (can?.privacy?.viewRequests) items.push({ title: 'Privacy & GDPR', href: '/privacy/dashboard', icon: Shield });
-    if (can?.compliance?.view) items.push({ title: 'Compliance', href: '/compliance', icon: Shield });
-    if (can?.hazards?.view) items.push({ title: 'Hazards', href: '/hazards', icon: ShieldAlert });
-    if (can?.risks?.viewAny || can?.risks?.viewAssigned) items.push({ title: 'Risks', href: '/risks', icon: Target });
-    return [{ label: 'Compliance & Safety', items }];
+    const groups: SubPanelGroup[] = [];
+
+    // H&S Overview
+    const overview: NavItem[] = [];
+    overview.push({ title: 'H&S Dashboard', href: '/health-safety', icon: ShieldCheck });
+    overview.push({ title: 'Analytics', href: '/health-safety/analytics', icon: BarChart3 });
+    if (overview.length > 0) groups.push({ label: 'Health & Safety', items: overview });
+
+    // Incident Management
+    const incidents: NavItem[] = [];
+    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned) incidents.push({ title: 'Incidents', href: '/incidents', icon: ShieldAlert });
+    if (can?.incidents?.viewAny || can?.incidents?.viewAssigned) incidents.push({ title: 'Near Misses', href: '/incidents?type=near_miss', icon: AlertTriangle });
+    if (can?.safeguarding?.viewAny || can?.safeguarding?.create) incidents.push({ title: 'Safeguarding', href: '/safeguarding', icon: Shield });
+    if (incidents.length > 0) groups.push({ label: 'Incidents & Safeguarding', items: incidents });
+
+    // H&S Management
+    const hsManagement: NavItem[] = [];
+    if (can?.hazards?.view) hsManagement.push({ title: 'Hazards', href: '/compliance/hazards', icon: AlertOctagon });
+    hsManagement.push({ title: 'Worker Participation', href: '/health-safety/worker-participation', icon: Users });
+    hsManagement.push({ title: 'Lone Worker Safety', href: '/health-safety/lone-workers', icon: PersonStanding });
+    hsManagement.push({ title: 'Emergency Drills', href: '/health-safety/drills', icon: Siren });
+    if (hsManagement.length > 0) groups.push({ label: 'H&S Management', items: hsManagement });
+
+    // Registers
+    const registers: NavItem[] = [];
+    registers.push({ title: 'Chemical Register', href: '/health-safety/substances', icon: FlaskConical });
+    registers.push({ title: 'PPE Management', href: '/health-safety/ppe', icon: HardHat });
+    registers.push({ title: 'First Aid Register', href: '/health-safety/first-aid', icon: HeartPulse });
+    registers.push({ title: 'Restraint Register', href: '/health-safety/restraints', icon: Clipboard });
+    if (registers.length > 0) groups.push({ label: 'Registers', items: registers });
+
+    // Injury & Recovery
+    const injury: NavItem[] = [];
+    injury.push({ title: 'Workplace Injuries', href: '/health-safety/injuries', icon: Activity });
+    injury.push({ title: 'Safe Work Procedures', href: '/health-safety/procedures', icon: FileText });
+    if (injury.length > 0) groups.push({ label: 'Injury & Procedures', items: injury });
+
+    // Compliance & Risk
+    const compliance: NavItem[] = [];
+    if (can?.compliance?.view) compliance.push({ title: 'Compliance', href: '/compliance', icon: Shield });
+    if (can?.risks?.viewAny || can?.risks?.viewAssigned) compliance.push({ title: 'Risks', href: '/risks', icon: Target });
+    if (can?.privacy?.viewRequests) compliance.push({ title: 'Privacy & GDPR', href: '/privacy/dashboard', icon: Shield });
+    if (compliance.length > 0) groups.push({ label: 'Compliance & Risk', items: compliance });
+
+    return groups;
 }
 
 function buildFleetAssetsSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {

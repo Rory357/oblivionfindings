@@ -157,6 +157,7 @@ class SafeguardingConcernController extends Controller
             'canUpdate' => auth()->user()->can('update', $concern),
             'canInvestigate' => auth()->user()->can('investigate', $concern),
             'canReportExternal' => auth()->user()->can('reportExternal', $concern),
+            'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
         ]);
     }
 

@@ -104,6 +104,22 @@ class IncidentController extends Controller
             'requires_followup' => ['sometimes', 'boolean'],
             'immediate_action_taken' => ['nullable', 'string'],
             'witnesses' => ['nullable', 'string'],
+
+            // Near-miss fields
+            'potential_severity' => ['nullable', 'in:low,medium,high,critical'],
+            'potential_consequence' => ['nullable', 'string'],
+
+            // Injury details
+            'injured_person_name' => ['nullable', 'string', 'max:255'],
+            'injured_person_role' => ['nullable', 'in:staff,client,visitor,contractor'],
+            'injured_person_age' => ['nullable', 'integer', 'min:0', 'max:150'],
+            'injury_body_part' => ['nullable', 'string', 'max:255'],
+            'injury_nature' => ['nullable', 'in:fracture,burn,laceration,sprain,bruising,concussion,poisoning,other'],
+            'injury_classification' => ['nullable', 'in:minor,moderate,serious,notifiable'],
+            'medical_treatment_type' => ['nullable', 'in:none,first_aid,medical_centre,hospital,ambulance'],
+
+            // WorkSafe
+            'is_notifiable' => ['sometimes', 'boolean'],
         ]);
 
         $client = Client::query()->findOrFail($data['client_id']);
@@ -123,6 +139,22 @@ class IncidentController extends Controller
             'immediate_action_taken' => $data['immediate_action_taken'] ?? null,
             'witnesses' => $data['witnesses'] ?? null,
             'title' => $data['type'] . ' incident',
+
+            // Near-miss
+            'potential_severity' => $data['potential_severity'] ?? null,
+            'potential_consequence' => $data['potential_consequence'] ?? null,
+
+            // Injury details
+            'injured_person_name' => $data['injured_person_name'] ?? null,
+            'injured_person_role' => $data['injured_person_role'] ?? null,
+            'injured_person_age' => $data['injured_person_age'] ?? null,
+            'injury_body_part' => $data['injury_body_part'] ?? null,
+            'injury_nature' => $data['injury_nature'] ?? null,
+            'injury_classification' => $data['injury_classification'] ?? null,
+            'medical_treatment_type' => $data['medical_treatment_type'] ?? null,
+
+            // WorkSafe
+            'is_notifiable' => (bool)($data['is_notifiable'] ?? false),
         ]);
 
         // High severity alert -> managers only (drafts can still be high severity)
@@ -159,6 +191,7 @@ class IncidentController extends Controller
             'template',
             'followups.assignedTo:id,name',
             'followups.creator:id,name',
+            'investigator:id,name,email',
         ]);
 
         $user = $request->user();
@@ -212,6 +245,36 @@ class IncidentController extends Controller
 
             // portal sharing (manager/admin)
             'portal_visible' => ['sometimes', 'boolean'],
+
+            // Near-miss fields
+            'potential_severity' => ['nullable', 'in:low,medium,high,critical'],
+            'potential_consequence' => ['nullable', 'string'],
+
+            // Injury details
+            'injured_person_name' => ['nullable', 'string', 'max:255'],
+            'injured_person_role' => ['nullable', 'in:staff,client,visitor,contractor'],
+            'injured_person_age' => ['nullable', 'integer', 'min:0', 'max:150'],
+            'injury_body_part' => ['nullable', 'string', 'max:255'],
+            'injury_nature' => ['nullable', 'in:fracture,burn,laceration,sprain,bruising,concussion,poisoning,other'],
+            'injury_classification' => ['nullable', 'in:minor,moderate,serious,notifiable'],
+            'medical_treatment_type' => ['nullable', 'in:none,first_aid,medical_centre,hospital,ambulance'],
+
+            // WorkSafe
+            'is_notifiable' => ['sometimes', 'boolean'],
+
+            // Investigation fields
+            'investigation_status' => ['nullable', 'in:not_required,pending,in_progress,completed'],
+            'investigation_assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+            'root_cause_category' => ['nullable', 'string', 'max:255'],
+            'root_cause_description' => ['nullable', 'string'],
+            'contributing_factors' => ['nullable', 'string'],
+            'corrective_actions' => ['nullable', 'array'],
+            'corrective_actions.*.description' => ['required_with:corrective_actions', 'string'],
+            'corrective_actions.*.assigned_to' => ['nullable', 'string'],
+            'corrective_actions.*.due_date' => ['nullable', 'string'],
+            'corrective_actions.*.status' => ['nullable', 'string'],
+            'corrective_actions.*.completed_at' => ['nullable', 'string'],
+            'lessons_learned' => ['nullable', 'string'],
         ]);
 
         // If reporter is editing, do not allow review fields / portal visibility to be overwritten
@@ -226,7 +289,13 @@ class IncidentController extends Controller
 
         if ($coreLocked) {
             // Only allow manager/admin-only fields after submission.
-            foreach (['type', 'severity', 'occurred_at', 'description', 'requires_followup', 'immediate_action_taken', 'witnesses'] as $field) {
+            // Core fields and injury/near-miss details are locked; investigation fields remain editable.
+            foreach ([
+                'type', 'severity', 'occurred_at', 'description', 'requires_followup', 'immediate_action_taken', 'witnesses',
+                'potential_severity', 'potential_consequence',
+                'injured_person_name', 'injured_person_role', 'injured_person_age',
+                'injury_body_part', 'injury_nature', 'injury_classification', 'medical_treatment_type',
+            ] as $field) {
                 unset($data[$field]);
             }
         }

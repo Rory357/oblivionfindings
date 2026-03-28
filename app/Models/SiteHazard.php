@@ -46,6 +46,12 @@ class SiteHazard extends Model
         'linked_checklist_run_id',
         'warning_sent_at',
         'overdue_notified_at',
+        'control_hierarchy',
+        'residual_risk_rating',
+        'residual_likelihood',
+        'residual_severity',
+        'control_effectiveness',
+        'control_review_date',
     ];
 
     protected $casts = [
@@ -59,6 +65,8 @@ class SiteHazard extends Model
         'review_date' => 'date',
         'warning_sent_at' => 'datetime',
         'overdue_notified_at' => 'datetime',
+        'control_hierarchy' => 'array',
+        'control_review_date' => 'date',
     ];
 
     // Relationships

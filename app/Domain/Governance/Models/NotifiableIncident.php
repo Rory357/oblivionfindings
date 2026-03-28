@@ -31,6 +31,15 @@ class NotifiableIncident extends Model
         'outcome',
         'closed_at',
         'closed_by',
+        'notification_deadline',
+        'site_preserved',
+        'site_preservation_released_at',
+        'site_preservation_released_by',
+        'authority_response_tracking',
+        'closure_certified_by',
+        'closure_certified_at',
+        'investigation_findings',
+        'preventive_actions',
     ];
 
     protected $casts = [
@@ -39,6 +48,12 @@ class NotifiableIncident extends Model
         'notified_at' => 'datetime',
         'closed_at' => 'datetime',
         'evidence' => 'array',
+        'notification_deadline' => 'datetime',
+        'site_preserved' => 'boolean',
+        'site_preservation_released_at' => 'datetime',
+        'closure_certified_at' => 'datetime',
+        'authority_response_tracking' => 'array',
+        'preventive_actions' => 'array',
     ];
 
     public function submittedBy(): BelongsTo
@@ -54,6 +69,16 @@ class NotifiableIncident extends Model
     public function closedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'closed_by');
+    }
+
+    public function sitePreservationReleasedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'site_preservation_released_by');
+    }
+
+    public function closureCertifiedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closure_certified_by');
     }
 
     public function relatedIncident(): BelongsTo
