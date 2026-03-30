@@ -195,49 +195,58 @@ export default function DirectoryShow({
             <Head title={`${employee.name} - Directory`} />
 
             <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Back link */}
-                <Link href="/hr/directory" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground w-fit">
-                    <ArrowLeft className="h-4 w-4" />
-                    Back to Directory
-                </Link>
+                {/* ========== HERO BANNER ========== */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 shadow-lg">
+                    {/* Decorative shapes */}
+                    <div className="absolute -right-16 -top-16 h-56 w-56 rounded-full bg-white/5" />
+                    <div className="absolute -bottom-10 -left-10 h-36 w-36 rounded-full bg-white/5" />
+                    <div className="absolute right-32 bottom-0 h-24 w-24 rounded-full bg-white/5" />
 
-                <div className="grid gap-6 lg:grid-cols-[340px_1fr]">
-                    {/* ========== LEFT COLUMN ========== */}
-                    <div className="flex flex-col gap-4">
-                        {/* Profile Hero */}
-                        <Card className="overflow-hidden">
-                            <div className="h-24 bg-gradient-to-br from-primary/30 via-primary/15 to-transparent" />
-                            <CardContent className="-mt-14 flex flex-col items-center px-5 pb-6 text-center">
-                                <Avatar className="h-28 w-28 border-4 border-background shadow-lg">
-                                    <AvatarImage src={employee.profile_photo_path ? `/storage/${employee.profile_photo_path}` : undefined} />
-                                    <AvatarFallback className="bg-primary/10 text-primary text-3xl font-bold">
-                                        {getInitials(employee.name)}
-                                    </AvatarFallback>
-                                </Avatar>
+                    <div className="relative p-6 md:p-8">
+                        <Link href="/hr/directory" className="mb-4 inline-flex items-center gap-1.5 text-sm text-white/60 hover:text-white transition-colors">
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to Directory
+                        </Link>
 
-                                <h1 className="mt-4 text-xl font-bold">{employee.name}</h1>
+                        <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
+                            {/* Avatar */}
+                            <Avatar className="h-32 w-32 border-4 border-white/20 shadow-xl md:h-36 md:w-36">
+                                <AvatarImage src={employee.profile_photo_path ? `/storage/${employee.profile_photo_path}` : undefined} />
+                                <AvatarFallback className="bg-white/20 text-white text-4xl font-bold">
+                                    {getInitials(employee.name)}
+                                </AvatarFallback>
+                            </Avatar>
+
+                            {/* Info */}
+                            <div className="flex-1 text-center text-primary-foreground md:text-left">
+                                <h1 className="text-2xl font-bold md:text-3xl">{employee.name}</h1>
                                 {employee.full_name !== employee.name && (
-                                    <p className="text-xs text-muted-foreground">({employee.full_name})</p>
+                                    <p className="text-sm text-white/60">({employee.full_name})</p>
                                 )}
                                 {employee.position_title && (
-                                    <p className="mt-1 text-sm text-muted-foreground">{employee.position_title}</p>
+                                    <p className="mt-1 text-lg text-white/80">{employee.position_title}</p>
                                 )}
 
                                 {/* Badges */}
-                                <div className="mt-3 flex flex-wrap justify-center gap-1.5">
+                                <div className="mt-3 flex flex-wrap justify-center gap-2 md:justify-start">
                                     {employee.department && (
-                                        <Badge variant="secondary" className="text-xs">{employee.department}</Badge>
+                                        <Badge className="bg-white/15 text-white border-white/20 hover:bg-white/25 text-xs">{employee.department}</Badge>
                                     )}
                                     {employee.team && (
-                                        <Badge variant="outline" className="text-xs">{employee.team}</Badge>
+                                        <Badge className="bg-white/10 text-white/80 border-white/15 text-xs">{employee.team}</Badge>
+                                    )}
+                                    {employee.site && (
+                                        <Badge className="bg-white/10 text-white/80 border-white/15 text-xs gap-1">
+                                            <MapPin className="h-3 w-3" />{employee.site}
+                                        </Badge>
                                     )}
                                     {employee.is_first_aider && (
-                                        <Badge variant="outline" className="text-xs border-emerald-500/30 text-emerald-600 bg-emerald-500/10">
+                                        <Badge className="bg-emerald-500/20 text-emerald-200 border-emerald-400/30 text-xs">
                                             <Heart className="mr-1 h-3 w-3" /> First Aider
                                         </Badge>
                                     )}
                                     {employee.is_fire_warden && (
-                                        <Badge variant="outline" className="text-xs border-orange-500/30 text-orange-600 bg-orange-500/10">
+                                        <Badge className="bg-orange-500/20 text-orange-200 border-orange-400/30 text-xs">
                                             <Flame className="mr-1 h-3 w-3" /> Fire Warden
                                         </Badge>
                                     )}
@@ -245,127 +254,95 @@ export default function DirectoryShow({
 
                                 {/* Tenure */}
                                 {tenure && (
-                                    <div className="mt-4 flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <p className="mt-3 flex items-center justify-center gap-1.5 text-sm text-white/50 md:justify-start">
                                         <Clock className="h-3.5 w-3.5" />
-                                        {tenure.years > 0 ? `${tenure.years}y ${tenure.months}m` : `${tenure.months} months`} at the organisation
+                                        {tenure.years > 0 ? `${tenure.years} year${tenure.years !== 1 ? 's' : ''} ${tenure.months} month${tenure.months !== 1 ? 's' : ''}` : `${tenure.months} month${tenure.months !== 1 ? 's' : ''}`} at the organisation
+                                    </p>
+                                )}
+
+                                {/* Quick actions */}
+                                <div className="mt-5 flex flex-wrap items-center justify-center gap-2 md:justify-start">
+                                    {!isSelf && (
+                                        <Button
+                                            onClick={() => setKudosDialogOpen(true)}
+                                            size="sm"
+                                            className="gap-2 rounded-full bg-white text-primary font-semibold hover:bg-white/90 shadow-md"
+                                        >
+                                            <Sparkles className="h-4 w-4" />
+                                            Send Kudos
+                                        </Button>
+                                    )}
+                                    {employee.email && (
+                                        <Button asChild size="sm" variant="outline" className="gap-1.5 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+                                            <a href={`mailto:${employee.email}`}>
+                                                <Mail className="h-3.5 w-3.5" /> Email
+                                            </a>
+                                        </Button>
+                                    )}
+                                    {employee.phone && (
+                                        <Button asChild size="sm" variant="outline" className="gap-1.5 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white">
+                                            <a href={`tel:${employee.phone}`}>
+                                                <Phone className="h-3.5 w-3.5" /> Call
+                                            </a>
+                                        </Button>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Right side stats (desktop) */}
+                            <div className="hidden lg:flex items-center gap-4">
+                                <div className="flex flex-col items-center rounded-xl bg-white/10 px-5 py-3 backdrop-blur-sm">
+                                    <Clock className="h-5 w-5 text-white/70 mb-1" />
+                                    <span className="text-2xl font-bold text-white">
+                                        {tenure ? `${tenure.years}.${tenure.months}` : '\u2014'}
+                                    </span>
+                                    <span className="text-[10px] text-white/60">Years</span>
+                                </div>
+                                <div className="flex flex-col items-center rounded-xl bg-white/10 px-5 py-3 backdrop-blur-sm">
+                                    <Award className="h-5 w-5 text-amber-300 mb-1" />
+                                    <span className="text-2xl font-bold text-white">{kudosCount}</span>
+                                    <span className="text-[10px] text-white/60">Kudos</span>
+                                </div>
+                                {complianceRate != null && (
+                                    <div className="flex flex-col items-center rounded-xl bg-white/10 px-5 py-3 backdrop-blur-sm">
+                                        <Shield className="h-5 w-5 text-emerald-300 mb-1" />
+                                        <span className="text-2xl font-bold text-white">{complianceRate}%</span>
+                                        <span className="text-[10px] text-white/60">Compliant</span>
                                     </div>
                                 )}
-
-                                {/* Bio */}
-                                {employee.bio && (
-                                    <p className="mt-4 text-sm leading-relaxed text-muted-foreground border-t pt-4 whitespace-pre-line">
-                                        {employee.bio}
-                                    </p>
-                                )}
-
-                                {/* Send Kudos */}
-                                {!isSelf && (
-                                    <Button
-                                        onClick={() => setKudosDialogOpen(true)}
-                                        className="mt-5 w-full gap-2 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 text-white hover:from-amber-600 hover:to-orange-600 shadow-md"
-                                    >
-                                        <Sparkles className="h-4 w-4" />
-                                        Send Kudos
-                                    </Button>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {/* Reporting Structure */}
-                        {(manager || directReports.length > 0) && (
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="flex items-center gap-2 text-sm">
-                                        <Users className="h-4 w-4" />
-                                        Reporting Structure
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {manager && (
-                                        <div>
-                                            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">Reports to</p>
-                                            <Link href={`/hr/directory/${manager.id}`} className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50">
-                                                <Avatar className="h-9 w-9">
-                                                    <AvatarImage src={manager.profile_photo_path ? `/storage/${manager.profile_photo_path}` : undefined} />
-                                                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
-                                                        {getInitials(manager.name)}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <div className="min-w-0">
-                                                    <p className="text-sm font-medium truncate">{manager.name}</p>
-                                                    {manager.position_title && (
-                                                        <p className="text-[11px] text-muted-foreground truncate">{manager.position_title}</p>
-                                                    )}
-                                                </div>
-                                                <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground/50" />
-                                            </Link>
-                                        </div>
-                                    )}
-
-                                    {directReports.length > 0 && (
-                                        <div>
-                                            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
-                                                Direct Reports ({directReports.length})
-                                            </p>
-                                            <div className="space-y-0.5">
-                                                {directReports.map((r) => (
-                                                    <Link key={r.id} href={`/hr/directory/${r.id}`} className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50">
-                                                        <Avatar className="h-8 w-8">
-                                                            <AvatarImage src={r.profile_photo_path ? `/storage/${r.profile_photo_path}` : undefined} />
-                                                            <AvatarFallback className="bg-muted text-xs font-semibold">
-                                                                {getInitials(r.name)}
-                                                            </AvatarFallback>
-                                                        </Avatar>
-                                                        <div className="min-w-0">
-                                                            <p className="text-sm truncate">{r.name}</p>
-                                                            {r.position_title && (
-                                                                <p className="text-[11px] text-muted-foreground truncate">{r.position_title}</p>
-                                                            )}
-                                                        </div>
-                                                    </Link>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
-                    </div>
-
-                    {/* ========== RIGHT COLUMN ========== */}
-                    <div className="flex flex-col gap-4">
-                        {/* Stat Cards */}
-                        <div className="grid gap-4 grid-cols-3">
-                            <Card className="overflow-hidden">
-                                <div className="h-1 bg-blue-500" />
-                                <CardContent className="p-4 text-center">
-                                    <Clock className="mx-auto h-5 w-5 text-blue-500 mb-1" />
-                                    <p className="text-2xl font-bold">
-                                        {tenure ? (tenure.years > 0 ? `${tenure.years}.${tenure.months}` : tenure.months) : '\u2014'}
-                                    </p>
-                                    <p className="text-[11px] text-muted-foreground">{tenure && tenure.years > 0 ? 'Years' : 'Months'}</p>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="overflow-hidden">
-                                <div className="h-1 bg-amber-500" />
-                                <CardContent className="p-4 text-center">
-                                    <Award className="mx-auto h-5 w-5 text-amber-500 mb-1" />
-                                    <p className="text-2xl font-bold">{kudosCount}</p>
-                                    <p className="text-[11px] text-muted-foreground">Kudos (30d)</p>
-                                </CardContent>
-                            </Card>
-
-                            <Card className="overflow-hidden">
-                                <div className="h-1 bg-emerald-500" />
-                                <CardContent className="p-4 text-center">
-                                    <Shield className="mx-auto h-5 w-5 text-emerald-500 mb-1" />
-                                    <p className="text-2xl font-bold">{complianceRate != null ? `${complianceRate}%` : '\u2014'}</p>
-                                    <p className="text-[11px] text-muted-foreground">Compliance</p>
-                                </CardContent>
-                            </Card>
+                            </div>
                         </div>
+                    </div>
+                </div>
 
+                {/* Mobile stat cards (hidden on lg) */}
+                <div className="grid gap-3 grid-cols-3 lg:hidden">
+                    <Card className="overflow-hidden">
+                        <div className="h-1 bg-blue-500" />
+                        <CardContent className="p-3 text-center">
+                            <p className="text-xl font-bold">{tenure ? `${tenure.years}.${tenure.months}` : '\u2014'}</p>
+                            <p className="text-[10px] text-muted-foreground">Years</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="overflow-hidden">
+                        <div className="h-1 bg-amber-500" />
+                        <CardContent className="p-3 text-center">
+                            <p className="text-xl font-bold">{kudosCount}</p>
+                            <p className="text-[10px] text-muted-foreground">Kudos (30d)</p>
+                        </CardContent>
+                    </Card>
+                    <Card className="overflow-hidden">
+                        <div className="h-1 bg-emerald-500" />
+                        <CardContent className="p-3 text-center">
+                            <p className="text-xl font-bold">{complianceRate != null ? `${complianceRate}%` : '\u2014'}</p>
+                            <p className="text-[10px] text-muted-foreground">Compliance</p>
+                        </CardContent>
+                    </Card>
+                </div>
+
+                <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
+                    {/* ========== MAIN COLUMN ========== */}
+                    <div className="flex flex-col gap-4 order-2 lg:order-1">
                         {/* Contact & Details */}
                         <Card>
                             <CardHeader className="pb-2">
@@ -579,6 +556,126 @@ export default function DirectoryShow({
                                             );
                                         })}
                                     </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+
+                    {/* ========== RIGHT SIDEBAR ========== */}
+                    <div className="flex flex-col gap-4 order-1 lg:order-2">
+                        {/* About */}
+                        {employee.bio && (
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm flex items-center gap-2">
+                                        <MessageSquare className="h-4 w-4" />
+                                        About
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <p className="text-sm leading-relaxed text-muted-foreground whitespace-pre-line">
+                                        {employee.bio}
+                                    </p>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Employment Details */}
+                        <Card>
+                            <CardHeader className="pb-2">
+                                <CardTitle className="text-sm flex items-center gap-2">
+                                    <Briefcase className="h-4 w-4" />
+                                    Employment
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Position</span>
+                                    <span className="font-medium">{employee.position_title ?? '\u2014'}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Department</span>
+                                    <span className="font-medium">{employee.department ?? '\u2014'}</span>
+                                </div>
+                                {employee.team && (
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-muted-foreground">Team</span>
+                                        <span className="font-medium">{employee.team}</span>
+                                    </div>
+                                )}
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Type</span>
+                                    <span className="font-medium">{formatEmploymentType(employee.employment_type)}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <span className="text-muted-foreground">Start Date</span>
+                                    <span className="font-medium">{formatDate(employee.start_date)}</span>
+                                </div>
+                                {employee.site && (
+                                    <div className="flex items-center justify-between text-sm">
+                                        <span className="text-muted-foreground">Site</span>
+                                        <span className="font-medium">{employee.site}</span>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Reporting Structure */}
+                        {(manager || directReports.length > 0) && (
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center gap-2 text-sm">
+                                        <UserCheck className="h-4 w-4" />
+                                        Team
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                    {manager && (
+                                        <div>
+                                            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">Reports to</p>
+                                            <Link href={`/hr/directory/${manager.id}`} className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50">
+                                                <Avatar className="h-9 w-9">
+                                                    <AvatarImage src={manager.profile_photo_path ? `/storage/${manager.profile_photo_path}` : undefined} />
+                                                    <AvatarFallback className="bg-primary/10 text-primary text-xs font-semibold">
+                                                        {getInitials(manager.name)}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium truncate">{manager.name}</p>
+                                                    {manager.position_title && (
+                                                        <p className="text-[11px] text-muted-foreground truncate">{manager.position_title}</p>
+                                                    )}
+                                                </div>
+                                                <ChevronRight className="ml-auto h-4 w-4 shrink-0 text-muted-foreground/50" />
+                                            </Link>
+                                        </div>
+                                    )}
+
+                                    {directReports.length > 0 && (
+                                        <div>
+                                            <p className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1.5">
+                                                Direct Reports ({directReports.length})
+                                            </p>
+                                            <div className="space-y-0.5">
+                                                {directReports.map((r) => (
+                                                    <Link key={r.id} href={`/hr/directory/${r.id}`} className="flex items-center gap-3 rounded-lg p-2 transition-colors hover:bg-muted/50">
+                                                        <Avatar className="h-8 w-8">
+                                                            <AvatarImage src={r.profile_photo_path ? `/storage/${r.profile_photo_path}` : undefined} />
+                                                            <AvatarFallback className="bg-muted text-xs font-semibold">
+                                                                {getInitials(r.name)}
+                                                            </AvatarFallback>
+                                                        </Avatar>
+                                                        <div className="min-w-0">
+                                                            <p className="text-sm truncate">{r.name}</p>
+                                                            {r.position_title && (
+                                                                <p className="text-[11px] text-muted-foreground truncate">{r.position_title}</p>
+                                                            )}
+                                                        </div>
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         )}
