@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { Tooltip } from '@/components/ui/tooltip';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
@@ -21,6 +22,7 @@ import {
     Wallet,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { Area, AreaChart, ResponsiveContainer, Tooltip as RechartsTooltip, XAxis, YAxis } from 'recharts';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -105,8 +107,21 @@ const STATUS_CONFIG = {
 
 export default function MyPayslips({ payslips }: Props) {
     const [expandedId, setExpandedId] = useState<number | null>(null);
+    const [yearFilter, setYearFilter] = useState<string>('all');
 
-    const { latest, ytdGross, ytdNet, ytdPaye, ytdKiwi, netTrend, avgNet } = useMemo(() => {
+    // Available years from data
+    const years = useMemo(() => {
+        const yrs = new Set<number>();
+        payslips.data.forEach((p) => yrs.add(new Date(p.pay_period_end).getFullYear()));
+        return Array.from(yrs).sort((a, b) => b - a);
+    }, [payslips.data]);
+
+    const filteredPayslips = useMemo(() => {
+        if (yearFilter === 'all') return payslips.data;
+        return payslips.data.filter((p) => new Date(p.pay_period_end).getFullYear() === Number(yearFilter));
+    }, [payslips.data, yearFilter]);
+
+    const { latest, ytdGross, ytdNet, ytdPaye, ytdKiwi, netTrend, avgNet, chartData } = useMemo(() => {
         const all = payslips.data;
         const latest = all[0] ?? null;
         const currentYear = new Date().getFullYear();
@@ -124,7 +139,14 @@ export default function MyPayslips({ payslips }: Props) {
 
         const avgNet = netTrend.length > 0 ? netTrend.reduce((a, b) => a + b, 0) / netTrend.length : 0;
 
-        return { latest, ytdGross, ytdNet, ytdPaye, ytdKiwi, netTrend, avgNet };
+        // Chart data (reversed so oldest first)
+        const chartData = [...all].reverse().map((p) => ({
+            period: new Date(p.pay_period_end).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }),
+            net: Number(p.net_pay),
+            gross: Number(p.gross_pay),
+        }));
+
+        return { latest, ytdGross, ytdNet, ytdPaye, ytdKiwi, netTrend, avgNet, chartData };
     }, [payslips.data]);
 
     return (
@@ -249,18 +271,105 @@ export default function MyPayslips({ payslips }: Props) {
                     </div>
                 )}
 
+                {/* Net Pay Trend Chart */}
+                {chartData.length > 2 && (
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base">Net Pay Trend</CardTitle>
+                                <Badge variant="secondary" className="font-mono text-xs">
+                                    {chartData.length} periods
+                                </Badge>
+                            </div>
+                        </CardHeader>
+                        <CardContent>
+                            <ResponsiveContainer width="100%" height={180}>
+                                <AreaChart data={chartData} margin={{ top: 5, right: 10, bottom: 0, left: -10 }}>
+                                    <defs>
+                                        <linearGradient id="netGradient" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                                            <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
+                                        </linearGradient>
+                                    </defs>
+                                    <XAxis
+                                        dataKey="period"
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }}
+                                    />
+                                    <YAxis
+                                        axisLine={false}
+                                        tickLine={false}
+                                        tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }}
+                                        tickFormatter={(v: number) => `$${(v / 1000).toFixed(1)}k`}
+                                        width={48}
+                                    />
+                                    <RechartsTooltip
+                                        formatter={(value: any) => [nzd(value), '']}
+                                        labelStyle={{ fontWeight: 600 }}
+                                        contentStyle={{
+                                            backgroundColor: 'hsl(var(--card))',
+                                            border: '1px solid hsl(var(--border))',
+                                            borderRadius: '8px',
+                                            fontSize: '12px',
+                                        }}
+                                    />
+                                    <Area
+                                        type="monotone"
+                                        dataKey="net"
+                                        stroke="#10b981"
+                                        strokeWidth={2}
+                                        fill="url(#netGradient)"
+                                        name="Net Pay"
+                                    />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </CardContent>
+                    </Card>
+                )}
+
                 {/* Payslip List */}
                 <div>
                     <div className="mb-3 flex items-center justify-between">
                         <h2 className="text-base font-semibold">Pay History</h2>
-                        {payslips.total > 0 && (
-                            <p className="text-xs text-muted-foreground">{payslips.total} payslip{payslips.total !== 1 ? 's' : ''}</p>
-                        )}
+                        <div className="flex items-center gap-3">
+                            {/* Year filter tabs */}
+                            {years.length > 1 && (
+                                <div className="flex items-center gap-1 rounded-lg border bg-muted/30 p-0.5">
+                                    <button
+                                        onClick={() => setYearFilter('all')}
+                                        className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                                            yearFilter === 'all'
+                                                ? 'bg-background shadow-sm text-foreground'
+                                                : 'text-muted-foreground hover:text-foreground'
+                                        }`}
+                                    >
+                                        All
+                                    </button>
+                                    {years.map((y) => (
+                                        <button
+                                            key={y}
+                                            onClick={() => setYearFilter(String(y))}
+                                            className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
+                                                yearFilter === String(y)
+                                                    ? 'bg-background shadow-sm text-foreground'
+                                                    : 'text-muted-foreground hover:text-foreground'
+                                            }`}
+                                        >
+                                            {y}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                                {filteredPayslips.length} payslip{filteredPayslips.length !== 1 ? 's' : ''}
+                            </p>
+                        </div>
                     </div>
 
-                    {payslips.data.length > 0 ? (
+                    {filteredPayslips.length > 0 ? (
                         <div className="space-y-3">
-                            {payslips.data.map((p) => {
+                            {filteredPayslips.map((p) => {
                                 const config = STATUS_CONFIG[p.status] ?? STATUS_CONFIG.draft;
                                 const isExpanded = expandedId === p.id;
 
@@ -301,6 +410,23 @@ export default function MyPayslips({ payslips }: Props) {
                                                             </span>
                                                         )}
                                                     </div>
+                                                </div>
+
+                                                {/* Inline take-home bar (fills middle gap) */}
+                                                <div className="hidden lg:flex flex-1 items-center px-6">
+                                                    <div className="flex h-2 w-full max-w-[200px] overflow-hidden rounded-full">
+                                                        <div
+                                                            className="bg-emerald-500 rounded-l-full"
+                                                            style={{ width: `${(Number(p.net_pay) / Number(p.gross_pay)) * 100}%` }}
+                                                        />
+                                                        <div
+                                                            className="bg-red-400/70 rounded-r-full"
+                                                            style={{ width: `${(Number(p.total_deductions) / Number(p.gross_pay)) * 100}%` }}
+                                                        />
+                                                    </div>
+                                                    <span className="ml-2 text-[10px] text-muted-foreground whitespace-nowrap">
+                                                        {((Number(p.net_pay) / Number(p.gross_pay)) * 100).toFixed(0)}% take-home
+                                                    </span>
                                                 </div>
 
                                                 {/* Amounts */}
