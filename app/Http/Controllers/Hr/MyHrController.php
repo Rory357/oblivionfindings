@@ -244,8 +244,8 @@ class MyHrController extends Controller
 
         $complianceStatuses = HrStaffComplianceStatus::where('tenant_id', $tenantId)
             ->where('user_id', $user->id)
-            ->with('requirement:id,code,name,category,description,validity_months')
-            ->orderBy('status')
+            ->with('requirement:id,code,name,category,description,validity_months,renewal_reminder_days,check_type')
+            ->orderByRaw("FIELD(status, 'expired', 'non_compliant', 'expiring_soon', 'not_started', 'compliant')")
             ->get()
             ->map(function (HrStaffComplianceStatus $status) {
                 $normalizedStatus = match ($status->status) {
@@ -255,16 +255,24 @@ class MyHrController extends Controller
                     default => 'not_started',
                 };
 
+                $daysUntilExpiry = $status->expires_at
+                    ? now()->startOfDay()->diffInDays($status->expires_at->startOfDay(), false)
+                    : null;
+
                 return [
                     'id' => $status->id,
                     'status' => $normalizedStatus,
                     'expiry_date' => optional($status->expires_at)->toDateString(),
                     'completed_at' => optional($status->valid_from)->toDateString(),
+                    'days_until_expiry' => $daysUntilExpiry,
+                    'evidence_type' => $status->evidence_type,
                     'requirement' => [
                         'id' => $status->requirement?->id,
                         'name' => $status->requirement?->name ?? 'Untitled requirement',
                         'category' => $status->requirement?->category ?? 'general',
                         'description' => $status->requirement?->description,
+                        'validity_months' => $status->requirement?->validity_months,
+                        'check_type' => $status->requirement?->check_type,
                     ],
                 ];
             })
