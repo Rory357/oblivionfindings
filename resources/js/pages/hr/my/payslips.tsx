@@ -156,7 +156,11 @@ export default function MyPayslips({ payslips }: Props) {
                 {payslips.data.length > 0 && (
                     <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
                         {/* Latest Net Pay */}
-                        <Card className="overflow-hidden">
+                        <button
+                            onClick={() => latest && setExpandedId(expandedId === latest.id ? null : latest.id)}
+                            className="text-left"
+                        >
+                        <Card className="overflow-hidden cursor-pointer transition-all hover:shadow-md hover:border-emerald-500/40">
                             <div className="h-1 bg-emerald-500" />
                             <CardContent className="p-5">
                                 <div className="flex items-center justify-between">
@@ -171,15 +175,16 @@ export default function MyPayslips({ payslips }: Props) {
                                             </p>
                                         )}
                                     </div>
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/10 transition-transform group-hover:scale-110">
                                         <Banknote className="h-5 w-5 text-emerald-600" />
                                     </div>
                                 </div>
                             </CardContent>
                         </Card>
+                        </button>
 
                         {/* YTD Gross */}
-                        <Card className="overflow-hidden">
+                        <Card className="overflow-hidden transition-all hover:shadow-md hover:border-blue-500/40">
                             <div className="h-1 bg-blue-500" />
                             <CardContent className="p-5">
                                 <div className="flex items-center justify-between">
@@ -198,7 +203,7 @@ export default function MyPayslips({ payslips }: Props) {
                         </Card>
 
                         {/* YTD PAYE */}
-                        <Card className="overflow-hidden">
+                        <Card className="overflow-hidden transition-all hover:shadow-md hover:border-amber-500/40">
                             <div className="h-1 bg-amber-500" />
                             <CardContent className="p-5">
                                 <div className="flex items-center justify-between">
@@ -217,7 +222,7 @@ export default function MyPayslips({ payslips }: Props) {
                         </Card>
 
                         {/* Net Pay Trend */}
-                        <Card className="overflow-hidden">
+                        <Card className="overflow-hidden transition-all hover:shadow-md hover:border-violet-500/40">
                             <div className="h-1 bg-violet-500" />
                             <CardContent className="p-5">
                                 <div className="flex items-center justify-between">
