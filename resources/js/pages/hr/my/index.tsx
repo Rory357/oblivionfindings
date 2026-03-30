@@ -342,45 +342,110 @@ export default function MyHrIndex({
                 <div className="grid gap-6 lg:grid-cols-[3fr_2fr]">
                     {/* Left Column */}
                     <div className="flex flex-col gap-6">
-                        {/* Leave Balances Gauges */}
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between">
-                                    <CardTitle className="text-base">Leave Balances</CardTitle>
-                                    <Link
-                                        href="/hr/my/leave"
-                                        className="text-xs text-muted-foreground hover:text-foreground"
-                                    >
-                                        View all <ChevronRight className="inline h-3 w-3" />
-                                    </Link>
+                        {/* Leave Balances */}
+                        <div>
+                            <div className="mb-3 flex items-center justify-between">
+                                <h2 className="text-base font-semibold">Leave Balances</h2>
+                                <Link
+                                    href="/hr/my/leave"
+                                    className="text-xs text-muted-foreground hover:text-foreground"
+                                >
+                                    View all <ChevronRight className="inline h-3 w-3" />
+                                </Link>
+                            </div>
+
+                            {leaveBalances.length > 0 ? (
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    {leaveBalances.map((b, i) => {
+                                        const used = Number(b.taken_hours ?? b.used_hours ?? 0);
+                                        const total = Number(b.entitlement_hours ?? b.accrued_hours ?? 0);
+                                        const remaining = Math.max(0, total - used);
+                                        const pct = total > 0 ? Math.min(100, (used / total) * 100) : 0;
+                                        const remainingWeeks = (remaining / 40).toFixed(1);
+                                        const totalWeeks = (total / 40).toFixed(1);
+                                        const typeKey = b.leave_type.includes('_') ? b.leave_type : `${b.leave_type}_leave`;
+                                        const color = LEAVE_COLORS[typeKey] ?? LEAVE_COLORS[b.leave_type] ?? '#06b6d4';
+
+                                        return (
+                                            <Card key={i} className="overflow-hidden">
+                                                {/* Coloured top accent */}
+                                                <div className="h-1" style={{ backgroundColor: color }} />
+
+                                                <CardContent className="p-5">
+                                                    <div className="flex items-start gap-4">
+                                                        {/* Gauge */}
+                                                        <CircularGauge
+                                                            value={used}
+                                                            max={total}
+                                                            label=""
+                                                            color={color}
+                                                            size={90}
+                                                            thickness={8}
+                                                        />
+
+                                                        {/* Details */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <h3 className="font-semibold text-sm">
+                                                                {formatLeaveType(b.leave_type)}
+                                                            </h3>
+
+                                                            <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1.5 text-xs">
+                                                                <div>
+                                                                    <span className="text-muted-foreground">Remaining</span>
+                                                                    <p className="font-bold text-base leading-tight" style={{ color }}>
+                                                                        {remaining.toFixed(0)}h
+                                                                    </p>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-muted-foreground">Entitlement</span>
+                                                                    <p className="font-semibold text-sm leading-tight">
+                                                                        {total.toFixed(0)}h
+                                                                    </p>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-muted-foreground">Used</span>
+                                                                    <p className="font-medium text-sm leading-tight">
+                                                                        {used.toFixed(0)}h
+                                                                    </p>
+                                                                </div>
+                                                                <div>
+                                                                    <span className="text-muted-foreground">Weeks Left</span>
+                                                                    <p className="font-semibold text-sm leading-tight">
+                                                                        {remainingWeeks}<span className="text-muted-foreground font-normal">/{totalWeeks}</span>
+                                                                    </p>
+                                                                </div>
+                                                            </div>
+
+                                                            {/* Progress bar */}
+                                                            <div className="mt-3">
+                                                                <div className="flex justify-between text-[10px] text-muted-foreground mb-1">
+                                                                    <span>{pct.toFixed(0)}% used</span>
+                                                                    <span>{(100 - pct).toFixed(0)}% remaining</span>
+                                                                </div>
+                                                                <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted/40">
+                                                                    <div
+                                                                        className="h-full rounded-full transition-all duration-700"
+                                                                        style={{ width: `${pct}%`, backgroundColor: color }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
                                 </div>
-                            </CardHeader>
-                            <CardContent>
-                                {leaveBalances.length > 0 ? (
-                                    <div className="flex flex-wrap items-start justify-center gap-6 py-2">
-                                        {leaveBalances.map((b, i) => {
-                                            const used = Number(b.taken_hours ?? b.used_hours ?? 0);
-                                            const total = Number(b.entitlement_hours ?? b.accrued_hours ?? 0);
-                                            const typeKey = b.leave_type.includes('_') ? b.leave_type : `${b.leave_type}_leave`;
-                                            return (
-                                                <div key={i} className="relative">
-                                                    <CircularGauge
-                                                        value={used}
-                                                        max={total}
-                                                        label={formatLeaveType(b.leave_type)}
-                                                        color={LEAVE_COLORS[typeKey] ?? LEAVE_COLORS[b.leave_type] ?? '#06b6d4'}
-                                                    />
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                ) : (
-                                    <p className="py-6 text-center text-sm text-muted-foreground">
-                                        No leave balances recorded yet.
-                                    </p>
-                                )}
-                            </CardContent>
-                        </Card>
+                            ) : (
+                                <Card>
+                                    <CardContent className="py-8">
+                                        <p className="text-center text-sm text-muted-foreground">
+                                            No leave balances recorded yet.
+                                        </p>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
 
                         {/* Weekly Hours Chart */}
                         <Card>
