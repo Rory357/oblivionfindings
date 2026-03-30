@@ -42,7 +42,7 @@ class MyHrController extends Controller
 
         $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
             ->where('user_id', $user->id)
-            ->with('user:id,name,email,avatar')
+            ->with('user:id,name,email,profile_photo_path')
             ->first();
 
         $pendingLeave = HrLeaveRequest::where('tenant_id', $tenantId)
@@ -354,7 +354,7 @@ class MyHrController extends Controller
                 'id' => $profile->user->id,
                 'name' => $profile->user->name,
                 'email' => $profile->user->email,
-                'avatar' => $profile->user->avatar,
+                'avatar' => $profile->user->profile_photo_path,
             ] : null,
             'primary_site' => $profile->primarySite ? [
                 'id' => $profile->primarySite->id,

@@ -42,14 +42,17 @@ interface Props {
         employment_type: string;
         start_date: string | null;
         primary_site_id: number | null;
-        user?: { id: number; name: string; email: string; avatar?: string | null };
+        user?: { id: number; name: string; email: string; profile_photo_path?: string | null };
     } | null;
     pendingLeave: number;
     leaveBalances: Array<{
         leave_type: string;
-        entitlement_hours: number;
-        taken_hours: number;
-        remaining_hours: number;
+        entitlement_hours?: number;
+        taken_hours?: number;
+        remaining_hours?: number;
+        balance_hours?: string | number;
+        accrued_hours?: string | number;
+        used_hours?: string | number;
     }>;
     complianceSummary: {
         compliant: number;
@@ -193,7 +196,7 @@ export default function MyHrIndex({
                     {/* Left — Greeting */}
                     <div className="flex items-center gap-4">
                         <Avatar className="h-14 w-14 border-2 border-primary/20">
-                            <AvatarImage src={profile?.user?.avatar ?? undefined} />
+                            <AvatarImage src={profile?.user?.profile_photo_path ?? undefined} />
                             <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
                                 {userInitials}
                             </AvatarFallback>
@@ -321,16 +324,21 @@ export default function MyHrIndex({
                             <CardContent>
                                 {leaveBalances.length > 0 ? (
                                     <div className="flex flex-wrap items-start justify-center gap-6 py-2">
-                                        {leaveBalances.map((b, i) => (
-                                            <div key={i} className="relative">
-                                                <CircularGauge
-                                                    value={b.taken_hours}
-                                                    max={b.entitlement_hours}
-                                                    label={formatLeaveType(b.leave_type)}
-                                                    color={LEAVE_COLORS[b.leave_type] ?? '#06b6d4'}
-                                                />
-                                            </div>
-                                        ))}
+                                        {leaveBalances.map((b, i) => {
+                                            const used = Number(b.taken_hours ?? b.used_hours ?? 0);
+                                            const total = Number(b.entitlement_hours ?? b.accrued_hours ?? 0);
+                                            const typeKey = b.leave_type.includes('_') ? b.leave_type : `${b.leave_type}_leave`;
+                                            return (
+                                                <div key={i} className="relative">
+                                                    <CircularGauge
+                                                        value={used}
+                                                        max={total}
+                                                        label={formatLeaveType(b.leave_type)}
+                                                        color={LEAVE_COLORS[typeKey] ?? LEAVE_COLORS[b.leave_type] ?? '#06b6d4'}
+                                                    />
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 ) : (
                                     <p className="py-6 text-center text-sm text-muted-foreground">
