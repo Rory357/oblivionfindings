@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { type BreadcrumbItem } from '@/types';
 import { Plus, MessageSquare, Eye, Clock } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type User = { id: number; name: string };
 
@@ -143,19 +144,7 @@ export default function FeedbackIndex({ requests, pendingCount, can }: Props) {
 
                 {/* Pagination */}
                 {requests.links?.length > 3 && (
-                    <div className="flex flex-wrap gap-2">
-                        {requests.links.map((l, i) => (
-                            <Button
-                                key={i}
-                                variant={l.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!l.url}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true })}
-                            >
-                                <span dangerouslySetInnerHTML={{ __html: l.label }} />
-                            </Button>
-                        ))}
-                    </div>
+                    <LaravelPagination links={requests.links} />
                 )}
             </div>
         </AppLayout>

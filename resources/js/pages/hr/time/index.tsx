@@ -14,6 +14,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Clock, Play, Square, Timer } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface TimeEntry {
     id: number;
@@ -300,18 +301,7 @@ export default function TimeIndex({ entries, activeClock, weeklySummary, filters
                             {Math.min(entries.current_page * entries.per_page, entries.total)} of{' '}
                             {entries.total} entries
                         </p>
-                        <div className="flex items-center gap-1">
-                            {entries.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                />
-                            ))}
-                        </div>
+                        <LaravelPagination links={entries.links} />
                     </div>
                 )}
             </PageShell>

@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Heart, Pin, MessageSquare, Trophy, Star, Gift, Briefcase, Users } from 'lucide-react';
 import { useState } from 'react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type User = { id: number; name: string };
 
@@ -400,19 +401,7 @@ export default function FeedIndex({ posts, milestones, leaderboard, filters, kud
 
                         {/* Pagination */}
                         {posts.links?.length > 3 && (
-                            <div className="flex flex-wrap gap-2">
-                                {posts.links.map((l, i) => (
-                                    <Button
-                                        key={i}
-                                        variant={l.active ? 'default' : 'outline'}
-                                        size="sm"
-                                        disabled={!l.url}
-                                        onClick={() => l.url && router.get(l.url, {}, { preserveState: true })}
-                                    >
-                                        <span dangerouslySetInnerHTML={{ __html: l.label }} />
-                                    </Button>
-                                ))}
-                            </div>
+                            <LaravelPagination links={posts.links} />
                         )}
                     </div>
 

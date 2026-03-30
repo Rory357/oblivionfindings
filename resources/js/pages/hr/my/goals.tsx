@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { type BreadcrumbItem } from '@/types';
 import { ChevronDown, Target } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface Goal {
     id: number;
@@ -236,18 +237,7 @@ export default function MyGoals({ goals }: Props) {
                 )}
 
                 {goals.last_page > 1 && (
-                    <div className="flex justify-center gap-1">
-                        {goals.links.map((link, i) => (
-                            <Button
-                                key={i}
-                                variant={link.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!link.url}
-                                onClick={() => link.url && router.get(link.url)}
-                                dangerouslySetInnerHTML={{ __html: link.label }}
-                            />
-                        ))}
-                    </div>
+                    <LaravelPagination links={goals.links} />
                 )}
             </div>
         </AppLayout>

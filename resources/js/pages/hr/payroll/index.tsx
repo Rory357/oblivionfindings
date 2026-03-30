@@ -19,6 +19,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { Download, Plus } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface PayrollRun {
     id: number;
@@ -758,32 +759,7 @@ export default function PayrollIndex({ runs, profiles, exportFieldOptions, can }
                             )}{' '}
                             of {runs.total} results
                         </p>
-                        <div className="flex items-center gap-1">
-                            {runs.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={
-                                        link.active ? 'default' : 'outline'
-                                    }
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() =>
-                                        link.url &&
-                                        router.get(
-                                            link.url,
-                                            {},
-                                            { preserveState: true },
-                                        )
-                                    }
-                                >
-                                    <span
-                                        dangerouslySetInnerHTML={{
-                                            __html: link.label,
-                                        }}
-                                    />
-                                </Button>
-                            ))}
-                        </div>
+                        <LaravelPagination links={runs.links} />
                     </div>
                 )}
             </div>

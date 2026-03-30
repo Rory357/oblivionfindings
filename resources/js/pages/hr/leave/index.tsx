@@ -12,8 +12,22 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { CalendarDays, Plus, Clock, CheckCircle2, XCircle } from 'lucide-react';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { AlertTriangle, CalendarDays, Plus, Clock, CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 type LeaveRequest = {
     id: number;
@@ -75,29 +89,69 @@ const breadcrumbs = [
     { title: 'Leave', href: '/hr/leave' },
 ];
 
-const statusConfig: Record<string, { className: string; label: string }> = {
+type StatusVariant = 'default' | 'secondary' | 'destructive' | 'outline';
+
+const statusConfig: Record<string, { variant: StatusVariant; className: string; label: string }> = {
     pending: {
+        variant: 'outline',
         className: 'border-yellow-500/30 text-yellow-400 bg-yellow-500/10',
         label: 'Pending',
     },
     approved: {
+        variant: 'outline',
         className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10',
         label: 'Approved',
     },
     declined: {
-        className: 'border-red-500/30 text-red-400 bg-red-500/10',
+        variant: 'destructive',
+        className: '',
         label: 'Declined',
     },
     cancelled: {
-        className: 'border-slate-500/30 text-slate-400',
+        variant: 'secondary',
+        className: '',
         label: 'Cancelled',
     },
 };
+
+function StatusBadge({ status }: { status: string }) {
+    const config = statusConfig[status] || statusConfig.pending;
+    return (
+        <Badge variant={config.variant} className={config.className || undefined}>
+            {config.label}
+        </Badge>
+    );
+}
+
+function SlaBadge({ request }: { request: LeaveRequest }) {
+    if (request.is_overdue) {
+        return (
+            <Badge variant="destructive" className="ml-2 gap-1">
+                <AlertTriangle className="h-3 w-3" />
+                Overdue
+            </Badge>
+        );
+    }
+    if (request.due_within_24h) {
+        return (
+            <Badge variant="outline" className="ml-2 gap-1 border-amber-500/30 text-amber-400 bg-amber-500/10">
+                <Clock className="h-3 w-3" />
+                Due in 24h
+            </Badge>
+        );
+    }
+    return null;
+}
 
 export default function LeaveIndex({ requests, filters, sla, pendingAging, can }: Props) {
     const pendingRequests = requests.data.filter((r) => r.status === 'pending');
     const allRequests = requests.data;
     const [selectedRequestIds, setSelectedRequestIds] = useState<number[]>([]);
+    const [declineDialogOpen, setDeclineDialogOpen] = useState(false);
+    const [declineTarget, setDeclineTarget] = useState<{ type: 'single'; id: number } | { type: 'bulk' } | null>(null);
+    const [declineNotes, setDeclineNotes] = useState('');
+    const [processing, setProcessing] = useState(false);
+    const [bulkApproveDialogOpen, setBulkApproveDialogOpen] = useState(false);
     const selectedPendingIds = useMemo(
         () => selectedRequestIds.filter((id) => pendingRequests.some((request) => request.id === id)),
         [selectedRequestIds, pendingRequests],
@@ -112,15 +166,17 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
     };
 
     function handleApprove(requestId: number) {
-        router.post(`/hr/leave/${requestId}/approve`, {}, { preserveScroll: true });
+        setProcessing(true);
+        router.post(`/hr/leave/${requestId}/approve`, {}, {
+            preserveScroll: true,
+            onFinish: () => setProcessing(false),
+        });
     }
 
     function handleDecline(requestId: number) {
-        const reviewNotes = window.prompt('Decline note (required):', 'Declined after review.');
-        if (!reviewNotes || reviewNotes.trim() === '') {
-            return;
-        }
-        router.post(`/hr/leave/${requestId}/decline`, { review_notes: reviewNotes.trim() }, { preserveScroll: true });
+        setDeclineTarget({ type: 'single', id: requestId });
+        setDeclineNotes('');
+        setDeclineDialogOpen(true);
     }
 
     function toggleRequestSelection(requestId: number, checked: boolean) {
@@ -137,35 +193,52 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
     }
 
     function handleBulkApprove() {
-        if (selectedPendingIds.length === 0) {
-            return;
-        }
+        if (selectedPendingIds.length === 0) return;
+        setBulkApproveDialogOpen(true);
+    }
 
+    function confirmBulkApprove() {
+        setProcessing(true);
+        setBulkApproveDialogOpen(false);
         router.post('/hr/leave/bulk-approve', {
             request_ids: selectedPendingIds,
         }, {
             preserveScroll: true,
+            onFinish: () => setProcessing(false),
             onSuccess: () => setSelectedRequestIds([]),
         });
     }
 
     function handleBulkDecline() {
-        if (selectedPendingIds.length === 0) {
-            return;
-        }
+        if (selectedPendingIds.length === 0) return;
+        setDeclineTarget({ type: 'bulk' });
+        setDeclineNotes('');
+        setDeclineDialogOpen(true);
+    }
 
-        const reviewNotes = window.prompt('Decline note for selected requests (required):', 'Declined after review.');
-        if (!reviewNotes || reviewNotes.trim() === '') {
-            return;
-        }
+    function submitDecline() {
+        if (!declineNotes.trim() || !declineTarget) return;
 
-        router.post('/hr/leave/bulk-decline', {
-            request_ids: selectedPendingIds,
-            review_notes: reviewNotes.trim(),
-        }, {
-            preserveScroll: true,
-            onSuccess: () => setSelectedRequestIds([]),
-        });
+        setProcessing(true);
+        if (declineTarget.type === 'single') {
+            router.post(`/hr/leave/${declineTarget.id}/decline`, { review_notes: declineNotes.trim() }, {
+                preserveScroll: true,
+                onFinish: () => setProcessing(false),
+                onSuccess: () => setDeclineDialogOpen(false),
+            });
+        } else {
+            router.post('/hr/leave/bulk-decline', {
+                request_ids: selectedPendingIds,
+                review_notes: declineNotes.trim(),
+            }, {
+                preserveScroll: true,
+                onFinish: () => setProcessing(false),
+                onSuccess: () => {
+                    setSelectedRequestIds([]);
+                    setDeclineDialogOpen(false);
+                },
+            });
+        }
     }
 
     function extendSlaByHours(requestId: number, hours: number) {
@@ -225,12 +298,14 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                             </p>
                         </CardContent>
                     </Card>
-                    <Card>
+                    <Card className={sla.due_within_24h_count > 0 ? 'border-amber-500/40' : ''}>
                         <CardHeader className="pb-2">
                             <CardTitle className="text-sm text-muted-foreground">Due in 24h</CardTitle>
                         </CardHeader>
                         <CardContent>
-                            <p className="text-2xl font-semibold">{sla.due_within_24h_count}</p>
+                            <p className={`text-2xl font-semibold ${sla.due_within_24h_count > 0 ? 'text-amber-500' : ''}`}>
+                                {sla.due_within_24h_count}
+                            </p>
                         </CardContent>
                     </Card>
                     <Card>
@@ -257,8 +332,9 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                                         variant="outline"
                                         size="sm"
                                         onClick={handleBulkApprove}
-                                        disabled={selectedPendingIds.length === 0}
+                                        disabled={selectedPendingIds.length === 0 || processing}
                                     >
+                                        {processing ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
                                         Approve Selected ({selectedPendingIds.length})
                                     </Button>
                                     <Button
@@ -266,7 +342,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                                         size="sm"
                                         className="border-red-500/30 text-red-400 hover:bg-red-500/10"
                                         onClick={handleBulkDecline}
-                                        disabled={selectedPendingIds.length === 0}
+                                        disabled={selectedPendingIds.length === 0 || processing}
                                     >
                                         Decline Selected
                                     </Button>
@@ -311,12 +387,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                                                 <td className="px-4 py-3 text-muted-foreground">{request.hours}h</td>
                                                 <td className="px-4 py-3 text-muted-foreground">
                                                     {request.approval_due_at || '-'}
-                                                    {request.is_overdue && (
-                                                        <Badge variant="destructive" className="ml-2">Overdue</Badge>
-                                                    )}
-                                                    {!request.is_overdue && request.due_within_24h && (
-                                                        <Badge variant="secondary" className="ml-2">Due in 24h</Badge>
-                                                    )}
+                                                    <SlaBadge request={request} />
                                                 </td>
                                                 <td className="px-4 py-3 text-right">
                                                     <div className="flex items-center justify-end gap-2">
@@ -325,6 +396,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                                                             size="sm"
                                                             className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
                                                             onClick={() => handleApprove(request.id)}
+                                                            disabled={processing}
                                                         >
                                                             <CheckCircle2 className="h-3 w-3 mr-1" />
                                                             Approve
@@ -334,6 +406,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                                                             size="sm"
                                                             className="border-red-500/30 text-red-400 hover:bg-red-500/10"
                                                             onClick={() => handleDecline(request.id)}
+                                                            disabled={processing}
                                                         >
                                                             <XCircle className="h-3 w-3 mr-1" />
                                                             Decline
@@ -342,6 +415,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                                                             variant="ghost"
                                                             size="sm"
                                                             onClick={() => extendSlaByHours(request.id, 24)}
+                                                            disabled={processing}
                                                         >
                                                             +24h SLA
                                                         </Button>
@@ -439,26 +513,17 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {allRequests.map((request) => {
-                                            const config = statusConfig[request.status] || statusConfig.pending;
-                                            return (
+                                        {allRequests.map((request) => (
                                                 <tr key={request.id} className="border-b last:border-b-0 hover:bg-muted/50">
                                                     <td className="px-4 py-3 font-medium">{request.staff_name}</td>
                                                     <td className="px-4 py-3 text-muted-foreground">{request.leave_type}</td>
-                                                <td className="px-4 py-3 text-muted-foreground">
-                                                    {request.start_date} - {request.end_date}
-                                                    {request.is_overdue && (
-                                                        <Badge variant="destructive" className="ml-2">Overdue</Badge>
-                                                    )}
-                                                    {!request.is_overdue && request.due_within_24h && (
-                                                        <Badge variant="secondary" className="ml-2">Due in 24h</Badge>
-                                                    )}
-                                                </td>
+                                                    <td className="px-4 py-3 text-muted-foreground">
+                                                        {request.start_date} - {request.end_date}
+                                                        <SlaBadge request={request} />
+                                                    </td>
                                                     <td className="px-4 py-3 text-muted-foreground">{request.hours}h</td>
                                                     <td className="px-4 py-3">
-                                                        <Badge variant="outline" className={config.className}>
-                                                            {config.label}
-                                                        </Badge>
+                                                        <StatusBadge status={request.status} />
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
                                                         <div className="flex items-center justify-end gap-2">
@@ -472,6 +537,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                                                                         size="sm"
                                                                         className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
                                                                         onClick={() => handleApprove(request.id)}
+                                                                        disabled={processing}
                                                                     >
                                                                         Approve
                                                                     </Button>
@@ -480,6 +546,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                                                                         size="sm"
                                                                         className="border-red-500/30 text-red-400 hover:bg-red-500/10"
                                                                         onClick={() => handleDecline(request.id)}
+                                                                        disabled={processing}
                                                                     >
                                                                         Decline
                                                                     </Button>
@@ -488,8 +555,7 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                                                         </div>
                                                     </td>
                                                 </tr>
-                                            );
-                                        })}
+                                            ))}
                                     </tbody>
                                 </table>
                             </div>
@@ -524,28 +590,68 @@ export default function LeaveIndex({ requests, filters, sla, pendingAging, can }
                 )}
 
                 {/* Pagination */}
-                {requests.last_page > 1 && (
+                {requests.total > 0 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
                             Showing {(requests.current_page - 1) * requests.per_page + 1} to{' '}
                             {Math.min(requests.current_page * requests.per_page, requests.total)} of{' '}
-                            {requests.total} results
+                            {requests.total} {requests.total === 1 ? 'result' : 'results'}
                         </p>
-                        <div className="flex items-center gap-1">
-                            {requests.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                />
-                            ))}
-                        </div>
+                        {requests.last_page > 1 && (
+                            <LaravelPagination links={requests.links} />
+                        )}
                     </div>
                 )}
             </PageShell>
+
+            {/* Bulk Approve Confirmation */}
+            <AlertDialog open={bulkApproveDialogOpen} onOpenChange={setBulkApproveDialogOpen}>
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>Approve {selectedPendingIds.length} Leave Request{selectedPendingIds.length === 1 ? '' : 's'}?</AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This will approve {selectedPendingIds.length} pending leave{' '}
+                            {selectedPendingIds.length === 1 ? 'request' : 'requests'}. This action cannot be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction onClick={confirmBulkApprove}>
+                            Approve {selectedPendingIds.length} Request{selectedPendingIds.length === 1 ? '' : 's'}
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            {/* Decline Dialog */}
+            <Dialog open={declineDialogOpen} onOpenChange={setDeclineDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>
+                            {declineTarget?.type === 'bulk'
+                                ? `Decline ${selectedPendingIds.length} Leave Request(s)`
+                                : 'Decline Leave Request'}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-2">
+                        <Label htmlFor="decline-notes">Reason for declining (required)</Label>
+                        <Textarea
+                            id="decline-notes"
+                            value={declineNotes}
+                            onChange={(e) => setDeclineNotes(e.target.value)}
+                            placeholder="Enter the reason for declining this request..."
+                            rows={3}
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeclineDialogOpen(false)} disabled={processing}>Cancel</Button>
+                        <Button variant="destructive" onClick={submitDecline} disabled={!declineNotes.trim() || processing}>
+                            {processing ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                            Decline
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

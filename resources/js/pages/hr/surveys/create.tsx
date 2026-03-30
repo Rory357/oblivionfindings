@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -47,6 +47,8 @@ const emptyQuestion: Question = {
 };
 
 export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
+    const { errors } = usePage<{ errors: Record<string, string> }>().props;
+
     const [form, setForm] = useState({
         title: '',
         description: '',
@@ -135,7 +137,7 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                         </CardHeader>
                         <CardContent className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2 sm:col-span-2">
-                                <Label htmlFor="title">Title</Label>
+                                <Label htmlFor="title">Title <span className="text-destructive">*</span></Label>
                                 <Input
                                     id="title"
                                     value={form.title}
@@ -143,6 +145,7 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                                     placeholder="e.g. Q1 2026 Employee Satisfaction"
                                     required
                                 />
+                                {errors.title && <p className="text-sm text-destructive">{errors.title}</p>}
                             </div>
                             <div className="space-y-2 sm:col-span-2">
                                 <Label htmlFor="description">Description</Label>
@@ -153,6 +156,7 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                                     onChange={(e) => set('description', e.target.value)}
                                     placeholder="Describe the purpose of this survey..."
                                 />
+                                {errors.description && <p className="text-sm text-destructive">{errors.description}</p>}
                             </div>
                             <div className="space-y-2">
                                 <Label>Survey Type</Label>
@@ -168,6 +172,7 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                                         ))}
                                     </SelectContent>
                                 </Select>
+                                {errors.survey_type && <p className="text-sm text-destructive">{errors.survey_type}</p>}
                             </div>
                             <div className="flex items-end">
                                 <label className="flex items-center gap-2 text-sm">
@@ -181,12 +186,14 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                                 </label>
                             </div>
                             <div className="space-y-2">
-                                <Label>Start Date</Label>
+                                <Label>Start Date <span className="text-destructive">*</span></Label>
                                 <Input type="date" value={form.starts_at} onChange={(e) => set('starts_at', e.target.value)} />
+                                {errors.starts_at && <p className="text-sm text-destructive">{errors.starts_at}</p>}
                             </div>
                             <div className="space-y-2">
-                                <Label>End Date</Label>
+                                <Label>End Date <span className="text-destructive">*</span></Label>
                                 <Input type="date" value={form.ends_at} onChange={(e) => set('ends_at', e.target.value)} />
+                                {errors.ends_at && <p className="text-sm text-destructive">{errors.ends_at}</p>}
                             </div>
                         </CardContent>
                     </Card>
@@ -203,35 +210,45 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            {errors.questions && <p className="text-sm text-destructive">{errors.questions}</p>}
                             {questions.map((question, qIndex) => (
                                 <div key={qIndex} className="rounded-lg border p-4 space-y-3">
                                     <div className="flex items-start gap-3">
                                         <GripVertical className="mt-2 h-4 w-4 text-muted-foreground" />
                                         <div className="flex-1 space-y-3">
                                             <div className="flex gap-3">
-                                                <div className="flex-1">
+                                                <div className="flex-1 space-y-1">
+                                                    <Label>Question Text <span className="text-destructive">*</span></Label>
                                                     <Input
                                                         value={question.question_text}
                                                         onChange={(e) => updateQuestion(qIndex, 'question_text', e.target.value)}
                                                         placeholder={`Question ${qIndex + 1}`}
                                                         required
                                                     />
+                                                    {errors[`questions.${qIndex}.question_text`] && (
+                                                        <p className="text-sm text-destructive">{errors[`questions.${qIndex}.question_text`]}</p>
+                                                    )}
                                                 </div>
-                                                <Select
-                                                    value={question.question_type}
-                                                    onValueChange={(v) => updateQuestion(qIndex, 'question_type', v)}
-                                                >
-                                                    <SelectTrigger className="w-44">
-                                                        <SelectValue />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {questionTypes.map((t) => (
-                                                            <SelectItem key={t} value={t}>
-                                                                {typeLabels[t] || t}
-                                                            </SelectItem>
-                                                        ))}
-                                                    </SelectContent>
-                                                </Select>
+                                                <div className="space-y-1">
+                                                    <Select
+                                                        value={question.question_type}
+                                                        onValueChange={(v) => updateQuestion(qIndex, 'question_type', v)}
+                                                    >
+                                                        <SelectTrigger className="w-44">
+                                                            <SelectValue />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {questionTypes.map((t) => (
+                                                                <SelectItem key={t} value={t}>
+                                                                    {typeLabels[t] || t}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {errors[`questions.${qIndex}.question_type`] && (
+                                                        <p className="text-sm text-destructive">{errors[`questions.${qIndex}.question_type`]}</p>
+                                                    )}
+                                                </div>
                                             </div>
 
                                             {question.question_type === 'multiple_choice' && (
@@ -262,6 +279,9 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
                                                         <Plus className="mr-1 h-3 w-3" />
                                                         Add Option
                                                     </Button>
+                                                    {errors[`questions.${qIndex}.options`] && (
+                                                        <p className="text-sm text-destructive">{errors[`questions.${qIndex}.options`]}</p>
+                                                    )}
                                                 </div>
                                             )}
 

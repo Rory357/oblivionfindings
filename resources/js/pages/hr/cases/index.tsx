@@ -7,7 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, Briefcase, Clock3, Plus, Search, ShieldAlert } from 'lucide-react';
+import { AlertTriangle, Briefcase, Clock3, FolderOpen, Plus, Search, ShieldAlert } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -40,6 +41,10 @@ type Props = {
     cases: {
         data: HrCaseRow[];
         links: PaginationLink[];
+        current_page: number;
+        last_page: number;
+        per_page: number;
+        total: number;
     };
     summary: {
         open_cases: number;
@@ -78,7 +83,7 @@ const formatDate = (value?: string | null) => {
     const d = new Date(value);
     return Number.isNaN(d.getTime())
         ? value
-        : d.toLocaleDateString('en-GB', {
+        : d.toLocaleDateString('en-NZ', {
               day: '2-digit',
               month: 'short',
               year: 'numeric',
@@ -356,8 +361,26 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                                 })}
                                 {cases.data.length === 0 ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="py-8 text-center text-sm text-slate-500">
-                                            No HR cases found.
+                                        <TableCell colSpan={8} className="py-16 text-center">
+                                            <div className="flex flex-col items-center gap-3">
+                                                <FolderOpen className="h-10 w-10 text-muted-foreground/50" />
+                                                <div>
+                                                    <p className="font-medium text-muted-foreground">No HR cases found</p>
+                                                    <p className="mt-1 text-sm text-muted-foreground/70">
+                                                        {filters.q || filters.status || filters.case_type || filters.severity || filters.sla_window
+                                                            ? 'Try adjusting your search or filter criteria.'
+                                                            : 'No cases have been opened yet.'}
+                                                    </p>
+                                                </div>
+                                                {can.manage && !filters.q && !filters.status && !filters.case_type && !filters.severity && (
+                                                    <Button asChild size="sm" className="mt-2">
+                                                        <Link href="/hr/cases/create">
+                                                            <Plus className="mr-1.5 h-4 w-4" />
+                                                            Open Case
+                                                        </Link>
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ) : null}
@@ -366,22 +389,18 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
                     </CardContent>
                 </Card>
 
-                {cases.links?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                        {cases.links.map((link, index) => (
-                            <button
-                                key={`${link.label}-${index}`}
-                                disabled={!link.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${link.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => {
-                                    if (!link.url) return;
-                                    router.get(link.url, {}, { preserveState: true, preserveScroll: true });
-                                }}
-                                dangerouslySetInnerHTML={{ __html: link.label }}
-                            />
-                        ))}
+                {cases.total > 0 && (
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                            Showing {(cases.current_page - 1) * cases.per_page + 1} to{' '}
+                            {Math.min(cases.current_page * cases.per_page, cases.total)} of{' '}
+                            {cases.total} results
+                        </p>
+                        {cases.last_page > 1 && (
+                            <LaravelPagination links={cases.links} />
+                        )}
                     </div>
-                ) : null}
+                )}
             </div>
         </AppLayout>
     );

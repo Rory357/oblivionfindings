@@ -14,7 +14,8 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { useState } from 'react';
-import { Search, Mail, Phone, Users } from 'lucide-react';
+import { Search, Mail, Phone, Users, MapPin } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface Employee {
     id: number;
@@ -29,6 +30,11 @@ interface Employee {
     bio: string | null;
 }
 
+interface SiteOption {
+    id: number;
+    name: string;
+}
+
 interface Props {
     employees: {
         data: Employee[];
@@ -39,6 +45,7 @@ interface Props {
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     departments: string[];
+    sites: SiteOption[];
     filters: {
         q: string;
         department: string | null;
@@ -60,7 +67,7 @@ function getInitials(name: string): string {
         .slice(0, 2);
 }
 
-export default function DirectoryIndex({ employees, departments, filters }: Props) {
+export default function DirectoryIndex({ employees, departments, sites, filters }: Props) {
     const [searchValue, setSearchValue] = useState(filters.q ?? '');
 
     function handleSearch(e: React.FormEvent) {
@@ -124,12 +131,31 @@ export default function DirectoryIndex({ employees, departments, filters }: Prop
                         </SelectContent>
                     </Select>
 
+                    {sites.length > 0 && (
+                        <Select
+                            value={filters.site ?? 'all'}
+                            onValueChange={(v) => updateFilter('site', v === 'all' ? null : v)}
+                        >
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="All Sites" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All Sites</SelectItem>
+                                {sites.map((site) => (
+                                    <SelectItem key={site.id} value={String(site.id)}>
+                                        {site.name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    )}
+
                     <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => {
                             setSearchValue('');
-                            router.get('/hr/directory', {}, { preserveState: true });
+                            router.get('/hr/directory', {}, { preserveState: true, replace: true });
                         }}
                     >
                         Clear
@@ -140,8 +166,24 @@ export default function DirectoryIndex({ employees, departments, filters }: Prop
                 {employees.data.length === 0 ? (
                     <Card>
                         <CardContent className="py-12 text-center">
-                            <Users className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                            <p className="text-muted-foreground">No employees found.</p>
+                            <Users className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
+                            <p className="font-medium">No employees found</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                No employees found matching your search. Try adjusting your filters.
+                            </p>
+                            {(filters.q || filters.department || filters.site) && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="mt-4"
+                                    onClick={() => {
+                                        setSearchValue('');
+                                        router.get('/hr/directory', {}, { preserveState: true, replace: true });
+                                    }}
+                                >
+                                    Clear all filters
+                                </Button>
+                            )}
                         </CardContent>
                     </Card>
                 ) : (
@@ -212,18 +254,7 @@ export default function DirectoryIndex({ employees, departments, filters }: Prop
                             {Math.min(employees.current_page * employees.per_page, employees.total)} of{' '}
                             {employees.total} employees
                         </p>
-                        <div className="flex items-center gap-1">
-                            {employees.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                />
-                            ))}
-                        </div>
+                        <LaravelPagination links={employees.links} />
                     </div>
                 )}
             </PageShell>

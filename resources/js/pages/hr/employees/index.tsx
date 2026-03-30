@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface Props {
     profiles: {
@@ -123,14 +124,7 @@ export default function EmployeesIndex({ profiles, sites, filters, can }: Props)
                 </Card>
 
                 {profiles.last_page > 1 && (
-                    <div className="flex justify-center gap-2">
-                        {profiles.links.map((link: any, i: number) => (
-                            <Button key={i} variant={link.active ? 'default' : 'outline'} size="sm" disabled={!link.url}
-                                onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}>
-                                <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                            </Button>
-                        ))}
-                    </div>
+                    <LaravelPagination links={profiles.links} />
                 )}
             </div>
         </AppLayout>

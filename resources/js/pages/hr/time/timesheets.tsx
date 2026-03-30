@@ -12,9 +12,20 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { FileText, CheckCircle2, XCircle, Send } from 'lucide-react';
+import {
+    AlertDialog,
+    AlertDialogAction,
+    AlertDialogCancel,
+    AlertDialogContent,
+    AlertDialogDescription,
+    AlertDialogFooter,
+    AlertDialogHeader,
+    AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import { FileText, CheckCircle2, XCircle, Send, ClipboardList } from 'lucide-react';
 import { useState } from 'react';
 import { Input } from '@/components/ui/input';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface Timesheet {
     id: number;
@@ -61,9 +72,25 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     rejected: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Rejected' },
 };
 
+function formatDate(dateStr: string): string {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-NZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatDateTime(dateStr: string | null): string {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-NZ', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
 export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
     const [rejectId, setRejectId] = useState<number | null>(null);
     const [rejectReason, setRejectReason] = useState('');
+    const [processing, setProcessing] = useState<number | null>(null);
+    const [confirmApproveId, setConfirmApproveId] = useState<number | null>(null);
 
     function updateFilter(key: string, value: string | null) {
         const newFilters = { ...filters, [key]: value };
@@ -74,17 +101,28 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
     }
 
     function handleSubmit(id: number) {
-        router.post(`/hr/time/timesheets/${id}/submit`, {}, { preserveScroll: true });
+        setProcessing(id);
+        router.post(`/hr/time/timesheets/${id}/submit`, {}, {
+            preserveScroll: true,
+            onFinish: () => setProcessing(null),
+        });
     }
 
     function handleApprove(id: number) {
-        router.post(`/hr/time/timesheets/${id}/approve`, {}, { preserveScroll: true });
+        setProcessing(id);
+        setConfirmApproveId(null);
+        router.post(`/hr/time/timesheets/${id}/approve`, {}, {
+            preserveScroll: true,
+            onFinish: () => setProcessing(null),
+        });
     }
 
     function handleReject(id: number) {
         if (!rejectReason.trim()) return;
+        setProcessing(id);
         router.post(`/hr/time/timesheets/${id}/reject`, { rejection_reason: rejectReason }, {
             preserveScroll: true,
+            onFinish: () => setProcessing(null),
             onSuccess: () => {
                 setRejectId(null);
                 setRejectReason('');
@@ -137,9 +175,16 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                     </CardHeader>
                     <CardContent className="p-0">
                         {timesheets.data.length === 0 ? (
-                            <div className="py-12 text-center text-muted-foreground">
-                                <FileText className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                <p>No timesheets found.</p>
+                            <div className="py-16 text-center text-muted-foreground">
+                                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
+                                    <ClipboardList className="h-8 w-8 opacity-40" />
+                                </div>
+                                <p className="text-base font-medium">No timesheets found</p>
+                                <p className="mt-1 text-sm">
+                                    {filters.status
+                                        ? `There are no timesheets with "${statusConfig[filters.status]?.label ?? filters.status}" status. Try clearing your filters.`
+                                        : 'Timesheets will appear here once staff begin logging their hours.'}
+                                </p>
                             </div>
                         ) : (
                             <div className="overflow-hidden rounded-xl border">
@@ -161,7 +206,7 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                                 <tr key={ts.id} className="border-b last:border-b-0 hover:bg-muted/50">
                                                     <td className="px-4 py-3 font-medium">{ts.user_name}</td>
                                                     <td className="px-4 py-3 text-muted-foreground">
-                                                        {ts.period_start} - {ts.period_end}
+                                                        {formatDate(ts.period_start)} &ndash; {formatDate(ts.period_end)}
                                                     </td>
                                                     <td className="px-4 py-3 text-right font-medium">{ts.total_hours}h</td>
                                                     <td className="px-4 py-3">
@@ -170,7 +215,7 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                                         </Badge>
                                                     </td>
                                                     <td className="px-4 py-3 text-muted-foreground">
-                                                        {ts.submitted_at ?? '-'}
+                                                        {formatDateTime(ts.submitted_at)}
                                                     </td>
                                                     <td className="px-4 py-3 text-right">
                                                         <div className="flex items-center justify-end gap-2">
@@ -178,10 +223,11 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
+                                                                    disabled={processing === ts.id}
                                                                     onClick={() => handleSubmit(ts.id)}
                                                                 >
                                                                     <Send className="mr-1 h-3 w-3" />
-                                                                    Submit
+                                                                    {processing === ts.id ? 'Submitting...' : 'Submit'}
                                                                 </Button>
                                                             )}
                                                             {can.approve && ts.status === 'submitted' && (
@@ -190,10 +236,11 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                                                         variant="outline"
                                                                         size="sm"
                                                                         className="border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/10"
-                                                                        onClick={() => handleApprove(ts.id)}
+                                                                        disabled={processing === ts.id}
+                                                                        onClick={() => setConfirmApproveId(ts.id)}
                                                                     >
                                                                         <CheckCircle2 className="mr-1 h-3 w-3" />
-                                                                        Approve
+                                                                        {processing === ts.id ? 'Approving...' : 'Approve'}
                                                                     </Button>
                                                                     {rejectId === ts.id ? (
                                                                         <div className="flex items-center gap-1">
@@ -206,13 +253,15 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                                                             <Button
                                                                                 variant="destructive"
                                                                                 size="sm"
+                                                                                disabled={processing === ts.id || !rejectReason.trim()}
                                                                                 onClick={() => handleReject(ts.id)}
                                                                             >
-                                                                                Reject
+                                                                                {processing === ts.id ? 'Rejecting...' : 'Reject'}
                                                                             </Button>
                                                                             <Button
                                                                                 variant="ghost"
                                                                                 size="sm"
+                                                                                disabled={processing === ts.id}
                                                                                 onClick={() => { setRejectId(null); setRejectReason(''); }}
                                                                             >
                                                                                 Cancel
@@ -223,6 +272,7 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                                                                             variant="outline"
                                                                             size="sm"
                                                                             className="border-red-500/30 text-red-400 hover:bg-red-500/10"
+                                                                            disabled={processing === ts.id}
                                                                             onClick={() => setRejectId(ts.id)}
                                                                         >
                                                                             <XCircle className="mr-1 h-3 w-3" />
@@ -256,20 +306,29 @@ export default function TimesheetsIndex({ timesheets, filters, can }: Props) {
                             {Math.min(timesheets.current_page * timesheets.per_page, timesheets.total)} of{' '}
                             {timesheets.total} timesheets
                         </p>
-                        <div className="flex items-center gap-1">
-                            {timesheets.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                />
-                            ))}
-                        </div>
+                        <LaravelPagination links={timesheets.links} />
                     </div>
                 )}
+                {/* Approve Confirmation Dialog */}
+                <AlertDialog open={confirmApproveId !== null} onOpenChange={(open) => { if (!open) setConfirmApproveId(null); }}>
+                    <AlertDialogContent>
+                        <AlertDialogHeader>
+                            <AlertDialogTitle>Approve Timesheet</AlertDialogTitle>
+                            <AlertDialogDescription>
+                                Are you sure you want to approve this timesheet? This will mark the hours as finalised and they may be forwarded to payroll.
+                            </AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                                onClick={() => confirmApproveId && handleApprove(confirmApproveId)}
+                                className="bg-emerald-600 hover:bg-emerald-700"
+                            >
+                                Yes, Approve
+                            </AlertDialogAction>
+                        </AlertDialogFooter>
+                    </AlertDialogContent>
+                </AlertDialog>
             </PageShell>
         </AppLayout>
     );

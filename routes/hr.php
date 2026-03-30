@@ -29,6 +29,41 @@ use App\Http\Controllers\Hr\HrReportController;
 use App\Http\Controllers\Hr\HrWebhookController;
 use App\Http\Controllers\Hr\HrAutomationController;
 use App\Http\Controllers\Hr\MyHrController;
+use App\Http\Controllers\Hr\DirectoryController;
+use App\Http\Controllers\Hr\ImportExportController;
+use App\Http\Controllers\Hr\PositionController;
+use App\Http\Controllers\Hr\OrgChartController;
+use App\Http\Controllers\Hr\JobPostingController;
+use App\Http\Controllers\Hr\CompensationController;
+use App\Http\Controllers\Hr\BenefitsController;
+use App\Http\Controllers\Hr\ExpenseController;
+use App\Http\Controllers\Hr\TimeOffCalendarController;
+use App\Http\Controllers\Hr\FeedbackController;
+use App\Http\Controllers\Hr\CompetencyController;
+use App\Http\Controllers\Hr\SuccessionController;
+use App\Http\Controllers\Hr\GoalController;
+use App\Http\Controllers\Hr\FeedController;
+use App\Http\Controllers\Hr\SurveyController;
+use App\Http\Controllers\Hr\AnnouncementController;
+use App\Http\Controllers\Hr\SkillsController;
+use App\Http\Controllers\Hr\AnalyticsDashboardController;
+use App\Http\Controllers\Hr\HeadcountController;
+use App\Http\Controllers\Hr\CalendarController;
+use App\Http\Controllers\Hr\AssetController;
+use App\Http\Controllers\Hr\ApprovalController;
+use App\Http\Controllers\Hr\ESignatureController;
+use App\Http\Controllers\Hr\PayslipController;
+use App\Http\Controllers\Hr\ExitInterviewController;
+use App\Http\Controllers\Hr\TimeTrackingController;
+use App\Http\Controllers\Hr\CustomFieldController;
+use App\Http\Controllers\Hr\AuditController;
+use App\Http\Controllers\Hr\ReportBuilderController;
+use App\Http\Controllers\Hr\BonusController;
+use App\Http\Controllers\Hr\PipController;
+use App\Http\Controllers\Hr\ScorecardController;
+use App\Http\Controllers\Hr\ICalController;
+use App\Http\Controllers\Hr\LeaveReportController;
+use App\Http\Controllers\Hr\WebhookController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -486,5 +521,489 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::put('/reports/automations/{rule}', [HrAutomationController::class, 'update'])->name('reports.automations.update');
             Route::post('/reports/automations/{rule}/toggle-active', [HrAutomationController::class, 'toggle'])->name('reports.automations.toggleActive');
         });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Directory
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.employees.viewAny')->group(function () {
+        Route::get('/directory', [DirectoryController::class, 'index'])->name('directory.index');
+        Route::get('/directory/{profile}', [DirectoryController::class, 'show'])->name('directory.show');
+        Route::post('/directory/{profile}/photo', [DirectoryController::class, 'uploadPhoto'])->name('directory.uploadPhoto')
+            ->middleware('permission:hr.employees.manage');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Import / Export
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.employees.manage')->prefix('import-export')->name('import-export.')->group(function () {
+        Route::get('/', [ImportExportController::class, 'index'])->name('index');
+        Route::post('/export', [ImportExportController::class, 'export'])->name('export');
+        Route::get('/template', [ImportExportController::class, 'template'])->name('template');
+        Route::post('/import', [ImportExportController::class, 'import'])->name('import');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Positions
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.employees.viewAny')->prefix('positions')->name('positions.')->group(function () {
+        Route::get('/', [PositionController::class, 'index'])->name('index');
+
+        Route::middleware('permission:hr.employees.manage')->group(function () {
+            Route::get('/create', [PositionController::class, 'create'])->name('create');
+            Route::post('/', [PositionController::class, 'store'])->name('store');
+            Route::get('/{position}/edit', [PositionController::class, 'edit'])->name('edit');
+            Route::put('/{position}', [PositionController::class, 'update'])->name('update');
+        });
+
+        Route::get('/{position}', [PositionController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Org Chart
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.employees.viewAny')->group(function () {
+        Route::get('/orgchart', [OrgChartController::class, 'index'])->name('orgchart.index');
+        Route::put('/orgchart/{profile}', [OrgChartController::class, 'update'])->name('orgchart.update')
+            ->middleware('permission:hr.employees.manage');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Job Postings
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.recruitment.view')->prefix('job-postings')->name('job-postings.')->group(function () {
+        Route::get('/', [JobPostingController::class, 'index'])->name('index');
+
+        Route::middleware('permission:hr.recruitment.manage')->group(function () {
+            Route::get('/create', [JobPostingController::class, 'create'])->name('create');
+            Route::post('/', [JobPostingController::class, 'store'])->name('store');
+            Route::get('/{posting}/edit', [JobPostingController::class, 'edit'])->name('edit');
+            Route::put('/{posting}', [JobPostingController::class, 'update'])->name('update');
+            Route::post('/{posting}/publish', [JobPostingController::class, 'publish'])->name('publish');
+            Route::post('/{posting}/close', [JobPostingController::class, 'close'])->name('close');
+        });
+
+        Route::get('/{posting}', [JobPostingController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Compensation
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.compensation.view')->prefix('compensation')->name('compensation.')->group(function () {
+        Route::get('/bands', [CompensationController::class, 'bands'])->name('bands');
+        Route::get('/reviews', [CompensationController::class, 'reviews'])->name('reviews');
+        Route::get('/history/{profile}', [CompensationController::class, 'history'])->name('history');
+        Route::get('/bonuses', [BonusController::class, 'index'])->name('bonuses');
+
+        Route::middleware('permission:hr.compensation.manage')->group(function () {
+            Route::post('/bands', [CompensationController::class, 'storeBand'])->name('bands.store');
+            Route::put('/bands/{band}', [CompensationController::class, 'updateBand'])->name('bands.update');
+            Route::get('/reviews/create', [CompensationController::class, 'createReview'])->name('reviews.create');
+            Route::post('/reviews', [CompensationController::class, 'storeReview'])->name('reviews.store');
+            Route::get('/reviews/{review}', [CompensationController::class, 'showReview'])->name('reviews.show');
+            Route::post('/reviews/{review}/apply', [CompensationController::class, 'applyReview'])->name('reviews.apply');
+            Route::post('/bonuses', [BonusController::class, 'store'])->name('bonuses.store');
+            Route::post('/bonuses/{bonus}/approve', [BonusController::class, 'approve'])->name('bonuses.approve');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Benefits
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.benefits.view')->prefix('benefits')->name('benefits.')->group(function () {
+        Route::get('/', [BenefitsController::class, 'index'])->name('index');
+        Route::get('/plans', [BenefitsController::class, 'plans'])->name('plans');
+
+        Route::middleware('permission:hr.benefits.manage')->group(function () {
+            Route::post('/plans', [BenefitsController::class, 'storePlan'])->name('plans.store');
+            Route::post('/enroll', [BenefitsController::class, 'enroll'])->name('enroll');
+            Route::put('/enrollments/{enrollment}', [BenefitsController::class, 'updateEnrollment'])->name('enrollments.update');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Expenses
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.expenses.view')->prefix('expenses')->name('expenses.')->group(function () {
+        Route::get('/', [ExpenseController::class, 'index'])->name('index');
+
+        Route::middleware('permission:hr.expenses.manage')->group(function () {
+            Route::get('/create', [ExpenseController::class, 'create'])->name('create');
+            Route::post('/', [ExpenseController::class, 'store'])->name('store');
+            Route::post('/{expenseClaim}/submit', [ExpenseController::class, 'submit'])->name('submit');
+        });
+
+        Route::middleware('permission:hr.expenses.approve')->group(function () {
+            Route::post('/{expenseClaim}/approve', [ExpenseController::class, 'approve'])->name('approve');
+            Route::post('/{expenseClaim}/reject', [ExpenseController::class, 'reject'])->name('reject');
+        });
+
+        Route::get('/{expenseClaim}', [ExpenseController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Time Off Calendar
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/calendar/time-off', [TimeOffCalendarController::class, 'index'])->name('calendar.time-off');
+
+    /*
+    |--------------------------------------------------------------------------
+    | 360 Feedback
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.performance.view')->prefix('feedback')->name('feedback.')->group(function () {
+        Route::get('/', [FeedbackController::class, 'index'])->name('index');
+        Route::get('/request', [FeedbackController::class, 'request'])->name('request');
+        Route::post('/request', [FeedbackController::class, 'storeRequest'])->name('request.store');
+        Route::get('/{feedbackRequest}/respond', [FeedbackController::class, 'respond'])->name('respond');
+        Route::post('/{feedbackRequest}/respond', [FeedbackController::class, 'submitResponse'])->name('respond.store');
+        Route::get('/summary/{user}', [FeedbackController::class, 'summary'])->name('summary');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Competencies
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.performance.view')->group(function () {
+        Route::get('/performance/competencies', [CompetencyController::class, 'index'])->name('competencies.index');
+        Route::get('/performance/competencies/{profile}', [CompetencyController::class, 'employeeProfile'])->name('competencies.profile');
+
+        Route::middleware('permission:hr.performance.manage')->group(function () {
+            Route::post('/performance/competencies', [CompetencyController::class, 'store'])->name('competencies.store');
+            Route::put('/performance/competencies/{competency}', [CompetencyController::class, 'update'])->name('competencies.update');
+            Route::post('/performance/competencies/assess', [CompetencyController::class, 'assess'])->name('competencies.assess');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | PIPs (Performance Improvement Plans)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.performance.view')->prefix('performance/pips')->name('pips.')->group(function () {
+        Route::get('/', [PipController::class, 'index'])->name('index');
+
+        Route::middleware('permission:hr.performance.manage')->group(function () {
+            Route::get('/create', [PipController::class, 'create'])->name('create');
+            Route::post('/', [PipController::class, 'store'])->name('store');
+            Route::put('/milestones/{milestone}', [PipController::class, 'updateMilestone'])->name('milestones.update');
+            Route::post('/{pip}/complete', [PipController::class, 'complete'])->name('complete');
+        });
+
+        Route::get('/{pip}', [PipController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Succession Planning
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.performance.view')->prefix('succession')->name('succession.')->group(function () {
+        Route::get('/', [SuccessionController::class, 'index'])->name('index');
+
+        Route::middleware('permission:hr.performance.manage')->group(function () {
+            Route::get('/create', [SuccessionController::class, 'create'])->name('create');
+            Route::post('/', [SuccessionController::class, 'store'])->name('store');
+            Route::put('/{plan}', [SuccessionController::class, 'update'])->name('update');
+            Route::post('/{plan}/candidates', [SuccessionController::class, 'addCandidate'])->name('candidates.store');
+            Route::put('/candidates/{candidate}', [SuccessionController::class, 'updateCandidate'])->name('candidates.update');
+        });
+
+        Route::get('/{plan}', [SuccessionController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Goals & OKRs
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.performance.view')->prefix('goals')->name('goals.')->group(function () {
+        Route::get('/', [GoalController::class, 'index'])->name('index');
+
+        Route::middleware('permission:hr.performance.manage')->group(function () {
+            Route::get('/create', [GoalController::class, 'create'])->name('create');
+            Route::post('/', [GoalController::class, 'store'])->name('store');
+            Route::put('/{goal}', [GoalController::class, 'update'])->name('update');
+            Route::post('/{goal}/progress', [GoalController::class, 'updateProgress'])->name('progress');
+        });
+
+        Route::get('/{goal}', [GoalController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Community Feed
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('feed')->name('feed.')->group(function () {
+        Route::get('/', [FeedController::class, 'index'])->name('index');
+        Route::post('/', [FeedController::class, 'store'])->name('store');
+        Route::post('/kudos', [FeedController::class, 'sendKudos'])->name('kudos');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Surveys
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.surveys.view')->prefix('surveys')->name('surveys.')->group(function () {
+        Route::get('/', [SurveyController::class, 'index'])->name('index');
+
+        Route::middleware('permission:hr.surveys.manage')->group(function () {
+            Route::get('/create', [SurveyController::class, 'create'])->name('create');
+            Route::post('/', [SurveyController::class, 'store'])->name('store');
+        });
+
+        Route::get('/{survey}/respond', [SurveyController::class, 'respond'])->name('respond');
+        Route::post('/{survey}/respond', [SurveyController::class, 'submitResponse'])->name('respond.store');
+        Route::get('/{survey}', [SurveyController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Announcements
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('announcements')->name('announcements.')->group(function () {
+        Route::get('/', [AnnouncementController::class, 'index'])->name('index');
+
+        Route::middleware('permission:hr.announcements.manage')->group(function () {
+            Route::get('/create', [AnnouncementController::class, 'create'])->name('create');
+            Route::post('/', [AnnouncementController::class, 'store'])->name('store');
+        });
+
+        Route::post('/{announcement}/acknowledge', [AnnouncementController::class, 'acknowledge'])->name('acknowledge');
+        Route::get('/{announcement}', [AnnouncementController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Skills Matrix
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.performance.view')->prefix('skills')->name('skills.')->group(function () {
+        Route::get('/', [SkillsController::class, 'index'])->name('index');
+        Route::get('/matrix', [SkillsController::class, 'matrix'])->name('matrix');
+
+        Route::middleware('permission:hr.performance.manage')->group(function () {
+            Route::post('/', [SkillsController::class, 'storeSkill'])->name('store');
+            Route::post('/assess', [SkillsController::class, 'assessEmployee'])->name('assess');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Analytics & Headcount
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.analytics.view')->group(function () {
+        Route::get('/analytics', [AnalyticsDashboardController::class, 'index'])->name('analytics.index');
+        Route::get('/headcount', [HeadcountController::class, 'index'])->name('headcount.index');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Calendar
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('calendar')->name('calendar.')->group(function () {
+        Route::get('/', [CalendarController::class, 'index'])->name('index');
+        Route::post('/events', [CalendarController::class, 'store'])->name('events.store');
+        Route::put('/events/{event}', [CalendarController::class, 'update'])->name('events.update');
+        Route::delete('/events/{event}', [CalendarController::class, 'destroy'])->name('events.destroy');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Assets
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.assets.view')->prefix('assets')->name('assets.')->group(function () {
+        Route::get('/', [AssetController::class, 'index'])->name('index');
+
+        Route::middleware('permission:hr.assets.manage')->group(function () {
+            Route::get('/create', [AssetController::class, 'create'])->name('create');
+            Route::post('/', [AssetController::class, 'store'])->name('store');
+            Route::post('/{asset}/assign', [AssetController::class, 'assign'])->name('assign');
+            Route::post('/assignments/{assignment}/return', [AssetController::class, 'returnAsset'])->name('assignments.return');
+        });
+
+        Route::get('/{asset}', [AssetController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Approvals
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.approvals.view')->prefix('approvals')->name('approvals.')->group(function () {
+        Route::get('/pending', [ApprovalController::class, 'pending'])->name('pending');
+        Route::get('/chains', [ApprovalController::class, 'chains'])->name('chains');
+
+        Route::middleware('permission:hr.approvals.manage')->group(function () {
+            Route::post('/chains', [ApprovalController::class, 'storeChain'])->name('chains.store');
+            Route::post('/{instance}/action', [ApprovalController::class, 'action'])->name('action');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | E-Signatures
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('signatures')->name('signatures.')->group(function () {
+        Route::get('/pending', [ESignatureController::class, 'pending'])->name('pending');
+        Route::get('/{signature}', [ESignatureController::class, 'show'])->name('show');
+        Route::post('/{signature}/sign', [ESignatureController::class, 'sign'])->name('sign');
+        Route::post('/{signature}/decline', [ESignatureController::class, 'decline'])->name('decline');
+        Route::post('/request', [ESignatureController::class, 'request'])->name('request');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Payslips
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.payroll.view')->group(function () {
+        Route::get('/payroll/payslips', [PayslipController::class, 'index'])->name('payslips.index');
+        Route::get('/payroll/payslips/{payslip}', [PayslipController::class, 'show'])->name('payslips.show');
+        Route::get('/payroll/payslips/{payslip}/download', [PayslipController::class, 'download'])->name('payslips.download');
+
+        Route::middleware('permission:hr.payroll.export')->group(function () {
+            Route::post('/payroll/payslips/generate', [PayslipController::class, 'generate'])->name('payslips.generate');
+        });
+    });
+
+    // My Payslips (self-service)
+    Route::get('/my/payslips', [PayslipController::class, 'myPayslips'])->name('my.payslips');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Exit Interviews
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.onboarding.view')->prefix('exit-interviews')->name('exit-interviews.')->group(function () {
+        Route::get('/', [ExitInterviewController::class, 'index'])->name('index');
+        Route::get('/trends', [ExitInterviewController::class, 'trends'])->name('trends');
+
+        Route::middleware('permission:hr.onboarding.manage')->group(function () {
+            Route::get('/create', [ExitInterviewController::class, 'create'])->name('create');
+            Route::post('/', [ExitInterviewController::class, 'store'])->name('store');
+        });
+
+        Route::get('/{exitInterview}', [ExitInterviewController::class, 'show'])->name('show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Time Tracking
+    |--------------------------------------------------------------------------
+    */
+    Route::prefix('time')->name('time.')->group(function () {
+        Route::get('/', [TimeTrackingController::class, 'index'])->name('index');
+        Route::post('/clock-in', [TimeTrackingController::class, 'clockIn'])->name('clock-in');
+        Route::post('/clock-out', [TimeTrackingController::class, 'clockOut'])->name('clock-out');
+        Route::post('/entries', [TimeTrackingController::class, 'store'])->name('entries.store');
+        Route::get('/timesheets', [TimeTrackingController::class, 'timesheets'])->name('timesheets');
+
+        Route::middleware('permission:hr.timeTracking.manage')->group(function () {
+            Route::post('/timesheets/{timesheet}/submit', [TimeTrackingController::class, 'submitTimesheet'])->name('timesheets.submit');
+            Route::post('/timesheets/{timesheet}/approve', [TimeTrackingController::class, 'approveTimesheet'])->name('timesheets.approve');
+            Route::post('/timesheets/{timesheet}/reject', [TimeTrackingController::class, 'rejectTimesheet'])->name('timesheets.reject');
+        });
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Leave Reports
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.leave.viewAny')->group(function () {
+        Route::get('/leave/reports', [LeaveReportController::class, 'index'])->name('leave.reports');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Settings
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.settings.manage')->prefix('settings')->name('settings.')->group(function () {
+        Route::get('/webhooks', [WebhookController::class, 'index'])->name('webhooks');
+        Route::post('/webhooks', [WebhookController::class, 'store'])->name('webhooks.store');
+        Route::put('/webhooks/{webhook}', [WebhookController::class, 'update'])->name('webhooks.update');
+        Route::delete('/webhooks/{webhook}', [WebhookController::class, 'destroy'])->name('webhooks.destroy');
+        Route::post('/webhooks/{webhook}/test', [WebhookController::class, 'test'])->name('webhooks.test');
+
+        Route::get('/custom-fields', [CustomFieldController::class, 'definitions'])->name('custom-fields');
+        Route::post('/custom-fields', [CustomFieldController::class, 'storeDefinition'])->name('custom-fields.store');
+        Route::put('/custom-fields/{definition}', [CustomFieldController::class, 'updateDefinition'])->name('custom-fields.update');
+        Route::delete('/custom-fields/{definition}', [CustomFieldController::class, 'destroyDefinition'])->name('custom-fields.destroy');
+
+        Route::get('/audit-log', [AuditController::class, 'index'])->name('audit-log');
+        Route::get('/audit-log/{type}/{id}', [AuditController::class, 'show'])->name('audit-log.show');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Report Builder
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.reports.view')->group(function () {
+        Route::get('/reports/saved', [ReportBuilderController::class, 'index'])->name('reports.saved');
+        Route::get('/reports/builder', [ReportBuilderController::class, 'create'])->name('reports.builder');
+        Route::post('/reports/builder/preview', [ReportBuilderController::class, 'preview'])->name('reports.builder.preview');
+        Route::post('/reports/builder', [ReportBuilderController::class, 'store'])->name('reports.builder.store');
+        Route::post('/reports/saved/{report}/run', [ReportBuilderController::class, 'run'])->name('reports.saved.run');
+        Route::get('/reports/saved/{report}/export', [ReportBuilderController::class, 'export'])->name('reports.saved.export');
+        Route::delete('/reports/saved/{report}', [ReportBuilderController::class, 'destroy'])->name('reports.saved.destroy');
+        Route::post('/reports/saved/{report}/schedule', [ReportBuilderController::class, 'schedule'])->name('reports.saved.schedule');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Recruitment Scorecards
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.recruitment.view')->group(function () {
+        Route::get('/recruitment/interviews/{interview}/scorecard', [ScorecardController::class, 'create'])->name('scorecards.create');
+        Route::post('/recruitment/interviews/{interview}/scorecard', [ScorecardController::class, 'store'])->name('scorecards.store')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::get('/recruitment/applications/{application}/scorecard-summary', [ScorecardController::class, 'summary'])->name('scorecards.summary');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | iCal Feed
+    |--------------------------------------------------------------------------
+    */
+    Route::get('/ical/{token}', [ICalController::class, 'feed'])->name('ical.feed')->withoutMiddleware('auth');
+    Route::post('/ical/token', [ICalController::class, 'generateToken'])->name('ical.token');
+
+    /*
+    |--------------------------------------------------------------------------
+    | Training Catalog (alternate route)
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.training.view')->group(function () {
+        Route::get('/training/catalog', [TrainingDashboardController::class, 'index'])->name('training.catalog');
     });
 });

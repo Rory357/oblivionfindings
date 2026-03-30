@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
 import { Download, Plus, FileText } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface HrDocument {
     id: number;
@@ -163,19 +164,7 @@ export default function DocumentsIndex({ documents, filters, can }: Props) {
                             {Math.min(documents.current_page * documents.per_page, documents.total)} of{' '}
                             {documents.total} results
                         </p>
-                        <div className="flex items-center gap-1">
-                            {documents.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                >
-                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                </Button>
-                            ))}
-                        </div>
+                        <LaravelPagination links={documents.links} />
                     </div>
                 )}
             </div>

@@ -1,14 +1,14 @@
 import AppLayout from '@/layouts/app-layout';
 import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useState, FormEvent } from 'react';
+import { FormEvent } from 'react';
 import { type BreadcrumbItem } from '@/types';
 
 interface SelectOption {
@@ -40,7 +40,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function CreateGoal({ users, parentGoals, goalTypes, priorities }: Props) {
-    const [form, setForm] = useState({
+    const form = useForm({
         user_id: '',
         title: '',
         description: '',
@@ -55,15 +55,16 @@ export default function CreateGoal({ users, parentGoals, goalTypes, priorities }
         status: 'draft',
     });
 
-    const set = (key: string, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
+    const set = (key: string, value: string) => form.setData(key as keyof typeof form.data, value);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
-        router.post('/hr/goals', {
-            ...form,
-            parent_goal_id: form.parent_goal_id || null,
-            target_value: form.target_value || null,
-        });
+        form.transform((data) => ({
+            ...data,
+            parent_goal_id: data.parent_goal_id || null,
+            target_value: data.target_value || null,
+        }));
+        form.post('/hr/goals');
     };
 
     return (
@@ -83,12 +84,13 @@ export default function CreateGoal({ users, parentGoals, goalTypes, priorities }
                         <form onSubmit={submit} className="space-y-4">
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                                 <div>
-                                    <Label>Title</Label>
-                                    <Input value={form.title} onChange={(e) => set('title', e.target.value)} required />
+                                    <Label>Title <span className="text-red-500">*</span></Label>
+                                    <Input value={form.data.title} onChange={(e) => set('title', e.target.value)} required />
+                                    {form.errors.title && <p className="mt-1 text-sm text-red-600">{form.errors.title}</p>}
                                 </div>
                                 <div>
-                                    <Label>Assigned To</Label>
-                                    <Select value={form.user_id} onValueChange={(val) => set('user_id', val)}>
+                                    <Label>Assigned To <span className="text-red-500">*</span></Label>
+                                    <Select value={form.data.user_id} onValueChange={(val) => set('user_id', val)}>
                                         <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
                                         <SelectContent>
                                             {users.map((u) => (
@@ -96,18 +98,20 @@ export default function CreateGoal({ users, parentGoals, goalTypes, priorities }
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    {form.errors.user_id && <p className="mt-1 text-sm text-red-600">{form.errors.user_id}</p>}
                                 </div>
                             </div>
 
                             <div>
                                 <Label>Description</Label>
-                                <Textarea value={form.description} onChange={(e) => set('description', e.target.value)} rows={3} />
+                                <Textarea value={form.data.description} onChange={(e) => set('description', e.target.value)} rows={3} />
+                                {form.errors.description && <p className="mt-1 text-sm text-red-600">{form.errors.description}</p>}
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <div>
-                                    <Label>Goal Type</Label>
-                                    <Select value={form.goal_type} onValueChange={(val) => set('goal_type', val)}>
+                                    <Label>Goal Type <span className="text-red-500">*</span></Label>
+                                    <Select value={form.data.goal_type} onValueChange={(val) => set('goal_type', val)}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             {goalTypes.map((gt) => (
@@ -115,10 +119,11 @@ export default function CreateGoal({ users, parentGoals, goalTypes, priorities }
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    {form.errors.goal_type && <p className="mt-1 text-sm text-red-600">{form.errors.goal_type}</p>}
                                 </div>
                                 <div>
-                                    <Label>Priority</Label>
-                                    <Select value={form.priority} onValueChange={(val) => set('priority', val)}>
+                                    <Label>Priority <span className="text-red-500">*</span></Label>
+                                    <Select value={form.data.priority} onValueChange={(val) => set('priority', val)}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             {priorities.map((p) => (
@@ -126,17 +131,19 @@ export default function CreateGoal({ users, parentGoals, goalTypes, priorities }
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    {form.errors.priority && <p className="mt-1 text-sm text-red-600">{form.errors.priority}</p>}
                                 </div>
                                 <div>
                                     <Label>Category</Label>
-                                    <Input value={form.category} onChange={(e) => set('category', e.target.value)} placeholder="e.g. Sales, Engineering" />
+                                    <Input value={form.data.category} onChange={(e) => set('category', e.target.value)} placeholder="e.g. Sales, Engineering" />
+                                    {form.errors.category && <p className="mt-1 text-sm text-red-600">{form.errors.category}</p>}
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <div>
                                     <Label>Parent Goal (optional)</Label>
-                                    <Select value={form.parent_goal_id || 'none'} onValueChange={(val) => set('parent_goal_id', val === 'none' ? '' : val)}>
+                                    <Select value={form.data.parent_goal_id || 'none'} onValueChange={(val) => set('parent_goal_id', val === 'none' ? '' : val)}>
                                         <SelectTrigger><SelectValue placeholder="None" /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="none">None</SelectItem>
@@ -145,41 +152,47 @@ export default function CreateGoal({ users, parentGoals, goalTypes, priorities }
                                             ))}
                                         </SelectContent>
                                     </Select>
+                                    {form.errors.parent_goal_id && <p className="mt-1 text-sm text-red-600">{form.errors.parent_goal_id}</p>}
                                 </div>
                                 <div>
                                     <Label>Target Value</Label>
-                                    <Input type="number" step="0.01" value={form.target_value} onChange={(e) => set('target_value', e.target.value)} placeholder="e.g. 100" />
+                                    <Input type="number" step="0.01" value={form.data.target_value} onChange={(e) => set('target_value', e.target.value)} placeholder="e.g. 100" />
+                                    {form.errors.target_value && <p className="mt-1 text-sm text-red-600">{form.errors.target_value}</p>}
                                 </div>
                                 <div>
                                     <Label>Unit</Label>
-                                    <Input value={form.unit} onChange={(e) => set('unit', e.target.value)} placeholder="e.g. %, deals, hours" />
+                                    <Input value={form.data.unit} onChange={(e) => set('unit', e.target.value)} placeholder="e.g. %, deals, hours" />
+                                    {form.errors.unit && <p className="mt-1 text-sm text-red-600">{form.errors.unit}</p>}
                                 </div>
                             </div>
 
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                                 <div>
-                                    <Label>Start Date</Label>
-                                    <Input type="date" value={form.start_date} onChange={(e) => set('start_date', e.target.value)} required />
+                                    <Label>Start Date <span className="text-red-500">*</span></Label>
+                                    <Input type="date" value={form.data.start_date} onChange={(e) => set('start_date', e.target.value)} required />
+                                    {form.errors.start_date && <p className="mt-1 text-sm text-red-600">{form.errors.start_date}</p>}
                                 </div>
                                 <div>
-                                    <Label>Due Date</Label>
-                                    <Input type="date" value={form.due_date} onChange={(e) => set('due_date', e.target.value)} required />
+                                    <Label>Due Date <span className="text-red-500">*</span></Label>
+                                    <Input type="date" value={form.data.due_date} onChange={(e) => set('due_date', e.target.value)} required />
+                                    {form.errors.due_date && <p className="mt-1 text-sm text-red-600">{form.errors.due_date}</p>}
                                 </div>
                                 <div>
                                     <Label>Initial Status</Label>
-                                    <Select value={form.status} onValueChange={(val) => set('status', val)}>
+                                    <Select value={form.data.status} onValueChange={(val) => set('status', val)}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
                                             <SelectItem value="draft">Draft</SelectItem>
                                             <SelectItem value="active">Active</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    {form.errors.status && <p className="mt-1 text-sm text-red-600">{form.errors.status}</p>}
                                 </div>
                             </div>
 
                             <div className="flex justify-end gap-2 pt-2">
-                                <Button type="button" variant="outline" onClick={() => router.get('/hr/goals')}>Cancel</Button>
-                                <Button type="submit">Create Goal</Button>
+                                <Button type="button" variant="outline" onClick={() => window.history.back()}>Cancel</Button>
+                                <Button type="submit" disabled={form.processing}>Create Goal</Button>
                             </div>
                         </form>
                     </CardContent>

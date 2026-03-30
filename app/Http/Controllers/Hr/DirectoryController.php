@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Models\Site;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -52,9 +53,14 @@ class DirectoryController extends Controller
             ->sort()
             ->values();
 
+        $sites = Site::where('tenant_id', $tenantId)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return Inertia::render('hr/directory/index', [
             'employees' => $employees,
             'departments' => $departments,
+            'sites' => $sites,
             'filters' => [
                 'q' => $search,
                 'department' => $department,

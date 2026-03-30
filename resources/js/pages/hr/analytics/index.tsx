@@ -1,9 +1,9 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { type BreadcrumbItem } from '@/types';
-import { Users, TrendingDown, Clock, ShieldCheck } from 'lucide-react';
+import { BarChart2, Users, TrendingDown, Clock, ShieldCheck } from 'lucide-react';
 import {
     LineChart,
     Line,
@@ -42,7 +42,32 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Analytics', href: '/hr/analytics' },
 ];
 
-const PIE_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
+/**
+ * Chart colour palette using CSS custom properties so charts respect the active
+ * theme.  The tokens map to Tailwind's default palette via hsl() values set on
+ * :root / .dark in the global stylesheet.  We fall back to hard-coded hex values
+ * that match Tailwind's default blue-500, emerald-500, amber-500, etc. so charts
+ * still render correctly if the custom properties are absent.
+ */
+const CHART_COLORS = [
+    'hsl(var(--chart-1, 217 91% 60%))',   // blue-500
+    'hsl(var(--chart-2, 160 84% 39%))',   // emerald-500
+    'hsl(var(--chart-3, 38 92% 50%))',    // amber-500
+    'hsl(var(--chart-4, 0 84% 60%))',     // red-500
+    'hsl(var(--chart-5, 258 90% 66%))',   // violet-500
+    'hsl(var(--chart-6, 330 81% 60%))',   // pink-500
+    'hsl(var(--chart-7, 189 94% 43%))',   // cyan-500
+    'hsl(var(--chart-8, 84 81% 44%))',    // lime-500
+];
+
+function ChartEmptyState({ message }: { message: string }) {
+    return (
+        <div className="flex h-64 flex-col items-center justify-center gap-2 text-muted-foreground">
+            <BarChart2 className="h-10 w-10 opacity-30" />
+            <p className="text-sm">{message}</p>
+        </div>
+    );
+}
 
 export default function AnalyticsDashboard({
     headcountTrend,
@@ -58,7 +83,12 @@ export default function AnalyticsDashboard({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Workforce Analytics" />
             <div className="flex flex-col gap-6 p-6">
-                <h1 className="text-2xl font-bold">Workforce Analytics</h1>
+                <div className="flex flex-wrap items-end justify-between gap-2">
+                    <h1 className="text-2xl font-bold">Workforce Analytics</h1>
+                    <Badge variant="outline" className="text-xs font-normal text-muted-foreground">
+                        Showing last 12 months
+                    </Badge>
+                </div>
 
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -117,30 +147,35 @@ export default function AnalyticsDashboard({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Headcount Trend</CardTitle>
+                            <CardDescription>Monthly active employee count</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={headcountTrend}>
-                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                        <XAxis
-                                            dataKey="month"
-                                            tick={{ fontSize: 11 }}
-                                            className="fill-muted-foreground"
-                                        />
-                                        <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                                        <Tooltip />
-                                        <Line
-                                            type="monotone"
-                                            dataKey="count"
-                                            stroke="#3b82f6"
-                                            strokeWidth={2}
-                                            dot={{ r: 3 }}
-                                            name="Employees"
-                                        />
-                                    </LineChart>
-                                </ResponsiveContainer>
-                            </div>
+                            {headcountTrend.length > 0 ? (
+                                <div className="h-64">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <LineChart data={headcountTrend}>
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <XAxis
+                                                dataKey="month"
+                                                tick={{ fontSize: 11 }}
+                                                className="fill-muted-foreground"
+                                            />
+                                            <YAxis tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                                            <Tooltip />
+                                            <Line
+                                                type="monotone"
+                                                dataKey="count"
+                                                stroke={CHART_COLORS[0]}
+                                                strokeWidth={2}
+                                                dot={{ r: 3 }}
+                                                name="Employees"
+                                            />
+                                        </LineChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <ChartEmptyState message="No headcount data recorded yet." />
+                            )}
                         </CardContent>
                     </Card>
 
@@ -148,25 +183,30 @@ export default function AnalyticsDashboard({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Department Breakdown</CardTitle>
+                            <CardDescription>Employees per department</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={departmentBreakdown} layout="vertical">
-                                        <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                                        <XAxis type="number" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
-                                        <YAxis
-                                            type="category"
-                                            dataKey="department"
-                                            width={120}
-                                            tick={{ fontSize: 11 }}
-                                            className="fill-muted-foreground"
-                                        />
-                                        <Tooltip />
-                                        <Bar dataKey="count" fill="#3b82f6" radius={[0, 4, 4, 0]} name="Employees" />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </div>
+                            {departmentBreakdown.length > 0 ? (
+                                <div className="h-64">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <BarChart data={departmentBreakdown} layout="vertical">
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <XAxis type="number" tick={{ fontSize: 11 }} className="fill-muted-foreground" />
+                                            <YAxis
+                                                type="category"
+                                                dataKey="department"
+                                                width={120}
+                                                tick={{ fontSize: 11 }}
+                                                className="fill-muted-foreground"
+                                            />
+                                            <Tooltip />
+                                            <Bar dataKey="count" fill={CHART_COLORS[0]} radius={[0, 4, 4, 0]} name="Employees" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <ChartEmptyState message="No department data available." />
+                            )}
                         </CardContent>
                     </Card>
 
@@ -174,35 +214,41 @@ export default function AnalyticsDashboard({
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">Tenure Distribution</CardTitle>
+                            <CardDescription>Years of service breakdown</CardDescription>
                         </CardHeader>
                         <CardContent>
-                            <div className="h-64">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <PieChart>
-                                        <Pie
-                                            data={tenureBrackets}
-                                            dataKey="count"
-                                            nameKey="bracket"
-                                            cx="50%"
-                                            cy="50%"
-                                            outerRadius={90}
-                                            label={({ bracket, count }) => `${bracket}: ${count}`}
-                                        >
-                                            {tenureBrackets.map((_, index) => (
-                                                <Cell key={index} fill={PIE_COLORS[index % PIE_COLORS.length]} />
-                                            ))}
-                                        </Pie>
-                                        <Tooltip />
-                                    </PieChart>
-                                </ResponsiveContainer>
-                            </div>
+                            {tenureBrackets.length > 0 ? (
+                                <div className="h-64">
+                                    <ResponsiveContainer width="100%" height="100%">
+                                        <PieChart>
+                                            <Pie
+                                                data={tenureBrackets}
+                                                dataKey="count"
+                                                nameKey="bracket"
+                                                cx="50%"
+                                                cy="50%"
+                                                outerRadius={90}
+                                                label={(props: any) => `${props.name}: ${props.value}`}
+                                            >
+                                                {tenureBrackets.map((_, index) => (
+                                                    <Cell key={index} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                                                ))}
+                                            </Pie>
+                                            <Tooltip />
+                                        </PieChart>
+                                    </ResponsiveContainer>
+                                </div>
+                            ) : (
+                                <ChartEmptyState message="No tenure data available." />
+                            )}
                         </CardContent>
                     </Card>
 
                     {/* Leave Utilization */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Leave Utilization (This Year)</CardTitle>
+                            <CardTitle className="text-base">Leave Utilization</CardTitle>
+                            <CardDescription>Requests by type for the current year</CardDescription>
                         </CardHeader>
                         <CardContent>
                             {leaveUtilization.length > 0 ? (

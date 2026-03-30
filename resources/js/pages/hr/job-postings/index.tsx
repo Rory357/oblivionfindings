@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { type BreadcrumbItem } from '@/types';
 import { Plus, Eye, Pencil, Globe, XCircle } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type Posting = {
     id: number;
@@ -171,19 +172,7 @@ export default function JobPostingIndex({ postings, filters, can }: Props) {
 
                 {/* Pagination */}
                 {postings.links?.length > 3 && (
-                    <div className="flex flex-wrap gap-2">
-                        {postings.links.map((l, i) => (
-                            <Button
-                                key={i}
-                                variant={l.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!l.url}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true })}
-                            >
-                                <span dangerouslySetInnerHTML={{ __html: l.label }} />
-                            </Button>
-                        ))}
-                    </div>
+                    <LaravelPagination links={postings.links} />
                 )}
             </div>
         </AppLayout>

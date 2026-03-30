@@ -8,6 +8,7 @@ type Props = {
     backHref?: string;
     backLabel?: string;
     actions?: ReactNode;
+    children?: ReactNode;
 };
 
 export default function PageHeader({
@@ -16,6 +17,7 @@ export default function PageHeader({
     backHref,
     backLabel = 'Back',
     actions,
+    children,
 }: Props) {
     return (
         <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -40,9 +42,10 @@ export default function PageHeader({
                 ) : null}
             </div>
 
-            {actions ? (
+            {(actions || children) ? (
                 <div className="flex shrink-0 flex-wrap items-center gap-2">
                     {actions}
+                    {children}
                 </div>
             ) : null}
         </div>

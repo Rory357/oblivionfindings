@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Target } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface Goal {
     id: number;
@@ -225,17 +226,7 @@ export default function GoalsIndex({ goals, users, filters, can }: Props) {
                 </Card>
 
                 {goals?.links?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                        {goals.links.map((l: any) => (
-                            <button
-                                key={l.label}
-                                disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
-                                dangerouslySetInnerHTML={{ __html: l.label }}
-                            />
-                        ))}
-                    </div>
+                    <LaravelPagination links={goals.links} />
                 ) : null}
             </div>
         </AppLayout>

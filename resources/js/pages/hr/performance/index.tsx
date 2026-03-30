@@ -2,12 +2,13 @@ import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import { ClipboardList, AlertTriangle, Calendar, Plus, Search } from 'lucide-react';
+import { ClipboardList, AlertTriangle, Calendar, Plus, Search, ArrowRight, FileText, Target, Users } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -86,7 +87,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 const formatDate = (value?: string | null) => {
     if (!value) return 'Not set';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', {
+    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-NZ', {
         day: '2-digit',
         month: 'short',
         year: 'numeric',
@@ -119,8 +120,15 @@ export default function PerformanceIndex({
     filters,
     can,
 }: Props) {
+    const [processing, setProcessing] = useState(false);
+
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/hr/performance', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get('/hr/performance', { ...filters, ...next }, {
+            preserveState: true,
+            preserveScroll: true,
+            onStart: () => setProcessing(true),
+            onFinish: () => setProcessing(false),
+        });
     };
 
     const now = new Date();
@@ -150,14 +158,14 @@ export default function PerformanceIndex({
 
                     <div className="flex flex-wrap items-center gap-2">
                         <Link href="/hr/performance/reviews">
-                            <Button size="sm" variant="outline">
+                            <Button size="sm" variant="outline" disabled={processing}>
                                 <ClipboardList className="mr-1.5 h-4 w-4" />
                                 Reviews
                             </Button>
                         </Link>
                         {can.manage && (
                             <Link href="/hr/performance/supervision/create">
-                                <Button size="sm">
+                                <Button size="sm" disabled={processing}>
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     Add Note
                                 </Button>
@@ -233,15 +241,23 @@ export default function PerformanceIndex({
                     </CardHeader>
                 </Card>
 
-                {upcomingReviews.length > 0 && (
-                    <Card>
-                        <CardHeader>
+                <Card>
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <Calendar className="h-5 w-5 text-blue-500" />
                                 Upcoming Reviews
                             </CardTitle>
-                        </CardHeader>
-                        <CardContent className="p-0">
+                            <Link href="/hr/performance/reviews">
+                                <Button variant="ghost" size="sm" disabled={processing} className="text-slate-500 hover:text-slate-700">
+                                    View All
+                                    <ArrowRight className="ml-1.5 h-4 w-4" />
+                                </Button>
+                            </Link>
+                        </div>
+                    </CardHeader>
+                    <CardContent className="p-0">
+                        {upcomingReviews.length > 0 ? (
                             <Table>
                                 <TableHeader>
                                     <TableRow>
@@ -266,66 +282,99 @@ export default function PerformanceIndex({
                                     ))}
                                 </TableBody>
                             </Table>
-                        </CardContent>
-                    </Card>
-                )}
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-10 text-center">
+                                <Calendar className="mb-3 h-10 w-10 text-slate-300" />
+                                <p className="text-sm font-medium text-slate-500">No upcoming reviews</p>
+                                <p className="mt-1 text-xs text-slate-400">All reviews are up to date for the current filters.</p>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
 
                 <div className="grid gap-4 lg:grid-cols-2">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Competency Gaps</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            {competencyGaps.map((gap) => (
-                                <div key={gap.id} className="rounded-md border p-3">
-                                    <p className="font-medium">{gap.employee_name}</p>
-                                    <p className="text-xs text-slate-500">{gap.title}</p>
-                                    <p className="text-xs text-slate-500">
-                                        {gap.competency_area ?? 'General'} - Level {gap.current_level ?? '-'} to {gap.target_level ?? '-'} (gap {gap.gap})
-                                    </p>
-                                </div>
-                            ))}
-                            {competencyGaps.length === 0 && (
-                                <p className="text-sm text-slate-500">No active competency gaps for current filters.</p>
-                            )}
-                            <div>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base">Competency Gaps</CardTitle>
                                 <Link href="/hr/development/goals">
-                                    <Button variant="outline" size="sm">Open Development Goals</Button>
+                                    <Button variant="ghost" size="sm" disabled={processing} className="text-slate-500 hover:text-slate-700">
+                                        View All
+                                        <ArrowRight className="ml-1.5 h-4 w-4" />
+                                    </Button>
                                 </Link>
                             </div>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {competencyGaps.length > 0 ? (
+                                competencyGaps.map((gap) => (
+                                    <div key={gap.id} className="rounded-md border p-3">
+                                        <p className="font-medium">{gap.employee_name}</p>
+                                        <p className="text-xs text-slate-500">{gap.title}</p>
+                                        <p className="text-xs text-slate-500">
+                                            {gap.competency_area ?? 'General'} - Level {gap.current_level ?? '-'} to {gap.target_level ?? '-'} (gap {gap.gap})
+                                        </p>
+                                    </div>
+                                ))
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-8 text-center">
+                                    <Target className="mb-3 h-10 w-10 text-slate-300" />
+                                    <p className="text-sm font-medium text-slate-500">No competency gaps</p>
+                                    <p className="mt-1 text-xs text-slate-400">All staff are meeting their target competency levels.</p>
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">1:1 Session Follow-up</CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            {oneToOneSla.due_rows.slice(0, 8).map((row) => (
-                                <div key={row.id} className="flex items-center justify-between rounded-md border p-3">
-                                    <div>
-                                        <p className="font-medium">{row.employee_name}</p>
-                                        <p className="text-xs text-slate-500">Supervisor: {row.supervisor_name}</p>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-xs text-slate-500">{formatDate(row.next_session_date)}</p>
-                                        <Badge className={row.is_overdue ? 'bg-red-100 text-red-800 border-red-200' : 'bg-blue-100 text-blue-800 border-blue-200'}>
-                                            {row.is_overdue ? 'overdue' : 'scheduled'}
-                                        </Badge>
-                                    </div>
-                                </div>
-                            ))}
-                            {oneToOneSla.due_rows.length === 0 && (
-                                <p className="text-sm text-slate-500">No upcoming 1:1 sessions for current filters.</p>
-                            )}
-                            <div className="flex items-center gap-2">
-                                <Link href="/hr/performance/supervision/create">
-                                    <Button variant="outline" size="sm">Schedule 1:1</Button>
-                                </Link>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="text-base">1:1 Session Follow-up</CardTitle>
                                 <Link href="/hr/wellbeing">
-                                    <Button variant="ghost" size="sm">Open Engagement Plans</Button>
+                                    <Button variant="ghost" size="sm" disabled={processing} className="text-slate-500 hover:text-slate-700">
+                                        View All
+                                        <ArrowRight className="ml-1.5 h-4 w-4" />
+                                    </Button>
                                 </Link>
                             </div>
+                        </CardHeader>
+                        <CardContent className="space-y-2">
+                            {oneToOneSla.due_rows.length > 0 ? (
+                                <>
+                                    {oneToOneSla.due_rows.slice(0, 8).map((row) => (
+                                        <div key={row.id} className="flex items-center justify-between rounded-md border p-3">
+                                            <div>
+                                                <p className="font-medium">{row.employee_name}</p>
+                                                <p className="text-xs text-slate-500">Supervisor: {row.supervisor_name}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-xs text-slate-500">{formatDate(row.next_session_date)}</p>
+                                                <Badge className={row.is_overdue ? 'bg-red-100 text-red-800 border-red-200' : 'bg-blue-100 text-blue-800 border-blue-200'}>
+                                                    {row.is_overdue ? 'overdue' : 'scheduled'}
+                                                </Badge>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {can.manage && (
+                                        <div className="pt-1">
+                                            <Link href="/hr/performance/supervision/create">
+                                                <Button variant="outline" size="sm" disabled={processing}>Schedule 1:1</Button>
+                                            </Link>
+                                        </div>
+                                    )}
+                                </>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center py-8 text-center">
+                                    <Users className="mb-3 h-10 w-10 text-slate-300" />
+                                    <p className="text-sm font-medium text-slate-500">No upcoming 1:1 sessions</p>
+                                    <p className="mt-1 text-xs text-slate-400">No sessions are due or overdue for the current filters.</p>
+                                    {can.manage && (
+                                        <Link href="/hr/performance/supervision/create" className="mt-3">
+                                            <Button variant="outline" size="sm" disabled={processing}>Schedule 1:1</Button>
+                                        </Link>
+                                    )}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
@@ -342,64 +391,66 @@ export default function PerformanceIndex({
                                         value={filters.q || ''}
                                         onChange={(e) => onFilter({ q: e.target.value })}
                                         className="pl-9"
+                                        disabled={processing}
                                     />
                                 </div>
                             </div>
                         </div>
                     </CardHeader>
                     <CardContent className="p-0">
-                        <Table>
-                            <TableHeader>
-                                <TableRow>
-                                    <TableHead>Staff Member</TableHead>
-                                    <TableHead>Supervisor</TableHead>
-                                    <TableHead>Date</TableHead>
-                                    <TableHead>Summary</TableHead>
-                                    <TableHead className="w-20"></TableHead>
-                                </TableRow>
-                            </TableHeader>
-                            <TableBody>
-                                {supervisionNotes.data.map((note) => (
-                                    <TableRow key={note.id}>
-                                        <TableCell className="font-medium">{note.staff_user.name}</TableCell>
-                                        <TableCell>{note.supervisor.name}</TableCell>
-                                        <TableCell>{formatDate(note.date)}</TableCell>
-                                        <TableCell className="max-w-xs truncate text-sm text-slate-600">
-                                            {note.summary}
-                                        </TableCell>
-                                        <TableCell>
-                                            <Link href={`/hr/performance/supervision/${note.id}`}>
-                                                <Button variant="ghost" size="sm">
-                                                    View
-                                                </Button>
-                                            </Link>
-                                        </TableCell>
-                                    </TableRow>
-                                ))}
-                                {!supervisionNotes.data.length && (
+                        {supervisionNotes.data.length > 0 ? (
+                            <Table>
+                                <TableHeader>
                                     <TableRow>
-                                        <TableCell colSpan={5} className="py-8 text-center text-sm text-slate-500">
-                                            No supervision notes found.
-                                        </TableCell>
+                                        <TableHead>Staff Member</TableHead>
+                                        <TableHead>Supervisor</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Summary</TableHead>
+                                        <TableHead className="w-20"></TableHead>
                                     </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {supervisionNotes.data.map((note) => (
+                                        <TableRow key={note.id}>
+                                            <TableCell className="font-medium">{note.staff_user.name}</TableCell>
+                                            <TableCell>{note.supervisor.name}</TableCell>
+                                            <TableCell>{formatDate(note.date)}</TableCell>
+                                            <TableCell className="max-w-xs truncate text-sm text-slate-600">
+                                                {note.summary}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Link href={`/hr/performance/supervision/${note.id}`}>
+                                                    <Button variant="ghost" size="sm" disabled={processing}>
+                                                        View
+                                                    </Button>
+                                                </Link>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-10 text-center">
+                                <FileText className="mb-3 h-10 w-10 text-slate-300" />
+                                <p className="text-sm font-medium text-slate-500">No supervision notes found</p>
+                                <p className="mt-1 text-xs text-slate-400">
+                                    {filters.q ? 'Try adjusting your search terms.' : 'Create a supervision note to get started.'}
+                                </p>
+                                {can.manage && !filters.q && (
+                                    <Link href="/hr/performance/supervision/create" className="mt-3">
+                                        <Button variant="outline" size="sm" disabled={processing}>
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Add Note
+                                        </Button>
+                                    </Link>
                                 )}
-                            </TableBody>
-                        </Table>
+                            </div>
+                        )}
                     </CardContent>
                 </Card>
 
                 {supervisionNotes?.links?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                        {supervisionNotes.links.map((l: any) => (
-                            <button
-                                key={l.label}
-                                disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
-                                dangerouslySetInnerHTML={{ __html: l.label }}
-                            />
-                        ))}
-                    </div>
+                    <LaravelPagination links={supervisionNotes.links} />
                 ) : null}
             </div>
         </AppLayout>

@@ -10,7 +10,16 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { type BreadcrumbItem } from '@/types';
 import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import { ClipboardList, Plus } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
+
+const formatDate = (value: string | null) => {
+    if (!value) return '\u2014';
+    const d = new Date(value);
+    return Number.isNaN(d.getTime())
+        ? value
+        : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+};
 
 interface Checklist {
     id: number;
@@ -451,7 +460,7 @@ export default function OnboardingIndex({ checklists, templates, templateRoleOpt
                                                 </div>
                                             </td>
                                             <td className="px-4 py-3 text-muted-foreground">
-                                                {checklist.due_date || '\u2014'}
+                                                {formatDate(checklist.due_date)}
                                             </td>
                                             <td className="px-4 py-3 text-right">
                                                 <Button variant="ghost" size="sm" asChild>
@@ -463,8 +472,26 @@ export default function OnboardingIndex({ checklists, templates, templateRoleOpt
                                 })}
                                 {checklists.data.length === 0 && (
                                     <tr>
-                                        <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                                            No onboarding checklists found.
+                                        <td colSpan={6} className="px-4 py-16 text-center">
+                                            <div className="flex flex-col items-center gap-3">
+                                                <ClipboardList className="h-10 w-10 text-muted-foreground/50" />
+                                                <div>
+                                                    <p className="font-medium text-muted-foreground">No onboarding checklists found</p>
+                                                    <p className="mt-1 text-sm text-muted-foreground/70">
+                                                        {filters.q || filters.status
+                                                            ? 'Try adjusting your search or filter criteria.'
+                                                            : 'Get started by creating a checklist for a new employee.'}
+                                                    </p>
+                                                </div>
+                                                {can.manage && !filters.q && !filters.status && (
+                                                    <Button asChild size="sm" className="mt-2">
+                                                        <Link href="/hr/onboarding/create">
+                                                            <Plus className="mr-2 h-4 w-4" />
+                                                            Create Checklist
+                                                        </Link>
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 )}
@@ -474,26 +501,16 @@ export default function OnboardingIndex({ checklists, templates, templateRoleOpt
                 </Card>
 
                 {/* Pagination */}
-                {checklists.last_page > 1 && (
+                {checklists.total > 0 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
                             Showing {(checklists.current_page - 1) * checklists.per_page + 1} to{' '}
                             {Math.min(checklists.current_page * checklists.per_page, checklists.total)} of{' '}
                             {checklists.total} results
                         </p>
-                        <div className="flex items-center gap-1">
-                            {checklists.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                >
-                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                </Button>
-                            ))}
-                        </div>
+                        {checklists.last_page > 1 && (
+                            <LaravelPagination links={checklists.links} />
+                        )}
                     </div>
                 )}
             </div>

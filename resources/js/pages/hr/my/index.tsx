@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { type BreadcrumbItem } from '@/types';
+import { Clock, AlertTriangle } from 'lucide-react';
 
 interface Props {
     profile: {
@@ -50,7 +51,15 @@ export default function MyHrIndex({ profile, pendingLeave, leaveBalances, compli
                                     </Link>
                                 </div>
                             ) : (
-                                <p className="text-sm text-muted-foreground">No profile set up yet.</p>
+                                <div>
+                                    <div className="flex items-center gap-2 text-sm text-amber-600 dark:text-amber-400">
+                                        <AlertTriangle className="h-4 w-4 shrink-0" />
+                                        <span>Profile not set up yet</span>
+                                    </div>
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Please contact your HR administrator or manager to have your employee profile created.
+                                    </p>
+                                </div>
                             )}
                         </CardContent>
                     </Card>
@@ -71,11 +80,16 @@ export default function MyHrIndex({ profile, pendingLeave, leaveBalances, compli
                                     ))}
                                 </div>
                             ) : (
-                                <p className="text-sm text-muted-foreground">No leave balances.</p>
+                                <p className="text-sm text-muted-foreground">No leave balances recorded yet.</p>
                             )}
-                            <Link href="/hr/my/leave">
-                                <Button variant="outline" size="sm" className="mt-2">My Leave</Button>
-                            </Link>
+                            <div className="mt-2 flex gap-2">
+                                <Link href="/hr/my/leave">
+                                    <Button variant="outline" size="sm">My Leave</Button>
+                                </Link>
+                                <Link href="/hr/my/leave?action=request">
+                                    <Button size="sm">Request Leave</Button>
+                                </Link>
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -99,6 +113,12 @@ export default function MyHrIndex({ profile, pendingLeave, leaveBalances, compli
                                     <div className="flex justify-between">
                                         <span>Expired</span>
                                         <Badge variant="destructive">{complianceSummary.expired}</Badge>
+                                    </div>
+                                )}
+                                {complianceSummary.not_started > 0 && (
+                                    <div className="flex justify-between">
+                                        <span>Not Started</span>
+                                        <Badge variant="outline">{complianceSummary.not_started}</Badge>
                                     </div>
                                 )}
                             </div>
@@ -158,6 +178,21 @@ export default function MyHrIndex({ profile, pendingLeave, leaveBalances, compli
                             )}
                             <Link href="/hr/my/goals">
                                 <Button variant="outline" size="sm" className="mt-2">My Goals</Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+
+                    <Card>
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-medium text-muted-foreground">My Time</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Clock className="h-4 w-4" />
+                                <span>Track your hours and clock in/out</span>
+                            </div>
+                            <Link href="/hr/my/time">
+                                <Button variant="outline" size="sm" className="mt-2">Clock In / Out</Button>
                             </Link>
                         </CardContent>
                     </Card>

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { type BreadcrumbItem } from '@/types';
 import { ChevronDown, Star } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface Review {
     id: number;
@@ -221,18 +222,7 @@ export default function MyReviews({ reviews }: Props) {
                 )}
 
                 {reviews.last_page > 1 && (
-                    <div className="flex justify-center gap-1">
-                        {reviews.links.map((link, i) => (
-                            <Button
-                                key={i}
-                                variant={link.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!link.url}
-                                onClick={() => link.url && router.get(link.url)}
-                                dangerouslySetInnerHTML={{ __html: link.label }}
-                            />
-                        ))}
-                    </div>
+                    <LaravelPagination links={reviews.links} />
                 )}
             </div>
         </AppLayout>

@@ -20,6 +20,7 @@ import {
     FileText,
     ArrowRight,
 } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type Candidate = {
     id: number;
@@ -191,11 +192,17 @@ export default function RecruitmentIndex({ candidates, pipeline, sourceBreakdown
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">All sources</SelectItem>
-                            {Object.keys(sourceBreakdown).map((sourceKey) => (
-                                <SelectItem key={sourceKey} value={sourceKey}>
-                                    {sourceKey.replace(/_/g, ' ')}
+                            {Object.keys(sourceBreakdown).length > 0 ? (
+                                Object.entries(sourceBreakdown).map(([sourceKey, count]) => (
+                                    <SelectItem key={sourceKey} value={sourceKey}>
+                                        {sourceKey.replace(/_/g, ' ')} ({count})
+                                    </SelectItem>
+                                ))
+                            ) : (
+                                <SelectItem value="__none" disabled>
+                                    No sources available
                                 </SelectItem>
-                            ))}
+                            )}
                         </SelectContent>
                     </Select>
                     <Button type="submit" variant="secondary">
@@ -215,90 +222,109 @@ export default function RecruitmentIndex({ candidates, pipeline, sourceBreakdown
                 </form>
 
                 {/* Candidates Table */}
-                <div className="overflow-hidden rounded-xl border">
-                    <table className="w-full text-sm">
-                        <thead className="border-b bg-slate-50/5">
-                            <tr>
-                                <th className="px-4 py-3 text-left font-medium">Name</th>
-                                <th className="px-4 py-3 text-left font-medium">Email</th>
-                                <th className="px-4 py-3 text-left font-medium">Status</th>
-                                <th className="px-4 py-3 text-left font-medium">Source</th>
-                                <th className="px-4 py-3 text-left font-medium">Applied</th>
-                                <th className="px-4 py-3 text-right font-medium">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {candidates.data.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
-                                        <Users className="mx-auto mb-3 h-10 w-10 opacity-50" />
-                                        <p>No candidates found.</p>
-                                    </td>
-                                </tr>
-                            ) : (
-                                candidates.data.map((candidate) => (
-                                    <tr key={candidate.id} className="border-b last:border-b-0 hover:bg-muted/50">
-                                        <td className="px-4 py-3">
-                                            <Link
-                                                href={`/hr/recruitment/candidates/${candidate.id}`}
-                                                className="font-medium hover:underline"
-                                            >
-                                                {candidate.first_name} {candidate.last_name}
-                                            </Link>
-                                            {candidate.preferred_name && (
-                                                <div className="text-xs text-muted-foreground">
-                                                    "{candidate.preferred_name}"
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="px-4 py-3 text-muted-foreground">
-                                            {candidate.personal_email}
-                                        </td>
-                                        <td className="px-4 py-3">
-                                            <StatusBadge status={candidate.status} />
-                                        </td>
-                                        <td className="px-4 py-3 text-muted-foreground capitalize">
-                                            {candidate.source?.replace(/_/g, ' ') || '-'}
-                                        </td>
-                                        <td className="px-4 py-3 text-muted-foreground">
-                                            {new Date(candidate.created_at).toLocaleDateString()}
-                                        </td>
-                                        <td className="px-4 py-3 text-right">
-                                            <Button variant="ghost" size="sm" asChild>
-                                                <Link href={`/hr/recruitment/candidates/${candidate.id}`}>
-                                                    View
-                                                    <ArrowRight className="ml-1 h-3 w-3" />
-                                                </Link>
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                ))
+                {candidates.total === 0 && !filters.search && !filters.source ? (
+                    <Card>
+                        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                            <Users className="mb-4 h-12 w-12 text-muted-foreground/50" />
+                            <h3 className="mb-2 text-lg font-semibold">No candidates in the pipeline yet</h3>
+                            <p className="mb-6 max-w-sm text-sm text-muted-foreground">
+                                Create a job posting to start recruiting. Candidates will appear here as they apply or are added manually.
+                            </p>
+                            {can.manage && (
+                                <div className="flex items-center gap-2">
+                                    <Button variant="outline" asChild>
+                                        <Link href="/hr/recruitment/jobs">
+                                            <FileText className="mr-2 h-4 w-4" />
+                                            View Job Postings
+                                        </Link>
+                                    </Button>
+                                    <Button asChild>
+                                        <Link href="/hr/recruitment/candidates/create">
+                                            <Plus className="mr-2 h-4 w-4" />
+                                            Add Candidate
+                                        </Link>
+                                    </Button>
+                                </div>
                             )}
-                        </tbody>
-                    </table>
-                </div>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <>
+                        <div className="overflow-hidden rounded-xl border">
+                            <table className="w-full text-sm">
+                                <thead className="border-b bg-slate-50/5">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left font-medium">Name</th>
+                                        <th className="px-4 py-3 text-left font-medium">Email</th>
+                                        <th className="px-4 py-3 text-left font-medium">Status</th>
+                                        <th className="px-4 py-3 text-left font-medium">Source</th>
+                                        <th className="px-4 py-3 text-left font-medium">Applied</th>
+                                        <th className="px-4 py-3 text-right font-medium">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {candidates.data.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="px-4 py-8 text-center text-muted-foreground">
+                                                <Search className="mx-auto mb-3 h-10 w-10 opacity-50" />
+                                                <p>No candidates match your filters.</p>
+                                            </td>
+                                        </tr>
+                                    ) : (
+                                        candidates.data.map((candidate) => (
+                                            <tr key={candidate.id} className="border-b last:border-b-0 hover:bg-muted/50">
+                                                <td className="px-4 py-3">
+                                                    <Link
+                                                        href={`/hr/recruitment/candidates/${candidate.id}`}
+                                                        className="font-medium hover:underline"
+                                                    >
+                                                        {candidate.first_name} {candidate.last_name}
+                                                    </Link>
+                                                    {candidate.preferred_name && (
+                                                        <div className="text-xs text-muted-foreground">
+                                                            "{candidate.preferred_name}"
+                                                        </div>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-muted-foreground">
+                                                    {candidate.personal_email}
+                                                </td>
+                                                <td className="px-4 py-3">
+                                                    <StatusBadge status={candidate.status} />
+                                                </td>
+                                                <td className="px-4 py-3 text-muted-foreground capitalize">
+                                                    {candidate.source?.replace(/_/g, ' ') || '-'}
+                                                </td>
+                                                <td className="px-4 py-3 text-muted-foreground">
+                                                    {new Date(candidate.created_at).toLocaleDateString('en-NZ')}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    <Button variant="ghost" size="sm" asChild>
+                                                        <Link href={`/hr/recruitment/candidates/${candidate.id}`}>
+                                                            View
+                                                            <ArrowRight className="ml-1 h-3 w-3" />
+                                                        </Link>
+                                                    </Button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
 
-                {/* Pagination */}
-                {candidates.last_page > 1 && (
-                    <div className="flex items-center justify-between">
-                        <div className="text-sm text-muted-foreground">
-                            Showing {(candidates.current_page - 1) * candidates.per_page + 1} to{' '}
-                            {Math.min(candidates.current_page * candidates.per_page, candidates.total)} of{' '}
-                            {candidates.total} candidates
+                        {/* Pagination */}
+                        <div className="flex items-center justify-between">
+                            <div className="text-sm text-muted-foreground">
+                                {candidates.total > 0
+                                    ? `Showing ${(candidates.current_page - 1) * candidates.per_page + 1} to ${Math.min(candidates.current_page * candidates.per_page, candidates.total)} of ${candidates.total} candidates`
+                                    : `${candidates.total} candidates`}
+                            </div>
+                            {candidates.last_page > 1 && (
+                                <LaravelPagination links={candidates.links} />
+                            )}
                         </div>
-                        <div className="flex items-center gap-1">
-                            {candidates.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                />
-                            ))}
-                        </div>
-                    </div>
+                    </>
                 )}
             </PageShell>
         </AppLayout>

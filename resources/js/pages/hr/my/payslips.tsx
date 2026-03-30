@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { type BreadcrumbItem } from '@/types';
 import { FileText, Download } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface Payslip {
     id: number;
@@ -141,19 +142,7 @@ export default function MyPayslips({ payslips }: Props) {
                             {Math.min(payslips.current_page * payslips.per_page, payslips.total)} of{' '}
                             {payslips.total} results
                         </p>
-                        <div className="flex items-center gap-1">
-                            {payslips.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                >
-                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                </Button>
-                            ))}
-                        </div>
+                        <LaravelPagination links={payslips.links} />
                     </div>
                 )}
             </div>

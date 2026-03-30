@@ -1,12 +1,14 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
-import { Users, CheckCircle2, AlertTriangle, Clock, Shield } from 'lucide-react';
+import { Users, CheckCircle2, AlertTriangle, Clock, Shield, Search } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface StaffStatus {
     user_id: number;
@@ -32,6 +34,10 @@ interface Props {
         links: any[];
         current_page: number;
         last_page: number;
+        total: number;
+        from: number | null;
+        to: number | null;
+        per_page: number;
     };
     summary: {
         total_staff: number;
@@ -50,9 +56,26 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function ComplianceIndex({ staffStatuses, summary, requirements, filters, can }: Props) {
+    const [searchTerm, setSearchTerm] = useState(filters.q || '');
+    const debounceTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
     function applyFilter(key: string, value: string | null) {
         router.get('/hr/compliance', { ...filters, [key]: value || undefined }, { preserveState: true, replace: true });
     }
+
+    const handleSearchChange = useCallback((value: string) => {
+        setSearchTerm(value);
+        if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        debounceTimer.current = setTimeout(() => {
+            applyFilter('q', value || null);
+        }, 300);
+    }, [filters]);
+
+    useEffect(() => {
+        return () => {
+            if (debounceTimer.current) clearTimeout(debounceTimer.current);
+        };
+    }, []);
 
     const complianceRate = summary.total_staff > 0
         ? Math.round((summary.fully_compliant / summary.total_staff) * 100)
@@ -124,14 +147,15 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
 
                 {/* Filters */}
                 <div className="flex flex-wrap items-center gap-3">
-                    <Input
-                        placeholder="Search by name or email..."
-                        defaultValue={filters.q}
-                        className="w-64"
-                        onKeyDown={(e) => {
-                            if (e.key === 'Enter') applyFilter('q', (e.target as HTMLInputElement).value);
-                        }}
-                    />
+                    <div className="relative">
+                        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            placeholder="Search by name or email..."
+                            value={searchTerm}
+                            className="w-64 pl-9"
+                            onChange={(e) => handleSearchChange(e.target.value)}
+                        />
+                    </div>
                     <Select value={filters.status || '__none__'} onValueChange={(v) => applyFilter('status', v === '__none__' ? null : v)}>
                         <SelectTrigger className="w-48"><SelectValue placeholder="Compliance Status" /></SelectTrigger>
                         <SelectContent>
@@ -195,27 +219,33 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                                             </div>
                                         </td>
                                         <td className="px-4 py-3 text-center">
-                                            <Badge variant="default" className="bg-green-100 text-green-800 hover:bg-green-100">
+                                            <Badge variant="outline" className="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400">
                                                 {staff.compliant_count}
                                             </Badge>
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             {staff.expired_count > 0 ? (
-                                                <Badge variant="destructive">{staff.expired_count}</Badge>
+                                                <Badge variant="outline" className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400">
+                                                    {staff.expired_count}
+                                                </Badge>
                                             ) : (
                                                 <span className="text-muted-foreground">0</span>
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             {staff.expiring_soon_count > 0 ? (
-                                                <Badge variant="outline" className="border-yellow-500 text-yellow-600">{staff.expiring_soon_count}</Badge>
+                                                <Badge variant="outline" className="border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400">
+                                                    {staff.expiring_soon_count}
+                                                </Badge>
                                             ) : (
                                                 <span className="text-muted-foreground">0</span>
                                             )}
                                         </td>
                                         <td className="px-4 py-3 text-center">
                                             {staff.not_started_count > 0 ? (
-                                                <Badge variant="secondary">{staff.not_started_count}</Badge>
+                                                <Badge variant="outline" className="border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400">
+                                                    {staff.not_started_count}
+                                                </Badge>
                                             ) : (
                                                 <span className="text-muted-foreground">0</span>
                                             )}
@@ -229,9 +259,14 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                                 ))}
                                 {staffStatuses.data.length === 0 && (
                                     <tr>
-                                        <td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">
-                                            <Shield className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                            <p>No staff compliance records found.</p>
+                                        <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                                            <Shield className="mx-auto mb-3 h-12 w-12 opacity-30" />
+                                            <p className="text-base font-medium">No compliance records found</p>
+                                            <p className="mt-1 text-sm">
+                                                {filters.q || filters.status || filters.requirement_id
+                                                    ? 'Try adjusting your search or filters to find what you are looking for.'
+                                                    : 'Compliance records will appear here once requirements are assigned to staff.'}
+                                            </p>
                                         </td>
                                     </tr>
                                 )}
@@ -241,14 +276,14 @@ export default function ComplianceIndex({ staffStatuses, summary, requirements, 
                 </Card>
 
                 {/* Pagination */}
-                {staffStatuses.last_page > 1 && (
-                    <div className="flex justify-center gap-2">
-                        {staffStatuses.links.map((link: any, i: number) => (
-                            <Button key={i} variant={link.active ? 'default' : 'outline'} size="sm" disabled={!link.url}
-                                onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}>
-                                <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                            </Button>
-                        ))}
+                {staffStatuses.total > 0 && (
+                    <div className="flex items-center justify-between">
+                        <p className="text-sm text-muted-foreground">
+                            Showing {staffStatuses.from}–{staffStatuses.to} of {staffStatuses.total} results
+                        </p>
+                        {staffStatuses.last_page > 1 && (
+                            <LaravelPagination links={staffStatuses.links} />
+                        )}
                     </div>
                 )}
             </div>

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { type BreadcrumbItem } from '@/types';
 import { Plus, Eye } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type ExpenseClaim = {
     id: number;
@@ -151,19 +152,7 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
 
                 {/* Pagination */}
                 {claims.links?.length > 3 && (
-                    <div className="flex flex-wrap gap-2">
-                        {claims.links.map((l, i) => (
-                            <Button
-                                key={i}
-                                variant={l.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!l.url}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true })}
-                            >
-                                <span dangerouslySetInnerHTML={{ __html: l.label }} />
-                            </Button>
-                        ))}
-                    </div>
+                    <LaravelPagination links={claims.links} />
                 )}
             </div>
         </AppLayout>

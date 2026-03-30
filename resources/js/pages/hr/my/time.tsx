@@ -6,7 +6,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { type BreadcrumbItem } from '@/types';
-import { Clock, Play, Square, Timer } from 'lucide-react';
+import { Clock, Loader2, Play, Square, Timer } from 'lucide-react';
+import { toast } from 'sonner';
+import { useState } from 'react';
 
 interface TimeEntry {
     id: number;
@@ -50,12 +52,26 @@ const statusConfig: Record<string, { className: string; label: string }> = {
 const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 export default function MyTime({ activeClock, todayEntries, weeklySummary }: Props) {
+    const [processing, setProcessing] = useState(false);
+
     function handleClockIn() {
-        router.post('/hr/my/time/clock-in', {}, { preserveScroll: true });
+        setProcessing(true);
+        router.post('/hr/my/time/clock-in', {}, {
+            preserveScroll: true,
+            onSuccess: () => toast.success('Clocked in successfully'),
+            onError: () => toast.error('Failed to clock in'),
+            onFinish: () => setProcessing(false),
+        });
     }
 
     function handleClockOut() {
-        router.post('/hr/my/time/clock-out', {}, { preserveScroll: true });
+        setProcessing(true);
+        router.post('/hr/my/time/clock-out', {}, {
+            preserveScroll: true,
+            onSuccess: () => toast.success('Clocked out successfully'),
+            onError: () => toast.error('Failed to clock out'),
+            onFinish: () => setProcessing(false),
+        });
     }
 
     return (
@@ -86,9 +102,9 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary }: Pro
                                     {activeClock.notes && (
                                         <p className="text-sm text-muted-foreground">{activeClock.notes}</p>
                                     )}
-                                    <Button onClick={handleClockOut} variant="destructive" className="w-full">
-                                        <Square className="mr-2 h-4 w-4" />
-                                        Clock Out
+                                    <Button onClick={handleClockOut} variant="destructive" className="w-full" disabled={processing}>
+                                        {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Square className="mr-2 h-4 w-4" />}
+                                        {processing ? 'Clocking Out...' : 'Clock Out'}
                                     </Button>
                                 </div>
                             ) : (
@@ -97,9 +113,9 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary }: Pro
                                         <div className="h-3 w-3 rounded-full bg-slate-400" />
                                         <span className="text-sm text-muted-foreground">Not clocked in</span>
                                     </div>
-                                    <Button onClick={handleClockIn} className="w-full">
-                                        <Play className="mr-2 h-4 w-4" />
-                                        Clock In
+                                    <Button onClick={handleClockIn} className="w-full" disabled={processing}>
+                                        {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                                        {processing ? 'Clocking In...' : 'Clock In'}
                                     </Button>
                                 </div>
                             )}
@@ -122,22 +138,30 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary }: Pro
                                 </p>
                             </div>
                             <div className="flex items-end justify-between gap-1">
-                                {Object.entries(weeklySummary.daily_hours).map(([date, hours], i) => (
-                                    <div key={date} className="flex flex-1 flex-col items-center gap-1">
-                                        <div
-                                            className="w-full rounded bg-primary/20"
-                                            style={{ height: `${Math.max(4, (Number(hours) / 10) * 60)}px` }}
-                                        >
+                                {Object.entries(weeklySummary.daily_hours ?? {}).map(([date, hours], i) => {
+                                    const safeHours = Number(hours) || 0;
+                                    const maxHours = Math.max(
+                                        10,
+                                        ...Object.values(weeklySummary.daily_hours ?? {}).map((h) => Number(h) || 0),
+                                    );
+                                    const barHeight = maxHours > 0 ? (safeHours / maxHours) * 60 : 0;
+                                    return (
+                                        <div key={date} className="flex flex-1 flex-col items-center gap-1">
                                             <div
-                                                className="w-full rounded bg-primary"
-                                                style={{ height: `${Math.max(0, (Number(hours) / 10) * 60)}px` }}
-                                            />
+                                                className="w-full rounded bg-primary/20"
+                                                style={{ height: `${Math.max(4, barHeight)}px` }}
+                                            >
+                                                <div
+                                                    className="w-full rounded bg-primary"
+                                                    style={{ height: `${barHeight}px` }}
+                                                />
+                                            </div>
+                                            <span className="text-[10px] text-muted-foreground">
+                                                {dayLabels[i] ?? date.slice(5)}
+                                            </span>
                                         </div>
-                                        <span className="text-[10px] text-muted-foreground">
-                                            {dayLabels[i] ?? date.slice(5)}
-                                        </span>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </CardContent>
                     </Card>
@@ -152,7 +176,8 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary }: Pro
                         {todayEntries.length === 0 ? (
                             <div className="py-12 text-center text-muted-foreground">
                                 <Clock className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                <p>No entries today.</p>
+                                <p className="font-medium">No time entries recorded today</p>
+                                <p className="mt-1 text-sm">Clock in above to start tracking your hours.</p>
                             </div>
                         ) : (
                             <table className="w-full text-sm">

@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/select';
 import { Briefcase, Plus, Search, Users } from 'lucide-react';
 import { useState } from 'react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type Position = {
     id: number;
@@ -263,18 +264,7 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                             {Math.min(positions.current_page * positions.per_page, positions.total)} of{' '}
                             {positions.total} results
                         </p>
-                        <div className="flex items-center gap-1">
-                            {positions.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                />
-                            ))}
-                        </div>
+                        <LaravelPagination links={positions.links} />
                     </div>
                 )}
             </PageShell>

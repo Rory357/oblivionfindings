@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { type BreadcrumbItem } from '@/types';
 import { BarChart3, AlertTriangle, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
@@ -90,7 +90,7 @@ export default function LeaveReports({ absenteeism, bradfordFactor, utilization,
 
     const maxCount = Math.max(...absenteeism.monthly.map((m) => m.count), 1);
 
-    const yearOptions = [];
+    const yearOptions: number[] = [];
     const currentYear = new Date().getFullYear();
     for (let y = currentYear - 3; y <= currentYear; y++) {
         yearOptions.push(y);

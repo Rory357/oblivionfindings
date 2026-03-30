@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
 import { Search, Plus, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -302,17 +303,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
                 </Card>
 
                 {checks?.links?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                        {checks.links.map((l) => (
-                            <button
-                                key={l.label}
-                                disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
-                                dangerouslySetInnerHTML={{ __html: l.label }}
-                            />
-                        ))}
-                    </div>
+                    <LaravelPagination links={checks.links} />
                 ) : null}
             </div>
         </AppLayout>

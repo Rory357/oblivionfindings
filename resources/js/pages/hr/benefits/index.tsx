@@ -1,7 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,9 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
-import { Plus, Heart } from 'lucide-react';
+import { Plus, Heart, ShieldCheck } from 'lucide-react';
 import { useState, FormEvent } from 'react';
 import { type BreadcrumbItem } from '@/types';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface BenefitPlan {
     id: number;
@@ -84,18 +85,26 @@ const formatDate = (value?: string | null) => {
     return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
+const todayIso = () => new Date().toISOString().slice(0, 10);
+
 const emptyEnrollForm = {
     employee_profile_id: '',
     benefit_plan_id: '',
-    enrollment_date: '',
+    enrollment_date: todayIso(),
     employee_contribution_rate: '',
     employer_contribution_rate: '',
     notes: '',
 };
 
 export default function BenefitsIndex({ enrollments, plans, summary, filters, can }: Props) {
+    const { errors } = usePage<{ errors: Record<string, string> }>().props;
     const [open, setOpen] = useState(false);
     const [form, setForm] = useState(emptyEnrollForm);
+
+    const fieldError = (field: string) =>
+        errors?.[field] ? (
+            <p className="mt-1 text-xs text-red-600">{errors[field]}</p>
+        ) : null;
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get('/hr/benefits', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
@@ -238,8 +247,22 @@ export default function BenefitsIndex({ enrollments, plans, summary, filters, ca
                                 ))}
                                 {!enrollments.data.length && (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-8 text-center text-sm text-slate-500">
-                                            No enrollments found.
+                                        <TableCell colSpan={7} className="py-12 text-center">
+                                            <div className="flex flex-col items-center gap-2">
+                                                <ShieldCheck className="h-10 w-10 text-slate-300" />
+                                                <p className="text-sm font-medium text-slate-600">No enrollments found</p>
+                                                <p className="text-xs text-slate-400">
+                                                    {filters.status || filters.plan_id
+                                                        ? 'Try adjusting your filters to see more results.'
+                                                        : 'Get started by enrolling an employee in a benefit plan.'}
+                                                </p>
+                                                {can.manage && !filters.status && !filters.plan_id && (
+                                                    <Button size="sm" variant="outline" className="mt-2" onClick={() => setOpen(true)}>
+                                                        <Plus className="mr-1.5 h-4 w-4" />
+                                                        Enroll Employee
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 )}
@@ -249,17 +272,7 @@ export default function BenefitsIndex({ enrollments, plans, summary, filters, ca
                 </Card>
 
                 {enrollments?.links?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                        {enrollments.links.map((l: any) => (
-                            <button
-                                key={l.label}
-                                disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
-                                dangerouslySetInnerHTML={{ __html: l.label }}
-                            />
-                        ))}
-                    </div>
+                    <LaravelPagination links={enrollments.links} />
                 ) : null}
             </div>
 
@@ -271,21 +284,23 @@ export default function BenefitsIndex({ enrollments, plans, summary, filters, ca
                     </DialogHeader>
                     <form onSubmit={submit} className="space-y-4">
                         <div>
-                            <Label>Employee Profile ID</Label>
+                            <Label htmlFor="employee_profile_id">Employee Profile ID</Label>
                             <Input
+                                id="employee_profile_id"
                                 type="number"
                                 value={form.employee_profile_id}
                                 onChange={(e) => set('employee_profile_id', e.target.value)}
                                 required
                             />
+                            {fieldError('employee_profile_id')}
                         </div>
                         <div>
-                            <Label>Benefit Plan</Label>
+                            <Label htmlFor="benefit_plan_id">Benefit Plan</Label>
                             <Select
                                 value={form.benefit_plan_id}
                                 onValueChange={(val) => set('benefit_plan_id', val)}
                             >
-                                <SelectTrigger>
+                                <SelectTrigger id="benefit_plan_id">
                                     <SelectValue placeholder="Select a plan" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -296,35 +311,48 @@ export default function BenefitsIndex({ enrollments, plans, summary, filters, ca
                                     ))}
                                 </SelectContent>
                             </Select>
+                            {fieldError('benefit_plan_id')}
                         </div>
                         <div>
-                            <Label>Enrollment Date</Label>
-                            <Input type="date" value={form.enrollment_date} onChange={(e) => set('enrollment_date', e.target.value)} required />
+                            <Label htmlFor="enrollment_date">Enrollment Date</Label>
+                            <Input
+                                id="enrollment_date"
+                                type="date"
+                                value={form.enrollment_date}
+                                onChange={(e) => set('enrollment_date', e.target.value)}
+                                required
+                            />
+                            {fieldError('enrollment_date')}
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <Label>Employee Rate (%)</Label>
+                                <Label htmlFor="employee_contribution_rate">Employee Rate (%)</Label>
                                 <Input
+                                    id="employee_contribution_rate"
                                     type="number"
                                     step="0.01"
                                     value={form.employee_contribution_rate}
                                     onChange={(e) => set('employee_contribution_rate', e.target.value)}
                                     required
                                 />
+                                {fieldError('employee_contribution_rate')}
                             </div>
                             <div>
-                                <Label>Employer Rate (%)</Label>
+                                <Label htmlFor="employer_contribution_rate">Employer Rate (%)</Label>
                                 <Input
+                                    id="employer_contribution_rate"
                                     type="number"
                                     step="0.01"
                                     value={form.employer_contribution_rate}
                                     onChange={(e) => set('employer_contribution_rate', e.target.value)}
                                 />
+                                {fieldError('employer_contribution_rate')}
                             </div>
                         </div>
                         <div>
-                            <Label>Notes</Label>
-                            <Textarea value={form.notes} onChange={(e) => set('notes', e.target.value)} />
+                            <Label htmlFor="enroll_notes">Notes</Label>
+                            <Textarea id="enroll_notes" value={form.notes} onChange={(e) => set('notes', e.target.value)} />
+                            {fieldError('notes')}
                         </div>
                         <div className="flex justify-end gap-2">
                             <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>

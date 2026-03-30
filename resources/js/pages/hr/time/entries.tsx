@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { ChevronDown, Clock, Plus } from 'lucide-react';
+import { ChevronDown, Clock, Plus, CalendarClock } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface TimeEntry {
     id: number;
@@ -56,6 +57,20 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     approved: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Approved' },
     rejected: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Rejected' },
 };
+
+function formatEntryDate(dateStr: string): string {
+    if (!dateStr) return '-';
+    const d = new Date(dateStr + 'T00:00:00');
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString('en-NZ', { weekday: 'short', day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function formatTime(dateTimeStr: string): string {
+    if (!dateTimeStr) return '-';
+    const d = new Date(dateTimeStr);
+    if (isNaN(d.getTime())) return dateTimeStr;
+    return d.toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+}
 
 export default function TimeEntries({ entries, filters, can }: Props) {
     const [formOpen, setFormOpen] = useState(false);
@@ -220,9 +235,27 @@ export default function TimeEntries({ entries, filters, can }: Props) {
                     </CardHeader>
                     <CardContent className="p-0">
                         {entries.data.length === 0 ? (
-                            <div className="py-12 text-center text-muted-foreground">
-                                <Clock className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                <p>No time entries found.</p>
+                            <div className="py-16 text-center text-muted-foreground">
+                                <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted/50">
+                                    <CalendarClock className="h-8 w-8 opacity-40" />
+                                </div>
+                                <p className="text-base font-medium">No time entries found</p>
+                                <p className="mt-1 text-sm">
+                                    {filters.from || filters.to
+                                        ? 'No entries match the selected date range. Try adjusting or clearing your filters.'
+                                        : 'Time entries will appear here once staff begin clocking in.'}
+                                </p>
+                                {can.manage && !formOpen && (
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="mt-4"
+                                        onClick={() => setFormOpen(true)}
+                                    >
+                                        <Plus className="mr-1 h-3 w-3" />
+                                        Add Manual Entry
+                                    </Button>
+                                )}
                             </div>
                         ) : (
                             <div className="overflow-hidden rounded-xl border">
@@ -245,9 +278,9 @@ export default function TimeEntries({ entries, filters, can }: Props) {
                                             return (
                                                 <tr key={entry.id} className="border-b last:border-b-0 hover:bg-muted/50">
                                                     <td className="px-4 py-3 font-medium">{entry.user_name}</td>
-                                                    <td className="px-4 py-3 text-muted-foreground">{entry.entry_date}</td>
-                                                    <td className="px-4 py-3">{entry.clock_in}</td>
-                                                    <td className="px-4 py-3">{entry.clock_out ?? '-'}</td>
+                                                    <td className="px-4 py-3 text-muted-foreground">{formatEntryDate(entry.entry_date)}</td>
+                                                    <td className="px-4 py-3">{formatTime(entry.clock_in)}</td>
+                                                    <td className="px-4 py-3">{entry.clock_out ? formatTime(entry.clock_out) : '-'}</td>
                                                     <td className="px-4 py-3 text-right text-muted-foreground">
                                                         {entry.break_minutes > 0 ? `${entry.break_minutes}m` : '-'}
                                                     </td>
@@ -270,26 +303,17 @@ export default function TimeEntries({ entries, filters, can }: Props) {
                     </CardContent>
                 </Card>
 
-                {/* Pagination */}
-                {entries.last_page > 1 && (
+                {/* Pagination & results count */}
+                {entries.total > 0 && (
                     <div className="flex items-center justify-between">
                         <p className="text-sm text-muted-foreground">
                             Showing {(entries.current_page - 1) * entries.per_page + 1} to{' '}
                             {Math.min(entries.current_page * entries.per_page, entries.total)} of{' '}
-                            {entries.total} entries
+                            {entries.total} {entries.total === 1 ? 'entry' : 'entries'}
                         </p>
-                        <div className="flex items-center gap-1">
-                            {entries.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url)}
-                                    dangerouslySetInnerHTML={{ __html: link.label }}
-                                />
-                            ))}
-                        </div>
+                        {entries.last_page > 1 && (
+                            <LaravelPagination links={entries.links} />
+                        )}
                     </div>
                 )}
             </PageShell>

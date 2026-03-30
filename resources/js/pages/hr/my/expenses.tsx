@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { type BreadcrumbItem } from '@/types';
 import { ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type ExpenseClaim = {
     id: number;
@@ -258,19 +259,7 @@ export default function MyExpenses({ claims, categories }: Props) {
                             Showing {(claims.current_page - 1) * claims.per_page + 1} to{' '}
                             {Math.min(claims.current_page * claims.per_page, claims.total)} of {claims.total} results
                         </p>
-                        <div className="flex items-center gap-1">
-                            {claims.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                >
-                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                </Button>
-                            ))}
-                        </div>
+                        <LaravelPagination links={claims.links} />
                     </div>
                 )}
             </div>

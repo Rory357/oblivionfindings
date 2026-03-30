@@ -3,6 +3,7 @@ import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
 import { Head, Link, router } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -196,19 +197,7 @@ export default function ExitInterviewsIndex({ interviews, filters, can }: Props)
                 </Card>
 
                 {/* Pagination */}
-                {interviews?.links?.length ? (
-                    <div className="mt-4 flex flex-wrap gap-2">
-                        {interviews.links.map((l: any) => (
-                            <button
-                                key={l.label}
-                                disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
-                                dangerouslySetInnerHTML={{ __html: l.label }}
-                            />
-                        ))}
-                    </div>
-                ) : null}
+                <LaravelPagination links={interviews?.links ?? []} className="mt-4" />
             </PageShell>
         </AppLayout>
     );

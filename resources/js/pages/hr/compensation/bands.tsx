@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Plus, Pencil } from 'lucide-react';
 import { useState, FormEvent } from 'react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -213,17 +214,7 @@ export default function SalaryBands({ bands, filters, can }: Props) {
                 </Card>
 
                 {bands?.links?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                        {bands.links.map((l: any) => (
-                            <button
-                                key={l.label}
-                                disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
-                                dangerouslySetInnerHTML={{ __html: l.label }}
-                            />
-                        ))}
-                    </div>
+                    <LaravelPagination links={bands.links} />
                 ) : null}
             </div>
 

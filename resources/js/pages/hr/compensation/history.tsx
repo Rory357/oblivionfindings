@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -183,17 +184,7 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                 </Card>
 
                 {history?.links?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                        {history.links.map((l: any) => (
-                            <button
-                                key={l.label}
-                                disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
-                                dangerouslySetInnerHTML={{ __html: l.label }}
-                            />
-                        ))}
-                    </div>
+                    <LaravelPagination links={history.links} />
                 ) : null}
             </div>
         </AppLayout>

@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Package } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface SelectOption {
     value: string;
@@ -209,17 +210,7 @@ export default function AssetsIndex({ assets, filters, categories, can }: Props)
                 </Card>
 
                 {assets?.links?.length ? (
-                    <div className="flex flex-wrap gap-2">
-                        {assets.links.map((l: any) => (
-                            <button
-                                key={l.label}
-                                disabled={!l.url}
-                                className={`rounded-md border px-3 py-2 text-xs ${l.active ? 'bg-muted' : 'hover:bg-muted'}`}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true, preserveScroll: true })}
-                                dangerouslySetInnerHTML={{ __html: l.label }}
-                            />
-                        ))}
-                    </div>
+                    <LaravelPagination links={assets.links} />
                 ) : null}
             </div>
         </AppLayout>

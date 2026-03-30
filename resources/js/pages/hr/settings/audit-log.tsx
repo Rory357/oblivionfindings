@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/collapsible';
 import { FileSearch, ChevronDown, ChevronRight } from 'lucide-react';
 import { useState } from 'react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -262,18 +263,7 @@ export default function AuditLogIndex({ logs, actions, modelTypes, users, filter
 
                         {/* Pagination links */}
                         {logs.links && logs.links.length > 3 && (
-                            <div className="flex justify-center gap-1 mt-4">
-                                {logs.links.map((link: any, i: number) => (
-                                    <Button
-                                        key={i}
-                                        variant={link.active ? 'default' : 'outline'}
-                                        size="sm"
-                                        disabled={!link.url}
-                                        onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                        dangerouslySetInnerHTML={{ __html: link.label }}
-                                    />
-                                ))}
-                            </div>
+                            <LaravelPagination links={logs.links} />
                         )}
                     </CardContent>
                 </Card>

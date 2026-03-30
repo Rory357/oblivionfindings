@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { type BreadcrumbItem } from '@/types';
 import { Mail, Eye, Trash2, Pencil, Clock, Send, FileText } from 'lucide-react';
 import { useState } from 'react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface Props {
     templates: {
@@ -158,14 +159,7 @@ export default function OnboardingEmails({ templates, preview, emailLog, showLog
 
                         {/* Pagination */}
                         {templates.links?.length > 3 && (
-                            <div className="flex justify-center gap-2">
-                                {templates.links.map((link: any, i: number) => (
-                                    <Button key={i} variant={link.active ? 'default' : 'outline'} size="sm" disabled={!link.url}
-                                        onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}>
-                                        <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                    </Button>
-                                ))}
-                            </div>
+                            <LaravelPagination links={templates.links} />
                         )}
                     </div>
                 )}

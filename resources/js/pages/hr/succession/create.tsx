@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
 import PageShell from '@/components/page-shell';
 import PageHeader from '@/components/page-header';
-import { Head, useForm } from '@inertiajs/react';
+import { Head, useForm, router } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 type Props = {
@@ -44,18 +46,19 @@ export default function SuccessionCreate({ positions, employees }: Props) {
                         <CardContent className="space-y-4">
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-sm font-medium">Role Title *</label>
+                                    <Label>Role Title <span className="text-red-500">*</span></Label>
                                     <Input value={data.role_title} onChange={e => setData('role_title', e.target.value)} placeholder="e.g. Head of Operations" />
                                     {errors.role_title && <p className="text-sm text-red-500 mt-1">{errors.role_title}</p>}
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium">Department</label>
+                                    <Label>Department</Label>
                                     <Input value={data.department} onChange={e => setData('department', e.target.value)} />
+                                    {errors.department && <p className="text-sm text-red-500 mt-1">{errors.department}</p>}
                                 </div>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-sm font-medium">Risk Level *</label>
+                                    <Label>Risk Level <span className="text-red-500">*</span></Label>
                                     <Select value={data.risk_level} onValueChange={v => setData('risk_level', v)}>
                                         <SelectTrigger><SelectValue /></SelectTrigger>
                                         <SelectContent>
@@ -65,22 +68,40 @@ export default function SuccessionCreate({ positions, employees }: Props) {
                                             <SelectItem value="critical">Critical</SelectItem>
                                         </SelectContent>
                                     </Select>
+                                    {errors.risk_level && <p className="text-sm text-red-500 mt-1">{errors.risk_level}</p>}
                                 </div>
                                 <div>
-                                    <label className="text-sm font-medium">Current Holder</label>
+                                    <Label>Current Holder</Label>
                                     <Select value={data.current_holder_user_id} onValueChange={v => setData('current_holder_user_id', v)}>
                                         <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
                                         <SelectContent>
                                             {employees.map(e => <SelectItem key={e.id} value={String(e.id)}>{e.name}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
+                                    {errors.current_holder_user_id && <p className="text-sm text-red-500 mt-1">{errors.current_holder_user_id}</p>}
                                 </div>
                             </div>
+                            {positions && positions.length > 0 && (
+                                <div>
+                                    <Label>Position</Label>
+                                    <Select value={data.position_id} onValueChange={v => setData('position_id', v)}>
+                                        <SelectTrigger><SelectValue placeholder="Select position..." /></SelectTrigger>
+                                        <SelectContent>
+                                            {positions.map(p => <SelectItem key={p.id} value={String(p.id)}>{p.title}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.position_id && <p className="text-sm text-red-500 mt-1">{errors.position_id}</p>}
+                                </div>
+                            )}
                             <div>
-                                <label className="text-sm font-medium">Notes</label>
-                                <textarea className="w-full rounded-md border bg-transparent px-3 py-2 text-sm" rows={3} value={data.notes} onChange={e => setData('notes', e.target.value)} />
+                                <Label>Notes</Label>
+                                <Textarea rows={3} value={data.notes} onChange={e => setData('notes', e.target.value)} />
+                                {errors.notes && <p className="text-sm text-red-500 mt-1">{errors.notes}</p>}
                             </div>
-                            <Button type="submit" disabled={processing}>Create Plan</Button>
+                            <div className="flex items-center gap-2">
+                                <Button type="submit" disabled={processing}>Create Plan</Button>
+                                <Button type="button" variant="outline" onClick={() => router.visit('/hr/succession')}>Cancel</Button>
+                            </div>
                         </CardContent>
                     </Card>
                 </form>

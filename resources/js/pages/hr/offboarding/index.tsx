@@ -8,6 +8,7 @@ import { Progress } from '@/components/ui/progress';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
 import { Plus } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface Checklist {
     id: number;
@@ -226,19 +227,7 @@ export default function OffboardingIndex({ checklists, summary, filters, can }: 
                             {Math.min(checklists.current_page * checklists.per_page, checklists.total)} of{' '}
                             {checklists.total} results
                         </p>
-                        <div className="flex items-center gap-1">
-                            {checklists.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                >
-                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                </Button>
-                            ))}
-                        </div>
+                        <LaravelPagination links={checklists.links} />
                     </div>
                 )}
             </div>

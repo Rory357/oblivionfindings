@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
 import { Plus } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface Template {
     id: number;
@@ -131,7 +132,7 @@ export default function DocumentTemplates({ templates, categories, filters, can 
                                             <td className="px-4 py-3 text-muted-foreground">
                                                 {template.merge_fields.length > 0
                                                     ? template.merge_fields.slice(0, 3).join(', ')
-                                                    : '—'}
+                                                    : 'ï¿½'}
                                             </td>
                                             <td className="px-4 py-3">
                                                 <div className="flex items-center gap-2">
@@ -185,19 +186,7 @@ export default function DocumentTemplates({ templates, categories, filters, can 
                             {Math.min(templates.current_page * templates.per_page, templates.total)} of{' '}
                             {templates.total} templates
                         </p>
-                        <div className="flex items-center gap-1">
-                            {templates.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                >
-                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                </Button>
-                            ))}
-                        </div>
+                        <LaravelPagination links={templates.links} />
                     </div>
                 )}
             </div>

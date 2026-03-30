@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/table';
 import { FileSpreadsheet, Play, Download, Trash2, Plus } from 'lucide-react';
 import { useState } from 'react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type SavedReport = {
     id: number;
@@ -268,18 +269,7 @@ export default function SavedReports({ reports, sources }: Props) {
 
                 {/* Pagination */}
                 {reports.last_page > 1 && (
-                    <div className="flex items-center justify-center gap-1">
-                        {reports.links.map((link, i) => (
-                            <Button
-                                key={i}
-                                variant={link.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!link.url}
-                                onClick={() => link.url && router.visit(link.url)}
-                                dangerouslySetInnerHTML={{ __html: link.label }}
-                            />
-                        ))}
-                    </div>
+                    <LaravelPagination links={reports.links} />
                 )}
             </div>
         </AppLayout>

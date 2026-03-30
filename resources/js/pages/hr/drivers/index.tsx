@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface DriverRecord {
     id: number;
@@ -198,19 +199,7 @@ export default function DriversIndex({ records, summary, filters }: Props) {
                             {Math.min(records.current_page * records.per_page, records.total)} of{' '}
                             {records.total} results
                         </p>
-                        <div className="flex items-center gap-1">
-                            {records.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                >
-                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                </Button>
-                            ))}
-                        </div>
+                        <LaravelPagination links={records.links} />
                     </div>
                 )}
             </div>

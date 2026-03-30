@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { type BreadcrumbItem } from '@/types';
 import { ChevronDown, Plus } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 interface LeaveRequest {
     id: number;
@@ -282,19 +283,7 @@ export default function MyLeave({ requests, balances, leaveTypes }: Props) {
                             {Math.min(requests.current_page * requests.per_page, requests.total)} of{' '}
                             {requests.total} results
                         </p>
-                        <div className="flex items-center gap-1">
-                            {requests.links.map((link, i) => (
-                                <Button
-                                    key={i}
-                                    variant={link.active ? 'default' : 'outline'}
-                                    size="sm"
-                                    disabled={!link.url}
-                                    onClick={() => link.url && router.get(link.url, {}, { preserveState: true })}
-                                >
-                                    <span dangerouslySetInnerHTML={{ __html: link.label }} />
-                                </Button>
-                            ))}
-                        </div>
+                        <LaravelPagination links={requests.links} />
                     </div>
                 )}
             </div>

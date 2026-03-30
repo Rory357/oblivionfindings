@@ -2,7 +2,11 @@ import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, ArrowLeft, Briefcase, Calendar, Clock, Plus, User, XCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -183,14 +187,23 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
         return timeline.filter((item) => normalizeVisibility(item.visibility) === timelineVisibilityFilter);
     }, [timeline, timelineVisibilityFilter]);
 
-    function closeCase() {
-        const outcome = window.prompt('Enter the final case outcome summary:');
-        if (!outcome || outcome.trim() === '') return;
+    const [closeCaseDialogOpen, setCloseCaseDialogOpen] = useState(false);
+    const [closeCaseOutcome, setCloseCaseOutcome] = useState('');
+    const [closeCaseOutcomeType, setCloseCaseOutcomeType] = useState<'resolved' | 'no_action'>('resolved');
 
-        const resolved = window.confirm('Mark as "resolved"? Select Cancel for "no_action".');
+    function closeCase() {
+        setCloseCaseOutcome('');
+        setCloseCaseOutcomeType('resolved');
+        setCloseCaseDialogOpen(true);
+    }
+
+    function submitCloseCase() {
+        if (!closeCaseOutcome.trim()) return;
         router.post(`/hr/cases/${hrCase.id}/close`, {
-            outcome: outcome.trim(),
-            outcome_type: resolved ? 'resolved' : 'no_action',
+            outcome: closeCaseOutcome.trim(),
+            outcome_type: closeCaseOutcomeType,
+        }, {
+            onSuccess: () => setCloseCaseDialogOpen(false),
         });
     }
 
@@ -452,6 +465,43 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
                     </Card>
                 ) : null}
             </div>
+
+            <Dialog open={closeCaseDialogOpen} onOpenChange={setCloseCaseDialogOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Close Case</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <div className="space-y-2">
+                            <Label htmlFor="case-outcome">Outcome Summary (required)</Label>
+                            <Textarea
+                                id="case-outcome"
+                                value={closeCaseOutcome}
+                                onChange={(e) => setCloseCaseOutcome(e.target.value)}
+                                placeholder="Enter the final case outcome summary..."
+                                rows={3}
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label>Outcome Type</Label>
+                            <RadioGroup value={closeCaseOutcomeType} onValueChange={(v) => setCloseCaseOutcomeType(v as 'resolved' | 'no_action')}>
+                                <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="resolved" id="resolved" />
+                                    <Label htmlFor="resolved">Resolved</Label>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    <RadioGroupItem value="no_action" id="no_action" />
+                                    <Label htmlFor="no_action">No Action</Label>
+                                </div>
+                            </RadioGroup>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setCloseCaseDialogOpen(false)}>Cancel</Button>
+                        <Button onClick={submitCloseCase} disabled={!closeCaseOutcome.trim()}>Close Case</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </AppLayout>
     );
 }

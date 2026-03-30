@@ -10,8 +10,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
-import { AlertTriangle, BarChart3, HeartPulse, Plus } from 'lucide-react';
+import { AlertTriangle, ArrowUpDown, BarChart3, HeartPulse, Plus } from 'lucide-react';
 import { FormEvent, useMemo, useState } from 'react';
+
+type FlaggedSortKey = 'risk' | 'overtime' | 'consecutive';
+const FLAG_SORT_ORDER: Record<string, number> = { red: 0, amber: 1, none: 2 };
 
 type FlaggedStaff = {
     user_id: number;
@@ -162,6 +165,30 @@ export default function WellbeingIndex({
         () => surveys.filter((survey) => survey.status === 'published' && !survey.has_responded).length,
         [surveys],
     );
+
+    const [flaggedSortKey, setFlaggedSortKey] = useState<FlaggedSortKey>('risk');
+
+    const sortedFlaggedStaff = useMemo(() => {
+        const copy = [...flaggedStaff];
+        switch (flaggedSortKey) {
+            case 'risk':
+                return copy.sort(
+                    (a, b) =>
+                        (FLAG_SORT_ORDER[a.flag_level] ?? 2) - (FLAG_SORT_ORDER[b.flag_level] ?? 2) ||
+                        b.triggered_rules.length - a.triggered_rules.length,
+                );
+            case 'overtime':
+                return copy.sort((a, b) => b.metrics.overtime_hours - a.metrics.overtime_hours);
+            case 'consecutive':
+                return copy.sort(
+                    (a, b) => b.metrics.consecutive_days_worked - a.metrics.consecutive_days_worked,
+                );
+            default:
+                return copy;
+        }
+    }, [flaggedStaff, flaggedSortKey]);
+
+    const isSurveyFormValid = surveyForm.data.title.trim().length > 0 && questions.some((q) => q.question_text.trim().length > 0);
 
     function addQuestion() {
         setQuestions((current) => [...current, { ...initialQuestion }]);
@@ -481,12 +508,17 @@ export default function WellbeingIndex({
                                             </div>
 
                                             {question.question_type === 'choice' && (
-                                                <Textarea
-                                                    rows={3}
-                                                    value={question.options_text}
-                                                    onChange={(event) => updateQuestion(index, { options_text: event.target.value })}
-                                                    placeholder={'Option one\nOption two\nOption three'}
-                                                />
+                                                <div className="space-y-1">
+                                                    <Label className="text-xs text-muted-foreground">
+                                                        Answer options (one per line) -- only used for Choice questions
+                                                    </Label>
+                                                    <Textarea
+                                                        rows={3}
+                                                        value={question.options_text}
+                                                        onChange={(event) => updateQuestion(index, { options_text: event.target.value })}
+                                                        placeholder={'Option one\nOption two\nOption three'}
+                                                    />
+                                                </div>
                                             )}
 
                                             <div className="flex items-center justify-between">
@@ -508,9 +540,14 @@ export default function WellbeingIndex({
                                     ))}
                                 </div>
 
-                                <Button type="submit" disabled={surveyForm.processing}>
+                                <Button type="submit" disabled={surveyForm.processing || !isSurveyFormValid}>
                                     {surveyForm.processing ? 'Saving...' : editingSurveyId ? 'Update Survey' : 'Create Draft Survey'}
                                 </Button>
+                                {!isSurveyFormValid && (
+                                    <p className="text-xs text-muted-foreground">
+                                        A title and at least one question are required.
+                                    </p>
+                                )}
                             </form>
                         </CardContent>
                     </Card>
@@ -615,9 +652,9 @@ export default function WellbeingIndex({
                                         <p className="font-medium">{plan.title}</p>
                                         <div className="flex flex-wrap items-center gap-2">
                                             <Badge variant={plan.status === 'completed' ? 'default' : 'outline'}>{plan.status}</Badge>
-                                            {plan.is_overdue && (
+                                            {plan.is_overdue && plan.days_until_due != null && (
                                                 <Badge variant="destructive">
-                                                    {Math.abs(plan.days_until_due ?? 0)}d overdue
+                                                    {Math.abs(plan.days_until_due)}d overdue
                                                 </Badge>
                                             )}
                                             {!plan.is_overdue && plan.days_until_due === 0 && (
@@ -678,13 +715,33 @@ export default function WellbeingIndex({
 
                 <Card>
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <AlertTriangle className="h-4 w-4" />
-                            Flagged Wellbeing Indicators
-                        </CardTitle>
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                            <CardTitle className="flex items-center gap-2">
+                                <AlertTriangle className="h-4 w-4" />
+                                Flagged Wellbeing Indicators
+                            </CardTitle>
+                            {flaggedStaff.length > 1 && (
+                                <div className="flex items-center gap-2">
+                                    <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <Select
+                                        value={flaggedSortKey}
+                                        onValueChange={(value: FlaggedSortKey) => setFlaggedSortKey(value)}
+                                    >
+                                        <SelectTrigger className="h-8 w-[160px] text-xs">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="risk">Highest risk first</SelectItem>
+                                            <SelectItem value="overtime">Most overtime</SelectItem>
+                                            <SelectItem value="consecutive">Most consecutive days</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                            )}
+                        </div>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        {flaggedStaff.map((entry) => (
+                        {sortedFlaggedStaff.map((entry) => (
                             <div key={entry.user_id} className="rounded-lg border p-3">
                                 <div className="flex items-center justify-between gap-2">
                                     <p className="font-medium">{entry.name ?? 'Unknown user'}</p>

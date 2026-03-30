@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { type BreadcrumbItem } from '@/types';
 import { Plus, AlertTriangle, Grid3X3 } from 'lucide-react';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 
 type Skill = {
     id: number;
@@ -197,19 +198,7 @@ export default function SkillsIndex({ skills, categories, skillGaps, filters, ca
 
                 {/* Pagination */}
                 {skills.links?.length > 3 && (
-                    <div className="flex flex-wrap gap-2">
-                        {skills.links.map((l, i) => (
-                            <Button
-                                key={i}
-                                variant={l.active ? 'default' : 'outline'}
-                                size="sm"
-                                disabled={!l.url}
-                                onClick={() => l.url && router.get(l.url, {}, { preserveState: true })}
-                            >
-                                <span dangerouslySetInnerHTML={{ __html: l.label }} />
-                            </Button>
-                        ))}
-                    </div>
+                    <LaravelPagination links={skills.links} />
                 )}
             </div>
 
