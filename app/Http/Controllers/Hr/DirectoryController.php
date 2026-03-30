@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Site;
 use Illuminate\Http\Request;
@@ -10,12 +11,14 @@ use Inertia\Inertia;
 
 class DirectoryController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user, 403);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $search = trim((string) $request->query('q', ''));
         $department = $request->query('department');
         $site = $request->query('site');
