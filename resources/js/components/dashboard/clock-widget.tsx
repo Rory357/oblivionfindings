@@ -87,12 +87,12 @@ export function ClockWidget({ activeClock, todayTotal }: ClockWidgetProps) {
                             <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
                             <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-500" />
                         </span>
-                        <span className="text-sm font-medium text-emerald-600 dark:text-emerald-400">Clocked In</span>
+                        <span className="text-sm font-medium text-emerald-300">Clocked In</span>
                     </>
                 ) : (
                     <>
-                        <span className="h-2.5 w-2.5 rounded-full bg-slate-300 dark:bg-slate-600" />
-                        <span className="text-sm text-muted-foreground">Not Clocked In</span>
+                        <span className="h-2.5 w-2.5 rounded-full bg-white/30" />
+                        <span className="text-sm text-white/60">Not Clocked In</span>
                     </>
                 )}
             </div>
@@ -104,10 +104,10 @@ export function ClockWidget({ activeClock, todayTotal }: ClockWidgetProps) {
                         {formatElapsed(elapsed)}
                     </div>
                 ) : (
-                    <div className="text-2xl font-semibold text-muted-foreground/60">--:--:--</div>
+                    <div className="text-2xl font-semibold text-white/40">--:--:--</div>
                 )}
                 {todayTotal > 0 && (
-                    <p className="mt-1 text-xs text-muted-foreground">
+                    <p className="mt-1 text-xs text-white/50">
                         Today: {formatHours(todayTotal)}
                     </p>
                 )}
@@ -120,7 +120,7 @@ export function ClockWidget({ activeClock, todayTotal }: ClockWidgetProps) {
                     disabled={processing}
                     variant="destructive"
                     size="lg"
-                    className="gap-2 rounded-full px-8"
+                    className="gap-2 rounded-full px-8 bg-red-500 hover:bg-red-600 shadow-md"
                 >
                     {processing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -134,7 +134,7 @@ export function ClockWidget({ activeClock, todayTotal }: ClockWidgetProps) {
                     onClick={handleClockIn}
                     disabled={processing}
                     size="lg"
-                    className="gap-2 rounded-full bg-emerald-600 px-8 hover:bg-emerald-700"
+                    className="gap-2 rounded-full bg-white px-8 text-primary font-semibold hover:bg-white/90 shadow-md"
                 >
                     {processing ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

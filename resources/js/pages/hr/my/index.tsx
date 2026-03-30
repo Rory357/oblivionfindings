@@ -190,75 +190,72 @@ export default function MyHrIndex({
             <Head title="My HR" />
             <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* ============================================= */}
-                {/* ZONE A — Hero Strip                            */}
+                {/* ZONE A — Hero Banner                            */}
                 {/* ============================================= */}
-                <div className="grid items-center gap-6 lg:grid-cols-[1fr_auto_1fr]">
-                    {/* Left — Greeting */}
-                    <div className="flex items-center gap-4">
-                        <Avatar className="h-14 w-14 border-2 border-primary/20">
-                            <AvatarImage src={profile?.user?.profile_photo_path ?? undefined} />
-                            <AvatarFallback className="bg-primary/10 text-primary text-lg font-semibold">
-                                {userInitials}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div>
-                            <h1 className="text-xl font-bold md:text-2xl">
-                                {getGreeting()}, {userName.split(' ')[0]}
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                {new Date().toLocaleDateString('en-NZ', {
-                                    weekday: 'long',
-                                    day: 'numeric',
-                                    month: 'long',
-                                    year: 'numeric',
-                                })}
-                            </p>
-                            {profile && (
-                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                    {profile.position_title}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground shadow-lg md:p-8">
+                    {/* Decorative shapes */}
+                    <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/5" />
+                    <div className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-white/5" />
+                    <div className="absolute right-24 bottom-0 h-20 w-20 rounded-full bg-white/5" />
+
+                    <div className="relative grid items-center gap-6 lg:grid-cols-[1fr_auto_1fr]">
+                        {/* Left — Greeting */}
+                        <div className="flex items-center gap-4">
+                            <Avatar className="h-16 w-16 border-2 border-white/30 shadow-md">
+                                <AvatarImage src={profile?.user?.profile_photo_path ?? undefined} />
+                                <AvatarFallback className="bg-white/20 text-white text-xl font-bold">
+                                    {userInitials}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <h1 className="text-2xl font-bold md:text-3xl">
+                                    {getGreeting()}, {userName.split(' ')[0]}
+                                </h1>
+                                <p className="text-sm text-white/70">
+                                    {new Date().toLocaleDateString('en-NZ', {
+                                        weekday: 'long',
+                                        day: 'numeric',
+                                        month: 'long',
+                                        year: 'numeric',
+                                    })}
                                 </p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Centre — Clock Widget */}
-                    <Card className="border-2 px-8 py-6 shadow-sm">
-                        <ClockWidget activeClock={activeClock} todayTotal={todayTotal} />
-                    </Card>
-
-                    {/* Right — Quick Stats */}
-                    <div className="flex items-center justify-end gap-6">
-                        <div className="flex flex-col items-center gap-1">
-                            <div className="flex items-center gap-1.5">
-                                <Timer className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-lg font-bold">{(weeklySummary?.total_hours ?? 0).toFixed(1)}h</span>
+                                {profile && (
+                                    <p className="mt-0.5 text-xs text-white/50">
+                                        {profile.position_title}
+                                    </p>
+                                )}
                             </div>
-                            <span className="text-[11px] text-muted-foreground">This Week</span>
-                            {weeklySparkline.length > 1 && (
-                                <MiniSparkline data={weeklySparkline} width={64} height={24} color="hsl(var(--primary))" />
-                            )}
                         </div>
 
-                        <div className="h-10 w-px bg-border" />
+                        {/* Centre — Clock Widget */}
+                        <div className="rounded-xl bg-white/10 px-8 py-5 backdrop-blur-sm">
+                            <ClockWidget activeClock={activeClock} todayTotal={todayTotal} />
+                        </div>
 
-                        <div className="flex flex-col items-center gap-1">
-                            <div className="flex items-center gap-1.5">
-                                <DollarSign className="h-4 w-4 text-muted-foreground" />
-                                <span className="text-lg font-bold">
+                        {/* Right — Quick Stats */}
+                        <div className="flex items-center justify-end gap-5">
+                            <div className="flex flex-col items-center gap-1 rounded-lg bg-white/10 px-4 py-3">
+                                <Timer className="h-5 w-5 text-white/70" />
+                                <span className="text-xl font-bold">{(weeklySummary?.total_hours ?? 0).toFixed(1)}h</span>
+                                <span className="text-[10px] text-white/60">This Week</span>
+                                {weeklySparkline.length > 1 && (
+                                    <MiniSparkline data={weeklySparkline} width={64} height={20} color="rgba(255,255,255,0.8)" />
+                                )}
+                            </div>
+
+                            <div className="flex flex-col items-center gap-1 rounded-lg bg-white/10 px-4 py-3">
+                                <DollarSign className="h-5 w-5 text-white/70" />
+                                <span className="text-xl font-bold">
                                     {latestPayslip ? formatNzd(latestPayslip.net_pay) : '--'}
                                 </span>
+                                <span className="text-[10px] text-white/60">Latest Pay</span>
                             </div>
-                            <span className="text-[11px] text-muted-foreground">Latest Pay</span>
-                        </div>
 
-                        <div className="h-10 w-px bg-border" />
-
-                        <div className="flex flex-col items-center gap-1">
-                            <div className="flex items-center gap-1.5">
-                                <Heart className="h-4 w-4 text-pink-500" />
-                                <span className="text-lg font-bold">{kudosReceived}</span>
+                            <div className="flex flex-col items-center gap-1 rounded-lg bg-white/10 px-4 py-3">
+                                <Heart className="h-5 w-5 text-pink-300" />
+                                <span className="text-xl font-bold">{kudosReceived}</span>
+                                <span className="text-[10px] text-white/60">Kudos</span>
                             </div>
-                            <span className="text-[11px] text-muted-foreground">Kudos (30d)</span>
                         </div>
                     </div>
                 </div>
@@ -267,39 +264,76 @@ export default function MyHrIndex({
                 {/* ZONE B — KPI Metrics                           */}
                 {/* ============================================= */}
                 <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-                    <KpiCard
-                        label="Pending Leave"
-                        value={pendingLeave}
-                        icon={CalendarDays}
-                        href="/hr/my/leave"
-                    />
-                    <KpiCard
-                        label="Pending Expenses"
-                        value={pendingExpenses.count}
-                        icon={Receipt}
-                        href="/hr/my/expenses"
-                        trend={
-                            pendingExpenses.total > 0
-                                ? {
-                                      value: 0,
-                                      label: formatNzd(pendingExpenses.total),
-                                      direction: 'neutral' as const,
-                                  }
-                                : undefined
-                        }
-                    />
-                    <KpiCard
-                        label="Pending Reviews"
-                        value={pendingReviews}
-                        icon={ClipboardList}
-                        href="/hr/my/reviews"
-                    />
-                    <KpiCard
-                        label="Active Goals"
-                        value={activeGoals}
-                        icon={Target}
-                        href="/hr/my/goals"
-                    />
+                    <Link href="/hr/my/leave" className="group">
+                        <div className="relative overflow-hidden rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/40">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Pending Leave</p>
+                                    <p className="mt-1 text-3xl font-bold tracking-tight">{pendingLeave}</p>
+                                </div>
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400 transition-transform group-hover:scale-110">
+                                    <CalendarDays className="h-6 w-6" />
+                                </div>
+                            </div>
+                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-blue-100 dark:bg-blue-900/30">
+                                <div className="h-full rounded-full bg-blue-500 transition-all" style={{ width: pendingLeave > 0 ? '100%' : '0%' }} />
+                            </div>
+                        </div>
+                    </Link>
+
+                    <Link href="/hr/my/expenses" className="group">
+                        <div className="relative overflow-hidden rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/40">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Pending Expenses</p>
+                                    <p className="mt-1 text-3xl font-bold tracking-tight">{pendingExpenses.count}</p>
+                                    {pendingExpenses.total > 0 && (
+                                        <p className="mt-0.5 text-xs text-muted-foreground">{formatNzd(pendingExpenses.total)} total</p>
+                                    )}
+                                </div>
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 transition-transform group-hover:scale-110">
+                                    <Receipt className="h-6 w-6" />
+                                </div>
+                            </div>
+                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-amber-100 dark:bg-amber-900/30">
+                                <div className="h-full rounded-full bg-amber-500 transition-all" style={{ width: pendingExpenses.count > 0 ? '100%' : '0%' }} />
+                            </div>
+                        </div>
+                    </Link>
+
+                    <Link href="/hr/my/reviews" className="group">
+                        <div className="relative overflow-hidden rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/40">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Pending Reviews</p>
+                                    <p className="mt-1 text-3xl font-bold tracking-tight">{pendingReviews}</p>
+                                </div>
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-violet-500/10 text-violet-600 dark:text-violet-400 transition-transform group-hover:scale-110">
+                                    <ClipboardList className="h-6 w-6" />
+                                </div>
+                            </div>
+                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-violet-100 dark:bg-violet-900/30">
+                                <div className="h-full rounded-full bg-violet-500 transition-all" style={{ width: pendingReviews > 0 ? '100%' : '0%' }} />
+                            </div>
+                        </div>
+                    </Link>
+
+                    <Link href="/hr/my/goals" className="group">
+                        <div className="relative overflow-hidden rounded-xl border bg-card p-5 shadow-sm transition-all hover:shadow-md hover:border-primary/40">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="text-sm font-medium text-muted-foreground">Active Goals</p>
+                                    <p className="mt-1 text-3xl font-bold tracking-tight">{activeGoals}</p>
+                                </div>
+                                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 transition-transform group-hover:scale-110">
+                                    <Target className="h-6 w-6" />
+                                </div>
+                            </div>
+                            <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-emerald-100 dark:bg-emerald-900/30">
+                                <div className="h-full rounded-full bg-emerald-500 transition-all" style={{ width: activeGoals > 0 ? '100%' : '0%' }} />
+                            </div>
+                        </div>
+                    </Link>
                 </div>
 
                 {/* ============================================= */}
