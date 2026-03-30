@@ -4,17 +4,23 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementSurvey;
+use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrLeaveBalance;
+use App\Domain\Hr\Models\HrPayslip;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\EngagementService;
 use App\Domain\Hr\Services\LeaveService;
+use App\Domain\Hr\Services\TimeTrackingService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
@@ -26,6 +32,7 @@ class MyHrController extends Controller
     public function __construct(
         private readonly LeaveService $leaveService,
         private readonly EngagementService $engagementService,
+        private readonly TimeTrackingService $timeTrackingService,
     ) {}
 
     public function index(Request $request)
@@ -35,6 +42,7 @@ class MyHrController extends Controller
 
         $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
             ->where('user_id', $user->id)
+            ->with('user:id,name,email,avatar')
             ->first();
 
         $pendingLeave = HrLeaveRequest::where('tenant_id', $tenantId)
@@ -80,6 +88,47 @@ class MyHrController extends Controller
             ->where('status', 'published')
             ->count();
 
+        // Time tracking
+        $activeClock = HrTimeEntry::forTenant($tenantId)
+            ->forUser($user->id)
+            ->active()
+            ->first(['id', 'clock_in', 'notes']);
+
+        $weeklySummary = $this->timeTrackingService->getWeeklySummary($tenantId, $user->id);
+
+        $todayTotal = (float) HrTimeEntry::forTenant($tenantId)
+            ->forUser($user->id)
+            ->where('entry_date', now()->toDateString())
+            ->whereNotNull('clock_out')
+            ->sum('total_hours');
+
+        // Latest payslip
+        $latestPayslip = HrPayslip::where('user_id', $user->id)
+            ->where('status', 'paid')
+            ->orderByDesc('payment_date')
+            ->first(['net_pay', 'payment_date']);
+
+        // Expenses
+        $pendingExpenses = HrExpenseClaim::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->where('status', 'submitted')
+            ->selectRaw('count(*) as count, coalesce(sum(total_amount), 0) as total')
+            ->first();
+
+        // Kudos received (last 30 days)
+        $kudosReceived = HrKudos::where('tenant_id', $tenantId)
+            ->where('to_user_id', $user->id)
+            ->where('created_at', '>=', now()->subDays(30))
+            ->count();
+
+        // Announcements (unacknowledged, active)
+        $announcements = HrAnnouncement::forTenant($tenantId)
+            ->active()
+            ->whereDoesntHave('acknowledgements', fn ($q) => $q->where('user_id', $user->id))
+            ->orderByDesc('published_at')
+            ->limit(5)
+            ->get(['id', 'title', 'priority', 'published_at']);
+
         return Inertia::render('hr/my/index', [
             'profile' => $profile,
             'pendingLeave' => $pendingLeave,
@@ -90,6 +139,16 @@ class MyHrController extends Controller
             'pendingReviews' => $pendingReviews,
             'activeGoals' => $activeGoals,
             'availableSurveys' => $availableSurveys,
+            'activeClock' => $activeClock,
+            'weeklySummary' => $weeklySummary,
+            'todayTotal' => $todayTotal,
+            'latestPayslip' => $latestPayslip,
+            'pendingExpenses' => $pendingExpenses ? [
+                'count' => (int) $pendingExpenses->count,
+                'total' => (float) $pendingExpenses->total,
+            ] : ['count' => 0, 'total' => 0],
+            'kudosReceived' => $kudosReceived,
+            'announcements' => $announcements,
         ]);
     }
 
