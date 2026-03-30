@@ -367,7 +367,8 @@ export default function MyHrIndex({
                                         const color = LEAVE_COLORS[typeKey] ?? LEAVE_COLORS[b.leave_type] ?? '#06b6d4';
 
                                         return (
-                                            <Card key={i} className="overflow-hidden">
+                                            <Link key={i} href="/hr/my/leave" className="group">
+                                            <Card className="overflow-hidden transition-all group-hover:shadow-md group-hover:border-primary/40">
                                                 {/* Coloured top accent */}
                                                 <div className="h-1" style={{ backgroundColor: color }} />
 
@@ -433,6 +434,7 @@ export default function MyHrIndex({
                                                     </div>
                                                 </CardContent>
                                             </Card>
+                                            </Link>
                                         );
                                     })}
                                 </div>
