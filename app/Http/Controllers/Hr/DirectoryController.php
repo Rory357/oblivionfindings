@@ -81,7 +81,7 @@ class DirectoryController extends Controller
         abort_unless($user, 403);
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
-        $profile->load('user:id,name,email', 'primarySite:id,name', 'position:id,title,code');
+        $profile->load('user:id,name,email,cellphone,work_phone', 'primarySite:id,name', 'position:id,title,code');
 
         // Tenure calculation
         $tenure = null;
@@ -194,8 +194,11 @@ class DirectoryController extends Controller
                 'user_id' => $profile->user_id,
                 'name' => $profile->preferred_name ?? $profile->user?->name ?? 'Unknown',
                 'full_name' => $profile->user?->name ?? 'Unknown',
-                'email' => $profile->work_email,
-                'phone' => $profile->work_phone,
+                'email' => $profile->work_email ?? $profile->user?->email,
+                'phone' => $profile->work_phone ?? $profile->user?->cellphone ?? $profile->personal_phone,
+                'work_phone' => $profile->work_phone,
+                'cellphone' => $profile->user?->cellphone,
+                'personal_email' => $profile->personal_email,
                 'position_title' => $profile->position_title,
                 'department' => $profile->department,
                 'team' => $profile->team,

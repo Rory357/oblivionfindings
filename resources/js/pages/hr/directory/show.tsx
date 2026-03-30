@@ -23,6 +23,7 @@ import {
     Lightbulb,
     Mail,
     MapPin,
+    MessageCircle,
     MessageSquare,
     Phone,
     Rocket,
@@ -37,6 +38,10 @@ import {
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+function Loader2({ className }: { className?: string }) {
+    return <svg className={`animate-spin ${className ?? ''}`} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
@@ -48,6 +53,9 @@ interface Employee {
     full_name: string;
     email: string | null;
     phone: string | null;
+    work_phone: string | null;
+    cellphone: string | null;
+    personal_email: string | null;
     position_title: string | null;
     department: string | null;
     team: string | null;
@@ -165,11 +173,28 @@ export default function DirectoryShow({
     const [kudosCategory, setKudosCategory] = useState('teamwork');
     const [kudosMessage, setKudosMessage] = useState('');
     const [kudosSending, setKudosSending] = useState(false);
+    const [messageSending, setMessageSending] = useState(false);
 
     const isSelf = authUserId === employee.user_id;
     const complianceRate = complianceSummary && complianceSummary.total > 0
         ? Math.round((complianceSummary.compliant / complianceSummary.total) * 100)
         : null;
+
+    function startConversation() {
+        setMessageSending(true);
+        router.post('/operations/messages/create', {
+            participant_ids: [employee.user_id],
+        }, {
+            onSuccess: () => {
+                // Controller redirects back with selected_conversation_id in session
+                router.visit('/operations/messages');
+            },
+            onError: () => {
+                toast.error('Failed to start conversation');
+                setMessageSending(false);
+            },
+        });
+    }
 
     function sendKudos() {
         if (!kudosMessage.trim()) return;
@@ -284,6 +309,18 @@ export default function DirectoryShow({
                                             <a href={`tel:${employee.phone}`}>
                                                 <Phone className="h-3.5 w-3.5" /> Call
                                             </a>
+                                        </Button>
+                                    )}
+                                    {!isSelf && (
+                                        <Button
+                                            onClick={startConversation}
+                                            disabled={messageSending}
+                                            size="sm"
+                                            variant="outline"
+                                            className="gap-1.5 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/20 hover:text-white"
+                                        >
+                                            {messageSending ? <Loader2 className="h-3.5 w-3.5" /> : <MessageCircle className="h-3.5 w-3.5" />}
+                                            Message
                                         </Button>
                                     )}
                                 </div>
@@ -411,6 +448,37 @@ export default function DirectoryShow({
                                                 <p className="text-sm font-medium">{employee.department}</p>
                                             </div>
                                         </div>
+                                    )}
+                                    {employee.cellphone && employee.cellphone !== employee.phone && (
+                                        <a href={`tel:${employee.cellphone}`} className="flex items-center gap-3 rounded-lg p-3 bg-muted/30 hover:bg-muted/60 transition-colors">
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-teal-500/10">
+                                                <Phone className="h-4 w-4 text-teal-600" />
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-muted-foreground">Mobile</p>
+                                                <p className="text-sm font-medium">{employee.cellphone}</p>
+                                            </div>
+                                        </a>
+                                    )}
+                                    {!isSelf && (
+                                        <button
+                                            onClick={startConversation}
+                                            disabled={messageSending}
+                                            className="flex items-center gap-3 rounded-lg p-3 bg-primary/5 hover:bg-primary/10 transition-colors border border-primary/20 text-left"
+                                        >
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10">
+                                                {messageSending
+                                                    ? <Loader2 className="h-4 w-4 text-primary" />
+                                                    : <MessageCircle className="h-4 w-4 text-primary" />
+                                                }
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-muted-foreground">Direct Message</p>
+                                                <p className="text-sm font-medium text-primary">
+                                                    {messageSending ? 'Opening...' : `Message ${employee.name.split(' ')[0]}`}
+                                                </p>
+                                            </div>
+                                        </button>
                                     )}
                                 </div>
                             </CardContent>
