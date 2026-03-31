@@ -18,6 +18,7 @@ class HrDocument extends Model
         'template_id',
         'title',
         'category',
+        'folder',
         'storage_disk',
         'storage_path',
         'original_name',

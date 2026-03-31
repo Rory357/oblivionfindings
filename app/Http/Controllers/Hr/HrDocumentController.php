@@ -463,6 +463,124 @@ class HrDocumentController extends Controller
         return redirect()->back()->with('success', 'Template status updated.');
     }
 
+    /* ------------------------------------------------------------------ */
+    /*  Profile-scoped document management                                 */
+    /* ------------------------------------------------------------------ */
+
+    public function profileDocuments(Request $request, HrEmployeeProfile $profile)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.employees.viewAny'), 403);
+
+        $profile->load('user:id,name,email');
+
+        $documents = HrDocument::where('employee_profile_id', $profile->id)
+            ->with('uploader:id,name')
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($d) => [
+                'id' => $d->id,
+                'title' => $d->title,
+                'category' => $d->category,
+                'folder' => $d->folder ?? null,
+                'original_name' => $d->original_name,
+                'mime_type' => $d->mime_type,
+                'size_bytes' => $d->size_bytes,
+                'expires_at' => $d->expires_at?->toDateString(),
+                'signed_by_employee' => (bool) $d->signed_by_employee,
+                'is_restricted' => (bool) $d->is_restricted,
+                'created_at' => $d->created_at?->toIso8601String(),
+                'uploaded_by' => $d->uploader ? ['id' => $d->uploader->id, 'name' => $d->uploader->name] : null,
+            ]);
+
+        return Inertia::render('hr/employees/documents', [
+            'profile' => [
+                'id' => $profile->id,
+                'name' => $profile->user?->name ?? 'Unknown',
+            ],
+            'documents' => $documents,
+            'categories' => $this->documentCategories(),
+            'can' => [
+                'manage' => $user->canDo('hr.employees.manage'),
+            ],
+        ]);
+    }
+
+    public function storeForProfile(Request $request, HrEmployeeProfile $profile)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.employees.manage'), 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'max:51200'],
+            'title' => ['required', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:50'],
+            'folder' => ['nullable', 'string', 'max:255'],
+            'expires_at' => ['nullable', 'date'],
+            'is_restricted' => ['boolean'],
+            'notes' => ['nullable', 'string', 'max:5000'],
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->store("hr-documents/{$tenantId}/{$profile->id}", 'private');
+
+        HrDocument::create([
+            'tenant_id' => $tenantId,
+            'employee_profile_id' => $profile->id,
+            'title' => $validated['title'],
+            'category' => $validated['category'] ?? null,
+            'folder' => $validated['folder'] ?? null,
+            'storage_disk' => 'private',
+            'storage_path' => $path,
+            'original_name' => $file->getClientOriginalName(),
+            'mime_type' => $file->getClientMimeType(),
+            'size_bytes' => $file->getSize(),
+            'is_restricted' => $validated['is_restricted'] ?? false,
+            'expires_at' => $validated['expires_at'] ?? null,
+            'generated_from_template' => false,
+            'created_by' => $user->id,
+            'uploaded_by' => $user->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Document uploaded.');
+    }
+
+    public function updateForProfile(Request $request, HrEmployeeProfile $profile, HrDocument $document)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.employees.manage'), 403);
+        abort_unless($document->employee_profile_id === $profile->id, 404);
+
+        $validated = $request->validate([
+            'title' => ['required', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:50'],
+            'folder' => ['nullable', 'string', 'max:255'],
+            'expires_at' => ['nullable', 'date'],
+            'is_restricted' => ['boolean'],
+        ]);
+
+        $document->update($validated);
+
+        return redirect()->back()->with('success', 'Document updated.');
+    }
+
+    public function destroyForProfile(Request $request, HrEmployeeProfile $profile, HrDocument $document)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.employees.manage'), 403);
+        abort_unless($document->employee_profile_id === $profile->id, 404);
+
+        if ($document->storage_path && Storage::disk($document->storage_disk ?? 'private')->exists($document->storage_path)) {
+            Storage::disk($document->storage_disk ?? 'private')->delete($document->storage_path);
+        }
+
+        $document->delete();
+
+        return redirect()->back()->with('success', 'Document deleted.');
+    }
+
     /**
      * @return list<string>
      */

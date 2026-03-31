@@ -343,27 +343,35 @@ export default function EmployeeShow({
 
                     {/* ======== DOCUMENTS ======== */}
                     <TabsContent value="documents">
-                        <Card><CardContent className="p-0">
-                            {p.documents.length === 0 ? <EmptyState icon={FileText} label="No documents uploaded" /> : (
-                                <table className="w-full text-sm"><thead className="border-b bg-muted/50"><tr>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Title</th>
-                                    <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Category</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Uploaded</th>
-                                    <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">Expires</th>
-                                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Signed</th>
-                                </tr></thead><tbody className="divide-y">
-                                    {p.documents.map(d => (
-                                        <tr key={d.id} className="hover:bg-muted/30">
-                                            <td className="px-4 py-3 font-medium">{d.title}</td>
-                                            <td className="hidden px-4 py-3 sm:table-cell"><Badge variant="outline">{d.category ? formatLabel(d.category) : 'Other'}</Badge></td>
-                                            <td className="px-4 py-3 text-muted-foreground">{formatDate(d.created_at)}</td>
-                                            <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{formatDate(d.expires_at)}</td>
-                                            <td className="px-4 py-3">{d.signed_by_employee ? <Check className="h-4 w-4 text-emerald-500" /> : <X className="h-4 w-4 text-muted-foreground/30" />}</td>
-                                        </tr>
-                                    ))}
-                                </tbody></table>
-                            )}
-                        </CardContent></Card>
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-sm text-muted-foreground">{p.documents.length} document{p.documents.length !== 1 ? 's' : ''}</p>
+                                <Link href={`/hr/people/${p.id}/documents`}>
+                                    <Button variant="outline" size="sm" className="gap-1.5"><FolderOpen className="h-3.5 w-3.5" />Manage Documents</Button>
+                                </Link>
+                            </div>
+                            <Card><CardContent className="p-0">
+                                {p.documents.length === 0 ? <EmptyState icon={FileText} label="No documents uploaded" /> : (
+                                    <table className="w-full text-sm"><thead className="border-b bg-muted/50"><tr>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Title</th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Category</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Uploaded</th>
+                                        <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">Expires</th>
+                                        <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Signed</th>
+                                    </tr></thead><tbody className="divide-y">
+                                        {p.documents.map(d => (
+                                            <tr key={d.id} className="hover:bg-muted/30">
+                                                <td className="px-4 py-3 font-medium">{d.title}</td>
+                                                <td className="hidden px-4 py-3 sm:table-cell"><Badge variant="outline">{d.category ? formatLabel(d.category) : 'Other'}</Badge></td>
+                                                <td className="px-4 py-3 text-muted-foreground">{formatDate(d.created_at)}</td>
+                                                <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{formatDate(d.expires_at)}</td>
+                                                <td className="px-4 py-3">{d.signed_by_employee ? <Check className="h-4 w-4 text-emerald-500" /> : <X className="h-4 w-4 text-muted-foreground/30" />}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody></table>
+                                )}
+                            </CardContent></Card>
+                        </div>
                     </TabsContent>
 
                     {/* ======== PERFORMANCE ======== */}
