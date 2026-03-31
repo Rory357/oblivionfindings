@@ -320,7 +320,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                     <Button
                                         size="sm"
                                         className="ml-2"
-                                        onClick={() => router.post('/emar/rounds/generate', { date: new Date().toISOString().split('T')[0] })}
+                                        onClick={() => router.post(`/emar/rounds/${nextRound.id}/start`)}
                                     >
                                         Start Round
                                     </Button>
@@ -638,7 +638,7 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                 <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10">
                                     <Clock className="h-4 w-4" />
                                 </div>
-                                <span className="text-sm">Start Round</span>
+                                <span className="text-sm">Generate Today's Rounds</span>
                             </Button>
                             {[
                                 { label: 'Record Administration', href: '/emar/mar', icon: Syringe, color: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300' },

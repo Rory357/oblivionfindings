@@ -40,7 +40,7 @@ class MedicationAlertService
         $alerts = [];
 
         // Get active medications
-        $medications = $client->medications()->current()->get();
+        $medications = $client->medications()->active()->get();
 
         foreach ($medications as $medication) {
             // Check PRN limits
@@ -197,9 +197,8 @@ class MedicationAlertService
 
         // Find medications with scheduled times that have passed and no administration
         $medications = $client->medications()
-            ->current()
+            ->active()
             ->where('is_prn', false)
-            ->where('state', 'active')
             ->get();
 
         $overdueCount = 0;
@@ -380,7 +379,7 @@ class MedicationAlertService
      */
     private function getExpiringMedicationsWidget(?int $clientId = null): array
     {
-        $query = ClientMedication::current()
+        $query = ClientMedication::active()
             ->whereNotNull('end_date')
             ->where('end_date', '<=', now()->addDays(14))
             ->where('end_date', '>=', now())
@@ -412,7 +411,7 @@ class MedicationAlertService
      */
     private function getHighRiskMedicationsWidget(?int $clientId = null): array
     {
-        $query = ClientMedication::current()
+        $query = ClientMedication::active()
             ->where('high_risk', true)
             ->with('client:id,first_name,last_name');
 
@@ -446,7 +445,7 @@ class MedicationAlertService
         $tomorrow = $today->copy()->addDay();
 
         // Get scheduled medications (non-PRN, active today)
-        $scheduledQuery = ClientMedication::current()
+        $scheduledQuery = ClientMedication::active()
             ->where('is_prn', false)
             ->where(function ($q) use ($today) {
                 $q->whereNull('start_date')->orWhere('start_date', '<=', $today);
@@ -473,7 +472,7 @@ class MedicationAlertService
             ->whereNotNull('scheduled_for')
             ->whereBetween('scheduled_for', [$today, $tomorrow])
             ->whereHas('medication', function ($q) {
-                $q->where('is_prn', false);
+                $q->active()->where('is_prn', false);
             });
         
         if ($clientId) {
@@ -487,13 +486,13 @@ class MedicationAlertService
         $refusedQuery = ClientMedicationAdministration::where('status', 'refused')
             ->whereBetween('scheduled_for', [$today, $tomorrow])
             ->whereHas('medication', function ($q) {
-                $q->where('is_prn', false);
+                $q->active()->where('is_prn', false);
             });
-        
+
         $missedQuery = ClientMedicationAdministration::where('status', 'missed')
             ->whereBetween('scheduled_for', [$today, $tomorrow])
             ->whereHas('medication', function ($q) {
-                $q->where('is_prn', false);
+                $q->active()->where('is_prn', false);
             });
         
         if ($clientId) {

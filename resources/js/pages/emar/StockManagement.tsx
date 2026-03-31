@@ -81,7 +81,7 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
         quantity_ordered: '',
         order_notes: '',
         batch_number: '',
-        expiry_date: '',
+        batch_expiry: '',
     });
 
     const filteredMedications = activeMedications.filter(
@@ -325,8 +325,8 @@ export default function StockManagement({ stockItems, lowStockCount, expiringCou
                                         </div>
                                         <div className="space-y-2">
                                             <Label>Expiry Date</Label>
-                                            <Input type="date" value={orderForm.data.expiry_date} onChange={(e) => orderForm.setData('expiry_date', e.target.value)} />
-                                            {orderForm.errors.expiry_date && <p className="text-sm text-red-600">{orderForm.errors.expiry_date}</p>}
+                                            <Input type="date" value={orderForm.data.batch_expiry} onChange={(e) => orderForm.setData('batch_expiry', e.target.value)} />
+                                            {orderForm.errors.batch_expiry && <p className="text-sm text-red-600">{orderForm.errors.batch_expiry}</p>}
                                         </div>
                                     </div>
                                     <div className="space-y-2">

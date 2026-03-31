@@ -19,6 +19,8 @@ class ClientControlledDrugEntry extends Model
         'entry_type',
         'quantity',
         'unit',
+        'batch_number',
+        'expiry_date',
         'on_hand_before',
         'on_hand_after',
         'reason',
@@ -30,6 +32,7 @@ class ClientControlledDrugEntry extends Model
 
     protected $casts = [
         'recorded_at' => 'datetime',
+        'expiry_date' => 'date',
     ];
 
     public function client()

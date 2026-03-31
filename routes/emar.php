@@ -134,6 +134,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::post('/medications/import', [EmarController::class, 'importMedications'])->name('emar.medications.import');
     Route::put('/medications/{medication}', [EmarController::class, 'updateMedication'])->name('emar.medications.update');
     Route::post('/medications/{medication}/discontinue', [EmarController::class, 'discontinueMedication'])->name('emar.medications.discontinue');
+    Route::post('/alerts/{alert}/dismiss', [EmarController::class, 'dismissAlert'])->name('emar.alerts.dismiss');
 
     // Controlled Drug Entries
     Route::post('/controlled/entries', [EmarController::class, 'storeCDEntry'])->name('emar.controlled.entries.store');
@@ -154,6 +155,7 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::post('/stock/pharmacy-orders', [EmarController::class, 'storePharmacyOrder'])->name('emar.pharmacy_orders.store');
     Route::put('/stock/pharmacy-orders/{order}', [EmarController::class, 'updatePharmacyOrder'])->name('emar.pharmacy_orders.update');
     Route::post('/stock/pharmacy-orders/{order}/advance', [EmarController::class, 'advancePharmacyOrder'])->name('emar.pharmacy_orders.advance');
+    Route::patch('/stock/{stock}', [EmarController::class, 'updateStockItem'])->name('emar.stock.update');
     Route::post('/stock/receive', [EmarController::class, 'receiveStock'])->name('emar.stock.receive');
     Route::post('/stock/adjust', [EmarController::class, 'adjustStock'])->name('emar.stock.adjust');
 

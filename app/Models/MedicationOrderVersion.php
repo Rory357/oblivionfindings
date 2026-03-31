@@ -30,6 +30,7 @@ class MedicationOrderVersion extends Model
         'is_prn',
         'prn_reason',
         'max_per_day',
+        'min_hours_between_doses',
         'controlled_drug',
         'high_risk',
         'witness_required',
@@ -59,7 +60,9 @@ class MedicationOrderVersion extends Model
         'high_risk' => 'boolean',
         'witness_required' => 'boolean',
         'active' => 'boolean',
+        'max_per_day' => 'integer',
         'dose_amount' => 'decimal:4',
+        'min_hours_between_doses' => 'float',
     ];
 
     public function medication(): BelongsTo

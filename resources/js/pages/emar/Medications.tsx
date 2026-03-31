@@ -122,14 +122,32 @@ function defaultFormData() {
         indication: '',
         is_prn: false as boolean,
         prn_reason: '',
-        max_doses_per_day: '',
+        max_per_day: '',
         min_hours_between_doses: '',
-        is_controlled_drug: false as boolean,
-        is_high_risk: false as boolean,
+        controlled_drug: false as boolean,
+        high_risk: false as boolean,
         witness_required: false as boolean,
         start_date: '',
-        prescriber_name: '',
+        prescriber: '',
     };
+}
+
+function getEditableDose(med: any) {
+    if (med.dose_amount !== null && med.dose_amount !== undefined) {
+        return med.dose_amount.toString();
+    }
+
+    const dosage = med.dosage ?? '';
+    const doseUnit = med.dose_unit ?? '';
+
+    if (dosage && doseUnit) {
+        const suffix = ` ${doseUnit}`;
+        if (dosage.endsWith(suffix)) {
+            return dosage.slice(0, -suffix.length);
+        }
+    }
+
+    return dosage;
 }
 
 function MedicationFormFields({
@@ -275,11 +293,11 @@ function MedicationFormFields({
                     />
                 </div>
                 <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_prescriber_name`}>Prescriber Name</Label>
+                    <Label htmlFor={`${idPrefix}_prescriber`}>Prescriber</Label>
                     <Input
-                        id={`${idPrefix}_prescriber_name`}
-                        value={form.data.prescriber_name}
-                        onChange={(e) => form.setData('prescriber_name', e.target.value)}
+                        id={`${idPrefix}_prescriber`}
+                        value={form.data.prescriber}
+                        onChange={(e) => form.setData('prescriber', e.target.value)}
                     />
                 </div>
             </div>
@@ -309,19 +327,19 @@ function MedicationFormFields({
                 </div>
                 <div className="flex items-center space-x-2">
                     <Checkbox
-                        id={`${idPrefix}_is_controlled_drug`}
-                        checked={form.data.is_controlled_drug}
-                        onCheckedChange={(v) => form.setData('is_controlled_drug', v === true)}
+                        id={`${idPrefix}_controlled_drug`}
+                        checked={form.data.controlled_drug}
+                        onCheckedChange={(v) => form.setData('controlled_drug', v === true)}
                     />
-                    <Label htmlFor={`${idPrefix}_is_controlled_drug`}>Controlled Drug</Label>
+                    <Label htmlFor={`${idPrefix}_controlled_drug`}>Controlled Drug</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                     <Checkbox
-                        id={`${idPrefix}_is_high_risk`}
-                        checked={form.data.is_high_risk}
-                        onCheckedChange={(v) => form.setData('is_high_risk', v === true)}
+                        id={`${idPrefix}_high_risk`}
+                        checked={form.data.high_risk}
+                        onCheckedChange={(v) => form.setData('high_risk', v === true)}
                     />
-                    <Label htmlFor={`${idPrefix}_is_high_risk`}>High Risk</Label>
+                    <Label htmlFor={`${idPrefix}_high_risk`}>High Risk</Label>
                 </div>
                 <div className="flex items-center space-x-2">
                     <Checkbox
@@ -351,10 +369,10 @@ function MedicationFormFields({
                             <Input
                                 id={`${idPrefix}_max_doses`}
                                 type="number"
-                                value={form.data.max_doses_per_day}
-                                onChange={(e) => form.setData('max_doses_per_day', e.target.value)}
+                                value={form.data.max_per_day}
+                                onChange={(e) => form.setData('max_per_day', e.target.value)}
                             />
-                            {form.errors.max_doses_per_day && <p className="text-xs text-red-600">{form.errors.max_doses_per_day}</p>}
+                            {form.errors.max_per_day && <p className="text-xs text-red-600">{form.errors.max_per_day}</p>}
                         </div>
                         <div className="space-y-1.5">
                             <Label htmlFor={`${idPrefix}_min_hours`}>Min Hours Between</Label>
@@ -420,7 +438,7 @@ function EditMedicationDialog({ med, clients }: { med: any; clients: Props['clie
         client_id: med.client_id?.toString() ?? '',
         medication_name: med.name ?? '',
         brand_name: med.brand_name ?? '',
-        dose: med.dose_amount ?? med.dose ?? '',
+        dose: getEditableDose(med),
         dose_unit: med.dose_unit ?? '',
         frequency: med.frequency ?? '',
         route: med.route ?? '',
@@ -429,13 +447,13 @@ function EditMedicationDialog({ med, clients }: { med: any; clients: Props['clie
         indication: med.indication ?? '',
         is_prn: !!med.is_prn,
         prn_reason: med.prn_reason ?? '',
-        max_doses_per_day: med.max_doses_per_day?.toString() ?? '',
+        max_per_day: med.max_per_day?.toString() ?? '',
         min_hours_between_doses: med.min_hours_between_doses?.toString() ?? '',
-        is_controlled_drug: !!med.controlled_drug,
-        is_high_risk: !!med.high_risk,
+        controlled_drug: !!med.controlled_drug,
+        high_risk: !!med.high_risk,
         witness_required: !!med.witness_required,
         start_date: med.start_date ?? '',
-        prescriber_name: med.prescriber_name ?? '',
+        prescriber: med.prescriber ?? '',
     });
 
     function handleSubmit(e: React.FormEvent) {
@@ -612,7 +630,11 @@ export default function Medications({ medications, clients, staff, filters, inte
                                             {m.instructions && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{m.instructions}</p>}
                                         </td>
                                         <td className="p-3">{m.client?.last_name}, {m.client?.first_name}</td>
-                                        <td className="p-3 text-xs">{m.dosage ?? `${m.dose_amount} ${m.dose_unit}`}</td>
+                                        <td className="p-3 text-xs">
+                                            {m.dose_amount !== null && m.dose_amount !== undefined && m.dose_unit
+                                                ? `${m.dose_amount} ${m.dose_unit}`
+                                                : m.dosage ?? '—'}
+                                        </td>
                                         <td className="p-3 text-xs">{m.frequency}</td>
                                         <td className="p-3 text-xs">{m.route ?? '—'}</td>
                                         <td className="p-3">

@@ -51,8 +51,8 @@ export default function ControlledDrugs({ medications, recentEntries, discrepanc
         entry_type: '',
         quantity: '',
         unit: '',
-        balance_before: '',
-        balance_after: '',
+        on_hand_before: '',
+        on_hand_after: '',
         witnessed_by: '',
         batch_number: '',
         notes: '',
@@ -106,7 +106,9 @@ export default function ControlledDrugs({ medications, recentEntries, discrepanc
 
     function submitResolve(e: React.FormEvent) {
         e.preventDefault();
-        resolveForm.post('/emar/controlled/resolve-discrepancy', {
+        if (!resolveDiscrepancyId) return;
+
+        resolveForm.post(`/emar/controlled/discrepancies/${resolveDiscrepancyId}/resolve`, {
             onSuccess: () => {
                 setResolveOpen(false);
                 setResolveDiscrepancyId(null);
@@ -225,6 +227,9 @@ export default function ControlledDrugs({ medications, recentEntries, discrepanc
 
     const statusVariant = (status: string) => {
         switch (status) {
+            case 'open': return 'destructive' as const;
+            case 'under_review': return 'secondary' as const;
+            case 'closed': return 'outline' as const;
             case 'reported': return 'destructive' as const;
             case 'investigating': return 'secondary' as const;
             case 'resolved': return 'outline' as const;
@@ -330,13 +335,13 @@ export default function ControlledDrugs({ medications, recentEntries, discrepanc
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div className="space-y-1.5">
                                         <Label htmlFor="entry-before">Balance Before</Label>
-                                        <Input id="entry-before" type="number" min="0" step="any" value={entryForm.data.balance_before} onChange={(e) => entryForm.setData('balance_before', e.target.value)} />
-                                        {entryForm.errors.balance_before && <p className="text-xs text-destructive">{entryForm.errors.balance_before}</p>}
+                                        <Input id="entry-before" type="number" min="0" step="any" value={entryForm.data.on_hand_before} onChange={(e) => entryForm.setData('on_hand_before', e.target.value)} />
+                                        {entryForm.errors.on_hand_before && <p className="text-xs text-destructive">{entryForm.errors.on_hand_before}</p>}
                                     </div>
                                     <div className="space-y-1.5">
                                         <Label htmlFor="entry-after">Balance After</Label>
-                                        <Input id="entry-after" type="number" min="0" step="any" value={entryForm.data.balance_after} onChange={(e) => entryForm.setData('balance_after', e.target.value)} />
-                                        {entryForm.errors.balance_after && <p className="text-xs text-destructive">{entryForm.errors.balance_after}</p>}
+                                        <Input id="entry-after" type="number" min="0" step="any" value={entryForm.data.on_hand_after} onChange={(e) => entryForm.setData('on_hand_after', e.target.value)} />
+                                        {entryForm.errors.on_hand_after && <p className="text-xs text-destructive">{entryForm.errors.on_hand_after}</p>}
                                     </div>
                                 </div>
 
@@ -581,7 +586,7 @@ export default function ControlledDrugs({ medications, recentEntries, discrepanc
                                             <span className="text-sm">{d.medication?.name}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <Badge variant="destructive">{d.status}</Badge>
+                                            <Badge variant={statusVariant(d.status)}>{d.status}</Badge>
                                             <Button size="sm" variant="outline" onClick={() => openResolve(d.id)}>
                                                 <CheckCircle className="mr-1 h-3.5 w-3.5" /> Resolve
                                             </Button>

@@ -2,7 +2,6 @@
 
 namespace App\Console\Commands;
 
-use App\Models\ClientMedication;
 use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
 use Carbon\Carbon;
@@ -10,7 +9,9 @@ use Illuminate\Console\Command;
 
 class GenerateMedicationRounds extends Command
 {
-    protected $signature = 'emar:generate-rounds {--date= : Date to generate for (default today)}';
+    protected $signature = 'emar:generate-rounds
+        {--date= : Date to generate for (default today)}
+        {--generate-all : Ignore day-of-week filters and generate any missing rounds for the date}';
 
     protected $description = 'Generate medication rounds from active templates for the given date';
 
@@ -18,15 +19,14 @@ class GenerateMedicationRounds extends Command
     {
         $date = $this->option('date') ? Carbon::parse($this->option('date')) : today();
         $dayOfWeek = $date->dayOfWeekIso; // 1=Mon, 7=Sun
+        $generateAll = (bool) $this->option('generate-all');
 
         $templates = MedicationRoundTemplate::active()->get();
-        $totalMedications = ClientMedication::active()->count();
         $generated = 0;
         $skipped = 0;
 
         foreach ($templates as $template) {
-            // Check if this template runs on this day
-            if (! $template->appliesToDay($dayOfWeek)) {
+            if (! $generateAll && ! $template->appliesToDay($dayOfWeek)) {
                 $skipped++;
                 continue;
             }
@@ -50,7 +50,7 @@ class GenerateMedicationRounds extends Command
                 'round_date' => $date->toDateString(),
                 'status' => 'pending',
                 'assigned_to' => $template->default_assigned_to,
-                'total_medications' => $totalMedications,
+                'total_medications' => $template->applicableMedicationCountForDate($date),
                 'site_id' => $template->site_id,
                 'service_context_id' => $template->service_context_id,
             ]);

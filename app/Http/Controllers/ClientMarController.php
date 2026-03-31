@@ -113,12 +113,12 @@ class ClientMarController extends Controller
             ->map(fn ($d) => [
                 'id' => $d->id,
                 'medication_name' => $d->medication?->name ?? 'Unknown',
-                'expected_balance' => $d->expected_balance,
-                'actual_balance' => $d->actual_balance,
-                'discrepancy_amount' => $d->discrepancy_amount,
+                'expected_balance' => $d->on_hand_before,
+                'actual_balance' => $d->on_hand_after,
+                'discrepancy_amount' => $d->difference,
                 'status' => $d->status,
                 'reported_by' => $d->reportedBy?->name ?? 'System',
-                'created_at' => $d->created_at?->toIso8601String(),
+                'created_at' => $d->reported_at?->toIso8601String() ?? $d->created_at?->toIso8601String(),
             ]);
 
         // Get active medication alerts

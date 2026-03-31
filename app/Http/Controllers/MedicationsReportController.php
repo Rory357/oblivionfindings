@@ -19,7 +19,7 @@ class MedicationsReportController extends Controller
             'client_id' => ['nullable', 'integer'],
             'service_context_id' => ['nullable', 'integer'],
             'status' => ['nullable', 'in:given,refused,missed,withheld'],
-            'discrepancy_status' => ['nullable', 'in:open,closed'],
+            'discrepancy_status' => ['nullable', 'in:open,under_review,closed'],
         ]);
 
         $dateFrom = isset($filters['date_from']) && $filters['date_from']
@@ -96,7 +96,7 @@ class MedicationsReportController extends Controller
         }
 
         $discrepancies = $discQ
-            ->orderByRaw("status = 'open' desc")
+            ->orderByRaw("status = 'open' desc, status = 'under_review' desc")
             ->orderByDesc('reported_at')
             ->orderByDesc('id')
             ->limit(500)
@@ -249,7 +249,7 @@ class MedicationsReportController extends Controller
             'date_to' => ['nullable', 'date'],
             'client_id' => ['nullable', 'integer'],
             'service_context_id' => ['nullable', 'integer'],
-            'discrepancy_status' => ['nullable', 'in:open,closed'],
+            'discrepancy_status' => ['nullable', 'in:open,under_review,closed'],
         ]);
 
         $dateFrom = isset($filters['date_from']) && $filters['date_from']

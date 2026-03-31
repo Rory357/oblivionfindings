@@ -26,6 +26,7 @@ use App\Models\MedicationSelfAdminAssessment;
 use App\Models\Site;
 use App\Models\User;
 use App\Services\DoseSchedulingService;
+use App\Services\MedicationAlertService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -42,6 +43,86 @@ class EmarController extends Controller
     private function getClientsList()
     {
         return Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']);
+    }
+
+    private function buildMedicationPayload(array $validated): array
+    {
+        $payload = [];
+
+        if (array_key_exists('client_id', $validated)) {
+            $payload['client_id'] = $validated['client_id'];
+        }
+
+        if (array_key_exists('medication_name', $validated)) {
+            $payload['name'] = $validated['medication_name'];
+        }
+
+        if (array_key_exists('dose', $validated)) {
+            $payload['dosage'] = trim((string) $validated['dose']);
+            $payload['dose_amount'] = is_numeric($validated['dose']) ? (float) $validated['dose'] : null;
+        }
+
+        if (array_key_exists('dose_unit', $validated)) {
+            $payload['dose_unit'] = $validated['dose_unit'];
+        }
+
+        if (array_key_exists('frequency', $validated)) {
+            $payload['frequency'] = $validated['frequency'];
+            $payload['dose_times'] = DoseSchedulingService::calculateDoseTimes((string) $validated['frequency']);
+        }
+
+        foreach (['route', 'form', 'instructions', 'indication', 'start_date'] as $field) {
+            if (array_key_exists($field, $validated)) {
+                $payload[$field] = $validated[$field];
+            }
+        }
+
+        if (array_key_exists('is_prn', $validated)) {
+            $payload['is_prn'] = (bool) $validated['is_prn'];
+        }
+
+        if (array_key_exists('prn_reason', $validated)) {
+            $payload['prn_reason'] = $validated['prn_reason'];
+        }
+
+        if (array_key_exists('max_per_day', $validated) || array_key_exists('max_doses_per_day', $validated)) {
+            $payload['max_per_day'] = $validated['max_per_day'] ?? $validated['max_doses_per_day'];
+        }
+
+        if (array_key_exists('min_hours_between_doses', $validated)) {
+            $payload['min_hours_between_doses'] = $validated['min_hours_between_doses'];
+        }
+
+        if (array_key_exists('controlled_drug', $validated) || array_key_exists('is_controlled_drug', $validated)) {
+            $payload['controlled_drug'] = (bool) ($validated['controlled_drug'] ?? $validated['is_controlled_drug']);
+        }
+
+        if (array_key_exists('high_risk', $validated) || array_key_exists('is_high_risk', $validated)) {
+            $payload['high_risk'] = (bool) ($validated['high_risk'] ?? $validated['is_high_risk']);
+        }
+
+        if (array_key_exists('witness_required', $validated)) {
+            $payload['witness_required'] = (bool) $validated['witness_required'];
+        }
+
+        if (array_key_exists('prescriber', $validated) || array_key_exists('prescriber_name', $validated)) {
+            $payload['prescriber'] = $validated['prescriber'] ?? $validated['prescriber_name'];
+        }
+
+        if (array_key_exists('brand_name', $validated)) {
+            $payload['brand_name'] = $validated['brand_name'];
+        }
+
+        return $payload;
+    }
+
+    private function findControlledMedication(int $clientId, string $medicationName): ?ClientMedication
+    {
+        return ClientMedication::query()
+            ->where('client_id', $clientId)
+            ->controlled()
+            ->where('name', 'like', '%' . $medicationName . '%')
+            ->first();
     }
 
     // ─── Dashboard ─────────────────────────────────────────
@@ -95,7 +176,7 @@ class EmarController extends Controller
 
         // Controlled drugs
         $controlledCount = ClientMedication::active()->controlled()->count();
-        $activeDiscrepancies = ClientControlledDrugDiscrepancy::whereIn('status', ['reported', 'investigating'])->count();
+        $activeDiscrepancies = ClientControlledDrugDiscrepancy::whereIn('status', ['open', 'under_review'])->count();
 
         // Overdue reviews
         $overdueReviews = MedicationReview::where('status', 'scheduled')
@@ -468,7 +549,7 @@ class EmarController extends Controller
             ->get();
 
         $discrepancies = ClientControlledDrugDiscrepancy::query()
-            ->whereIn('status', ['reported', 'investigating'])
+            ->whereIn('status', ['open', 'under_review'])
             ->with(['client:id,first_name,last_name', 'medication:id,name'])
             ->latest()
             ->get();
@@ -1079,17 +1160,18 @@ class EmarController extends Controller
     {
         $validated = $request->validate([
             'date' => 'required|date',
+            'generate_all' => 'nullable|boolean',
         ]);
 
         $date = \Carbon\Carbon::parse($validated['date']);
         $dayOfWeek = $date->dayOfWeekIso; // 1=Mon, 7=Sun
+        $generateAll = (bool) ($validated['generate_all'] ?? false);
 
         $templates = MedicationRoundTemplate::active()->get();
-        $totalMedications = ClientMedication::active()->count();
         $created = 0;
 
         foreach ($templates as $template) {
-            if (!$template->appliesToDay($dayOfWeek)) {
+            if (!$generateAll && !$template->appliesToDay($dayOfWeek)) {
                 continue;
             }
 
@@ -1111,7 +1193,7 @@ class EmarController extends Controller
                 'round_date' => $date->toDateString(),
                 'status' => 'pending',
                 'assigned_to' => $template->default_assigned_to,
-                'total_medications' => $totalMedications,
+                'total_medications' => $template->applicableMedicationCountForDate($date),
                 'site_id' => $template->site_id,
                 'service_context_id' => $template->service_context_id,
             ]);
@@ -1359,8 +1441,16 @@ class EmarController extends Controller
             'quantity_ordered' => 'required|integer|min:1',
             'order_notes' => 'nullable|string',
             'order_type' => 'nullable|string|max:255',
+            'batch_number' => 'nullable|string|max:255',
+            'batch_expiry' => 'nullable|date',
+            'expiry_date' => 'nullable|date',
         ]);
 
+        if (!isset($validated['batch_expiry']) && !empty($validated['expiry_date'])) {
+            $validated['batch_expiry'] = $validated['expiry_date'];
+        }
+
+        unset($validated['expiry_date']);
         $validated['status'] = 'draft';
         $validated['ordered_by'] = auth()->id();
 
@@ -1378,8 +1468,16 @@ class EmarController extends Controller
             'pharmacy_email' => 'nullable|string|email|max:255',
             'quantity_ordered' => 'nullable|integer|min:1',
             'delivery_notes' => 'nullable|string',
+            'batch_number' => 'nullable|string|max:255',
+            'batch_expiry' => 'nullable|date',
+            'expiry_date' => 'nullable|date',
         ]);
 
+        if (!isset($validated['batch_expiry']) && !empty($validated['expiry_date'])) {
+            $validated['batch_expiry'] = $validated['expiry_date'];
+        }
+
+        unset($validated['expiry_date']);
         $order->update($validated);
 
         return redirect()->back();
@@ -1436,12 +1534,23 @@ class EmarController extends Controller
 
             if ($nextStatus === 'delivered') {
                 $quantityReceived = $updateData['quantity_received'] ?? 0;
-                if ($order->client_medication_id && $quantityReceived > 0) {
+                if ($order->client_medication_id) {
                     $stock = ClientMedicationStock::firstOrCreate(
                         ['client_medication_id' => $order->client_medication_id],
                         ['on_hand' => 0, 'unit' => 'units']
                     );
-                    $stock->increment('on_hand', $quantityReceived);
+
+                    if ($quantityReceived > 0) {
+                        $stock->increment('on_hand', $quantityReceived);
+                    }
+
+                    $stock->fill([
+                        'batch_number' => $order->batch_number,
+                        'expiry_date' => $order->batch_expiry,
+                        'supplier_name' => $order->pharmacy_name,
+                        'last_counted_at' => now(),
+                    ]);
+                    $stock->save();
                 }
             }
         });
@@ -1454,6 +1563,9 @@ class EmarController extends Controller
         $validated = $request->validate([
             'client_medication_id' => 'required|exists:client_medications,id',
             'quantity' => 'required|integer|min:1',
+            'notes' => 'nullable|string|max:2000',
+            'batch_number' => 'nullable|string|max:100',
+            'expiry_date' => 'nullable|date',
         ]);
 
         DB::transaction(function () use ($validated) {
@@ -1461,9 +1573,30 @@ class EmarController extends Controller
                 ['client_medication_id' => $validated['client_medication_id']],
                 ['on_hand' => 0, 'unit' => 'units']
             );
+
             $stock->increment('on_hand', $validated['quantity']);
-            $stock->update(['last_counted_at' => now()]);
+            $stock->update([
+                'last_counted_at' => now(),
+                'notes' => $validated['notes'] ?? $stock->notes,
+                'batch_number' => $validated['batch_number'] ?? $stock->batch_number,
+                'expiry_date' => $validated['expiry_date'] ?? $stock->expiry_date,
+            ]);
         });
+
+        return redirect()->back();
+    }
+
+    public function updateStockItem(Request $request, ClientMedicationStock $stock)
+    {
+        $validated = $request->validate([
+            'reorder_level' => 'nullable|integer|min:0',
+            'reorder_quantity' => 'nullable|integer|min:1',
+            'expiry_date' => 'nullable|date',
+            'batch_number' => 'nullable|string|max:100',
+            'supplier_name' => 'nullable|string|max:255',
+        ]);
+
+        $stock->update($validated);
 
         return redirect()->back();
     }
@@ -1534,42 +1667,27 @@ class EmarController extends Controller
             'indication' => 'nullable|string|max:500',
             'is_prn' => 'nullable|boolean',
             'prn_reason' => 'nullable|string|max:500',
+            'max_per_day' => 'nullable|integer|min:1',
             'max_doses_per_day' => 'nullable|integer|min:1',
             'min_hours_between_doses' => 'nullable|numeric|min:0',
+            'controlled_drug' => 'nullable|boolean',
             'is_controlled_drug' => 'nullable|boolean',
+            'high_risk' => 'nullable|boolean',
             'is_high_risk' => 'nullable|boolean',
             'witness_required' => 'nullable|boolean',
             'start_date' => 'nullable|date',
+            'prescriber' => 'nullable|string|max:255',
             'prescriber_name' => 'nullable|string|max:255',
         ]);
 
-        $medication = ClientMedication::create([
-            'client_id' => $validated['client_id'],
-            'name' => $validated['medication_name'],
-            'brand_name' => $validated['brand_name'] ?? null,
-            'dosage' => $validated['dose'],
-            'dose_unit' => $validated['dose_unit'] ?? null,
-            'frequency' => $validated['frequency'],
-            'route' => $validated['route'] ?? null,
-            'form' => $validated['form'] ?? null,
-            'instructions' => $validated['instructions'] ?? null,
-            'indication' => $validated['indication'] ?? null,
-            'is_prn' => $validated['is_prn'] ?? false,
-            'prn_reason' => $validated['prn_reason'] ?? null,
-            'max_doses_per_day' => $validated['max_doses_per_day'] ?? null,
-            'min_hours_between_doses' => $validated['min_hours_between_doses'] ?? null,
-            'is_controlled_drug' => $validated['is_controlled_drug'] ?? false,
-            'is_high_risk' => $validated['is_high_risk'] ?? false,
-            'witness_required' => $validated['witness_required'] ?? false,
-            'start_date' => $validated['start_date'] ?? now()->toDateString(),
-            'prescriber_name' => $validated['prescriber_name'] ?? null,
-            'state' => 'active',
-        ]);
-
-        // Auto-calculate dose times from the frequency
-        $medication->update([
-            'dose_times' => DoseSchedulingService::calculateDoseTimes($validated['frequency']),
-        ]);
+        $medication = ClientMedication::create(array_merge(
+            $this->buildMedicationPayload($validated),
+            [
+                'start_date' => $validated['start_date'] ?? now()->toDateString(),
+                'state' => 'active',
+                'active' => true,
+            ],
+        ));
 
         return redirect()->back();
     }
@@ -1577,6 +1695,7 @@ class EmarController extends Controller
     public function updateMedication(Request $request, ClientMedication $medication)
     {
         $validated = $request->validate([
+            'client_id' => 'nullable|exists:clients,id',
             'medication_name' => 'sometimes|string|max:255',
             'brand_name' => 'nullable|string|max:255',
             'dose' => 'sometimes|string|max:100',
@@ -1588,26 +1707,20 @@ class EmarController extends Controller
             'indication' => 'nullable|string|max:500',
             'is_prn' => 'nullable|boolean',
             'prn_reason' => 'nullable|string|max:500',
+            'max_per_day' => 'nullable|integer|min:1',
             'max_doses_per_day' => 'nullable|integer|min:1',
             'min_hours_between_doses' => 'nullable|numeric|min:0',
+            'controlled_drug' => 'nullable|boolean',
             'is_controlled_drug' => 'nullable|boolean',
+            'high_risk' => 'nullable|boolean',
             'is_high_risk' => 'nullable|boolean',
             'witness_required' => 'nullable|boolean',
+            'start_date' => 'nullable|date',
+            'prescriber' => 'nullable|string|max:255',
             'prescriber_name' => 'nullable|string|max:255',
         ]);
 
-        $updateData = [];
-        if (isset($validated['medication_name'])) $updateData['name'] = $validated['medication_name'];
-        if (isset($validated['dose'])) $updateData['dosage'] = $validated['dose'];
-        unset($validated['medication_name'], $validated['dose']);
-        $updateData = array_merge($updateData, $validated);
-
-        // Recalculate dose_times if frequency changed
-        if (isset($validated['frequency']) && $validated['frequency'] !== $medication->frequency) {
-            $updateData['dose_times'] = DoseSchedulingService::calculateDoseTimes($validated['frequency']);
-        }
-
-        $medication->update($updateData);
+        $medication->update($this->buildMedicationPayload($validated));
 
         return redirect()->back();
     }
@@ -1620,10 +1733,10 @@ class EmarController extends Controller
 
         $medication->update([
             'state' => 'ceased',
+            'active' => false,
             'end_date' => now()->toDateString(),
-            'discontinued_reason' => $request->reason,
-            'discontinued_by' => auth()->id(),
-            'discontinued_at' => now(),
+            'ceased_reason' => $request->reason,
+            'ceased_at' => now(),
         ]);
 
         return redirect()->back();
@@ -1639,41 +1752,52 @@ class EmarController extends Controller
             'entry_type' => 'required|in:receipt,administration,disposal,transfer_in,transfer_out,balance_check,adjustment',
             'quantity' => 'required|numeric|min:0',
             'unit' => 'nullable|string|max:50',
+            'on_hand_before' => 'nullable|numeric|min:0',
+            'on_hand_after' => 'nullable|numeric|min:0',
             'balance_before' => 'nullable|numeric|min:0',
             'balance_after' => 'nullable|numeric|min:0',
             'witnessed_by' => 'required|exists:users,id|different:' . auth()->id(),
             'batch_number' => 'nullable|string|max:100',
+            'expiry_date' => 'nullable|date',
             'notes' => 'nullable|string|max:2000',
         ]);
 
-        // Try to find matching controlled medication
-        $medication = ClientMedication::where('client_id', $validated['client_id'])
-            ->where('name', 'like', '%' . $validated['medication_name'] . '%')
-            ->controlled()
-            ->first();
+        $client = Client::findOrFail($validated['client_id']);
+        $medication = $this->findControlledMedication($validated['client_id'], $validated['medication_name']);
+        $onHandBefore = $validated['on_hand_before'] ?? $validated['balance_before'] ?? null;
+        $onHandAfter = $validated['on_hand_after'] ?? $validated['balance_after'] ?? null;
+        $unit = $validated['unit'] ?? $medication?->stock?->unit ?? 'tablets';
 
         ClientControlledDrugEntry::create([
             'client_id' => $validated['client_id'],
             'client_medication_id' => $medication?->id,
-            'medication_name' => $validated['medication_name'],
+            'service_context_id' => $client->service_context_id,
             'entry_type' => $validated['entry_type'],
             'quantity' => $validated['quantity'],
-            'unit' => $validated['unit'] ?? 'tablets',
-            'balance_before' => $validated['balance_before'],
-            'balance_after' => $validated['balance_after'],
+            'unit' => $unit,
+            'batch_number' => $validated['batch_number'] ?? null,
+            'expiry_date' => $validated['expiry_date'] ?? null,
+            'on_hand_before' => $onHandBefore,
+            'on_hand_after' => $onHandAfter,
+            'reason' => ucwords(str_replace('_', ' ', $validated['entry_type'])),
             'recorded_by' => auth()->id(),
             'witnessed_by' => $validated['witnessed_by'],
-            'batch_number' => $validated['batch_number'],
             'notes' => $validated['notes'],
             'recorded_at' => now(),
         ]);
 
-        // Update stock if medication found and balance_after is provided
-        if ($medication && isset($validated['balance_after'])) {
+        if ($medication && $onHandAfter !== null) {
             $stock = $medication->stock ?? $medication->stock()->create([
-                'client_id' => $validated['client_id'],
+                'on_hand' => 0,
+                'unit' => $unit,
             ]);
-            $stock->update(['on_hand' => $validated['balance_after']]);
+            $stock->update([
+                'on_hand' => $onHandAfter,
+                'unit' => $unit,
+                'batch_number' => $validated['batch_number'] ?? $stock->batch_number,
+                'expiry_date' => $validated['expiry_date'] ?? $stock->expiry_date,
+                'last_counted_at' => now(),
+            ]);
         }
 
         return redirect()->back();
@@ -1684,46 +1808,60 @@ class EmarController extends Controller
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,id',
             'medication_name' => 'required|string|max:255',
+            'on_hand_before' => 'nullable|numeric|min:0',
+            'on_hand_after' => 'nullable|numeric|min:0',
             'expected_balance' => 'required|numeric|min:0',
             'actual_balance' => 'required|numeric|min:0',
-            'witnessed_by' => 'required|exists:users,id',
+            'witnessed_by' => 'required|exists:users,id|different:' . auth()->id(),
             'discrepancy_notes' => 'nullable|string|max:2000',
         ]);
 
-        $medication = ClientMedication::where('client_id', $validated['client_id'])
-            ->where('name', 'like', '%' . $validated['medication_name'] . '%')
-            ->controlled()
-            ->first();
+        $client = Client::findOrFail($validated['client_id']);
+        $medication = $this->findControlledMedication($validated['client_id'], $validated['medication_name']);
+        $expectedBalance = $validated['on_hand_before'] ?? $validated['expected_balance'];
+        $actualBalance = $validated['on_hand_after'] ?? $validated['actual_balance'];
 
-        DB::transaction(function () use ($validated, $medication) {
-            // Record the balance check entry
+        DB::transaction(function () use ($validated, $client, $medication, $expectedBalance, $actualBalance) {
             ClientControlledDrugEntry::create([
                 'client_id' => $validated['client_id'],
                 'client_medication_id' => $medication?->id,
-                'medication_name' => $validated['medication_name'],
+                'service_context_id' => $client->service_context_id,
                 'entry_type' => 'balance_check',
-                'quantity' => $validated['actual_balance'],
-                'balance_before' => $validated['expected_balance'],
-                'balance_after' => $validated['actual_balance'],
+                'quantity' => $actualBalance,
+                'unit' => $medication?->stock?->unit ?? 'units',
+                'on_hand_before' => $expectedBalance,
+                'on_hand_after' => $actualBalance,
+                'reason' => 'Balance check',
                 'recorded_by' => auth()->id(),
                 'witnessed_by' => $validated['witnessed_by'],
                 'notes' => $validated['discrepancy_notes'],
                 'recorded_at' => now(),
             ]);
 
-            // Create discrepancy if amounts don't match
-            if ($validated['expected_balance'] != $validated['actual_balance']) {
+            if ($medication) {
+                $stock = $medication->stock ?? $medication->stock()->create([
+                    'on_hand' => 0,
+                    'unit' => 'units',
+                ]);
+                $stock->update([
+                    'on_hand' => $actualBalance,
+                    'last_counted_at' => now(),
+                ]);
+            }
+
+            if ($expectedBalance != $actualBalance) {
                 ClientControlledDrugDiscrepancy::create([
                     'client_id' => $validated['client_id'],
                     'client_medication_id' => $medication?->id,
-                    'medication_name' => $validated['medication_name'],
-                    'expected_quantity' => $validated['expected_balance'],
-                    'actual_quantity' => $validated['actual_balance'],
-                    'discrepancy' => $validated['actual_balance'] - $validated['expected_balance'],
+                    'service_context_id' => $client->service_context_id,
+                    'on_hand_before' => $expectedBalance,
+                    'on_hand_after' => $actualBalance,
+                    'difference' => $actualBalance - $expectedBalance,
+                    'reason' => 'Balance check discrepancy',
                     'reported_by' => auth()->id(),
                     'witnessed_by' => $validated['witnessed_by'],
                     'notes' => $validated['discrepancy_notes'],
-                    'status' => 'reported',
+                    'status' => 'open',
                     'reported_at' => now(),
                 ]);
             }
@@ -1736,16 +1874,25 @@ class EmarController extends Controller
     {
         $validated = $request->validate([
             'resolution_notes' => 'required|string|max:2000',
-            'resolution_action' => 'required|string|max:255',
+            'resolution_action' => 'nullable|string|max:255',
         ]);
 
         $discrepancy->update([
-            'status' => 'resolved',
-            'resolution_notes' => $validated['resolution_notes'],
-            'resolution_action' => $validated['resolution_action'],
+            'status' => 'closed',
+            'resolution_notes' => trim(
+                ($validated['resolution_action'] ? 'Action: ' . $validated['resolution_action'] . "\n\n" : '')
+                . $validated['resolution_notes']
+            ),
             'resolved_by' => auth()->id(),
             'resolved_at' => now(),
         ]);
+
+        return redirect()->back();
+    }
+
+    public function dismissAlert(MedicationDashboardAlert $alert)
+    {
+        app(MedicationAlertService::class)->acknowledgeAlert($alert->id, auth()->id());
 
         return redirect()->back();
     }

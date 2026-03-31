@@ -44,7 +44,7 @@ class EnhancedMarService
 
         // Get active medications
         $medications = $client->medications()
-            ->current()
+            ->active()
             ->where(function ($q) use ($date) {
                 $q->whereNull('start_date')->orWhere('start_date', '<=', $date);
             })
@@ -59,10 +59,6 @@ class EnhancedMarService
         $prnRows = [];
 
         foreach ($medications as $medication) {
-            if ($medication->state === 'ceased' || ($medication->ceased_at && $date->gt($medication->ceased_at))) {
-                continue;
-            }
-
             // Build scheduled doses for non-PRN medications
             if (!$medication->is_prn) {
                 $scheduledTimes = $this->scheduleService->scheduledTimesForDate($medication, $date);

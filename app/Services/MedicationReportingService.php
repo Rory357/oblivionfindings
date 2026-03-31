@@ -112,7 +112,12 @@ class MedicationReportingService
         // Group by medication and client
         $grouped = $administrations->groupBy(fn ($a) => "{$a->client_id}-{$a->client_medication_id}");
 
-        $summaries = $grouped->map(function ($group) {
+        $daysInRange = max(
+            1,
+            $dateFrom->copy()->startOfDay()->diffInDays($dateTo->copy()->startOfDay()) + 1
+        );
+
+        $summaries = $grouped->map(function ($group) use ($daysInRange) {
             $first = $group->first();
             $count = $group->count();
             $maxPerDay = (int) filter_var($first->medication?->max_per_day, FILTER_SANITIZE_NUMBER_INT);
@@ -124,7 +129,7 @@ class MedicationReportingService
                 'medication_name' => $first->medication?->name ?? 'Unknown',
                 'max_per_day' => $maxPerDay ?: null,
                 'total_administrations' => $count,
-                'average_per_day' => round($count / 30, 2), // Assuming 30-day period
+                'average_per_day' => round($count / $daysInRange, 2),
                 'first_administration' => $group->first()->administered_at?->toDateString(),
                 'last_administration' => $group->last()->administered_at?->toDateString(),
                 'limit_exceeded_count' => $maxPerDay > 0 ? $group->filter(function ($a) use ($maxPerDay) {
@@ -273,7 +278,7 @@ class MedicationReportingService
         ?int $medicationId = null
     ): array {
         $query = ClientMedication::where('controlled_drug', true)
-            ->current()
+            ->active()
             ->with(['stock', 'client:id,first_name,last_name']);
 
         if ($clientId) {
@@ -360,6 +365,7 @@ class MedicationReportingService
                 'date_to' => $dateTo->toDateString(),
                 'total_discrepancies' => $discrepancies->count(),
                 'open_count' => $discrepancies->where('status', 'open')->count(),
+                'under_review_count' => $discrepancies->where('status', 'under_review')->count(),
                 'closed_count' => $discrepancies->where('status', 'closed')->count(),
             ],
             'records' => $discrepancies->map(fn ($d) => [
@@ -557,7 +563,7 @@ class MedicationReportingService
         return [
             'total_prn_administrations' => $totalPrn,
             'limit_exceedances' => $limitExceedances,
-            'avg_per_day' => round($totalPrn / max(1, $dateFrom->diffInDays($dateTo)), 2),
+            'avg_per_day' => round($totalPrn / max(1, $dateFrom->diffInDays($dateTo) + 1), 2),
         ];
     }
 
@@ -667,7 +673,11 @@ class MedicationReportingService
         }
 
         $withNotes = $query->clone()->whereNotNull('notes')->count();
-        $withReason = $query->clone()->where('status', 'given')->orWhereNotNull('reason')->count();
+        $withReason = $query->clone()
+            ->where(function ($builder) {
+                $builder->where('status', 'given')->orWhereNotNull('reason');
+            })
+            ->count();
 
         return round((($withNotes + $withReason) / ($total * 2)) * 100, 1);
     }

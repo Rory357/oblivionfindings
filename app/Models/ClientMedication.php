@@ -31,6 +31,7 @@ class ClientMedication extends Model
         'witness_required',
         'prn_reason',
         'max_per_day',
+        'min_hours_between_doses',
         'route',
         'form',
         'prescriber',
@@ -63,7 +64,9 @@ class ClientMedication extends Model
         'witness_required' => 'boolean',
         'active' => 'boolean',
         'dose_times' => 'array',
+        'max_per_day' => 'integer',
         'dose_amount' => 'decimal:4',
+        'min_hours_between_doses' => 'float',
         'version' => 'integer',
     ];
 
@@ -338,6 +341,7 @@ class ClientMedication extends Model
             'is_prn' => $this->is_prn,
             'prn_reason' => $this->prn_reason,
             'max_per_day' => $this->max_per_day,
+            'min_hours_between_doses' => $this->min_hours_between_doses,
             'controlled_drug' => $this->controlled_drug,
             'high_risk' => $this->high_risk,
             'witness_required' => $this->witness_required,

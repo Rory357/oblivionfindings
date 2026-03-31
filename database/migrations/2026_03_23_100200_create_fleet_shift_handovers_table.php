@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('fleet_shift_handovers')) {
+        if (Schema::hasTable('fleet_shift_handovers') || ! Schema::hasTable('organisations')) {
             return;
         }
         Schema::create('fleet_shift_handovers', function (Blueprint $table) {

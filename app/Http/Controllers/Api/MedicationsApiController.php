@@ -65,7 +65,7 @@ class MedicationsApiController extends Controller
 
         // Add controlled drug discrepancies
         $marData['controlled_discrepancies'] = \App\Models\ClientControlledDrugDiscrepancy::where('client_id', $client->id)
-            ->where('status', 'open')
+            ->whereIn('status', ['open', 'under_review'])
             ->with('medication:id,name')
             ->get()
             ->map(fn ($d) => [
@@ -85,6 +85,7 @@ class MedicationsApiController extends Controller
     public function safetyCheck(Request $request, Client $client, ClientMedication $medication)
     {
         $this->authorize('viewMedications', $client);
+        abort_unless($medication->client_id === $client->id, 404);
 
         $check = $this->safetyService->performSafetyCheck($client, $medication);
 
@@ -97,6 +98,7 @@ class MedicationsApiController extends Controller
     public function getPrnHistory(Request $request, Client $client, ClientMedication $medication)
     {
         $this->authorize('viewMedications', $client);
+        abort_unless($medication->client_id === $client->id, 404);
 
         $hours = $request->input('hours', 24);
         $history = $this->safetyService->getPrnHistory($medication, $hours);
@@ -113,6 +115,7 @@ class MedicationsApiController extends Controller
         ClientMedication $medication
     ) {
         $this->authorize('viewMedications', $client);
+        abort_unless($medication->client_id === $client->id, 404);
         $user = $request->user();
         
         abort_unless(

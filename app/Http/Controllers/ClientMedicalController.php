@@ -19,6 +19,57 @@ use Illuminate\Http\Request;
 
 class ClientMedicalController extends Controller
 {
+    private function buildMedicationPayload(array $validated): array
+    {
+        $payload = [];
+
+        foreach ([
+            'name',
+            'dosage',
+            'frequency',
+            'dose_times',
+            'is_prn',
+            'prn_reason',
+            'route',
+            'form',
+            'pharmacy',
+            'start_date',
+            'end_date',
+            'ceased_at',
+            'ceased_reason',
+            'state',
+            'paused_at',
+            'instructions',
+            'active',
+        ] as $field) {
+            if (array_key_exists($field, $validated)) {
+                $payload[$field] = $validated[$field];
+            }
+        }
+
+        if (array_key_exists('max_per_day', $validated) || array_key_exists('max_doses_per_day', $validated)) {
+            $payload['max_per_day'] = $validated['max_per_day'] ?? $validated['max_doses_per_day'];
+        }
+
+        if (array_key_exists('min_hours_between_doses', $validated)) {
+            $payload['min_hours_between_doses'] = $validated['min_hours_between_doses'];
+        }
+
+        if (array_key_exists('controlled_drug', $validated) || array_key_exists('is_controlled_drug', $validated)) {
+            $payload['controlled_drug'] = (bool) ($validated['controlled_drug'] ?? $validated['is_controlled_drug']);
+        }
+
+        if (array_key_exists('high_risk', $validated) || array_key_exists('is_high_risk', $validated)) {
+            $payload['high_risk'] = (bool) ($validated['high_risk'] ?? $validated['is_high_risk']);
+        }
+
+        if (array_key_exists('prescriber', $validated) || array_key_exists('prescriber_name', $validated)) {
+            $payload['prescriber'] = $validated['prescriber'] ?? $validated['prescriber_name'];
+        }
+
+        return $payload;
+    }
+
     public function show(Request $request, Client $client)
     {
         $this->authorize('viewMedications', $client);
@@ -239,11 +290,17 @@ class ClientMedicalController extends Controller
             'dose_times.*' => ['string', 'regex:/^\d{2}:\d{2}$/'],
             'is_prn' => ['sometimes', 'boolean'],
             'controlled_drug' => ['sometimes', 'boolean'],
+            'is_controlled_drug' => ['sometimes', 'boolean'],
+            'high_risk' => ['sometimes', 'boolean'],
+            'is_high_risk' => ['sometimes', 'boolean'],
             'prn_reason' => ['nullable', 'string', 'max:255'],
-            'max_per_day' => ['nullable', 'string', 'max:255'],
+            'max_per_day' => ['nullable', 'integer', 'min:1'],
+            'max_doses_per_day' => ['nullable', 'integer', 'min:1'],
+            'min_hours_between_doses' => ['nullable', 'numeric', 'min:0'],
             'route' => ['nullable', 'string', 'max:255'],
             'form' => ['nullable', 'string', 'max:255'],
             'prescriber' => ['nullable', 'string', 'max:255'],
+            'prescriber_name' => ['nullable', 'string', 'max:255'],
             'pharmacy' => ['nullable', 'string', 'max:255'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date'],
@@ -265,7 +322,7 @@ class ClientMedicalController extends Controller
         try {
             $m = new ClientMedication();
             $m->client_id = $client->id;
-            $m->fill($data);
+            $m->fill($this->buildMedicationPayload($data));
             $m->save();
 
             app(NotificationService::class)->notifyCrud($request->user(), 'created', 'medication', $m, $client, [
@@ -295,11 +352,17 @@ class ClientMedicalController extends Controller
             'dose_times.*' => ['string', 'regex:/^\d{2}:\d{2}$/'],
             'is_prn' => ['sometimes', 'boolean'],
             'controlled_drug' => ['sometimes', 'boolean'],
+            'is_controlled_drug' => ['sometimes', 'boolean'],
+            'high_risk' => ['sometimes', 'boolean'],
+            'is_high_risk' => ['sometimes', 'boolean'],
             'prn_reason' => ['nullable', 'string', 'max:255'],
-            'max_per_day' => ['nullable', 'string', 'max:255'],
+            'max_per_day' => ['nullable', 'integer', 'min:1'],
+            'max_doses_per_day' => ['nullable', 'integer', 'min:1'],
+            'min_hours_between_doses' => ['nullable', 'numeric', 'min:0'],
             'route' => ['nullable', 'string', 'max:255'],
             'form' => ['nullable', 'string', 'max:255'],
             'prescriber' => ['nullable', 'string', 'max:255'],
+            'prescriber_name' => ['nullable', 'string', 'max:255'],
             'pharmacy' => ['nullable', 'string', 'max:255'],
             'start_date' => ['nullable', 'date'],
             'end_date' => ['nullable', 'date'],
@@ -318,7 +381,7 @@ class ClientMedicalController extends Controller
         }
 
         try {
-            $medication->fill($data);
+            $medication->fill($this->buildMedicationPayload($data));
             $medication->save();
 
             app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'medication', $medication, $client, [

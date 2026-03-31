@@ -514,6 +514,40 @@ class MedicationControllerTest extends TestCase
         ]);
     }
 
+    public function test_store_prn_medication_persists_canonical_prn_fields(): void
+    {
+        $this->mockNotificationService();
+
+        $this->actingAs($this->admin)
+            ->post("/clients/{$this->client->id}/medical/medications", [
+                'name' => 'Ibuprofen PRN',
+                'dosage' => '200mg',
+                'is_prn' => true,
+                'prn_reason' => 'Breakthrough pain',
+                'max_per_day' => 4,
+                'min_hours_between_doses' => 6,
+                'controlled_drug' => true,
+                'high_risk' => true,
+                'prescriber' => 'Dr Canonical',
+                'route' => 'oral',
+                'form' => 'tablet',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $medication = ClientMedication::where('client_id', $this->client->id)
+            ->where('name', 'Ibuprofen PRN')
+            ->firstOrFail();
+
+        $this->assertTrue($medication->is_prn);
+        $this->assertSame('Breakthrough pain', $medication->prn_reason);
+        $this->assertSame(4, $medication->max_per_day);
+        $this->assertSame(6.0, $medication->min_hours_between_doses);
+        $this->assertTrue($medication->controlled_drug);
+        $this->assertTrue($medication->high_risk);
+        $this->assertSame('Dr Canonical', $medication->prescriber);
+    }
+
     public function test_store_medication_forbidden_for_support_worker(): void
     {
         $this->actingAs($this->supportWorker)
@@ -627,6 +661,46 @@ class MedicationControllerTest extends TestCase
             'dosage' => '1000mg',
             'frequency' => 'Three times daily',
         ]);
+    }
+
+    public function test_update_medication_persists_canonical_prn_fields(): void
+    {
+        $this->mockNotificationService();
+        $med = $this->createPrnMedication([
+            'max_per_day' => 2,
+            'min_hours_between_doses' => 4,
+            'controlled_drug' => false,
+            'high_risk' => false,
+            'prescriber' => 'Dr Initial',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->put("/clients/{$this->client->id}/medical/medications/{$med->id}", [
+                'name' => 'Ibuprofen PRN Updated',
+                'is_prn' => true,
+                'prn_reason' => 'Updated PRN reason',
+                'max_per_day' => 6,
+                'min_hours_between_doses' => 3,
+                'controlled_drug' => true,
+                'high_risk' => true,
+                'prescriber' => 'Dr Updated',
+                'route' => 'oral',
+                'form' => 'capsule',
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $med->refresh();
+
+        $this->assertSame('Ibuprofen PRN Updated', $med->name);
+        $this->assertTrue($med->is_prn);
+        $this->assertSame('Updated PRN reason', $med->prn_reason);
+        $this->assertSame(6, $med->max_per_day);
+        $this->assertSame(3.0, $med->min_hours_between_doses);
+        $this->assertTrue($med->controlled_drug);
+        $this->assertTrue($med->high_risk);
+        $this->assertSame('Dr Updated', $med->prescriber);
+        $this->assertSame('capsule', $med->form);
     }
 
     public function test_update_medication_returns_404_for_mismatched_client(): void

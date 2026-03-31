@@ -112,22 +112,6 @@ Route::middleware(['auth'])->group(function () {
 Route::get('/my-calendar', [\App\Http\Controllers\MyCalendarController::class, 'index'])->middleware('auth')->name('my-calendar');
 Route::get('/my-calendar/events', [\App\Http\Controllers\MyCalendarController::class, 'events'])->middleware('auth')->name('my-calendar.events');
 
-// ── Backward-compatible redirects (old → new Operations URLs) ────────
-Route::middleware(['auth'])->group(function () {
-    Route::redirect('/clients', '/operations/clients');
-    Route::redirect('/clients/{any}', '/operations/clients/{any}')->where('any', '.*');
-    Route::redirect('/shifts', '/operations/shifts');
-    Route::redirect('/shifts/{any}', '/operations/shifts/{any}')->where('any', '.*');
-    Route::redirect('/timesheets', '/operations/timesheets');
-    Route::redirect('/timesheets/{any}', '/operations/timesheets/{any}')->where('any', '.*');
-    Route::redirect('/rostering', '/operations/rostering');
-    Route::redirect('/rostering/{any}', '/operations/rostering/{any}')->where('any', '.*');
-    Route::redirect('/medications', '/emar/daily');
-    Route::redirect('/medications/{any}', '/emar/{any}')->where('any', '.*');
-    Route::redirect('/emergency-access', '/emar/emergency-access');
-    Route::redirect('/consents', '/operations/clients');
-});
-
 // ── Operations module ────────────────────────────────────────────────
 require __DIR__ . '/operations.php';
 
@@ -178,3 +162,19 @@ require __DIR__.'/health-safety.php';
 
 // API routes
 require __DIR__.'/api_medications.php';
+
+// ── Backward-compatible redirects (old → new Operations URLs) ────────
+Route::middleware(['auth'])->group(function () {
+    Route::redirect('/clients', '/operations/clients');
+    Route::redirect('/clients/{any}', '/operations/clients/{any}')->where('any', '.*');
+    Route::redirect('/shifts', '/operations/shifts');
+    Route::redirect('/shifts/{any}', '/operations/shifts/{any}')->where('any', '.*');
+    Route::redirect('/timesheets', '/operations/timesheets');
+    Route::redirect('/timesheets/{any}', '/operations/timesheets/{any}')->where('any', '.*');
+    Route::redirect('/rostering', '/operations/rostering');
+    Route::redirect('/rostering/{any}', '/operations/rostering/{any}')->where('any', '.*');
+    Route::redirect('/medications', '/emar/daily');
+    Route::redirect('/medications/{any}', '/emar/{any}')->where('any', '.*');
+    Route::redirect('/emergency-access', '/emar/emergency-access');
+    Route::redirect('/consents', '/operations/clients');
+});

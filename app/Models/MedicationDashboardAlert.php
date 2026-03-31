@@ -91,6 +91,7 @@ class MedicationDashboardAlert extends Model
     {
         $this->acknowledged_by = $userId;
         $this->acknowledged_at = now();
+        $this->status = 'acknowledged';
         $this->save();
     }
 
