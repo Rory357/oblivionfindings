@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Models\AppSetting;
 use App\Models\NotificationEscalationRule;
+use App\Models\NotificationTemplate;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\RoleNotificationPreference;
@@ -179,6 +180,42 @@ class SettingsControllerTest extends TestCase
         $this->put('/settings/notifications/escalations')->assertRedirect('/login');
     }
 
+    public function test_security_settings_require_authentication(): void
+    {
+        $this->get('/settings/security')->assertRedirect('/login');
+        $this->put('/settings/security')->assertRedirect('/login');
+    }
+
+    public function test_audit_logs_require_authentication(): void
+    {
+        $this->get('/settings/audit-logs')->assertRedirect('/login');
+    }
+
+    public function test_sso_routes_require_authentication(): void
+    {
+        $this->get('/settings/sso')->assertRedirect('/login');
+        $this->get('/settings/sso-groups')->assertRedirect('/login');
+        $this->post('/settings/sso-groups')->assertRedirect('/login');
+    }
+
+    public function test_templates_require_authentication(): void
+    {
+        $template = NotificationTemplate::create([
+            'type' => 'email',
+            'key' => 'auth-test-template',
+            'name' => 'Auth Test Template',
+            'category' => 'system',
+            'subject' => 'Subject',
+            'body' => 'Body',
+            'merge_fields' => [],
+            'is_active' => true,
+            'is_system' => true,
+        ]);
+
+        $this->get('/settings/templates')->assertRedirect('/login');
+        $this->put("/settings/templates/{$template->id}", ['body' => 'Updated body'])->assertRedirect('/login');
+    }
+
     // ========================================================================
     // AUTHORIZATION: permission-protected routes deny unprivileged users
     // ========================================================================
@@ -285,6 +322,64 @@ class SettingsControllerTest extends TestCase
         $this->actingAs($this->staff)
             ->put('/settings/notifications/escalations', ['rules' => []])
             ->assertForbidden();
+    }
+
+    public function test_security_settings_denied_for_support_worker(): void
+    {
+        $this->actingAs($this->staff)->get('/settings/security')->assertForbidden();
+
+        $this->actingAs($this->staff)->put('/settings/security', [
+            'password_min_length' => 12,
+            'password_require_uppercase' => true,
+            'password_require_numbers' => true,
+            'password_require_symbols' => true,
+            'password_expiry_days' => 90,
+            'session_timeout_minutes' => 60,
+            'max_login_attempts' => 5,
+            'lockout_duration_minutes' => 15,
+            'force_2fa' => true,
+        ])->assertForbidden();
+    }
+
+    public function test_audit_logs_denied_for_support_worker(): void
+    {
+        $this->actingAs($this->staff)->get('/settings/audit-logs')->assertForbidden();
+    }
+
+    public function test_sso_routes_denied_for_support_worker(): void
+    {
+        $this->actingAs($this->staff)->get('/settings/sso')->assertForbidden();
+        $this->actingAs($this->staff)->get('/settings/sso-groups')->assertForbidden();
+
+        $this->actingAs($this->staff)->post('/settings/sso-groups', [
+            'provider' => 'microsoft',
+            'external_group_id' => 'group-1',
+            'external_group_name' => 'Group 1',
+            'role_id' => Role::where('name', 'support_worker')->first()->id,
+            'auto_assign' => true,
+            'auto_remove' => false,
+        ])->assertForbidden();
+    }
+
+    public function test_templates_denied_for_support_worker(): void
+    {
+        $template = NotificationTemplate::create([
+            'type' => 'email',
+            'key' => 'staff-denied-template',
+            'name' => 'Staff Denied Template',
+            'category' => 'system',
+            'subject' => 'Subject',
+            'body' => 'Body',
+            'merge_fields' => [],
+            'is_active' => true,
+            'is_system' => true,
+        ]);
+
+        $this->actingAs($this->staff)->get('/settings/templates')->assertForbidden();
+
+        $this->actingAs($this->staff)->put("/settings/templates/{$template->id}", [
+            'body' => 'Updated body',
+        ])->assertForbidden();
     }
 
     // ========================================================================
@@ -2006,6 +2101,91 @@ class SettingsControllerTest extends TestCase
             'enabled' => true,
             'force_delivery' => true,
         ]);
+    }
+
+    public function test_security_settings_render_for_admin(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/settings/security')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('settings/security')
+                ->has('settings')
+                ->has('twoFaStats')
+            );
+    }
+
+    public function test_security_settings_update_persists_values_without_group_column(): void
+    {
+        $this->actingAs($this->admin)
+            ->put('/settings/security', [
+                'password_min_length' => 14,
+                'password_require_uppercase' => true,
+                'password_require_numbers' => true,
+                'password_require_symbols' => false,
+                'password_expiry_days' => 60,
+                'session_timeout_minutes' => 30,
+                'max_login_attempts' => 4,
+                'lockout_duration_minutes' => 20,
+                'force_2fa' => true,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('app_settings', ['key' => 'password_min_length']);
+        $this->assertSame(14, AppSetting::query()->where('key', 'password_min_length')->value('value'));
+        $this->assertTrue((bool) AppSetting::query()->where('key', 'force_2fa')->value('value'));
+    }
+
+    public function test_audit_logs_render_for_admin(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/settings/audit-logs')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('settings/audit-logs')
+                ->has('events')
+                ->has('users')
+                ->has('filters')
+            );
+    }
+
+    public function test_sso_configuration_renders_for_admin(): void
+    {
+        $this->actingAs($this->admin)
+            ->get('/settings/sso')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('settings/sso-config')
+                ->has('mappings')
+                ->has('roles')
+                ->has('stats')
+            );
+    }
+
+    public function test_templates_render_for_admin(): void
+    {
+        NotificationTemplate::create([
+            'type' => 'email',
+            'key' => 'admin-visible-template',
+            'name' => 'Admin Visible Template',
+            'category' => 'system',
+            'subject' => 'Subject',
+            'body' => 'Body',
+            'merge_fields' => [],
+            'is_active' => true,
+            'is_system' => true,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get('/settings/templates')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->component('settings/templates')
+                ->has('templates')
+                ->has('orgName')
+                ->has('mergeFieldRegistry')
+            );
     }
 
     public function test_role_edit_denied_for_support_worker(): void

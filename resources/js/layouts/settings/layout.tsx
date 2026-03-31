@@ -89,7 +89,7 @@ const navSections: NavSection[] = [
             { icon: BellRing, title: 'Role Defaults', href: '/settings/notifications/roles', permission: 'settings.manageAccess' },
             { icon: AlertTriangle, title: 'Escalation Rules', href: '/settings/notifications/escalations', permission: 'settings.manageAccess' },
             { icon: MailCheck, title: 'Email', href: '/settings/email', permission: 'settings.manageAccess' },
-            { icon: Mail, title: 'Templates', href: '/settings/templates', permission: 'settings.manageAccess' },
+            { icon: Mail, title: 'Templates', href: '/settings/templates', permission: 'settings.templatesManage' },
         ],
     },
     {
@@ -103,10 +103,9 @@ const navSections: NavSection[] = [
     },
     {
         label: 'Data & Compliance',
-        permission: 'settings.manageAccess',
         items: [
-            { icon: Database, title: 'Data & Privacy', href: '/settings/data' },
-            { icon: FileText, title: 'Audit Logs', href: '/settings/audit-logs' },
+            { icon: Database, title: 'Data & Privacy', href: '/settings/data', permission: 'settings.manageAccess' },
+            { icon: FileText, title: 'Audit Logs', href: '/settings/audit-logs', permission: 'audit.viewAny' },
         ],
     },
     {

@@ -17,8 +17,10 @@ class NotificationTemplateController extends Controller
         private TemplateRenderService $renderService,
     ) {}
 
-    public function index()
+    public function index(Request $request)
     {
+        $this->authorizeTemplates($request);
+
         return Inertia::render('settings/templates', [
             'templates' => NotificationTemplate::orderBy('category')->orderBy('name')->get(),
             'orgName' => AppSetting::where('key', 'branding.name')->value('value') ?? config('app.name'),
@@ -28,6 +30,8 @@ class NotificationTemplateController extends Controller
 
     public function update(Request $request, NotificationTemplate $template)
     {
+        $this->authorizeTemplates($request);
+
         $validated = $request->validate([
             'subject' => 'nullable|string|max:500',
             'body' => 'required|string',
@@ -41,6 +45,8 @@ class NotificationTemplateController extends Controller
 
     public function preview(Request $request, NotificationTemplate $template)
     {
+        $this->authorizeTemplates($request);
+
         $user = $request->user();
 
         $renderedBody = $this->renderService->render($template, $user);
@@ -54,6 +60,8 @@ class NotificationTemplateController extends Controller
 
     public function sendTest(Request $request, NotificationTemplate $template)
     {
+        $this->authorizeTemplates($request);
+
         $user = $request->user();
 
         $renderedBody = $this->renderService->render($template, $user);
@@ -67,8 +75,10 @@ class NotificationTemplateController extends Controller
         return redirect()->back()->with('success', 'Test email sent to ' . $user->email);
     }
 
-    public function reset(NotificationTemplate $template)
+    public function reset(Request $request, NotificationTemplate $template)
     {
+        $this->authorizeTemplates($request);
+
         if (!$template->is_system) {
             return redirect()->back()->with('error', 'Only system templates can be reset.');
         }
@@ -84,5 +94,10 @@ class NotificationTemplateController extends Controller
         }
 
         return redirect()->back()->with('success', 'Template reset to default.');
+    }
+
+    private function authorizeTemplates(Request $request): void
+    {
+        abort_unless($request->user()?->canDo('settings.templates.manage'), 403);
     }
 }

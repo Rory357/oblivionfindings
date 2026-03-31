@@ -12,8 +12,10 @@ use Inertia\Inertia;
 
 class SsoGroupController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
+        $this->authorizeAccess($request);
+
         $mappings = SsoGroupMapping::with('role')->orderBy('provider')->orderBy('external_group_name')->get();
         $roles = Role::orderBy('name')->get(['id', 'name', 'label']);
 
@@ -30,13 +32,16 @@ class SsoGroupController extends Controller
 
     public function fetchGroups(Request $request, AzureAdGroupService $service)
     {
-        // Find an admin user's Microsoft identity to query groups
-        $identity = Identity::where('provider', 'microsoft')
+        $this->authorizeAccess($request);
+
+        $identity = Identity::query()
+            ->where('user_id', $request->user()?->id)
+            ->where('provider', 'microsoft')
             ->whereNotNull('access_token')
             ->first();
 
         if (!$identity) {
-            return back()->with('error', 'No Microsoft identity found. Please connect a Microsoft account first.');
+            return back()->with('error', 'No Microsoft identity found for your account. Please connect a Microsoft account first.');
         }
 
         if ($identity->isExpired()) {
@@ -50,6 +55,8 @@ class SsoGroupController extends Controller
 
     public function store(Request $request)
     {
+        $this->authorizeAccess($request);
+
         $data = $request->validate([
             'provider' => 'required|in:microsoft,google',
             'external_group_id' => 'required|string|max:255',
@@ -66,6 +73,8 @@ class SsoGroupController extends Controller
 
     public function update(Request $request, SsoGroupMapping $mapping)
     {
+        $this->authorizeAccess($request);
+
         $data = $request->validate([
             'role_id' => 'required|exists:roles,id',
             'auto_assign' => 'boolean',
@@ -77,10 +86,17 @@ class SsoGroupController extends Controller
         return back()->with('success', 'Group mapping updated.');
     }
 
-    public function destroy(SsoGroupMapping $mapping)
+    public function destroy(Request $request, SsoGroupMapping $mapping)
     {
+        $this->authorizeAccess($request);
+
         $mapping->delete();
 
         return back()->with('success', 'Group mapping deleted.');
+    }
+
+    private function authorizeAccess(Request $request): void
+    {
+        abort_unless($request->user()?->canDo('settings.access.manage'), 403);
     }
 }

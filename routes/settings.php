@@ -133,30 +133,80 @@ Route::middleware('auth')->group(function () {
         ->name('settings.notifications.escalations.update');
 
     // Email & SMS Templates
-    Route::get('settings/templates', [NotificationTemplateController::class, 'index'])->name('settings.templates');
-    Route::put('settings/templates/{template}', [NotificationTemplateController::class, 'update'])->name('settings.templates.update');
-    Route::post('settings/templates/{template}/preview', [NotificationTemplateController::class, 'preview'])->name('settings.templates.preview');
-    Route::post('settings/templates/{template}/send-test', [NotificationTemplateController::class, 'sendTest'])->name('settings.templates.send-test');
-    Route::post('settings/templates/{template}/reset', [NotificationTemplateController::class, 'reset'])->name('settings.templates.reset');
+    Route::get('settings/templates', [NotificationTemplateController::class, 'index'])
+        ->middleware('permission:settings.templates.manage')
+        ->name('settings.templates');
+    Route::put('settings/templates/{template}', [NotificationTemplateController::class, 'update'])
+        ->middleware('permission:settings.templates.manage')
+        ->name('settings.templates.update');
+    Route::post('settings/templates/{template}/preview', [NotificationTemplateController::class, 'preview'])
+        ->middleware('permission:settings.templates.manage')
+        ->name('settings.templates.preview');
+    Route::post('settings/templates/{template}/send-test', [NotificationTemplateController::class, 'sendTest'])
+        ->middleware('permission:settings.templates.manage')
+        ->name('settings.templates.send-test');
+    Route::post('settings/templates/{template}/reset', [NotificationTemplateController::class, 'reset'])
+        ->middleware('permission:settings.templates.manage')
+        ->name('settings.templates.reset');
 
     // Email Settings
     Route::get('settings/email', fn () => Inertia::render('settings/email-settings'))->name('settings.email');
 
     // Security Settings
     Route::get('settings/security', fn () => Inertia::render('settings/security', [
-        'settings' => \App\Models\AppSetting::where('group', 'security')->pluck('value', 'key'),
-    ]))->name('settings.security');
+        'settings' => \App\Models\AppSetting::query()
+            ->whereIn('key', [
+                'password_min_length',
+                'password_require_uppercase',
+                'password_require_numbers',
+                'password_require_symbols',
+                'password_expiry_days',
+                'session_timeout_minutes',
+                'max_login_attempts',
+                'lockout_duration_minutes',
+                'force_2fa',
+            ])
+            ->pluck('value', 'key'),
+        'twoFaStats' => [
+            'enabled' => \App\Models\User::query()->whereNotNull('two_factor_confirmed_at')->count(),
+            'total' => \App\Models\User::query()->count(),
+        ],
+    ]))
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.security');
     Route::put('settings/security', function (\Illuminate\Http\Request $request) {
-        collect($request->only([
-            'password_min_length', 'password_require_uppercase', 'password_require_numbers',
-            'password_require_symbols', 'password_expiry_days', 'session_timeout_minutes',
-            'max_login_attempts', 'lockout_duration_minutes', 'force_2fa',
-        ]))->each(fn ($value, $key) => \App\Models\AppSetting::updateOrCreate(
-            ['key' => $key, 'group' => 'security'],
-            ['value' => $value]
-        ));
+        $request->validate([
+            'password_min_length' => ['required', 'integer', 'min:6', 'max:128'],
+            'password_require_uppercase' => ['required', 'boolean'],
+            'password_require_numbers' => ['required', 'boolean'],
+            'password_require_symbols' => ['required', 'boolean'],
+            'password_expiry_days' => ['required', 'integer', 'min:0'],
+            'session_timeout_minutes' => ['required', 'integer', 'min:1'],
+            'max_login_attempts' => ['required', 'integer', 'min:1'],
+            'lockout_duration_minutes' => ['required', 'integer', 'min:1'],
+            'force_2fa' => ['required', 'boolean'],
+        ]);
+
+        $settings = [
+            'password_min_length' => (int) $request->input('password_min_length'),
+            'password_require_uppercase' => $request->boolean('password_require_uppercase'),
+            'password_require_numbers' => $request->boolean('password_require_numbers'),
+            'password_require_symbols' => $request->boolean('password_require_symbols'),
+            'password_expiry_days' => (int) $request->input('password_expiry_days'),
+            'session_timeout_minutes' => (int) $request->input('session_timeout_minutes'),
+            'max_login_attempts' => (int) $request->input('max_login_attempts'),
+            'lockout_duration_minutes' => (int) $request->input('lockout_duration_minutes'),
+            'force_2fa' => $request->boolean('force_2fa'),
+        ];
+
+        collect($settings)->each(
+            fn ($value, $key) => \App\Models\AppSetting::updateOrCreate(['key' => $key], ['value' => $value])
+        );
+
         return back()->with('success', 'Security settings updated.');
-    })->name('settings.security.update');
+    })
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.security.update');
 
     // API & Webhooks (UI-first, no backend yet)
     Route::get('settings/api', fn () => Inertia::render('settings/api'))->name('settings.api');
@@ -185,12 +235,24 @@ Route::middleware('auth')->group(function () {
             'microsoft' => \App\Models\SsoGroupMapping::where('provider', 'microsoft')->count(),
             'google' => \App\Models\SsoGroupMapping::where('provider', 'google')->count(),
         ],
-    ]))->name('settings.sso');
-    Route::get('settings/sso-groups', [SsoGroupController::class, 'index'])->name('settings.sso_groups.index');
-    Route::post('settings/sso-groups', [SsoGroupController::class, 'store'])->name('settings.sso_groups.store');
-    Route::put('settings/sso-groups/{mapping}', [SsoGroupController::class, 'update'])->name('settings.sso_groups.update');
-    Route::delete('settings/sso-groups/{mapping}', [SsoGroupController::class, 'destroy'])->name('settings.sso_groups.destroy');
-    Route::post('settings/sso-groups/fetch', [SsoGroupController::class, 'fetchGroups'])->name('settings.sso_groups.fetch');
+    ]))
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.sso');
+    Route::get('settings/sso-groups', [SsoGroupController::class, 'index'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.sso_groups.index');
+    Route::post('settings/sso-groups', [SsoGroupController::class, 'store'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.sso_groups.store');
+    Route::put('settings/sso-groups/{mapping}', [SsoGroupController::class, 'update'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.sso_groups.update');
+    Route::delete('settings/sso-groups/{mapping}', [SsoGroupController::class, 'destroy'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.sso_groups.destroy');
+    Route::post('settings/sso-groups/fetch', [SsoGroupController::class, 'fetchGroups'])
+        ->middleware('permission:settings.access.manage')
+        ->name('settings.sso_groups.fetch');
 
     // Audit Logs
     Route::get('settings/audit-logs', function () {
@@ -210,7 +272,9 @@ Route::middleware('auth')->group(function () {
             'users' => \App\Models\User::select('id', 'name')->orderBy('name')->get(),
             'filters' => request()->only('q', 'user_id', 'type', 'from', 'to'),
         ]);
-    })->name('settings.audit_logs');
+    })
+        ->middleware('permission:audit.viewAny|settings.access.manage')
+        ->name('settings.audit_logs');
 
     // Integrations hub
     Route::get('settings/integrations', [IntegrationHubController::class, 'index'])
