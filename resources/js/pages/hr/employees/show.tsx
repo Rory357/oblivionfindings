@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsRoot as Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -238,7 +238,7 @@ export default function EmployeeShow({
                 {/*  TABS                                                         */}
                 {/* ============================================================ */}
                 <Tabs defaultValue="overview" className="w-full">
-                    <TabsList className="flex flex-wrap h-auto gap-1">
+                    <TabsList className="flex flex-wrap h-auto gap-1 w-full">
                         <TabsTrigger value="overview"><User className="mr-1.5 h-3.5 w-3.5" />Overview</TabsTrigger>
                         <TabsTrigger value="documents"><FileText className="mr-1.5 h-3.5 w-3.5" />Documents<TabCount count={p.documents.length} /></TabsTrigger>
                         <TabsTrigger value="performance"><Star className="mr-1.5 h-3.5 w-3.5" />Performance<TabCount count={performanceReviews.length} /></TabsTrigger>
