@@ -832,6 +832,9 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         admin.items.push({ title: 'Compliance', href: '/hr/compliance', icon: Shield });
         admin.items.push({ title: 'Compliance Calendar', href: '/hr/compliance/calendar', icon: CalendarDays });
     }
+    if (can?.hr?.settings?.manage || can?.hr?.employees?.manage) {
+        admin.items.push({ title: 'Departments', href: '/hr/departments', icon: Briefcase });
+    }
     if (can?.hr?.training?.view) {
         admin.items.push({ title: 'Training', href: '/hr/training/catalog', icon: BookOpen });
     }

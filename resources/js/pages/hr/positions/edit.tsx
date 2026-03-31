@@ -34,9 +34,10 @@ type PositionData = {
 type Props = {
     position: PositionData;
     parentPositions: ParentPosition[];
+    departments: Array<{ id: number; name: string }>;
 };
 
-export default function EditPosition({ position, parentPositions }: Props) {
+export default function EditPosition({ position, parentPositions, departments }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
         { title: 'Positions', href: '/hr/positions' },
@@ -118,13 +119,16 @@ export default function EditPosition({ position, parentPositions }: Props) {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="department">Department</Label>
-                                    <Input
-                                        id="department"
-                                        value={data.department}
-                                        onChange={(e) => setData('department', e.target.value)}
-                                        placeholder="e.g. Residential Services"
-                                    />
+                                    <Label>Department</Label>
+                                    <Select value={data.department || '__none__'} onValueChange={(v) => setData('department', v === '__none__' ? '' : v)}>
+                                        <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">No department</SelectItem>
+                                            {departments.map((d) => (
+                                                <SelectItem key={d.id} value={d.name}>{d.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                     {errors.department && (
                                         <p className="text-sm text-red-500">{errors.department}</p>
                                     )}

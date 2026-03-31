@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrLeaveRequest;
@@ -366,14 +367,14 @@ class DashboardController extends Controller
                 : 100;
 
             // Department breakdown
-            $departmentBreakdown = HrEmployeeProfile::where('is_active', true)
-                ->select('department', DB::raw('COUNT(*) as c'))
-                ->groupBy('department')
-                ->orderByDesc('c')
+            $departmentBreakdown = HrDepartment::query()
+                ->where('is_active', true)
+                ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
+                ->orderByDesc('employees_count')
                 ->get()
-                ->map(fn ($r) => [
-                    'department' => (string) ($r->department ?? 'Unassigned'),
-                    'count' => (int) $r->c,
+                ->map(fn ($dept) => [
+                    'department' => $dept->name,
+                    'count' => (int) $dept->employees_count,
                 ])
                 ->values();
 

@@ -103,6 +103,11 @@ class HrEmployeeProfile extends Model
         return $this->belongsTo(Site::class, 'primary_site_id');
     }
 
+    public function departmentRelation(): BelongsTo
+    {
+        return $this->belongsTo(HrDepartment::class, 'department_id');
+    }
+
     public function versions(): HasMany
     {
         return $this->hasMany(HrEmployeeProfileVersion::class, 'employee_profile_id');

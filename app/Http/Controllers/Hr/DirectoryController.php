@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hr;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrKudos;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
@@ -31,9 +32,9 @@ class DirectoryController extends Controller
             ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) =>
                 $u->where('name', 'like', "%{$search}%")
             ))
-            ->when($department, fn ($q) => $q->where('department', $department))
+            ->when($department, fn ($q) => $q->where('department_id', (int) $department))
             ->when($site, fn ($q) => $q->where('primary_site_id', $site))
-            ->with('user:id,name,email', 'primarySite:id,name')
+            ->with('user:id,name,email', 'primarySite:id,name', 'departmentRelation:id,name')
             ->orderBy('position_title')
             ->paginate(24)
             ->withQueryString();
@@ -45,19 +46,17 @@ class DirectoryController extends Controller
             'email' => $emp->work_email,
             'phone' => $emp->work_phone,
             'position_title' => $emp->position_title,
-            'department' => $emp->department,
+            'department' => $emp->departmentRelation?->name ?? $emp->department,
             'site' => $emp->primarySite?->name,
             'profile_photo_path' => $emp->profile_photo_path,
             'bio' => $emp->bio,
         ]);
 
-        $departments = HrEmployeeProfile::forTenant($tenantId)
-            ->active()
-            ->whereNotNull('department')
-            ->distinct()
-            ->pluck('department')
-            ->sort()
-            ->values();
+        $departments = HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         $sites = Site::where('tenant_id', $tenantId)
             ->orderBy('name')
@@ -81,7 +80,7 @@ class DirectoryController extends Controller
         abort_unless($user, 403);
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
-        $profile->load('user:id,name,email,cellphone,work_phone', 'primarySite:id,name', 'position:id,title,code');
+        $profile->load('user:id,name,email,cellphone,work_phone', 'primarySite:id,name', 'position:id,title,code', 'departmentRelation:id,name');
 
         // Tenure calculation
         $tenure = null;
@@ -200,7 +199,7 @@ class DirectoryController extends Controller
                 'cellphone' => $profile->user?->cellphone,
                 'personal_email' => $profile->personal_email,
                 'position_title' => $profile->position_title,
-                'department' => $profile->department,
+                'department' => $profile->departmentRelation?->name ?? $profile->department,
                 'team' => $profile->team,
                 'site' => $profile->primarySite?->name,
                 'profile_photo_path' => $profile->profile_photo_path,

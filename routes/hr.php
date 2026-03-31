@@ -64,6 +64,7 @@ use App\Http\Controllers\Hr\ScorecardController;
 use App\Http\Controllers\Hr\ICalController;
 use App\Http\Controllers\Hr\LeaveReportController;
 use App\Http\Controllers\Hr\WebhookController;
+use App\Http\Controllers\Hr\DepartmentController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -939,6 +940,18 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.leave.viewAny')->group(function () {
         Route::get('/leave/reports', [LeaveReportController::class, 'index'])->name('leave.reports');
+    });
+
+    /*
+    |--------------------------------------------------------------------------
+    | Departments
+    |--------------------------------------------------------------------------
+    */
+    Route::middleware('permission:hr.settings.manage|hr.employees.manage')->group(function () {
+        Route::get('/departments', [DepartmentController::class, 'index'])->name('departments.index');
+        Route::post('/departments', [DepartmentController::class, 'store'])->name('departments.store');
+        Route::put('/departments/{department}', [DepartmentController::class, 'update'])->name('departments.update');
+        Route::delete('/departments/{department}', [DepartmentController::class, 'destroy'])->name('departments.destroy');
     });
 
     /*

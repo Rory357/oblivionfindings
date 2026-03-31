@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use Illuminate\Http\Request;
@@ -34,7 +35,7 @@ class TimeOffCalendarController extends Controller
             $profileUserIds = HrEmployeeProfile::query()
                 ->where('tenant_id', $user->tenant_id)
                 ->where('is_active', true)
-                ->when($request->query('department'), fn ($q, $dept) => $q->where('department', $dept))
+                ->when($request->query('department'), fn ($q, $dept) => $q->where('department_id', (int) $dept))
                 ->when($request->query('team'), fn ($q, $team) => $q->where('team', $team))
                 ->when($request->query('site_id'), fn ($q, $siteId) => $q->where('primary_site_id', $siteId))
                 ->pluck('user_id');
@@ -70,12 +71,11 @@ class TimeOffCalendarController extends Controller
         }
 
         // Get filter options
-        $departments = HrEmployeeProfile::query()
-            ->where('tenant_id', $user->tenant_id)
+        $departments = HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $user->tenant_id)->orWhereNull('tenant_id'))
             ->where('is_active', true)
-            ->whereNotNull('department')
-            ->distinct()
-            ->pluck('department');
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         $teams = HrEmployeeProfile::query()
             ->where('tenant_id', $user->tenant_id)

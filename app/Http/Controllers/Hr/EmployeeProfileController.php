@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\UpdateEmployeeProfileRequest;
+use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
@@ -27,6 +28,8 @@ class EmployeeProfileController extends Controller
         $search = trim((string) $request->query('q', ''));
         $status = $request->query('status'); // 'active', 'inactive', or null for all
         $siteId = $request->query('site_id');
+        $department = $request->query('department');
+        $employmentType = $request->query('employment_type');
 
         $profiles = User::query()
             ->staff()
@@ -58,6 +61,12 @@ class EmployeeProfileController extends Controller
                     });
                 })
             )
+            ->when($department, fn ($q) =>
+                $q->whereHas('hrEmployeeProfile', fn ($p) => $p->where('department_id', (int) $department))
+            )
+            ->when($employmentType, fn ($q) =>
+                $q->whereHas('hrEmployeeProfile', fn ($p) => $p->where('employment_type', $employmentType))
+            )
             ->orderBy('name')
             ->paginate(20)
             ->through(function (User $staffUser) {
@@ -70,6 +79,7 @@ class EmployeeProfileController extends Controller
                     'employee_number' => $profile?->employee_number,
                     'position_title' => $profile?->position_title,
                     'employment_type' => $profile?->employment_type,
+                    'department' => $profile?->department,
                     'is_active' => $profile ? (bool) $profile->is_active : true,
                     'start_date' => $profile?->start_date?->toDateString(),
                     'user' => [
@@ -88,13 +98,50 @@ class EmployeeProfileController extends Controller
         $sites = Site::orderBy('name')
             ->get(['id', 'name']);
 
+        // Summary stats for mini dashboard
+        $activeCount = HrEmployeeProfile::where('is_active', true)->count();
+        $inactiveCount = HrEmployeeProfile::where('is_active', false)->count();
+        $newHires = HrEmployeeProfile::where('is_active', true)
+            ->where('start_date', '>=', now()->subDays(30))
+            ->count();
+        $onProbation = HrEmployeeProfile::where('is_active', true)
+            ->whereNotNull('probation_end_date')
+            ->where('probation_end_date', '>=', now())
+            ->count();
+        $complianceAlerts = HrStaffComplianceStatus::whereIn('status', ['expired', 'expiring_soon'])->count();
+
+        // Employment type breakdown
+        $typeCounts = HrEmployeeProfile::where('is_active', true)
+            ->selectRaw("employment_type, count(*) as count")
+            ->groupBy('employment_type')
+            ->pluck('count', 'employment_type')
+            ->toArray();
+
+        // Departments list for filter (from managed departments table)
+        $departments = HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $user->tenant_id)->orWhereNull('tenant_id'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return Inertia::render('hr/employees/index', [
             'profiles' => $profiles,
             'sites' => $sites,
+            'departments' => $departments,
             'filters' => [
                 'q' => $search,
                 'status' => $status,
                 'site_id' => $siteId,
+                'department' => $department,
+                'employment_type' => $employmentType,
+            ],
+            'summary' => [
+                'active' => $activeCount,
+                'inactive' => $inactiveCount,
+                'new_hires' => $newHires,
+                'on_probation' => $onProbation,
+                'compliance_alerts' => $complianceAlerts,
+                'type_counts' => $typeCounts,
             ],
             'can' => [
                 'manage' => $user->canDo('hr.employees.manage'),
@@ -199,9 +246,16 @@ class EmployeeProfileController extends Controller
         $sites = Site::orderBy('name')
             ->get(['id', 'name']);
 
+        $departments = HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $user->tenant_id)->orWhereNull('tenant_id'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return Inertia::render('hr/employees/edit', [
             'profile' => $profile,
             'sites' => $sites,
+            'departments' => $departments,
             'employmentTypes' => ['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'],
             'contractTypes' => ['permanent', 'fixed_term', 'casual', 'contractor'],
             'payFrequencies' => ['weekly', 'fortnightly', 'monthly'],

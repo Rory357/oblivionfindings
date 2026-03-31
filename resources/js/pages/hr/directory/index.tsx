@@ -57,7 +57,7 @@ interface Props {
         total: number;
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
-    departments: string[];
+    departments: Array<{ id: number; name: string }>;
     sites: SiteOption[];
     filters: {
         q: string;
@@ -209,7 +209,7 @@ export default function DirectoryIndex({ employees, departments, sites, filters 
                         <SelectContent>
                             <SelectItem value="all">All Departments</SelectItem>
                             {departments.map((dept) => (
-                                <SelectItem key={dept} value={dept}>{dept}</SelectItem>
+                                <SelectItem key={dept.id} value={String(dept.id)}>{dept.name}</SelectItem>
                             ))}
                         </SelectContent>
                     </Select>

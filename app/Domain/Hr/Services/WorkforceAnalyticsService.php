@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
@@ -195,16 +196,16 @@ class WorkforceAnalyticsService
      */
     public function getDepartmentBreakdown(?int $tenantId): array
     {
-        return HrEmployeeProfile::forTenant($tenantId)
-            ->active()
-            ->whereNotNull('department')
-            ->select('department', DB::raw('COUNT(*) as count'))
-            ->groupBy('department')
-            ->orderByDesc('count')
+        return HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+            ->where('is_active', true)
+            ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
+            ->having('employees_count', '>', 0)
+            ->orderByDesc('employees_count')
             ->get()
-            ->map(fn ($row) => [
-                'department' => $row->department,
-                'count' => $row->count,
+            ->map(fn ($dept) => [
+                'department' => $dept->name,
+                'count' => $dept->employees_count,
             ])
             ->all();
     }

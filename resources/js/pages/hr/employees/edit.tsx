@@ -15,6 +15,7 @@ interface Profile {
     position_title: string;
     employment_type: string;
     contract_type: string | null;
+    department_id: number | null;
     is_active: boolean;
     start_date: string | null;
     end_date: string | null;
@@ -33,12 +34,13 @@ interface Profile {
 interface Props {
     profile: Profile;
     sites: Array<{ id: number; name: string }>;
+    departments: Array<{ id: number; name: string }>;
     employmentTypes: Array<{ value: string; label: string }>;
     contractTypes: Array<{ value: string; label: string }>;
     payFrequencies: Array<{ value: string; label: string }>;
 }
 
-export default function EmployeeEdit({ profile, sites, employmentTypes, contractTypes, payFrequencies }: Props) {
+export default function EmployeeEdit({ profile, sites, departments, employmentTypes, contractTypes, payFrequencies }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr/people' },
         { title: 'People', href: '/hr/people' },
@@ -51,6 +53,7 @@ export default function EmployeeEdit({ profile, sites, employmentTypes, contract
         position_title: profile.position_title || '',
         employment_type: profile.employment_type || '',
         contract_type: profile.contract_type || '',
+        department_id: profile.department_id ? String(profile.department_id) : '',
         is_active: profile.is_active,
         start_date: profile.start_date || '',
         end_date: profile.end_date || '',
@@ -153,6 +156,19 @@ export default function EmployeeEdit({ profile, sites, employmentTypes, contract
                                         </SelectContent>
                                     </Select>
                                     {form.errors.contract_type && <p className="mt-1 text-sm text-destructive">{form.errors.contract_type}</p>}
+                                </div>
+                                <div>
+                                    <Label>Department</Label>
+                                    <Select value={form.data.department_id || '__none__'} onValueChange={(v) => form.setData('department_id', v === '__none__' ? '' : v)}>
+                                        <SelectTrigger><SelectValue placeholder="Select department" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">No department</SelectItem>
+                                            {departments.map((d) => (
+                                                <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {form.errors.department_id && <p className="mt-1 text-sm text-destructive">{form.errors.department_id}</p>}
                                 </div>
                                 <div>
                                     <Label htmlFor="hours_per_week">Hours Per Week</Label>

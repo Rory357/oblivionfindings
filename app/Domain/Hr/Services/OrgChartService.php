@@ -63,7 +63,7 @@ class OrgChartService
             'name' => $employee->user?->name ?? 'Unknown',
             'email' => $employee->user?->email,
             'position_title' => $employee->position_title,
-            'department' => $employee->department,
+            'department' => $employee->departmentRelation?->name ?? $employee->department,
             'profile_photo_path' => $employee->profile_photo_path ?? null,
             'children' => $reports->map(fn ($r) => $this->buildNode($r, $all))->values()->all(),
         ];

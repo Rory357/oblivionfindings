@@ -42,7 +42,7 @@ type PaginatedPositions = {
 
 type Props = {
     positions: PaginatedPositions;
-    departments: string[];
+    departments: Array<{ id: number; name: string }>;
     filters: {
         q?: string;
         department?: string;
@@ -128,8 +128,8 @@ export default function PositionsIndex({ positions, departments, filters, can }:
                         <SelectContent>
                             <SelectItem value="all">All Departments</SelectItem>
                             {departments.map((dept) => (
-                                <SelectItem key={dept} value={dept}>
-                                    {dept}
+                                <SelectItem key={dept.id} value={String(dept.id)}>
+                                    {dept.name}
                                 </SelectItem>
                             ))}
                         </SelectContent>

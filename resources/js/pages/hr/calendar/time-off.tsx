@@ -30,7 +30,7 @@ interface Props {
     month: string;
     monthLabel: string;
     filters: { department: string | null; team: string | null; site_id: string | null };
-    departments: string[];
+    departments: Array<{ id: number; name: string }>;
     teams: string[];
 }
 
@@ -120,7 +120,7 @@ export default function TimeOffCalendar({ calendarDays, month, monthLabel, filte
                                 <SelectContent>
                                     <SelectItem value="all">All Departments</SelectItem>
                                     {departments.map((d) => (
-                                        <SelectItem key={d} value={d}>{d}</SelectItem>
+                                        <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>

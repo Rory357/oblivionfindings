@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Services\PositionService;
 use Illuminate\Http\Request;
@@ -54,7 +55,11 @@ class PositionController extends Controller
             'is_active' => $pos->is_active,
         ]);
 
-        $departments = $this->positionService->getDepartments($tenantId);
+        $departments = HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return Inertia::render('hr/positions/index', [
             'positions' => $positions,
@@ -77,9 +82,15 @@ class PositionController extends Controller
 
         $tenantId = $user->tenant_id;
         $parentPositions = HrPosition::forTenant($tenantId)->active()->orderBy('title')->get(['id', 'title', 'code']);
+        $departments = HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
 
         return Inertia::render('hr/positions/create', [
             'parentPositions' => $parentPositions,
+            'departments' => $departments,
         ]);
     }
 
@@ -169,6 +180,12 @@ class PositionController extends Controller
             ->orderBy('title')
             ->get(['id', 'title', 'code']);
 
+        $departments = HrDepartment::query()
+            ->when($user->tenant_id, fn ($q) => $q->where('tenant_id', $user->tenant_id), fn ($q) => $q->whereNull('tenant_id'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+
         return Inertia::render('hr/positions/edit', [
             'position' => $position->only([
                 'id', 'title', 'code', 'department', 'team', 'description',
@@ -176,6 +193,7 @@ class PositionController extends Controller
                 'reports_to_position_id', 'is_active',
             ]),
             'parentPositions' => $parentPositions,
+            'departments' => $departments,
         ]);
     }
 
