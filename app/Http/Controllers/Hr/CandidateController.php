@@ -260,8 +260,42 @@ class CandidateController extends Controller
             })->values(),
         ];
 
+        // Build activity log from interviews, offers, and status changes
+        $activityLog = [];
+        foreach ($candidate->applications as $app) {
+            $activityLog[] = [
+                'type' => 'application',
+                'description' => "Applied for {$app->position_title}",
+                'timestamp' => optional($app->created_at)->diffForHumans() ?? '',
+            ];
+            foreach ($app->interviews as $interview) {
+                $activityLog[] = [
+                    'type' => 'interview',
+                    'description' => ucfirst($interview->interview_type) . " interview {$interview->status}",
+                    'timestamp' => optional($interview->scheduled_at)->diffForHumans() ?? '',
+                    'actor' => $interview->completedBy?->name,
+                ];
+            }
+            if ($app->offer) {
+                $activityLog[] = [
+                    'type' => 'offer',
+                    'description' => "Offer created - {$app->offer->position_title}",
+                    'timestamp' => optional($app->offer->created_at)->diffForHumans() ?? '',
+                ];
+                if ($app->offer->response) {
+                    $activityLog[] = [
+                        'type' => 'offer',
+                        'description' => "Offer {$app->offer->response}",
+                        'timestamp' => optional($app->offer->response_at)->diffForHumans() ?? '',
+                    ];
+                }
+            }
+        }
+
         return Inertia::render('hr/candidates/show', [
             'candidate' => $candidateData,
+            'activityLog' => $activityLog,
+            'totalDaysInPipeline' => $candidate->created_at ? (int) $candidate->created_at->diffInDays(now()) : 0,
             'stages' => RecruitmentService::STAGES,
             'can' => [
                 'manage' => $user->canDo('hr.recruitment.manage'),
