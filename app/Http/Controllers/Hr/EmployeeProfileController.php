@@ -4,12 +4,26 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Hr\UpdateEmployeeProfileRequest;
+use App\Domain\Hr\Models\HrAssetAssignment;
+use App\Domain\Hr\Models\HrCase;
+use App\Domain\Hr\Models\HrCompetencyAssessment;
+use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrDepartment;
+use App\Domain\Hr\Models\HrDevelopmentGoal;
+use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrEmployeeSkill;
 use App\Domain\Hr\Models\HrLeaveBalance;
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
+use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
+use App\Domain\Hr\Models\HrPerformanceReview;
+use App\Domain\Hr\Models\HrPolicyAttestation;
+use App\Domain\Hr\Models\HrProbationReview;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
+use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Models\Site;
+use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -161,70 +175,276 @@ class EmployeeProfileController extends Controller
         $profile->load([
             'user:id,name,email',
             'primarySite:id,name',
+            'departmentRelation:id,name',
             'documents',
             'offer:id,application_id,position_title,proposed_start_date,employment_type',
         ]);
 
-        // Compliance status for this employee
-        $rawStatuses = HrStaffComplianceStatus::where('user_id', $profile->user_id)
-            ->with('requirement:id,code,name,category,check_type,hard_stop')
-            ->get();
+        $userId = $profile->user_id;
 
-        // Transform to match frontend ComplianceStatus interface
+        // Tenure
+        $tenure = null;
+        if ($profile->start_date) {
+            $months = (int) $profile->start_date->diffInMonths(now());
+            $tenure = ['years' => intdiv($months, 12), 'months' => $months % 12];
+        }
+
+        // Manager
+        $manager = null;
+        if ($profile->manager_user_id) {
+            $mp = HrEmployeeProfile::where('user_id', $profile->manager_user_id)->with('user:id,name')->first();
+            if ($mp) {
+                $manager = ['id' => $mp->id, 'name' => $mp->user?->name ?? 'Unknown', 'position_title' => $mp->position_title, 'profile_photo_path' => $mp->profile_photo_path];
+            }
+        }
+
+        // Direct reports
+        $directReports = HrEmployeeProfile::where('manager_user_id', $userId)
+            ->where('is_active', true)->with('user:id,name')->limit(20)->get()
+            ->map(fn ($r) => ['id' => $r->id, 'name' => $r->user?->name ?? 'Unknown', 'position_title' => $r->position_title]);
+
+        // Compliance
+        $rawStatuses = HrStaffComplianceStatus::where('user_id', $userId)
+            ->with('requirement:id,code,name,category,check_type,hard_stop')->get();
+
         $complianceStatuses = $rawStatuses->map(fn ($s) => [
-            'id'              => $s->id,
-            'requirement_name' => $s->requirement?->name ?? '',
-            'requirement_type' => $s->requirement?->check_type ?? '',
-            'status'          => $s->status,
-            'expiry_date'     => $s->expires_at?->toDateString(),
-            'completed_date'  => $s->valid_from?->toDateString(),
-            'evidence_url'    => null,
+            'id' => $s->id, 'requirement_name' => $s->requirement?->name ?? '', 'requirement_type' => $s->requirement?->check_type ?? '',
+            'status' => $s->status, 'expiry_date' => $s->expires_at?->toDateString(), 'completed_date' => $s->valid_from?->toDateString(),
         ])->values();
 
         $complianceSummary = [
-            'compliant'     => $rawStatuses->where('status', 'compliant')->count(),
+            'compliant' => $rawStatuses->where('status', 'compliant')->count(),
             'expiring_soon' => $rawStatuses->where('status', 'expiring_soon')->count(),
-            'expired'       => $rawStatuses->where('status', 'expired')->count(),
-            'not_started'   => $rawStatuses->where('status', 'not_started')->count(),
-            'total'         => $rawStatuses->count(),
+            'expired' => $rawStatuses->where('status', 'expired')->count(),
+            'not_started' => $rawStatuses->where('status', 'not_started')->count(),
+            'total' => $rawStatuses->count(),
         ];
 
-        // Leave balances for current year
-        $leaveBalances = HrLeaveBalance::where('user_id', $profile->user_id)
-            ->where('year', now()->year)
-            ->get()
+        // Leave
+        $leaveBalances = HrLeaveBalance::where('user_id', $userId)->where('year', now()->year)->get()
             ->map(fn ($lb) => [
-                'id'           => $lb->id,
-                'leave_type'   => $lb->leave_type,
-                'accrued_hours' => (float) $lb->accrued_hours,
-                'used_hours'   => (float) $lb->used_hours,
+                'id' => $lb->id, 'leave_type' => $lb->leave_type,
+                'accrued_hours' => (float) $lb->accrued_hours, 'used_hours' => (float) $lb->used_hours,
                 'balance_hours' => (float) $lb->balance_hours,
-                'as_at_date'   => $lb->last_synced_at?->toDateString() ?? now()->toDateString(),
+                'as_at_date' => $lb->last_synced_at?->toDateString() ?? now()->toDateString(),
             ]);
 
-        // Onboarding checklists — transform to match frontend interface
+        $recentLeaveRequests = HrLeaveRequest::where('user_id', $userId)
+            ->orderByDesc('created_at')->limit(10)->get()
+            ->map(fn ($lr) => [
+                'id' => $lr->id, 'leave_type' => $lr->leave_type, 'status' => $lr->status,
+                'starts_at' => $lr->starts_at?->toDateString(), 'ends_at' => $lr->ends_at?->toDateString(),
+                'hours_requested' => (float) ($lr->hours_requested ?? 0),
+            ]);
+
+        // Onboarding
         $onboardingChecklists = HrOnboardingChecklist::where('employee_profile_id', $profile->id)
-            ->with('tasks')
-            ->orderByDesc('created_at')
-            ->get()
+            ->with(['tasks' => fn ($q) => $q->orderBy('category')->orderBy('sort_order')])
+            ->orderByDesc('created_at')->get()
             ->map(fn ($cl) => [
-                'id'   => $cl->id,
-                'name' => $cl->template_key ?? 'Onboarding Checklist',
-                'items' => $cl->tasks->map(fn ($t) => [
-                    'key'          => (string) $t->id,
-                    'label'        => $t->title,
-                    'done'         => $t->status === 'completed',
+                'id' => $cl->id, 'name' => $cl->template_key ?? 'Onboarding Checklist',
+                'status' => $cl->status, 'due_date' => $cl->due_date?->toDateString(),
+                'started_at' => $cl->started_at?->toDateString(), 'completed_at' => $cl->completed_at?->toDateString(),
+                'tasks' => $cl->tasks->map(fn ($t) => [
+                    'id' => $t->id, 'category' => $t->category, 'title' => $t->title,
+                    'description' => $t->description, 'is_required' => (bool) $t->is_required,
+                    'status' => $t->status, 'assigned_to_role' => $t->assigned_to_role,
+                    'sign_off_required' => (bool) $t->sign_off_required,
                     'completed_at' => $t->completed_at?->toDateString(),
                 ])->values(),
-                'completed_at' => $cl->completed_at?->toDateString(),
+            ]);
+
+        // Performance reviews
+        $performanceReviews = HrPerformanceReview::where('employee_user_id', $userId)
+            ->with('reviewer:id,name')->orderByDesc('review_period_end')->limit(10)->get()
+            ->map(fn ($r) => [
+                'id' => $r->id, 'review_type' => $r->review_type, 'status' => $r->status,
+                'overall_rating' => $r->overall_rating,
+                'period_start' => $r->review_period_start?->toDateString(),
+                'period_end' => $r->review_period_end?->toDateString(),
+                'reviewer_name' => $r->reviewer?->name, 'next_review_date' => $r->next_review_date?->toDateString(),
+            ]);
+
+        // Probation reviews
+        $probationReviews = HrProbationReview::where('employee_user_id', $userId)
+            ->with('reviewer:id,name')->orderBy('review_number')->get()
+            ->map(fn ($r) => [
+                'id' => $r->id, 'review_number' => $r->review_number, 'review_date' => $r->review_date?->toDateString(),
+                'status' => $r->status, 'recommendation' => $r->recommendation,
+                'reviewer_name' => $r->reviewer?->name, 'extension_weeks' => $r->extension_weeks,
+            ]);
+
+        // PIPs
+        $pips = HrPerformanceImprovementPlan::where('employee_profile_id', $profile->id)
+            ->with('milestones')->orderByDesc('start_date')->limit(5)->get()
+            ->map(fn ($p) => [
+                'id' => $p->id, 'title' => $p->title, 'status' => $p->status, 'reason' => $p->reason,
+                'start_date' => $p->start_date?->toDateString(), 'end_date' => $p->end_date?->toDateString(),
+                'outcome' => $p->outcome,
+                'milestones' => $p->milestones->map(fn ($m) => [
+                    'id' => $m->id, 'title' => $m->title, 'due_date' => $m->due_date?->toDateString(),
+                    'status' => $m->status, 'outcome' => $m->outcome,
+                ])->values(),
+            ]);
+
+        // Development goals
+        $developmentGoals = HrDevelopmentGoal::where('employee_user_id', $userId)
+            ->orderByDesc('created_at')->limit(10)->get()
+            ->map(fn ($g) => [
+                'id' => $g->id, 'title' => $g->title, 'status' => $g->status,
+                'progress_percent' => $g->progress_percent ?? 0,
+                'due_date' => $g->due_date?->toDateString(),
+            ]);
+
+        // Training
+        $courseEnrollments = HrCourseEnrollment::where('user_id', $userId)
+            ->with('course:id,title,category,duration_hours')->orderByDesc('enrolled_at')->limit(20)->get()
+            ->map(fn ($e) => [
+                'id' => $e->id, 'course_name' => $e->course?->title, 'category' => $e->course?->category,
+                'status' => $e->status, 'enrolled_at' => $e->enrolled_at?->toDateString(),
+                'completed_at' => $e->completed_at?->toDateString(), 'score' => $e->score,
+            ]);
+
+        // Skills
+        $employeeSkills = HrEmployeeSkill::where('employee_profile_id', $profile->id)
+            ->with('skill:id,name,category')->get()
+            ->map(fn ($s) => [
+                'id' => $s->id, 'skill_name' => $s->skill?->name, 'category' => $s->skill?->category,
+                'proficiency_level' => $s->proficiency_level, 'self_assessed' => (bool) $s->self_assessed,
+            ]);
+
+        // Competency assessments
+        $competencyAssessments = HrCompetencyAssessment::where('employee_profile_id', $profile->id)
+            ->with('competency:id,name,category')->orderByDesc('assessment_date')->limit(20)->get()
+            ->map(fn ($a) => [
+                'id' => $a->id, 'competency_name' => $a->competency?->name, 'category' => $a->competency?->category,
+                'proficiency_level' => $a->proficiency_level, 'target_level' => $a->target_level,
+                'assessment_date' => $a->assessment_date?->toDateString(),
+            ]);
+
+        // Driver eligibility
+        $driverData = null;
+        try {
+            $driverEligibility = HrDriverEligibility::where('user_id', $userId)->first();
+            if ($driverEligibility) {
+                $driverData = [
+                    'id' => $driverEligibility->id, 'status' => $driverEligibility->status,
+                    'licence_number' => $driverEligibility->licence_number, 'licence_class' => $driverEligibility->licence_class,
+                    'licence_endorsements' => $driverEligibility->licence_endorsements,
+                    'licence_expires_at' => $driverEligibility->licence_expires_at?->toDateString(),
+                    'can_drive_clients' => (bool) $driverEligibility->can_drive_clients,
+                    'incident_free_since' => $driverEligibility->incident_free_since?->toDateString(),
+                    'next_review_at' => $driverEligibility->next_review_at?->toDateString(),
+                ];
+            }
+        } catch (\Exception $e) {
+            // Table may not exist yet
+        }
+
+        // Vetting / background checks
+        $backgroundChecks = StaffBackgroundCheck::where('user_id', $userId)
+            ->orderByDesc('check_date')->get()
+            ->map(fn ($c) => [
+                'id' => $c->id, 'check_type' => $c->check_type, 'status' => $c->status,
+                'provider' => $c->provider, 'reference_number' => $c->reference_number,
+                'check_date' => $c->check_date?->toDateString(), 'expires_at' => $c->expires_at?->toDateString(),
+                'risk_decision' => $c->risk_decision,
+            ]);
+
+        // Supervision notes
+        $supervisionNotes = HrSupervisionNote::where('employee_user_id', $userId)
+            ->with('supervisor:id,name')->orderByDesc('session_date')->limit(10)->get()
+            ->map(fn ($n) => [
+                'id' => $n->id, 'session_date' => $n->session_date?->toDateString(), 'session_type' => $n->session_type,
+                'duration_minutes' => $n->duration_minutes, 'supervisor_name' => $n->supervisor?->name,
+                'topics_discussed' => $n->topics_discussed, 'actions_agreed' => $n->actions_agreed,
+                'next_session_date' => $n->next_session_date?->toDateString(),
+            ]);
+
+        // Cases
+        $cases = HrCase::where('user_id', $userId)
+            ->with('assignedTo:id,name')->orderByDesc('opened_at')->limit(10)->get()
+            ->map(fn ($c) => [
+                'id' => $c->id, 'case_number' => $c->case_number, 'case_type' => $c->case_type,
+                'severity' => $c->severity, 'status' => $c->status, 'title' => $c->title,
+                'opened_at' => $c->opened_at?->toDateString(), 'closed_at' => $c->closed_at?->toDateString(),
+                'assigned_to_name' => $c->assignedTo?->name,
+            ]);
+
+        // Asset assignments
+        $assetAssignments = HrAssetAssignment::where('employee_profile_id', $profile->id)
+            ->with('asset:id,asset_tag,name,category,serial_number')->orderByDesc('assigned_at')->get()
+            ->map(fn ($a) => [
+                'id' => $a->id, 'asset_name' => $a->asset?->name, 'asset_tag' => $a->asset?->asset_tag,
+                'category' => $a->asset?->category, 'serial_number' => $a->asset?->serial_number,
+                'assigned_at' => $a->assigned_at?->toDateString(), 'returned_at' => $a->returned_at?->toDateString(),
+                'condition' => $a->condition_on_assign,
+            ]);
+
+        // Policy attestations
+        $policyAttestations = HrPolicyAttestation::where('user_id', $userId)
+            ->with('policy:id,title')->orderByDesc('attested_at')->limit(20)->get()
+            ->map(fn ($a) => [
+                'id' => $a->id, 'policy_name' => $a->policy?->title,
+                'attested_at' => $a->attested_at?->toDateString(),
             ]);
 
         return Inertia::render('hr/employees/show', [
-            'profile' => $profile,
+            'profile' => [
+                'id' => $profile->id,
+                'employee_number' => $profile->employee_number,
+                'position_title' => $profile->position_title,
+                'employment_type' => $profile->employment_type,
+                'contract_type' => $profile->contract_type,
+                'department' => $profile->departmentRelation?->name ?? $profile->department,
+                'team' => $profile->team,
+                'is_active' => (bool) $profile->is_active,
+                'start_date' => $profile->start_date?->toDateString(),
+                'end_date' => $profile->end_date?->toDateString(),
+                'probation_end_date' => $profile->probation_end_date?->toDateString(),
+                'hours_per_week' => $profile->hours_per_week,
+                'pay_rate' => $profile->hourly_rate,
+                'pay_frequency' => $profile->pay_frequency,
+                'bio' => $profile->bio,
+                'preferred_name' => $profile->preferred_name,
+                'profile_photo_path' => $profile->profile_photo_path,
+                'is_first_aider' => (bool) $profile->is_first_aider,
+                'is_fire_warden' => (bool) $profile->is_fire_warden,
+                'can_drive_clients' => (bool) $profile->can_drive_clients,
+                'notes' => $profile->notes,
+                'emergency_contact_name' => $profile->emergency_contact_name ?? ($profile->emergency_contacts[0]['name'] ?? null),
+                'emergency_contact_phone' => $profile->emergency_contact_phone ?? ($profile->emergency_contacts[0]['phone'] ?? null),
+                'emergency_contact_relationship' => $profile->emergency_contact_relationship ?? ($profile->emergency_contacts[0]['relationship'] ?? null),
+                'user' => ['id' => $profile->user->id, 'name' => $profile->user->name, 'email' => $profile->user->email],
+                'primary_site' => $profile->primarySite ? ['id' => $profile->primarySite->id, 'name' => $profile->primarySite->name] : null,
+                'documents' => $profile->documents->map(fn ($d) => [
+                    'id' => $d->id, 'title' => $d->title, 'category' => $d->category,
+                    'original_name' => $d->original_name, 'created_at' => $d->created_at?->toDateString(),
+                    'expires_at' => $d->expires_at?->toDateString(),
+                    'signed_by_employee' => (bool) $d->signed_by_employee,
+                ])->values(),
+            ],
+            'tenure' => $tenure,
+            'manager' => $manager,
+            'directReports' => $directReports,
             'complianceStatuses' => $complianceStatuses,
             'complianceSummary' => $complianceSummary,
             'leaveBalances' => $leaveBalances,
+            'recentLeaveRequests' => $recentLeaveRequests,
             'onboardingChecklists' => $onboardingChecklists,
+            'performanceReviews' => $performanceReviews,
+            'probationReviews' => $probationReviews,
+            'pips' => $pips,
+            'developmentGoals' => $developmentGoals,
+            'courseEnrollments' => $courseEnrollments,
+            'employeeSkills' => $employeeSkills,
+            'competencyAssessments' => $competencyAssessments,
+            'driverEligibility' => $driverData,
+            'backgroundChecks' => $backgroundChecks,
+            'supervisionNotes' => $supervisionNotes,
+            'cases' => $cases,
+            'assetAssignments' => $assetAssignments,
+            'policyAttestations' => $policyAttestations,
             'can' => [
                 'manage' => $user->canDo('hr.employees.manage'),
                 'viewSensitive' => $user->canDo('hr.employees.viewRestricted'),
