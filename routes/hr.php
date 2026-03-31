@@ -106,6 +106,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     Route::middleware('permission:hr.recruitment.view')->group(function () {
         Route::get('/recruitment', [RecruitmentController::class, 'index'])->name('recruitment.index');
         Route::get('/recruitment/candidates', [RecruitmentController::class, 'index'])->name('candidates.index');
+        Route::get('/recruitment/kanban', [RecruitmentController::class, 'kanban'])->name('recruitment.kanban');
+        Route::get('/recruitment/analytics', [RecruitmentController::class, 'analytics'])->name('recruitment.analytics');
         Route::get('/recruitment/jobs', [RecruitmentJobController::class, 'index'])->name('jobs.index');
         Route::get('/recruitment/kits', [InterviewKitController::class, 'index'])->name('kits.index');
 

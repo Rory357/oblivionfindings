@@ -9,16 +9,13 @@ use Illuminate\Support\Facades\DB;
 
 class RecruitmentAnalyticsService
 {
-    /**
-     * Average days from application to offer per month.
-     */
     public function getTimeToHire(?int $tenantId, int $months = 12): array
     {
         $since = now()->subMonths($months)->startOfMonth();
 
         $results = DB::table('hr_offers')
             ->join('hr_applications', 'hr_offers.application_id', '=', 'hr_applications.id')
-            ->where('hr_applications.tenant_id', $tenantId)
+            ->when($tenantId !== null, fn ($q) => $q->where('hr_applications.tenant_id', $tenantId))
             ->where('hr_offers.created_at', '>=', $since)
             ->whereNotNull('hr_offers.created_at')
             ->selectRaw("
@@ -37,13 +34,10 @@ class RecruitmentAnalyticsService
         ])->toArray();
     }
 
-    /**
-     * Candidates by source with conversion rates.
-     */
     public function getSourceEffectiveness(?int $tenantId): array
     {
         $results = DB::table('hr_candidates')
-            ->where('tenant_id', $tenantId)
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->selectRaw("
                 source,
                 COUNT(*) as total,
@@ -63,15 +57,12 @@ class RecruitmentAnalyticsService
         ])->toArray();
     }
 
-    /**
-     * Conversion rate at each pipeline stage.
-     */
     public function getPipelineConversion(?int $tenantId): array
     {
         $stages = RecruitmentService::STAGES;
 
         $counts = DB::table('hr_candidates')
-            ->where('tenant_id', $tenantId)
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->selectRaw('status, COUNT(*) as count')
             ->groupBy('status')
             ->pluck('count', 'status')
@@ -89,7 +80,6 @@ class RecruitmentAnalyticsService
             ];
         }
 
-        // Add terminal statuses
         foreach (['withdrawn', 'rejected'] as $terminal) {
             $count = $counts[$terminal] ?? 0;
             $result[] = [
@@ -102,13 +92,10 @@ class RecruitmentAnalyticsService
         return $result;
     }
 
-    /**
-     * Open positions, applications per position, avg time open.
-     */
     public function getOpenPositionsSummary(?int $tenantId): array
     {
         $results = DB::table('hr_applications')
-            ->where('tenant_id', $tenantId)
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->whereNotIn('status', ['rejected', 'withdrawn'])
             ->selectRaw("
                 position_title,
@@ -125,6 +112,72 @@ class RecruitmentAnalyticsService
             'applications' => (int) $r->applications,
             'days_open' => (int) $r->days_open,
             'first_application' => $r->first_application,
+        ])->toArray();
+    }
+
+    public function getHiringVelocity(?int $tenantId, int $months = 12): array
+    {
+        $since = now()->subMonths($months)->startOfMonth();
+
+        $results = DB::table('hr_offers')
+            ->join('hr_applications', 'hr_offers.application_id', '=', 'hr_applications.id')
+            ->when($tenantId !== null, fn ($q) => $q->where('hr_applications.tenant_id', $tenantId))
+            ->where('hr_offers.response', 'accepted')
+            ->where('hr_offers.response_at', '>=', $since)
+            ->selectRaw("
+                DATE_FORMAT(hr_offers.response_at, '%Y-%m') as month,
+                COUNT(*) as count
+            ")
+            ->groupByRaw("DATE_FORMAT(hr_offers.response_at, '%Y-%m')")
+            ->orderBy('month')
+            ->get();
+
+        return $results->map(fn ($r) => [
+            'month' => $r->month,
+            'count' => (int) $r->count,
+        ])->toArray();
+    }
+
+    public function getStageBottlenecks(?int $tenantId): array
+    {
+        $results = DB::table('hr_candidates')
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->whereNotIn('status', ['withdrawn', 'rejected', 'hired'])
+            ->whereNotNull('current_stage_entered_at')
+            ->selectRaw("
+                status,
+                AVG(DATEDIFF(NOW(), current_stage_entered_at)) as avg_days,
+                COUNT(*) as count
+            ")
+            ->groupBy('status')
+            ->orderByDesc('avg_days')
+            ->get();
+
+        return $results->map(fn ($r) => [
+            'stage' => $r->status,
+            'avg_days' => round((float) $r->avg_days, 1),
+            'count' => (int) $r->count,
+        ])->toArray();
+    }
+
+    public function getMonthlyApplicationTrend(?int $tenantId, int $months = 12): array
+    {
+        $since = now()->subMonths($months)->startOfMonth();
+
+        $results = DB::table('hr_candidates')
+            ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
+            ->where('created_at', '>=', $since)
+            ->selectRaw("
+                DATE_FORMAT(created_at, '%Y-%m') as month,
+                COUNT(*) as count
+            ")
+            ->groupByRaw("DATE_FORMAT(created_at, '%Y-%m')")
+            ->orderBy('month')
+            ->get();
+
+        return $results->map(fn ($r) => [
+            'month' => $r->month,
+            'count' => (int) $r->count,
         ])->toArray();
     }
 }
