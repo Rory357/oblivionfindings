@@ -42,9 +42,22 @@ class ClientPolicy
      */
     public function viewMedications(User $user, Client $client): bool
     {
+        $hasMedicationOpsAccess =
+            $user->canDo('medications.view')
+            && (
+                $user->canDo('medications.stock.update')
+                || $user->canDo('medications.audit.view')
+                || $user->canDo('medications.reports.export')
+                || $user->canDo('reports.viewAny')
+            );
+
         // Portal roles can view meds only via the portal rules.
         if ($user->hasRole('client', 'next_of_kin') && $user->canAccessClientPortal($client)) {
             return $user->canDo('medications.view');
+        }
+
+        if ($hasMedicationOpsAccess) {
+            return true;
         }
 
         // Managers/admins: global.

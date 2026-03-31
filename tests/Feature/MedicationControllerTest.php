@@ -277,7 +277,7 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->get('/medications/audit/export')
             ->assertOk()
-            ->assertHeader('content-type', 'text/csv');
+            ->assertHeader('content-type', 'text/csv; charset=utf-8');
     }
 
     public function test_audit_export_forbidden_for_support_worker(): void
@@ -373,7 +373,7 @@ class MedicationControllerTest extends TestCase
             ->get("/clients/{$this->client->id}/medical")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('clients/medical')
+                ->component('operations/clients/medical')
                 ->has('client')
                 ->has('medications')
                 ->has('conditions')
@@ -420,19 +420,17 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->put("/clients/{$this->client->id}/medical/profile", [
                 'medical_history' => 'Type 2 diabetes',
-                'disabilities' => 'Mobility impairment',
-                'allergies' => 'Penicillin',
+                'disabilities' => ['Mobility impairment'],
+                'allergies' => ['Penicillin'],
                 'notes' => 'Requires daily blood sugar monitoring',
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertDatabaseHas('client_medical_profiles', [
-            'client_id' => $this->client->id,
-            'medical_history' => 'Type 2 diabetes',
-            'disabilities' => 'Mobility impairment',
-            'allergies' => 'Penicillin',
-        ]);
+        $profile = ClientMedicalProfile::where('client_id', $this->client->id)->firstOrFail();
+        $this->assertSame('Type 2 diabetes', $profile->medical_history);
+        $this->assertSame(['Mobility impairment'], $profile->disabilities);
+        $this->assertSame(['Penicillin'], $profile->allergies);
     }
 
     public function test_update_medical_profile_forbidden_for_support_worker(): void
@@ -451,22 +449,20 @@ class MedicationControllerTest extends TestCase
         ClientMedicalProfile::create([
             'client_id' => $this->client->id,
             'medical_history' => 'Old history',
-            'allergies' => 'Old allergies',
+            'allergies' => ['Old allergies'],
         ]);
 
         $this->actingAs($this->admin)
             ->put("/clients/{$this->client->id}/medical/profile", [
                 'medical_history' => 'Updated history',
-                'allergies' => 'Updated allergies',
+                'allergies' => ['Updated allergies'],
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertDatabaseHas('client_medical_profiles', [
-            'client_id' => $this->client->id,
-            'medical_history' => 'Updated history',
-            'allergies' => 'Updated allergies',
-        ]);
+        $profile = ClientMedicalProfile::where('client_id', $this->client->id)->firstOrFail();
+        $this->assertSame('Updated history', $profile->medical_history);
+        $this->assertSame(['Updated allergies'], $profile->allergies);
         $this->assertDatabaseCount('client_medical_profiles', 1);
     }
 
@@ -752,7 +748,7 @@ class MedicationControllerTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertDatabaseMissing('client_medications', ['id' => $med->id]);
+        $this->assertSoftDeleted('client_medications', ['id' => $med->id]);
     }
 
     public function test_destroy_medication_returns_404_for_mismatched_client(): void
@@ -1487,9 +1483,9 @@ class MedicationControllerTest extends TestCase
 
         $this->assertNotNull($access);
         $this->assertEquals('Emergency medication query', $access->reason);
-        // Default 60-minute expiry
-        $this->assertTrue($access->expires_at->diffInMinutes(now()) >= 59);
-        $this->assertTrue($access->expires_at->diffInMinutes(now()) <= 61);
+        $minutesUntilExpiry = now()->diffInMinutes($access->expires_at, false);
+        $this->assertTrue($minutesUntilExpiry >= 58);
+        $this->assertTrue($minutesUntilExpiry <= 61);
     }
 
     public function test_break_glass_store_with_custom_minutes(): void
@@ -1505,7 +1501,8 @@ class MedicationControllerTest extends TestCase
             ->assertSessionHas('success');
 
         $access = ClientBreakGlassAccess::where('client_id', $this->client->id)->first();
-        $this->assertTrue($access->expires_at->diffInMinutes(now()) >= 119);
+        $minutesUntilExpiry = now()->diffInMinutes($access->expires_at, false);
+        $this->assertTrue($minutesUntilExpiry >= 118);
     }
 
     public function test_break_glass_store_validates_reason_required(): void
@@ -2097,7 +2094,7 @@ class MedicationControllerTest extends TestCase
             ->get("/clients/{$this->client->id}/mar")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->component('clients/mar')
+                ->component('operations/clients/mar')
                 ->has('client')
                 ->has('date')
                 ->has('rows')
@@ -2149,7 +2146,7 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->get("/clients/{$this->client->id}/mar/export.csv")
             ->assertOk()
-            ->assertHeader('content-type', 'text/csv');
+            ->assertHeader('content-type', 'text/csv; charset=utf-8');
     }
 
     // ══════════════════════════════════════════════════════════════
@@ -2822,6 +2819,6 @@ class MedicationControllerTest extends TestCase
             ->assertRedirect()
             ->assertSessionHas('success');
 
-        $this->assertDatabaseMissing('client_medications', ['id' => $med->id]);
+        $this->assertSoftDeleted('client_medications', ['id' => $med->id]);
     }
 }

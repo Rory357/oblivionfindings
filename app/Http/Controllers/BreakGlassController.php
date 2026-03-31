@@ -41,7 +41,7 @@ class BreakGlassController extends Controller
     public function destroy(Request $request, Client $client, ClientBreakGlassAccess $access)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('medications.breakglass'), 403);
+        abort_unless($user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')), 403);
 
         abort_unless((int) $access->client_id === (int) $client->id, 404);
 

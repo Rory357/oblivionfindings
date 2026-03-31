@@ -27,7 +27,10 @@ class MedicationAdministrationCorrectionController extends Controller
             'correction_reason' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $minutesSince = $administration->created_at ? $administration->created_at->diffInMinutes(now()) : 999999;
+        $windowAnchor = $administration->administered_at
+            ?? $administration->updated_at
+            ?? $administration->created_at;
+        $minutesSince = $windowAnchor ? $windowAnchor->diffInMinutes(now()) : 999999;
         if ($minutesSince > 30 && empty($data['correction_reason'])) {
             return back()->withInput()->with('error', 'Please provide a correction reason (outside the 30-minute edit window).');
         }

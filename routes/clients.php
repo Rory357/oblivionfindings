@@ -155,7 +155,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Medication stock updates (managers/finance)
     Route::put('/clients/{client}/medical/medications/{medication}/stock', [ClientMedicalController::class, 'updateMedicationStock'])
-        ->middleware('permission:medications.stock.update|clients.update')
+        ->middleware('permission:medications.stock.update|medications.controlled.record|clients.update')
         ->name('clients.medical.medications.stock.update');
 
     // Medication administration (support workers + managers)
@@ -173,7 +173,7 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:medications.breakglass')
         ->name('clients.break_glass.store');
     Route::delete('/clients/{client}/break-glass/{access}', [BreakGlassController::class, 'destroy'])
-        ->middleware('permission:medications.breakglass')
+        ->middleware('permission:medications.breakglass|medications.audit.view')
         ->name('clients.break_glass.destroy');
 
     // Emergency access entry point

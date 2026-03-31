@@ -173,7 +173,6 @@ Route::middleware(['auth'])->group(function () {
     Route::redirect('/timesheets/{any}', '/operations/timesheets/{any}')->where('any', '.*');
     Route::redirect('/rostering', '/operations/rostering');
     Route::redirect('/rostering/{any}', '/operations/rostering/{any}')->where('any', '.*');
-    Route::redirect('/medications', '/emar/daily');
     Route::redirect('/medications/{any}', '/emar/{any}')->where('any', '.*');
     Route::redirect('/emergency-access', '/emar/emergency-access');
     Route::redirect('/consents', '/operations/clients');

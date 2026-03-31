@@ -256,12 +256,23 @@ class ClientMedicalController extends Controller
 
         $data = $request->validate([
             'medical_history' => ['nullable', 'string'],
-            'disabilities' => ['nullable', 'array'],
+            'disabilities' => ['nullable'],
             'disabilities.*' => ['string', 'max:255'],
-            'allergies' => ['nullable', 'array'],
+            'allergies' => ['nullable'],
             'allergies.*' => ['string', 'max:255'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        foreach (['disabilities', 'allergies'] as $field) {
+            if (!array_key_exists($field, $data) || $data[$field] === null || $data[$field] === '') {
+                $data[$field] = [];
+                continue;
+            }
+
+            $data[$field] = is_array($data[$field])
+                ? array_values(array_filter($data[$field], fn ($value) => filled($value)))
+                : [(string) $data[$field]];
+        }
 
         $profile = ClientMedicalProfile::firstOrNew(['client_id' => $client->id]);
         $profile->fill($data);
@@ -402,7 +413,12 @@ class ClientMedicalController extends Controller
         abort_unless($medication->client_id === $client->id, 404);
 
         $user = $request->user();
-        abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.stock.update') ?? false), 403);
+        abort_unless(
+            ($user?->canDo('clients.update') ?? false)
+            || ($user?->canDo('medications.stock.update') ?? false)
+            || ($user?->canDo('medications.controlled.record') ?? false),
+            403
+        );
 
         $data = $request->validate([
             'on_hand' => ['nullable', 'integer', 'min:0'],

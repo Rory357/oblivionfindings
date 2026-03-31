@@ -20,9 +20,8 @@ class ClientMarController extends Controller
         // If the user isn't allowed, but can break-glass, show the request screen instead of a hard 403.
         if (!$user?->can('viewMedications', $client)) {
             abort_unless($user && $user->canDo('medications.breakglass'), 403);
-            return inertia('emar/Placeholder', [
+            return inertia('emergency/request', [
                 'client' => $client->only(['id', 'first_name', 'last_name']),
-                'feature' => 'Emergency Access',
                 'redirectTo' => url("/clients/{$client->id}/mar"),
             ]);
         }
