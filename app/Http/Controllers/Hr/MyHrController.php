@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Hr;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrAnnouncement;
+use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementSurvey;
@@ -22,6 +23,7 @@ use App\Domain\Hr\Services\EngagementService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -627,5 +629,63 @@ class MyHrController extends Controller
         }
 
         return redirect()->back()->with('success', 'Survey response submitted.');
+    }
+
+    public function documents(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        abort_unless($profile, 404, 'Employee profile not found.');
+
+        $documents = HrDocument::where('employee_profile_id', $profile->id)
+            ->where('is_restricted', false)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn ($d) => [
+                'id' => $d->id,
+                'title' => $d->title,
+                'category' => $d->category,
+                'folder' => $d->folder ?? null,
+                'original_name' => $d->original_name,
+                'mime_type' => $d->mime_type,
+                'size_bytes' => $d->size_bytes,
+                'expires_at' => $d->expires_at?->toDateString(),
+                'signed_by_employee' => (bool) $d->signed_by_employee,
+                'created_at' => $d->created_at?->toIso8601String(),
+            ]);
+
+        return Inertia::render('hr/my/documents', [
+            'documents' => $documents,
+            'categories' => ['contract', 'letter', 'policy', 'certificate', 'offer', 'other'],
+        ]);
+    }
+
+    public function downloadDocument(Request $request, HrDocument $document)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $profile = HrEmployeeProfile::where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->first();
+
+        abort_unless($profile, 404);
+        abort_unless($document->employee_profile_id === $profile->id, 403);
+        abort_unless(!$document->is_restricted, 403, 'This document is restricted.');
+
+        abort_unless(
+            Storage::disk($document->storage_disk)->exists($document->storage_path),
+            404,
+            'Document file is missing from storage.',
+        );
+
+        $filename = $document->original_name ?: basename($document->storage_path);
+
+        return Storage::disk($document->storage_disk)->download($document->storage_path, $filename);
     }
 }

@@ -4,148 +4,218 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { type BreadcrumbItem } from '@/types';
-import { Plus, MessageSquare, Eye, Clock } from 'lucide-react';
+import {
+    Plus, MessageSquare, Eye, Clock, CheckCircle2, Users, BarChart3,
+    ArrowRight, AlertCircle, Send,
+} from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { useState } from 'react';
 
 type User = { id: number; name: string };
-
 type FeedbackRequest = {
-    id: number;
-    subject: User | null;
-    requester: User | null;
-    reviewer: User | null;
-    review_type: string;
-    status: string;
-    due_date: string | null;
-    completed_at: string | null;
-    created_at: string;
+    id: number; subject: User | null; requester: User | null; reviewer: User | null;
+    review_type: string; status: string; due_date: string | null; completed_at: string | null; created_at: string;
 };
-
 type Props = {
-    requests: {
-        data: FeedbackRequest[];
-        links: Array<{ url: string | null; label: string; active: boolean }>;
-    };
+    requests: { data: FeedbackRequest[]; links: Array<{ url: string | null; label: string; active: boolean }> };
     pendingCount: number;
     can: { manage: boolean };
 };
 
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr' },
-    { title: '360 Feedback', href: '/hr/feedback' },
-];
+const breadcrumbs: BreadcrumbItem[] = [{ title: 'HR', href: '/hr' }, { title: '360 Feedback', href: '/hr/feedback' }];
 
-const statusConfig: Record<string, { className: string; label: string }> = {
-    pending: { className: 'border-amber-500/30 text-amber-400 bg-amber-500/10', label: 'Pending' },
-    completed: { className: 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10', label: 'Completed' },
-    declined: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Declined' },
-    expired: { className: 'border-slate-500/30 text-slate-400 bg-slate-500/10', label: 'Expired' },
+const statusConfig: Record<string, { bg: string; text: string; dot: string; label: string }> = {
+    pending: { bg: 'bg-amber-50', text: 'text-amber-700', dot: 'bg-amber-400', label: 'Pending' },
+    completed: { bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-400', label: 'Completed' },
+    declined: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-400', label: 'Declined' },
+    expired: { bg: 'bg-slate-50', text: 'text-slate-600', dot: 'bg-slate-400', label: 'Expired' },
 };
 
-const reviewTypeLabels: Record<string, string> = {
-    peer: 'Peer Review',
-    manager: 'Manager Review',
-    direct_report: 'Direct Report',
-    self: 'Self Assessment',
+const reviewTypeConfig: Record<string, { label: string; color: string }> = {
+    peer: { label: 'Peer', color: 'bg-blue-100 text-blue-700' },
+    manager: { label: 'Manager', color: 'bg-violet-100 text-violet-700' },
+    direct_report: { label: 'Direct Report', color: 'bg-emerald-100 text-emerald-700' },
+    self: { label: 'Self', color: 'bg-amber-100 text-amber-700' },
 };
+
+function formatDate(v?: string | null): string {
+    if (!v) return '\u2014';
+    const d = new Date(v);
+    return Number.isNaN(d.getTime()) ? v : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function getInitials(name: string) { return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2); }
+
+const AVATAR_COLORS = ['bg-blue-500', 'bg-violet-500', 'bg-emerald-500', 'bg-amber-500', 'bg-pink-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500'];
+function avatarColor(id: number) { return AVATAR_COLORS[id % AVATAR_COLORS.length]; }
 
 export default function FeedbackIndex({ requests, pendingCount, can }: Props) {
+    const [statusFilter, setStatusFilter] = useState<string | null>(null);
+
+    const allData = requests.data;
+    const totalCount = allData.length;
+    const completedCount = allData.filter(r => r.status === 'completed').length;
+    const responseRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+    const filtered = statusFilter ? allData.filter(r => r.status === statusFilter) : allData;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="360 Feedback" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold">360-Degree Feedback</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage and respond to feedback requests
-                            {pendingCount > 0 && (
-                                <Badge variant="secondary" className="ml-2">
-                                    {pendingCount} pending
-                                </Badge>
+            <div className="space-y-6 p-4 lg:p-6">
+
+                {/* Hero Banner */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 p-6 text-white shadow-lg">
+                    <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/5" />
+                    <div className="absolute -bottom-8 right-20 h-24 w-24 rounded-full bg-white/5" />
+                    <div className="absolute left-1/3 -top-4 h-28 w-28 rounded-full bg-white/5" />
+                    <div className="relative flex flex-wrap items-center justify-between gap-4">
+                        <div>
+                            <h1 className="text-2xl font-bold">360-Degree Feedback</h1>
+                            <p className="mt-1 text-white/70">Manage and respond to feedback requests across your team</p>
+                        </div>
+                        <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-6">
+                                {pendingCount > 0 && (
+                                    <>
+                                        <div className="text-center">
+                                            <div className="text-3xl font-bold">{pendingCount}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-white/60">Pending</div>
+                                        </div>
+                                        <div className="h-10 w-px bg-white/20" />
+                                    </>
+                                )}
+                                <div className="text-center">
+                                    <div className="text-3xl font-bold">{responseRate}%</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-white/60">Response Rate</div>
+                                </div>
+                            </div>
+                            {can.manage && (
+                                <Button size="sm" className="ml-4 gap-1.5 bg-white text-violet-700 hover:bg-white/90 shadow-md" asChild>
+                                    <Link href="/hr/feedback/request"><Plus className="h-4 w-4" />Request Feedback</Link>
+                                </Button>
                             )}
-                        </p>
+                        </div>
                     </div>
-                    {can.manage && (
-                        <Button asChild size="sm">
-                            <Link href="/hr/feedback/request">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                Request Feedback
-                            </Link>
-                        </Button>
-                    )}
                 </div>
 
-                {/* Requests List */}
-                <div className="grid gap-4">
-                    {requests.data.map((req) => {
-                        const config = statusConfig[req.status] || statusConfig.pending;
+                {/* KPI Cards */}
+                <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+                    {[
+                        { label: 'Total Requests', value: totalCount, icon: Send, gradient: 'from-violet-500/10 to-purple-500/5', iconBg: 'bg-violet-100', iconColor: 'text-violet-600', hover: 'hover:border-violet-300' },
+                        { label: 'Pending', value: pendingCount, icon: Clock, gradient: 'from-amber-500/10 to-yellow-500/5', iconBg: 'bg-amber-100', iconColor: 'text-amber-600', hover: 'hover:border-amber-300' },
+                        { label: 'Completed', value: completedCount, icon: CheckCircle2, gradient: 'from-emerald-500/10 to-green-500/5', iconBg: 'bg-emerald-100', iconColor: 'text-emerald-600', hover: 'hover:border-emerald-300' },
+                        { label: 'Response Rate', value: `${responseRate}%`, icon: BarChart3, gradient: 'from-blue-500/10 to-indigo-500/5', iconBg: 'bg-blue-100', iconColor: 'text-blue-600', hover: 'hover:border-blue-300' },
+                    ].map((kpi) => {
+                        const Icon = kpi.icon;
                         return (
-                            <Card key={req.id}>
-                                <CardHeader className="pb-3">
+                            <Card key={kpi.label} className={`group overflow-hidden bg-gradient-to-br ${kpi.gradient} transition-all ${kpi.hover} hover:shadow-md`}>
+                                <CardContent className="pt-5">
                                     <div className="flex items-start justify-between">
                                         <div>
-                                            <CardTitle className="text-base">
-                                                Feedback for {req.subject?.name ?? 'Unknown'}
-                                            </CardTitle>
-                                            <div className="mt-1 flex items-center gap-2">
-                                                <Badge variant="outline" className={config.className}>
-                                                    {config.label}
-                                                </Badge>
-                                                <Badge variant="secondary">
-                                                    {reviewTypeLabels[req.review_type] || req.review_type}
-                                                </Badge>
-                                            </div>
+                                            <p className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">{kpi.label}</p>
+                                            <p className="mt-1 text-3xl font-bold tracking-tight">{kpi.value}</p>
                                         </div>
-                                        <div className="flex gap-2">
-                                            {req.status === 'pending' && (
-                                                <Button variant="default" size="sm" asChild>
-                                                    <Link href={`/hr/feedback/${req.id}/respond`}>
-                                                        <MessageSquare className="mr-1.5 h-3.5 w-3.5" />
-                                                        Respond
-                                                    </Link>
-                                                </Button>
-                                            )}
-                                            {can.manage && req.status === 'completed' && (
-                                                <Button variant="outline" size="sm" asChild>
-                                                    <Link href={`/hr/feedback/summary/${req.subject?.id}`}>
-                                                        <Eye className="mr-1.5 h-3.5 w-3.5" />
-                                                        Summary
-                                                    </Link>
-                                                </Button>
-                                            )}
+                                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${kpi.iconBg} transition-transform group-hover:scale-110`}>
+                                            <Icon className={`h-5 w-5 ${kpi.iconColor}`} />
                                         </div>
-                                    </div>
-                                </CardHeader>
-                                <CardContent className="pt-0">
-                                    <div className="flex gap-6 text-sm text-muted-foreground">
-                                        <span>Reviewer: {req.reviewer?.name ?? 'Unknown'}</span>
-                                        <span>Requested by: {req.requester?.name ?? 'Unknown'}</span>
-                                        {req.due_date && (
-                                            <span className="flex items-center gap-1">
-                                                <Clock className="h-3.5 w-3.5" />
-                                                Due: {req.due_date}
-                                            </span>
-                                        )}
-                                        {req.completed_at && <span>Completed: {req.completed_at}</span>}
                                     </div>
                                 </CardContent>
                             </Card>
                         );
                     })}
-                    {requests.data.length === 0 && (
-                        <Card>
-                            <CardContent className="py-12 text-center text-muted-foreground">
-                                No feedback requests found.
-                            </CardContent>
-                        </Card>
-                    )}
                 </div>
 
-                {/* Pagination */}
-                {requests.links?.length > 3 && (
-                    <LaravelPagination links={requests.links} />
+                {/* Status Filter Tabs */}
+                <div className="flex items-center gap-2">
+                    {[
+                        { key: null, label: 'All', count: totalCount },
+                        { key: 'pending', label: 'Pending', count: pendingCount },
+                        { key: 'completed', label: 'Completed', count: completedCount },
+                    ].map((tab) => (
+                        <button key={tab.label} onClick={() => setStatusFilter(tab.key)}
+                            className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+                                statusFilter === tab.key ? 'bg-primary text-white shadow-sm' : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                            }`}>
+                            {tab.label}
+                            <Badge variant="secondary" className={`text-[9px] ${statusFilter === tab.key ? 'bg-white/20 text-white' : ''}`}>{tab.count}</Badge>
+                        </button>
+                    ))}
+                </div>
+
+                {/* Requests List */}
+                {filtered.length === 0 ? (
+                    <Card className="border-dashed">
+                        <CardContent className="flex flex-col items-center justify-center py-16">
+                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-violet-50">
+                                <MessageSquare className="h-8 w-8 text-violet-400" />
+                            </div>
+                            <p className="font-medium">No Feedback Requests</p>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                                {statusFilter ? `No ${statusFilter} feedback requests.` : 'Start by requesting feedback for a team member.'}
+                            </p>
+                            {can.manage && !statusFilter && (
+                                <Button className="mt-4 gap-1.5 bg-violet-600 hover:bg-violet-700" size="sm" asChild>
+                                    <Link href="/hr/feedback/request"><Plus className="h-3.5 w-3.5" />Request Feedback</Link>
+                                </Button>
+                            )}
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="space-y-3">
+                        {filtered.map((req) => {
+                            const sc = statusConfig[req.status] || statusConfig.pending;
+                            const rtc = reviewTypeConfig[req.review_type] || { label: req.review_type, color: 'bg-slate-100 text-slate-600' };
+                            return (
+                                <Card key={req.id} className="group overflow-hidden transition-all hover:shadow-md hover:border-violet-200">
+                                    <CardContent className="p-4">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                {/* Subject avatar */}
+                                                <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold text-white ${avatarColor(req.subject?.id ?? 0)}`}>
+                                                    {getInitials(req.subject?.name ?? '?')}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-semibold truncate">Feedback for {req.subject?.name ?? 'Unknown'}</p>
+                                                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                                                        <Badge className={`border-0 text-[9px] ${sc.bg} ${sc.text}`}>
+                                                            <span className={`mr-1 inline-block h-1.5 w-1.5 rounded-full ${sc.dot}`} />
+                                                            {sc.label}
+                                                        </Badge>
+                                                        <Badge className={`border-0 text-[9px] ${rtc.color}`}>{rtc.label}</Badge>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-4">
+                                                <div className="hidden text-right text-[11px] text-muted-foreground sm:block">
+                                                    <p>Reviewer: <span className="font-medium text-foreground">{req.reviewer?.name ?? 'Unknown'}</span></p>
+                                                    <p>
+                                                        {req.status === 'completed' ? `Completed ${formatDate(req.completed_at)}` : req.due_date ? `Due ${formatDate(req.due_date)}` : `Created ${formatDate(req.created_at)}`}
+                                                    </p>
+                                                </div>
+                                                <div className="flex gap-1.5">
+                                                    {req.status === 'pending' && (
+                                                        <Button size="sm" className="gap-1 bg-violet-600 hover:bg-violet-700 text-xs" asChild>
+                                                            <Link href={`/hr/feedback/${req.id}/respond`}><MessageSquare className="h-3 w-3" />Respond</Link>
+                                                        </Button>
+                                                    )}
+                                                    {can.manage && req.status === 'completed' && (
+                                                        <Button variant="outline" size="sm" className="gap-1 text-xs" asChild>
+                                                            <Link href={`/hr/feedback/summary/${req.subject?.id}`}><Eye className="h-3 w-3" />Summary</Link>
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            );
+                        })}
+                    </div>
                 )}
+
+                {requests.links?.length > 3 && <LaravelPagination links={requests.links} />}
             </div>
         </AppLayout>
     );

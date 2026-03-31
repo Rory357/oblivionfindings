@@ -2,22 +2,15 @@ import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import {
-    ArrowLeft, Download, File, FileImage, FileSpreadsheet, FileText,
-    Filter, FolderOpen, FolderPlus, Grid3X3, LayoutList, Lock, Pencil,
-    Search, Trash2, Upload, X,
+    Download, File, FileImage, FileSpreadsheet, FileText,
+    Filter, FolderOpen, Grid3X3, LayoutList, Search,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -35,17 +28,12 @@ interface Doc {
     size_bytes: number;
     expires_at: string | null;
     signed_by_employee: boolean;
-    is_restricted: boolean;
-    notes?: string | null;
     created_at: string;
-    uploaded_by: { id: number; name: string } | null;
 }
 
 interface Props {
-    profile: { id: number; name: string };
     documents: Doc[];
     categories: string[];
-    can: { manage: boolean };
 }
 
 /* ------------------------------------------------------------------ */
@@ -69,8 +57,6 @@ function getFileInfo(mime?: string, name?: string) {
     const ext = (name ?? '').split('.').pop()?.toLowerCase() ?? '';
     return FILE_ICONS[ext] ?? { icon: File, color: 'text-violet-600', bg: 'bg-violet-100' };
 }
-
-const NONE = '__none__';
 
 const CATEGORY_COLORS: Record<string, string> = {
     contract: 'bg-blue-100 text-blue-700',
@@ -101,23 +87,17 @@ function isExpired(date: string | null) {
 /*  Page                                                               */
 /* ------------------------------------------------------------------ */
 
-export default function StaffDocuments({ profile, documents, categories, can }: Props) {
+const breadcrumbs: BreadcrumbItem[] = [
+    { title: 'HR', href: '/hr/my' },
+    { title: 'My HR', href: '/hr/my' },
+    { title: 'My Documents', href: '/hr/my/documents' },
+];
+
+export default function MyDocuments({ documents, categories }: Props) {
     const [search, setSearch] = useState('');
     const [categoryFilter, setCategoryFilter] = useState('');
     const [currentFolder, setCurrentFolder] = useState<string | null>(null);
     const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-    const [showUpload, setShowUpload] = useState(false);
-    const [editingDoc, setEditingDoc] = useState<Doc | null>(null);
-    const [deletingDoc, setDeletingDoc] = useState<Doc | null>(null);
-    const [showNewFolder, setShowNewFolder] = useState(false);
-    const [newFolderName, setNewFolderName] = useState('');
-
-    const breadcrumbs: BreadcrumbItem[] = [
-        { title: 'HR', href: '/hr/people' },
-        { title: 'People', href: '/hr/people' },
-        { title: profile.name, href: `/hr/people/${profile.id}` },
-        { title: 'Documents', href: `/hr/people/${profile.id}/documents` },
-    ];
 
     // Derive unique folder names
     const allFolders = useMemo(() => {
@@ -138,13 +118,11 @@ export default function StaffDocuments({ profile, documents, categories, can }: 
         });
     }, [documents, search, categoryFilter, currentFolder]);
 
-    // Files in current view (root = unfiled only; folder = filtered)
     const filesInCurrentView = useMemo(() => {
         if (currentFolder !== null) return filtered;
         return filtered.filter(d => !d.folder);
     }, [filtered, currentFolder]);
 
-    // Folder counts (respects search + category filter)
     const folderCounts = useMemo(() => {
         const counts: Record<string, number> = {};
         documents.forEach(d => {
@@ -157,75 +135,28 @@ export default function StaffDocuments({ profile, documents, categories, can }: 
         return counts;
     }, [documents, search, categoryFilter]);
 
-    // Stats
     const stats = {
         total: documents.length,
-        restricted: documents.filter(d => d.is_restricted).length,
         expiring: documents.filter(d => isExpiringSoon(d.expires_at)).length,
         expired: documents.filter(d => isExpired(d.expires_at)).length,
     };
 
-    // Upload form
-    const uploadForm = useForm<{ file: File | null; title: string; category: string; folder: string; expires_at: string; is_restricted: boolean; notes: string }>({
-        file: null, title: '', category: '', folder: '', expires_at: '', is_restricted: false, notes: '',
-    });
-
-    const editForm = useForm<{ title: string; category: string; folder: string; expires_at: string; is_restricted: boolean; notes: string }>({
-        title: '', category: '', folder: '', expires_at: '', is_restricted: false, notes: '',
-    });
-
-    function openEdit(d: Doc) {
-        editForm.setData({ title: d.title || '', category: d.category || '', folder: d.folder || '', expires_at: d.expires_at || '', is_restricted: d.is_restricted, notes: d.notes || '' });
-        setEditingDoc(d);
-    }
-
-    const handleCreateFolder = () => {
-        const trimmed = newFolderName.trim();
-        if (!trimmed) return;
-        setCurrentFolder(trimmed);
-        setShowNewFolder(false);
-        setNewFolderName('');
-    };
-
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title={`Documents - ${profile.name}`} />
+            <Head title="My Documents" />
 
             <div className="space-y-4 p-4 lg:p-6">
                 {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-xl font-bold">Documents</h1>
-                        <p className="text-sm text-muted-foreground">{profile.name}&apos;s document library</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {can.manage && (
-                            <>
-                                <Button variant="outline" className="gap-1.5" size="sm" onClick={() => setShowNewFolder(true)}>
-                                    <FolderPlus className="h-4 w-4" />
-                                    New Folder
-                                </Button>
-                                <Button className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => {
-                                    uploadForm.setData('folder', currentFolder ?? '');
-                                    setShowUpload(true);
-                                }}>
-                                    <Upload className="h-4 w-4" />
-                                    Upload Document
-                                </Button>
-                            </>
-                        )}
-                    </div>
+                <div>
+                    <h1 className="text-xl font-bold">My Documents</h1>
+                    <p className="text-sm text-muted-foreground">Your employment documents and records</p>
                 </div>
 
                 {/* Stats Bar */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="grid grid-cols-3 gap-3">
                     <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
                         <div className="text-xl font-bold text-violet-700">{stats.total}</div>
                         <div className="text-[10px] uppercase tracking-wider text-violet-500">Total</div>
-                    </div>
-                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                        <div className="text-xl font-bold text-slate-600">{stats.restricted}</div>
-                        <div className="text-[10px] uppercase tracking-wider text-violet-500">Restricted</div>
                     </div>
                     <div className="rounded-xl border p-3 text-center">
                         <div className={`text-xl font-bold ${stats.expiring > 0 ? 'text-amber-600' : 'text-slate-400'}`}>{stats.expiring}</div>
@@ -281,16 +212,8 @@ export default function StaffDocuments({ profile, documents, categories, can }: 
                             </div>
                             <p className="font-medium">No Documents</p>
                             <p className="mt-1 text-sm text-muted-foreground">
-                                {search || categoryFilter ? 'No documents match your filters.' : currentFolder ? 'No documents in this folder yet.' : `Upload documents for ${profile.name}.`}
+                                {search || categoryFilter ? 'No documents match your filters.' : currentFolder ? 'No documents in this folder yet.' : 'No documents have been shared with you yet.'}
                             </p>
-                            {can.manage && !search && !categoryFilter && (
-                                <Button className="mt-4 gap-1.5 bg-violet-600 hover:bg-violet-700" size="sm" onClick={() => {
-                                    uploadForm.setData('folder', currentFolder ?? '');
-                                    setShowUpload(true);
-                                }}>
-                                    <Upload className="h-3.5 w-3.5" /> Upload
-                                </Button>
-                            )}
                         </CardContent>
                     </Card>
                 ) : viewMode === 'grid' ? (
@@ -319,7 +242,7 @@ export default function StaffDocuments({ profile, documents, categories, can }: 
                         {/* File cards */}
                         {filesInCurrentView.length > 0 && (
                             <div>
-                                {currentFolder === null && <div className="mb-2 flex items-center gap-2">
+                                {currentFolder === null && Object.keys(folderCounts).length > 0 && <div className="mb-2 flex items-center gap-2">
                                     <FileText className="h-4 w-4 text-violet-500" />
                                     <span className="text-sm font-semibold">Unfiled Documents</span>
                                     <Badge variant="secondary" className="text-[10px]">{filesInCurrentView.length}</Badge>
@@ -340,26 +263,15 @@ export default function StaffDocuments({ profile, documents, categories, can }: 
                                                 <h3 className="text-center text-xs font-medium leading-tight line-clamp-2">{d.title || d.original_name}</h3>
                                                 {/* Meta */}
                                                 <div className="mt-2 flex items-center justify-center gap-1">
-                                                    {d.is_restricted && <span title="Restricted"><Lock className="h-3 w-3 text-slate-500" /></span>}
                                                     {expired && <Badge className="h-4 border-0 bg-red-100 px-1 text-[8px] text-red-600">Expired</Badge>}
                                                     {expiring && !expired && <Badge className="h-4 border-0 bg-amber-100 px-1 text-[8px] text-amber-600">Expiring</Badge>}
                                                     {d.category && <Badge variant="outline" className={`h-4 border-0 px-1 text-[8px] ${CATEGORY_COLORS[d.category] || 'bg-slate-100 text-slate-600'}`}>{formatLabel(d.category)}</Badge>}
                                                 </div>
-                                                {/* Hover actions */}
+                                                {/* Hover download action */}
                                                 <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-1 rounded-b-xl bg-gradient-to-t from-white via-white to-transparent pb-2 pt-6 opacity-0 transition-opacity group-hover:opacity-100">
-                                                    <a href={`/hr/people/${profile.id}/documents/${d.id}/download`} className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-violet-600 hover:bg-violet-200">
+                                                    <a href={`/hr/my/documents/${d.id}/download`} className="flex h-7 w-7 items-center justify-center rounded-full bg-violet-100 text-violet-600 hover:bg-violet-200">
                                                         <Download className="h-3.5 w-3.5" />
                                                     </a>
-                                                    {can.manage && (
-                                                        <>
-                                                            <button onClick={() => openEdit(d)} className="flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200">
-                                                                <Pencil className="h-3.5 w-3.5" />
-                                                            </button>
-                                                            <button onClick={() => setDeletingDoc(d)} className="flex h-7 w-7 items-center justify-center rounded-full bg-red-100 text-red-600 hover:bg-red-200">
-                                                                <Trash2 className="h-3.5 w-3.5" />
-                                                            </button>
-                                                        </>
-                                                    )}
                                                 </div>
                                             </div>
                                         );
@@ -378,7 +290,7 @@ export default function StaffDocuments({ profile, documents, categories, can }: 
                                     <tbody>
                                         {Object.entries(folderCounts).sort(([a], [b]) => a.localeCompare(b)).map(([folder, count]) => (
                                             <tr key={folder} className="border-b hover:bg-slate-50 cursor-pointer" onClick={() => setCurrentFolder(folder)}>
-                                                <td className="px-4 py-2.5" colSpan={6}>
+                                                <td className="px-4 py-2.5" colSpan={5}>
                                                     <div className="flex items-center gap-2.5">
                                                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100">
                                                             <FolderOpen className="h-4 w-4 text-amber-600" />
@@ -402,7 +314,7 @@ export default function StaffDocuments({ profile, documents, categories, can }: 
                                         <th className="hidden px-4 py-2.5 font-medium md:table-cell">Category</th>
                                         <th className="hidden px-4 py-2.5 font-medium lg:table-cell">Expires</th>
                                         <th className="px-4 py-2.5 font-medium">Size</th>
-                                        <th className="px-4 py-2.5 font-medium text-right">Actions</th>
+                                        <th className="px-4 py-2.5 font-medium text-right">Download</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -418,11 +330,7 @@ export default function StaffDocuments({ profile, documents, categories, can }: 
                                                         <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${fi.bg}`}>
                                                             <IconComp className={`h-4 w-4 ${fi.color}`} />
                                                         </div>
-                                                        <div>
-                                                            <p className="font-medium">{d.title || d.original_name}</p>
-                                                            {d.notes && <p className="mt-0.5 text-[10px] text-muted-foreground line-clamp-1">{d.notes}</p>}
-                                                        </div>
-                                                        {d.is_restricted && <Lock className="h-3.5 w-3.5 text-slate-500" />}
+                                                        <p className="font-medium">{d.title || d.original_name}</p>
                                                     </div>
                                                 </td>
                                                 <td className="hidden px-4 py-2.5 text-muted-foreground sm:table-cell">{d.folder || '\u2014'}</td>
@@ -435,22 +343,10 @@ export default function StaffDocuments({ profile, documents, categories, can }: 
                                                     ) : <span className="text-muted-foreground">{'\u2014'}</span>}
                                                 </td>
                                                 <td className="px-4 py-2.5 text-muted-foreground">{formatBytes(d.size_bytes)}</td>
-                                                <td className="px-4 py-2.5">
-                                                    <div className="flex items-center justify-end gap-1">
-                                                        <a href={`/hr/people/${profile.id}/documents/${d.id}/download`} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-slate-100">
-                                                            <Download className="h-3.5 w-3.5 text-violet-600" />
-                                                        </a>
-                                                        {can.manage && (
-                                                            <>
-                                                                <button onClick={() => openEdit(d)} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-slate-100">
-                                                                    <Pencil className="h-3.5 w-3.5 text-slate-500" />
-                                                                </button>
-                                                                <button onClick={() => setDeletingDoc(d)} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-red-50">
-                                                                    <Trash2 className="h-3.5 w-3.5 text-red-500" />
-                                                                </button>
-                                                            </>
-                                                        )}
-                                                    </div>
+                                                <td className="px-4 py-2.5 text-right">
+                                                    <a href={`/hr/my/documents/${d.id}/download`} className="flex h-7 w-7 items-center justify-center rounded-lg hover:bg-slate-100 ml-auto">
+                                                        <Download className="h-3.5 w-3.5 text-violet-600" />
+                                                    </a>
                                                 </td>
                                             </tr>
                                         );
@@ -461,153 +357,6 @@ export default function StaffDocuments({ profile, documents, categories, can }: 
                     </Card>
                 )}
             </div>
-
-            {/* Upload Dialog */}
-            <Dialog open={showUpload} onOpenChange={v => !v && setShowUpload(false)}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>Upload Document</DialogTitle>
-                        <DialogDescription>Add a new document to {profile.name}&apos;s library.</DialogDescription>
-                    </DialogHeader>
-                    <form onSubmit={e => { e.preventDefault(); uploadForm.post(`/hr/people/${profile.id}/documents`, { forceFormData: true, preserveScroll: true, onSuccess: () => { uploadForm.reset(); setShowUpload(false); } }); }} className="space-y-4">
-                        {/* Drop zone */}
-                        <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-violet-300 bg-violet-50/50 p-8 transition-colors hover:bg-violet-50">
-                            <Upload className="mb-2 h-8 w-8 text-violet-400" />
-                            <p className="text-sm font-medium text-violet-700">{uploadForm.data.file ? uploadForm.data.file.name : 'Click to select a file'}</p>
-                            <p className="mt-1 text-xs text-violet-500">PDF, Word, Excel, Images up to 50MB</p>
-                            <input type="file" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) { uploadForm.setData('file', f); if (!uploadForm.data.title) uploadForm.setData('title', f.name.replace(/\.[^/.]+$/, '')); } }} />
-                        </label>
-                        {uploadForm.errors.file && <p className="text-xs text-red-600">{uploadForm.errors.file}</p>}
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="space-y-1.5">
-                                <Label>Title</Label>
-                                <Input value={uploadForm.data.title} onChange={e => uploadForm.setData('title', e.target.value)} placeholder="Document title" />
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label>Folder</Label>
-                                {allFolders.length > 0 ? (
-                                    <Select value={uploadForm.data.folder || NONE} onValueChange={v => uploadForm.setData('folder', v === NONE ? '' : v)}>
-                                        <SelectTrigger><SelectValue placeholder="No folder" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value={NONE}>No folder</SelectItem>
-                                            {allFolders.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                ) : (
-                                    <Input value={uploadForm.data.folder} onChange={e => uploadForm.setData('folder', e.target.value)} placeholder="Optional folder name" />
-                                )}
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label>Category</Label>
-                                <Select value={uploadForm.data.category || NONE} onValueChange={v => uploadForm.setData('category', v === NONE ? '' : v)}>
-                                    <SelectTrigger><SelectValue placeholder="Select..." /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={NONE}>None</SelectItem>
-                                        {categories.map(c => <SelectItem key={c} value={c}>{formatLabel(c)}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label>Expiry Date</Label>
-                                <Input type="date" value={uploadForm.data.expires_at} onChange={e => uploadForm.setData('expires_at', e.target.value)} />
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Checkbox checked={uploadForm.data.is_restricted} onCheckedChange={v => uploadForm.setData('is_restricted', !!v)} />
-                            <Label className="text-sm">Restricted (hidden from staff member)</Label>
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label>Notes</Label>
-                            <Textarea value={uploadForm.data.notes} onChange={e => uploadForm.setData('notes', e.target.value)} className="min-h-[60px]" placeholder="Optional notes about this document" />
-                        </div>
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setShowUpload(false)}>Cancel</Button>
-                            <Button type="submit" className="bg-violet-600 hover:bg-violet-700" disabled={uploadForm.processing || !uploadForm.data.file}>Upload</Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            {/* Edit Dialog */}
-            <Dialog open={!!editingDoc} onOpenChange={v => !v && setEditingDoc(null)}>
-                <DialogContent className="sm:max-w-lg">
-                    <DialogHeader><DialogTitle>Edit Document</DialogTitle></DialogHeader>
-                    <form onSubmit={e => { e.preventDefault(); if (editingDoc) editForm.put(`/hr/people/${profile.id}/documents/${editingDoc.id}`, { preserveScroll: true, onSuccess: () => setEditingDoc(null) }); }} className="space-y-4">
-                        <div className="grid gap-3 sm:grid-cols-2">
-                            <div className="space-y-1.5"><Label>Title</Label><Input value={editForm.data.title} onChange={e => editForm.setData('title', e.target.value)} /></div>
-                            <div className="space-y-1.5">
-                                <Label>Folder</Label>
-                                {allFolders.length > 0 ? (
-                                    <Select value={editForm.data.folder || NONE} onValueChange={v => editForm.setData('folder', v === NONE ? '' : v)}>
-                                        <SelectTrigger><SelectValue placeholder="No folder" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value={NONE}>No folder</SelectItem>
-                                            {allFolders.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                ) : (
-                                    <Input value={editForm.data.folder} onChange={e => editForm.setData('folder', e.target.value)} placeholder="Optional folder name" />
-                                )}
-                            </div>
-                            <div className="space-y-1.5">
-                                <Label>Category</Label>
-                                <Select value={editForm.data.category || NONE} onValueChange={v => editForm.setData('category', v === NONE ? '' : v)}>
-                                    <SelectTrigger><SelectValue /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={NONE}>None</SelectItem>
-                                        {categories.map(c => <SelectItem key={c} value={c}>{formatLabel(c)}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1.5"><Label>Expiry Date</Label><Input type="date" value={editForm.data.expires_at} onChange={e => editForm.setData('expires_at', e.target.value)} /></div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Checkbox checked={editForm.data.is_restricted} onCheckedChange={v => editForm.setData('is_restricted', !!v)} />
-                            <Label className="text-sm">Restricted (hidden from staff member)</Label>
-                        </div>
-                        <div className="space-y-1.5"><Label>Notes</Label><Textarea value={editForm.data.notes} onChange={e => editForm.setData('notes', e.target.value)} className="min-h-[60px]" /></div>
-                        <DialogFooter>
-                            <Button type="button" variant="outline" onClick={() => setEditingDoc(null)}>Cancel</Button>
-                            <Button type="submit" disabled={editForm.processing}>Save</Button>
-                        </DialogFooter>
-                    </form>
-                </DialogContent>
-            </Dialog>
-
-            {/* Delete Confirmation */}
-            <Dialog open={!!deletingDoc} onOpenChange={v => !v && setDeletingDoc(null)}>
-                <DialogContent className="sm:max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle>Delete Document</DialogTitle>
-                        <DialogDescription>Are you sure you want to delete &quot;{deletingDoc?.title || deletingDoc?.original_name}&quot;? This cannot be undone.</DialogDescription>
-                    </DialogHeader>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => setDeletingDoc(null)}>Cancel</Button>
-                        <Button variant="destructive" onClick={() => { if (deletingDoc) router.delete(`/hr/people/${profile.id}/documents/${deletingDoc.id}`, { preserveScroll: true, onSuccess: () => setDeletingDoc(null) }); }}>Delete</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* New Folder Dialog */}
-            <Dialog open={showNewFolder} onOpenChange={setShowNewFolder}>
-                <DialogContent className="sm:max-w-sm">
-                    <DialogHeader>
-                        <DialogTitle>New Folder</DialogTitle>
-                        <DialogDescription>Enter a name for the new folder.</DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-4 py-2">
-                        <div className="space-y-1.5">
-                            <Label>Folder Name</Label>
-                            <Input value={newFolderName} onChange={e => setNewFolderName(e.target.value)} placeholder="e.g. Employment Records"
-                                onKeyDown={e => { if (e.key === 'Enter') handleCreateFolder(); }} autoFocus />
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={() => { setShowNewFolder(false); setNewFolderName(''); }}>Cancel</Button>
-                        <Button className="bg-violet-600 hover:bg-violet-700" disabled={!newFolderName.trim()} onClick={handleCreateFolder}>Create Folder</Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </AppLayout>
     );
 }

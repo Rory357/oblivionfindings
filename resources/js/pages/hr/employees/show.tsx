@@ -4,10 +4,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TabsRoot as Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Award, BookOpen, Briefcase, Calendar, Car, Check, CheckCircle2, ChevronRight,
-    Clock, FileText, Flame, FolderOpen, Heart, Laptop, Mail, MapPin, Pencil,
+    Clock, FileText, Flame, FolderOpen, Heart, Laptop, Mail, MapPin, MessageSquare, Pencil,
     Shield, ShieldAlert, Star, Target, User, UserCheck, Users, X,
 } from 'lucide-react';
 
@@ -37,10 +37,11 @@ interface LeaveBalance { id: number; leave_type: string; accrued_hours: number; 
 interface LeaveRequest { id: number; leave_type: string; status: string; starts_at: string | null; ends_at: string | null; hours_requested: number }
 interface OnboardingChecklist { id: number; name: string; status: string; due_date: string | null; started_at: string | null; completed_at: string | null; tasks: OnboardingTask[] }
 interface OnboardingTask { id: number; category: string; title: string; description: string | null; is_required: boolean; status: string; assigned_to_role: string | null; sign_off_required: boolean; completed_at: string | null }
-interface PerformanceReview { id: number; review_type: string; status: string; overall_rating: number | null; period_start: string | null; period_end: string | null; reviewer_name: string | null; next_review_date: string | null }
+interface PerformanceReview { id: number; review_type: string; status: string; overall_rating: number | null; period_start: string | null; period_end: string | null; reviewer_name: string | null; next_review_date: string | null; employee_signed_off: boolean; manager_signed_off: boolean }
 interface ProbationReview { id: number; review_number: number; review_date: string | null; status: string; recommendation: string | null; reviewer_name: string | null; extension_weeks: number | null }
 interface Pip { id: number; title: string; status: string; reason: string | null; start_date: string | null; end_date: string | null; outcome: string | null; milestones: Array<{ id: number; title: string; due_date: string | null; status: string; outcome: string | null }> }
-interface DevGoal { id: number; title: string; status: string; progress_percent: number; due_date: string | null }
+interface DevGoal { id: number; title: string; status: string; progress_percent: number; due_date: string | null; category: string | null; competency_area: string | null }
+interface PerformanceSummary { latest_rating: number | null; next_review_date: string | null; active_goals_count: number; active_goals_avg: number; has_active_pip: boolean }
 interface CourseEnrollment { id: number; course_name: string | null; category: string | null; status: string; enrolled_at: string | null; completed_at: string | null; score: number | null }
 interface EmployeeSkill { id: number; skill_name: string | null; category: string | null; proficiency_level: number | null; self_assessed: boolean }
 interface CompetencyAssessment { id: number; competency_name: string | null; category: string | null; proficiency_level: number | null; target_level: number | null; assessment_date: string | null }
@@ -56,7 +57,7 @@ interface Props {
     complianceStatuses: ComplianceStatus[]; complianceSummary: ComplianceSummary;
     leaveBalances: LeaveBalance[]; recentLeaveRequests: LeaveRequest[];
     onboardingChecklists: OnboardingChecklist[];
-    performanceReviews: PerformanceReview[]; probationReviews: ProbationReview[]; pips: Pip[]; developmentGoals: DevGoal[];
+    performanceReviews: PerformanceReview[]; probationReviews: ProbationReview[]; pips: Pip[]; developmentGoals: DevGoal[]; performanceSummary: PerformanceSummary;
     courseEnrollments: CourseEnrollment[]; employeeSkills: EmployeeSkill[]; competencyAssessments: CompetencyAssessment[];
     driverEligibility: DriverEligibility | null; backgroundChecks: BackgroundCheck[];
     supervisionNotes: SupervisionNote[]; cases: HrCase[]; assetAssignments: AssetAssignment[]; policyAttestations: PolicyAttestation[];
@@ -154,6 +155,7 @@ export default function EmployeeShow({
     leaveBalances = [], recentLeaveRequests = [],
     onboardingChecklists = [],
     performanceReviews = [], probationReviews = [], pips = [], developmentGoals = [],
+    performanceSummary = { latest_rating: null, next_review_date: null, active_goals_count: 0, active_goals_avg: 0, has_active_pip: false },
     courseEnrollments = [], employeeSkills = [], competencyAssessments = [],
     driverEligibility = null, backgroundChecks = [],
     supervisionNotes = [], cases = [], assetAssignments = [], policyAttestations = [],
@@ -377,7 +379,49 @@ export default function EmployeeShow({
                     {/* ======== PERFORMANCE ======== */}
                     <TabsContent value="performance">
                         <div className="space-y-6">
-                            <Card><CardHeader><CardTitle className="text-base">Performance Reviews</CardTitle></CardHeader>
+                            {/* Quick Actions */}
+                            {can.manage && (
+                                <div className="flex flex-wrap gap-2">
+                                    <Link href={`/hr/performance/reviews/create?employee=${p.user.id}`}><Button variant="outline" size="sm" className="gap-1.5"><Star className="h-3.5 w-3.5" />Create Review</Button></Link>
+                                    <Link href={`/hr/feedback/request?employee=${p.user.id}`}><Button variant="outline" size="sm" className="gap-1.5"><MessageSquare className="h-3.5 w-3.5" />Request 360 Feedback</Button></Link>
+                                    <Link href={`/hr/goals/create?employee=${p.user.id}`}><Button variant="outline" size="sm" className="gap-1.5"><Target className="h-3.5 w-3.5" />Add Goal</Button></Link>
+                                </div>
+                            )}
+
+                            {/* Summary Cards */}
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-orange-50 p-3 text-center">
+                                    {performanceSummary.latest_rating ? (
+                                        <div className="flex items-center justify-center gap-0.5">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className={`h-4 w-4 ${i < performanceSummary.latest_rating! ? 'fill-amber-400 text-amber-400' : 'text-amber-200'}`} />)}</div>
+                                    ) : <div className="text-xl font-bold text-amber-400">&mdash;</div>}
+                                    <div className="mt-1 text-[10px] uppercase tracking-wider text-amber-600">Latest Rating</div>
+                                </div>
+                                <div className={`rounded-xl border p-3 text-center ${performanceSummary.next_review_date && new Date(performanceSummary.next_review_date) < new Date() ? 'bg-gradient-to-br from-red-50 to-rose-50' : ''}`}>
+                                    <div className={`text-sm font-bold ${performanceSummary.next_review_date && new Date(performanceSummary.next_review_date) < new Date() ? 'text-red-600' : 'text-slate-700'}`}>
+                                        {performanceSummary.next_review_date ? formatDate(performanceSummary.next_review_date) : 'Not scheduled'}
+                                    </div>
+                                    <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">Next Review</div>
+                                </div>
+                                <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-indigo-50 p-3 text-center">
+                                    <div className="text-xl font-bold text-blue-700">{performanceSummary.active_goals_count}</div>
+                                    <div className="mt-0.5 text-[10px] uppercase tracking-wider text-blue-500">Active Goals</div>
+                                    {performanceSummary.active_goals_count > 0 && (
+                                        <div className="mt-1.5"><ProgressBar value={performanceSummary.active_goals_avg} max={100} color="bg-blue-500" /></div>
+                                    )}
+                                </div>
+                                <div className={`rounded-xl border p-3 text-center ${performanceSummary.has_active_pip ? 'bg-gradient-to-br from-red-50 to-rose-50' : ''}`}>
+                                    <div className={`text-xl font-bold ${performanceSummary.has_active_pip ? 'text-red-600' : 'text-emerald-600'}`}>
+                                        {performanceSummary.has_active_pip ? 'Active' : 'None'}
+                                    </div>
+                                    <div className="mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">PIP Status</div>
+                                </div>
+                            </div>
+
+                            {/* Performance Reviews */}
+                            <Card><CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle className="text-base">Performance Reviews</CardTitle>
+                                {performanceReviews.length > 0 && <Link href={`/hr/performance/reviews?employee=${p.user.id}`} className="text-xs text-primary hover:underline">View All</Link>}
+                            </CardHeader>
                                 <CardContent className="p-0">
                                     {performanceReviews.length === 0 ? <EmptyState icon={Star} label="No performance reviews" /> : (
                                         <table className="w-full text-sm"><thead className="border-b bg-muted/50"><tr>
@@ -385,14 +429,21 @@ export default function EmployeeShow({
                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Period</th>
                                             <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground sm:table-cell">Rating</th>
                                             <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground md:table-cell">Reviewer</th>
+                                            <th className="hidden px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground lg:table-cell">Sign-off</th>
                                             <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
                                         </tr></thead><tbody className="divide-y">
                                             {performanceReviews.map(r => (
-                                                <tr key={r.id} className="hover:bg-muted/30">
+                                                <tr key={r.id} className="hover:bg-muted/30 cursor-pointer" onClick={() => router.visit(`/hr/performance/reviews/${r.id}`)} role="link" tabIndex={0} onKeyDown={e => e.key === 'Enter' && router.visit(`/hr/performance/reviews/${r.id}`)}>
                                                     <td className="px-4 py-3 font-medium">{formatLabel(r.review_type)}</td>
                                                     <td className="px-4 py-3 text-muted-foreground">{formatDate(r.period_start)} &ndash; {formatDate(r.period_end)}</td>
                                                     <td className="hidden px-4 py-3 sm:table-cell">{r.overall_rating ? <div className="flex gap-0.5">{Array.from({ length: 5 }).map((_, i) => <Star key={i} className={`h-3.5 w-3.5 ${i < r.overall_rating! ? 'fill-amber-400 text-amber-400' : 'text-muted-foreground/20'}`} />)}</div> : '\u2014'}</td>
                                                     <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{r.reviewer_name || '\u2014'}</td>
+                                                    <td className="hidden px-4 py-3 lg:table-cell">
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span title={r.employee_signed_off ? 'Employee signed off' : 'Employee not signed'}>{r.employee_signed_off ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <X className="h-3.5 w-3.5 text-muted-foreground/30" />}</span>
+                                                            <span title={r.manager_signed_off ? 'Manager signed off' : 'Manager not signed'}>{r.manager_signed_off ? <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" /> : <X className="h-3.5 w-3.5 text-muted-foreground/30" />}</span>
+                                                        </div>
+                                                    </td>
                                                     <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
                                                 </tr>
                                             ))}
@@ -400,24 +451,127 @@ export default function EmployeeShow({
                                     )}
                                 </CardContent>
                             </Card>
+
+                            {/* Development Goals */}
+                            <Card><CardHeader className="flex flex-row items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <CardTitle className="text-base">Development Goals</CardTitle>
+                                    {developmentGoals.length > 0 && <Badge variant="secondary" className="text-[10px]">{developmentGoals.length}</Badge>}
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    {developmentGoals.length > 0 && <Link href={`/hr/goals?employee=${p.user.id}`} className="text-xs text-primary hover:underline">View All</Link>}
+                                    {can.manage && <Link href={`/hr/goals/create?employee=${p.user.id}`}><Button variant="outline" size="sm" className="h-7 gap-1 text-xs"><Target className="h-3 w-3" />Add</Button></Link>}
+                                </div>
+                            </CardHeader>
+                                <CardContent className="space-y-3">
+                                    {developmentGoals.length === 0 ? <EmptyState icon={Target} label="No development goals" /> : developmentGoals.map(g => (
+                                        <div key={g.id} className="space-y-2 rounded-lg border p-3 cursor-pointer transition-colors hover:border-primary/30" onClick={() => router.visit(`/hr/goals/${g.id}`)} role="link" tabIndex={0} onKeyDown={e => e.key === 'Enter' && router.visit(`/hr/goals/${g.id}`)}>
+                                            <div className="flex items-center justify-between">
+                                                <div>
+                                                    <p className="text-sm font-medium">{g.title}</p>
+                                                    <div className="mt-1 flex gap-1">
+                                                        {g.category && <Badge variant="outline" className="text-[9px] px-1.5 py-0">{formatLabel(g.category)}</Badge>}
+                                                        {g.competency_area && <Badge variant="outline" className="text-[9px] px-1.5 py-0 bg-violet-50 text-violet-600">{g.competency_area}</Badge>}
+                                                    </div>
+                                                </div>
+                                                <StatusBadge status={g.status} />
+                                            </div>
+                                            <ProgressBar value={g.progress_percent} max={100} color="bg-blue-500" />
+                                            <div className="flex justify-between text-xs text-muted-foreground"><span>{g.progress_percent}%</span>{g.due_date && <span>Due {formatDate(g.due_date)}</span>}</div>
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
+
+                            {/* Competency Snapshot */}
+                            <Card><CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle className="text-base">Competency Snapshot</CardTitle>
+                                {competencyAssessments.length > 0 && <Link href={`/hr/performance/competencies?employee=${p.id}`} className="text-xs text-primary hover:underline">Full Profile</Link>}
+                            </CardHeader>
+                                <CardContent>
+                                    {competencyAssessments.length === 0 ? <EmptyState icon={Award} label="No competency assessments" /> : (() => {
+                                        const grouped: Record<string, CompetencyAssessment[]> = {};
+                                        competencyAssessments.forEach(a => { const cat = a.category || 'General'; (grouped[cat] ??= []).push(a); });
+                                        return (
+                                            <div className="space-y-4">
+                                                {Object.entries(grouped).map(([cat, items]) => (
+                                                    <div key={cat}>
+                                                        <p className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{cat}</p>
+                                                        <div className="space-y-2">
+                                                            {items.map(a => {
+                                                                const current = a.proficiency_level ?? 0;
+                                                                const target = a.target_level ?? 5;
+                                                                const meetsTarget = current >= target;
+                                                                return (
+                                                                    <div key={a.id}>
+                                                                        <div className="mb-1 flex items-center justify-between text-xs">
+                                                                            <span className="font-medium">{a.competency_name}</span>
+                                                                            <span className="text-muted-foreground">{current}/{target}</span>
+                                                                        </div>
+                                                                        <div className="relative h-2 rounded-full bg-muted">
+                                                                            <div className="absolute inset-y-0 left-0 rounded-full bg-primary/15" style={{ width: `${(target / 5) * 100}%` }} />
+                                                                            <div className={`absolute inset-y-0 left-0 rounded-full ${meetsTarget ? 'bg-emerald-500' : 'bg-violet-500'}`} style={{ width: `${(current / 5) * 100}%` }} />
+                                                                        </div>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        );
+                                    })()}
+                                </CardContent>
+                            </Card>
+
+                            {/* Probation Reviews */}
                             {probationReviews.length > 0 && (
                                 <Card><CardHeader><CardTitle className="text-base">Probation Reviews</CardTitle></CardHeader>
-                                    <CardContent className="space-y-3">
-                                        {probationReviews.map(r => (
-                                            <div key={r.id} className="flex items-center justify-between rounded-lg border p-3">
-                                                <div><p className="font-medium text-sm">Review #{r.review_number}</p><p className="text-xs text-muted-foreground">{formatDate(r.review_date)} &middot; {r.reviewer_name}</p></div>
-                                                <div className="flex items-center gap-2">{r.recommendation && <Badge variant="outline">{formatLabel(r.recommendation)}</Badge>}<StatusBadge status={r.status} /></div>
-                                            </div>
-                                        ))}
+                                    <CardContent>
+                                        <div className="relative space-y-4 pl-6 before:absolute before:left-[7px] before:top-2 before:h-[calc(100%-16px)] before:w-0.5 before:bg-muted">
+                                            {probationReviews.map(r => {
+                                                const dotColor = r.status === 'completed' || r.status === 'passed' ? 'bg-emerald-500' : r.status === 'in_progress' || r.status === 'scheduled' ? 'bg-amber-500' : r.status === 'failed' ? 'bg-red-500' : 'bg-slate-300';
+                                                return (
+                                                    <div key={r.id} className="relative">
+                                                        <div className={`absolute -left-6 top-1.5 h-3.5 w-3.5 rounded-full border-2 border-white ${dotColor}`} />
+                                                        <div className="flex items-center justify-between">
+                                                            <div>
+                                                                <p className="font-medium text-sm">Review #{r.review_number}</p>
+                                                                <p className="text-xs text-muted-foreground">{formatDate(r.review_date)} &middot; {r.reviewer_name}</p>
+                                                                {r.extension_weeks && <p className="text-xs text-amber-600">Extended by {r.extension_weeks} weeks</p>}
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                {r.recommendation && <Badge variant="outline">{formatLabel(r.recommendation)}</Badge>}
+                                                                <StatusBadge status={r.status} />
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
                                     </CardContent>
                                 </Card>
                             )}
+
+                            {/* PIPs */}
                             {pips.length > 0 && (
-                                <Card><CardHeader><CardTitle className="text-base">Performance Improvement Plans</CardTitle></CardHeader>
+                                <Card><CardHeader className="flex flex-row items-center justify-between">
+                                    <CardTitle className="text-base">Performance Improvement Plans</CardTitle>
+                                    <Link href="/hr/performance/pips" className="text-xs text-primary hover:underline">View All</Link>
+                                </CardHeader>
                                     <CardContent className="space-y-4">
                                         {pips.map(pip => (
-                                            <div key={pip.id} className="rounded-lg border p-4 space-y-3">
-                                                <div className="flex items-center justify-between"><p className="font-medium">{pip.title}</p><StatusBadge status={pip.status} /></div>
+                                            <div key={pip.id} className="rounded-lg border p-4 space-y-3 cursor-pointer transition-colors hover:border-primary/30" onClick={() => router.visit(`/hr/performance/pips/${pip.id}`)} role="link" tabIndex={0} onKeyDown={e => e.key === 'Enter' && router.visit(`/hr/performance/pips/${pip.id}`)}>
+                                                <div className="flex items-center justify-between">
+                                                    <div>
+                                                        <p className="font-medium">{pip.title}</p>
+                                                        {pip.reason && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{pip.reason}</p>}
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <StatusBadge status={pip.status} />
+                                                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                                                    </div>
+                                                </div>
                                                 <p className="text-xs text-muted-foreground">{formatDate(pip.start_date)} &ndash; {formatDate(pip.end_date)}</p>
                                                 {pip.milestones.length > 0 && (
                                                     <div className="space-y-2 pl-4 border-l-2 border-muted">
@@ -434,26 +588,50 @@ export default function EmployeeShow({
                                     </CardContent>
                                 </Card>
                             )}
-                            {developmentGoals.length > 0 && (
-                                <Card><CardHeader><CardTitle className="text-base">Development Goals</CardTitle></CardHeader>
-                                    <CardContent className="space-y-3">
-                                        {developmentGoals.map(g => (
-                                            <div key={g.id} className="space-y-2 rounded-lg border p-3">
-                                                <div className="flex items-center justify-between"><p className="text-sm font-medium">{g.title}</p><StatusBadge status={g.status} /></div>
-                                                <ProgressBar value={g.progress_percent} max={100} color="bg-blue-500" />
-                                                <div className="flex justify-between text-xs text-muted-foreground"><span>{g.progress_percent}%</span>{g.due_date && <span>Due {formatDate(g.due_date)}</span>}</div>
-                                            </div>
-                                        ))}
-                                    </CardContent>
-                                </Card>
-                            )}
                         </div>
                     </TabsContent>
 
                     {/* ======== TRAINING ======== */}
                     <TabsContent value="training">
                         <div className="space-y-6">
-                            <Card><CardHeader><CardTitle className="text-base">Course Enrolments</CardTitle></CardHeader>
+                            {/* Quick Actions */}
+                            {can.manage && (
+                                <div className="flex flex-wrap gap-2">
+                                    <Link href="/hr/training/catalog"><Button variant="outline" size="sm" className="gap-1.5"><BookOpen className="h-3.5 w-3.5" />Course Catalog</Button></Link>
+                                </div>
+                            )}
+
+                            {/* Summary Stats */}
+                            {(() => {
+                                const completedCount = courseEnrollments.filter(e => e.status === 'completed').length;
+                                const inProgressCount = courseEnrollments.filter(e => e.status === 'enrolled' || e.status === 'in_progress').length;
+                                return (
+                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                        <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                            <div className="text-xl font-bold text-violet-700">{courseEnrollments.length}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-violet-500">Enrolments</div>
+                                        </div>
+                                        <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
+                                            <div className="text-xl font-bold text-emerald-700">{completedCount}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-emerald-500">Completed</div>
+                                        </div>
+                                        <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-indigo-50 p-3 text-center">
+                                            <div className="text-xl font-bold text-blue-700">{inProgressCount}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-blue-500">In Progress</div>
+                                        </div>
+                                        <div className="rounded-xl border bg-gradient-to-br from-amber-50 to-yellow-50 p-3 text-center">
+                                            <div className="text-xl font-bold text-amber-700">{employeeSkills.length}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-amber-500">Skills</div>
+                                        </div>
+                                    </div>
+                                );
+                            })()}
+
+                            {/* Course Enrolments */}
+                            <Card><CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle className="text-base">Course Enrolments</CardTitle>
+                                {courseEnrollments.length > 0 && <Link href="/hr/training/catalog" className="text-xs text-primary hover:underline">View Catalog</Link>}
+                            </CardHeader>
                                 <CardContent className="p-0">
                                     {courseEnrollments.length === 0 ? <EmptyState icon={BookOpen} label="No course enrolments" /> : (
                                         <table className="w-full text-sm"><thead className="border-b bg-muted/50"><tr>
@@ -467,10 +645,10 @@ export default function EmployeeShow({
                                             {courseEnrollments.map(e => (
                                                 <tr key={e.id} className="hover:bg-muted/30">
                                                     <td className="px-4 py-3 font-medium">{e.course_name || '\u2014'}</td>
-                                                    <td className="hidden px-4 py-3 text-muted-foreground sm:table-cell">{e.category ? formatLabel(e.category) : '\u2014'}</td>
+                                                    <td className="hidden px-4 py-3 sm:table-cell">{e.category ? <Badge variant="outline" className="text-[10px]">{formatLabel(e.category)}</Badge> : '\u2014'}</td>
                                                     <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{formatDate(e.enrolled_at)}</td>
                                                     <td className="hidden px-4 py-3 text-muted-foreground md:table-cell">{formatDate(e.completed_at)}</td>
-                                                    <td className="hidden px-4 py-3 lg:table-cell">{e.score != null ? `${e.score}%` : '\u2014'}</td>
+                                                    <td className="hidden px-4 py-3 lg:table-cell">{e.score != null ? <span className="font-medium">{e.score}%</span> : '\u2014'}</td>
                                                     <td className="px-4 py-3"><StatusBadge status={e.status} /></td>
                                                 </tr>
                                             ))}
@@ -478,27 +656,60 @@ export default function EmployeeShow({
                                     )}
                                 </CardContent>
                             </Card>
-                            {employeeSkills.length > 0 && (
-                                <Card><CardHeader><CardTitle className="text-base">Skills</CardTitle></CardHeader>
-                                    <CardContent><div className="flex flex-wrap gap-2">
-                                        {employeeSkills.map(s => (
-                                            <Badge key={s.id} variant="outline" className="gap-1.5 py-1.5"><Target className="h-3 w-3" />{s.skill_name}{s.proficiency_level && <span className="ml-1 text-muted-foreground">Lv.{s.proficiency_level}</span>}</Badge>
-                                        ))}
-                                    </div></CardContent>
-                                </Card>
-                            )}
-                            {competencyAssessments.length > 0 && (
-                                <Card><CardHeader><CardTitle className="text-base">Competency Assessments</CardTitle></CardHeader>
-                                    <CardContent className="space-y-3">
-                                        {competencyAssessments.map(a => (
-                                            <div key={a.id} className="space-y-1.5">
-                                                <div className="flex items-center justify-between text-sm"><span className="font-medium">{a.competency_name}</span><span className="text-xs text-muted-foreground">{formatDate(a.assessment_date)}</span></div>
-                                                <div className="flex items-center gap-2"><ProgressBar value={a.proficiency_level || 0} max={a.target_level || 5} color="bg-violet-500" /><span className="text-xs text-muted-foreground whitespace-nowrap">{a.proficiency_level || 0}/{a.target_level || 5}</span></div>
-                                            </div>
-                                        ))}
-                                    </CardContent>
-                                </Card>
-                            )}
+
+                            {/* Skills */}
+                            <Card><CardHeader><CardTitle className="text-base">Skills</CardTitle></CardHeader>
+                                <CardContent>
+                                    {employeeSkills.length === 0 ? <EmptyState icon={Target} label="No skills recorded" /> : (
+                                        <div className="flex flex-wrap gap-2">
+                                            {employeeSkills.map(s => (
+                                                <div key={s.id} className="flex items-center gap-2 rounded-lg border px-3 py-2 transition-colors hover:bg-muted/50">
+                                                    <div className="flex h-6 w-6 items-center justify-center rounded-md bg-amber-100"><Target className="h-3 w-3 text-amber-600" /></div>
+                                                    <span className="text-sm font-medium">{s.skill_name}</span>
+                                                    {s.proficiency_level && <Badge variant="secondary" className="text-[9px]">Lv.{s.proficiency_level}</Badge>}
+                                                    {s.self_assessed && <span className="text-[9px] text-muted-foreground">(self)</span>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Competency Assessments */}
+                            <Card><CardHeader className="flex flex-row items-center justify-between">
+                                <CardTitle className="text-base">Competency Assessments</CardTitle>
+                                {competencyAssessments.length > 0 && <Link href={`/hr/performance/competencies?employee=${p.id}`} className="text-xs text-primary hover:underline">Full Profile</Link>}
+                            </CardHeader>
+                                <CardContent>
+                                    {competencyAssessments.length === 0 ? <EmptyState icon={Award} label="No competency assessments" /> : (
+                                        <div className="space-y-3">
+                                            {competencyAssessments.map(a => {
+                                                const current = a.proficiency_level ?? 0;
+                                                const target = a.target_level ?? 5;
+                                                const meetsTarget = current >= target;
+                                                return (
+                                                    <div key={a.id} className="rounded-lg border p-3 transition-colors hover:bg-muted/30">
+                                                        <div className="mb-1.5 flex items-center justify-between text-sm">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="font-medium">{a.competency_name}</span>
+                                                                {a.category && <Badge variant="outline" className="text-[9px]">{a.category}</Badge>}
+                                                            </div>
+                                                            <div className="flex items-center gap-2">
+                                                                <span className={`text-xs font-medium ${meetsTarget ? 'text-emerald-600' : 'text-amber-600'}`}>{current}/{target}</span>
+                                                                <span className="text-[10px] text-muted-foreground">{formatDate(a.assessment_date)}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="relative h-2 rounded-full bg-muted">
+                                                            <div className="absolute inset-y-0 left-0 rounded-full bg-primary/15" style={{ width: `${(target / 5) * 100}%` }} />
+                                                            <div className={`absolute inset-y-0 left-0 rounded-full ${meetsTarget ? 'bg-emerald-500' : 'bg-violet-500'}`} style={{ width: `${(current / 5) * 100}%` }} />
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
                         </div>
                     </TabsContent>
 

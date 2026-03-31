@@ -9,6 +9,7 @@ use App\Http\Controllers\Hr\DevelopmentGoalController;
 use App\Http\Controllers\Hr\EmployeeProfileController;
 use App\Http\Controllers\Hr\ComplianceController;
 use App\Http\Controllers\Hr\ComplianceMatrixController;
+use App\Http\Controllers\Hr\TrainingController;
 use App\Http\Controllers\Hr\TrainingDashboardController;
 use App\Http\Controllers\Hr\VettingController;
 use App\Http\Controllers\Hr\DriverEligibilityController;
@@ -96,6 +97,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::put('/goals/{goal}', [MyHrController::class, 'updateGoal'])->name('goals.update');
         Route::get('/surveys', [MyHrController::class, 'surveys'])->name('surveys');
         Route::post('/surveys/{survey}', [MyHrController::class, 'submitSurvey'])->name('surveys.submit');
+        Route::get('/documents', [MyHrController::class, 'documents'])->name('documents');
+        Route::get('/documents/{document}/download', [MyHrController::class, 'downloadDocument'])->name('documents.download');
     });
 
     /*
@@ -683,6 +686,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/{feedbackRequest}/respond', [FeedbackController::class, 'respond'])->name('respond');
         Route::post('/{feedbackRequest}/respond', [FeedbackController::class, 'submitResponse'])->name('respond.store');
         Route::get('/summary/{user}', [FeedbackController::class, 'summary'])->name('summary');
+        Route::post('/templates', [FeedbackController::class, 'storeTemplate'])->name('templates.store');
+        Route::put('/templates/{template}', [FeedbackController::class, 'updateTemplate'])->name('templates.update');
+        Route::delete('/templates/{template}', [FeedbackController::class, 'deleteTemplate'])->name('templates.destroy');
     });
 
     /*
@@ -1019,10 +1025,17 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Training Catalog (alternate route)
+    | Training Catalog & Course Management
     |--------------------------------------------------------------------------
     */
     Route::middleware('permission:hr.training.view')->group(function () {
-        Route::get('/training/catalog', [TrainingDashboardController::class, 'index'])->name('training.catalog');
+        Route::get('/training/catalog', [TrainingController::class, 'catalog'])->name('training.catalog');
+        Route::get('/training/courses/{course}', [TrainingController::class, 'showCourse'])->name('training.courses.show');
+        Route::get('/training/enrollments/{enrollment}/certificate', [TrainingController::class, 'downloadCertificate'])->name('training.certificate');
+    });
+    Route::middleware('permission:hr.training.manage')->group(function () {
+        Route::post('/training/courses', [TrainingController::class, 'storeCourse'])->name('training.courses.store');
+        Route::post('/training/enroll', [TrainingController::class, 'enroll'])->name('training.enroll');
+        Route::put('/training/enrollments/{enrollment}/complete', [TrainingController::class, 'completeEnrollment'])->name('training.enrollments.complete');
     });
 });

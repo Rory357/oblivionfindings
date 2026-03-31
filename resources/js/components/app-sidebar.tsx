@@ -37,7 +37,9 @@ import {
     DollarSign,
     Download,
     FileText,
+    FolderOpen,
     Fuel,
+    GraduationCap,
     GitBranch,
     Heart,
     Home,
@@ -744,6 +746,7 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         label: 'My HR',
         items: [
             { title: 'My HR', href: '/hr/my', icon: Home },
+            { title: 'My Documents', href: '/hr/my/documents', icon: FolderOpen },
             { title: 'My Training', href: '/hr/my/training', icon: Target },
             { title: 'My Payslips', href: '/hr/my/payslips', icon: FileText },
         ],
@@ -836,7 +839,8 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         admin.items.push({ title: 'Departments', href: '/hr/departments', icon: Briefcase });
     }
     if (can?.hr?.training?.view) {
-        admin.items.push({ title: 'Training', href: '/hr/training/catalog', icon: BookOpen });
+        admin.items.push({ title: 'Course Catalog', href: '/hr/training/catalog', icon: BookOpen });
+        admin.items.push({ title: 'Training Dashboard', href: '/hr/compliance/training', icon: GraduationCap });
     }
     if (can?.hr?.assets?.view) {
         admin.items.push({ title: 'Assets', href: '/hr/assets', icon: Package });

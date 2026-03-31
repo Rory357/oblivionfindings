@@ -141,6 +141,7 @@ const QUICK_LINKS = [
     { label: 'Time', icon: Timer, href: '/hr/my/time' },
     { label: 'Payslips', icon: Wallet, href: '/hr/my/payslips' },
     { label: 'Expenses', icon: Receipt, href: '/hr/my/expenses' },
+    { label: 'Documents', icon: FileCheck, href: '/hr/my/documents' },
     { label: 'Training', icon: BookOpen, href: '/hr/my/training' },
     { label: 'Policies', icon: ScrollText, href: '/hr/my/policies' },
     { label: 'Reviews', icon: ClipboardList, href: '/hr/my/reviews' },

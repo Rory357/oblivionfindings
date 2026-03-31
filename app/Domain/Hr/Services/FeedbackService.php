@@ -2,8 +2,10 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrFeedbackRequest;
 use App\Domain\Hr\Models\HrFeedbackResponse;
+use App\Domain\Hr\Models\HrFeedbackTemplate;
 use App\Models\User;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -11,7 +13,7 @@ use Illuminate\Support\Facades\DB;
 class FeedbackService
 {
     /**
-     * Standard 360-feedback questions.
+     * Standard 360-feedback questions (used as fallback when no template is selected).
      */
     public const FEEDBACK_QUESTIONS = [
         'communication' => 'How effectively does this person communicate?',
@@ -38,18 +40,44 @@ class FeedbackService
         string $reviewType,
         ?int $performanceReviewId,
         User $requester,
+        ?int $templateId = null,
     ): array {
-        return DB::transaction(function () use ($subjectUserId, $reviewerUserIds, $reviewType, $performanceReviewId, $requester) {
+        return DB::transaction(function () use ($subjectUserId, $reviewerUserIds, $reviewType, $performanceReviewId, $requester, $templateId) {
+            $tenantId = $requester->getAttribute('tenant_id')
+                ?? $requester->getAttribute('organization_id')
+                ?? HrEmployeeProfile::where('user_id', $requester->id)->value('tenant_id')
+                ?? HrEmployeeProfile::whereNotNull('tenant_id')->orderBy('id')->value('tenant_id')
+                ?? 1;
+
+            // Resolve questions from template or use defaults
+            $questionsSnapshot = null;
+            if ($templateId) {
+                $template = HrFeedbackTemplate::find($templateId);
+                if ($template) {
+                    $questionsSnapshot = $template->questions;
+                }
+            }
+
+            if (!$questionsSnapshot) {
+                // Convert hardcoded questions to array format
+                $questionsSnapshot = collect(self::FEEDBACK_QUESTIONS)
+                    ->map(fn ($question, $key) => ['key' => $key, 'question' => $question])
+                    ->values()
+                    ->all();
+            }
+
             $requests = [];
 
             foreach ($reviewerUserIds as $reviewerUserId) {
                 $requests[] = HrFeedbackRequest::create([
-                    'tenant_id' => $requester->tenant_id,
+                    'tenant_id' => $tenantId,
                     'subject_user_id' => $subjectUserId,
                     'requester_user_id' => $requester->id,
                     'reviewer_user_id' => $reviewerUserId,
                     'review_type' => $reviewType,
                     'performance_review_id' => $performanceReviewId,
+                    'template_id' => $templateId,
+                    'questions_snapshot' => $questionsSnapshot,
                     'status' => 'pending',
                     'due_date' => now()->addDays(14),
                 ]);
@@ -98,20 +126,25 @@ class FeedbackService
             return [
                 'total_reviews' => 0,
                 'questions' => [],
-                'comments' => [],
             ];
         }
 
         $allResponses = $completedRequests->flatMap->responses;
 
+        // Build question labels from snapshots (use the first request's snapshot as canonical labels)
+        $questionsMap = $completedRequests->first()->getQuestionsMap();
+
+        // Also gather any question keys from responses that might not be in the map
+        $allKeys = $allResponses->pluck('question_key')->unique()->values();
+
         $questionSummaries = [];
-        foreach (self::FEEDBACK_QUESTIONS as $key => $questionText) {
+        foreach ($allKeys as $key) {
             $questionResponses = $allResponses->where('question_key', $key);
             $ratings = $questionResponses->pluck('rating')->filter()->values();
             $comments = $questionResponses->pluck('comment')->filter()->values();
 
             $questionSummaries[$key] = [
-                'question' => $questionText,
+                'question' => $questionsMap[$key] ?? ucfirst(str_replace('_', ' ', $key)),
                 'average_rating' => $ratings->count() > 0 ? round($ratings->avg(), 2) : null,
                 'rating_count' => $ratings->count(),
                 'min_rating' => $ratings->min(),
