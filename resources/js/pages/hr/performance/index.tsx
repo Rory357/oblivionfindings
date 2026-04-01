@@ -6,9 +6,18 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import { ClipboardList, AlertTriangle, Calendar, Plus, Search, ArrowRight, FileText, Target, Users } from 'lucide-react';
+import {
+    ClipboardList, AlertTriangle, Calendar, Plus, Search, ArrowRight, FileText,
+    Target, Users, TrendingUp, TrendingDown, MessageSquare, ShieldAlert,
+    Star, BarChart3,
+} from 'lucide-react';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { useState } from 'react';
+import {
+    AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell,
+    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
+import { HorizontalBarChart, ProgressRing } from '@/components/fleet-charts';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -72,6 +81,12 @@ type Props = {
         overdue: number;
         due_next_7_days: number;
     };
+    reviewCompletionTrend: Array<{ month: string; completed: number; total: number }>;
+    notesPerMonth: Array<{ month: string; count: number }>;
+    ratingDistribution: Array<{ rating: number; count: number }>;
+    pipSummary: { active: number; completed: number; cancelled: number; total: number };
+    feedbackSummary: { pending: number; completed: number; overdue: number };
+    previousMonthNoteCount: number;
     filters: {
         q: string | null;
         staff_id: string | number | null;
@@ -83,6 +98,9 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'HR', href: '/hr' },
     { title: 'Performance & Supervision', href: '/hr/performance' },
 ];
+
+const RATING_COLORS = ['#ef4444', '#f59e0b', '#eab308', '#3b82f6', '#10b981'];
+const PIP_COLORS = { active: '#ef4444', completed: '#10b981', cancelled: '#94a3b8' };
 
 const formatDate = (value?: string | null) => {
     if (!value) return 'Not set';
@@ -96,16 +114,11 @@ const formatDate = (value?: string | null) => {
 
 const getStatusColor = (status: string) => {
     switch (status) {
-        case 'completed':
-            return 'bg-green-100 text-green-800 border-green-200';
-        case 'scheduled':
-            return 'bg-blue-100 text-blue-800 border-blue-200';
-        case 'overdue':
-            return 'bg-red-100 text-red-800 border-red-200';
-        case 'in_progress':
-            return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-        default:
-            return 'bg-slate-100 text-slate-800 border-slate-200';
+        case 'completed': return 'bg-green-100 text-green-800 border-green-200';
+        case 'scheduled': return 'bg-blue-100 text-blue-800 border-blue-200';
+        case 'overdue': return 'bg-red-100 text-red-800 border-red-200';
+        case 'in_progress': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        default: return 'bg-slate-100 text-slate-800 border-slate-200';
     }
 };
 
@@ -117,6 +130,12 @@ export default function PerformanceIndex({
     oneToOneSla,
     competencyGaps,
     engagementActionPlanSla,
+    reviewCompletionTrend,
+    notesPerMonth,
+    ratingDistribution,
+    pipSummary,
+    feedbackSummary,
+    previousMonthNoteCount,
     filters,
     can,
 }: Props) {
@@ -143,254 +162,459 @@ export default function PerformanceIndex({
         return r.status === 'overdue' || (r.scheduled_at && new Date(r.scheduled_at) < now && r.status !== 'completed');
     }).length;
 
+    const notesTrend = previousMonthNoteCount > 0
+        ? Math.round(((notesThisMonth - previousMonthNoteCount) / previousMonthNoteCount) * 100)
+        : null;
+
+    // Data checks for conditional chart rendering
+    const hasReviewTrend = reviewCompletionTrend.some((d) => d.total > 0);
+    const hasRatings = ratingDistribution.some((d) => d.count > 0);
+    const hasNotesTrend = notesPerMonth.some((d) => d.count > 0);
+    const hasCompetencyGaps = competencyGaps.length > 0;
+    const hasPips = pipSummary.total > 0;
+    const feedbackTotal = feedbackSummary.pending + feedbackSummary.completed;
+    const hasFeedback = feedbackTotal > 0;
+    const hasAnyCharts = hasReviewTrend || hasRatings || hasNotesTrend || hasCompetencyGaps || hasPips || hasFeedback;
+
+    const pipChartData = [
+        { name: 'Active', value: pipSummary.active, color: PIP_COLORS.active },
+        { name: 'Completed', value: pipSummary.completed, color: PIP_COLORS.completed },
+        { name: 'Cancelled', value: pipSummary.cancelled, color: PIP_COLORS.cancelled },
+    ].filter((d) => d.value > 0);
+
+    const feedbackCompletionPct = feedbackTotal > 0 ? Math.round((feedbackSummary.completed / feedbackTotal) * 100) : 0;
+
+    const competencyChartItems = competencyGaps.slice(0, 8).map((gap) => ({
+        label: `${gap.employee_name}: ${gap.competency_area ?? 'General'}`,
+        value: gap.gap,
+        color: gap.gap >= 3 ? '#ef4444' : gap.gap >= 2 ? '#f59e0b' : '#3b82f6',
+    }));
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Performance & Supervision" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
+            <div className="space-y-6">
+                {/* Header */}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-lg font-semibold">Performance & Supervision</h1>
-                        <div className="mt-1 text-sm text-slate-500">
+                        <p className="mt-0.5 text-sm text-slate-500">
                             Supervision notes, performance reviews, and staff development
-                        </div>
+                        </p>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/hr/performance/reviews">
-                            <Button size="sm" variant="outline" disabled={processing}>
-                                <ClipboardList className="mr-1.5 h-4 w-4" />
-                                Reviews
-                            </Button>
-                        </Link>
+                        <div className="w-40">
+                            <Select
+                                value={filters.staff_id ? String(filters.staff_id) : '__all__'}
+                                onValueChange={(value) => onFilter({ staff_id: value === '__all__' ? null : value })}
+                            >
+                                <SelectTrigger className="h-8 text-xs">
+                                    <SelectValue placeholder="All staff" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="__all__">All staff</SelectItem>
+                                    {staff.map((row) => (
+                                        <SelectItem key={row.id} value={String(row.id)}>{row.name}</SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                         {can.manage && (
-                            <Link href="/hr/performance/supervision/create">
-                                <Button size="sm" disabled={processing}>
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add Note
-                                </Button>
-                            </Link>
+                            <>
+                                <Link href="/hr/performance/supervision/create">
+                                    <Button size="sm" disabled={processing}>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Add Note
+                                    </Button>
+                                </Link>
+                                <Link href="/hr/performance/reviews/create">
+                                    <Button size="sm" variant="outline" disabled={processing}>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Review
+                                    </Button>
+                                </Link>
+                            </>
                         )}
                     </div>
                 </div>
 
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Notes This Month</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                <ClipboardList className="h-5 w-5 text-blue-500" />
-                                <div className="text-2xl font-bold">{notesThisMonth}</div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Overdue Reviews</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="flex items-center gap-2">
-                                {overdueReviews > 0 && <AlertTriangle className="h-5 w-5 text-red-500" />}
-                                <div className={`text-2xl font-bold ${overdueReviews > 0 ? 'text-red-600' : ''}`}>
-                                    {overdueReviews}
+                {/* KPI Cards */}
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+                    <Card className="border-l-4 border-l-blue-500 bg-blue-50/40">
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-medium text-blue-700">Notes This Month</p>
+                                <div className="rounded-full bg-blue-100 p-1.5">
+                                    <ClipboardList className="h-4 w-4 text-blue-600" />
                                 </div>
                             </div>
+                            <div className="mt-1.5 flex items-baseline gap-2">
+                                <span className="text-2xl font-bold text-blue-900">{notesThisMonth}</span>
+                                {notesTrend !== null && notesTrend !== 0 && (
+                                    <span className={`flex items-center text-xs ${notesTrend > 0 ? 'text-green-600' : 'text-red-500'}`}>
+                                        {notesTrend > 0 ? <TrendingUp className="mr-0.5 h-3 w-3" /> : <TrendingDown className="mr-0.5 h-3 w-3" />}
+                                        {Math.abs(notesTrend)}%
+                                    </span>
+                                )}
+                            </div>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">1:1 Overdue</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{oneToOneSla.overdue_count}</div>
-                            <p className="text-xs text-slate-500">{oneToOneSla.due_soon_count} due in next 7 days</p>
+                    <Link href="/hr/performance/reviews">
+                        <Card className={`h-full border-l-4 cursor-pointer transition-colors hover:opacity-80 ${overdueReviews > 0 ? 'border-l-red-500 bg-red-50/50' : 'border-l-emerald-500 bg-emerald-50/40'}`}>
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <p className={`text-xs font-medium ${overdueReviews > 0 ? 'text-red-700' : 'text-emerald-700'}`}>Overdue Reviews</p>
+                                    <div className={`rounded-full p-1.5 ${overdueReviews > 0 ? 'bg-red-100' : 'bg-emerald-100'}`}>
+                                        <AlertTriangle className={`h-4 w-4 ${overdueReviews > 0 ? 'text-red-600' : 'text-emerald-600'}`} />
+                                    </div>
+                                </div>
+                                <span className={`mt-1.5 block text-2xl font-bold ${overdueReviews > 0 ? 'text-red-700' : 'text-emerald-900'}`}>{overdueReviews}</span>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                    <Card className={`border-l-4 ${oneToOneSla.overdue_count > 0 ? 'border-l-amber-500 bg-amber-50/50' : 'border-l-purple-500 bg-purple-50/40'}`}>
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <p className={`text-xs font-medium ${oneToOneSla.overdue_count > 0 ? 'text-amber-700' : 'text-purple-700'}`}>1:1 Overdue</p>
+                                <div className={`rounded-full p-1.5 ${oneToOneSla.overdue_count > 0 ? 'bg-amber-100' : 'bg-purple-100'}`}>
+                                    <Users className={`h-4 w-4 ${oneToOneSla.overdue_count > 0 ? 'text-amber-600' : 'text-purple-600'}`} />
+                                </div>
+                            </div>
+                            <span className={`mt-1.5 block text-2xl font-bold ${oneToOneSla.overdue_count > 0 ? 'text-amber-800' : 'text-purple-900'}`}>{oneToOneSla.overdue_count}</span>
+                            <p className={`mt-0.5 text-xs ${oneToOneSla.overdue_count > 0 ? 'text-amber-600' : 'text-purple-500'}`}>{oneToOneSla.due_soon_count} due in 7 days</p>
                         </CardContent>
                     </Card>
-                    <Card>
-                        <CardHeader className="pb-3">
-                            <CardTitle className="text-sm font-medium text-slate-500">Open Action Plans</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{engagementActionPlanSla.open_total}</div>
-                            <p className="text-xs text-slate-500">{engagementActionPlanSla.overdue} overdue</p>
+                    <Card className={`border-l-4 ${engagementActionPlanSla.overdue > 0 ? 'border-l-orange-500 bg-orange-50/50' : 'border-l-cyan-500 bg-cyan-50/40'}`}>
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <p className={`text-xs font-medium ${engagementActionPlanSla.overdue > 0 ? 'text-orange-700' : 'text-cyan-700'}`}>Open Action Plans</p>
+                                <div className={`rounded-full p-1.5 ${engagementActionPlanSla.overdue > 0 ? 'bg-orange-100' : 'bg-cyan-100'}`}>
+                                    <Target className={`h-4 w-4 ${engagementActionPlanSla.overdue > 0 ? 'text-orange-600' : 'text-cyan-600'}`} />
+                                </div>
+                            </div>
+                            <span className={`mt-1.5 block text-2xl font-bold ${engagementActionPlanSla.overdue > 0 ? 'text-orange-800' : 'text-cyan-900'}`}>{engagementActionPlanSla.open_total}</span>
+                            {engagementActionPlanSla.overdue > 0 && (
+                                <p className="mt-0.5 text-xs text-orange-600">{engagementActionPlanSla.overdue} overdue</p>
+                            )}
                         </CardContent>
                     </Card>
                 </div>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <CardTitle className="text-base">Manager Filters</CardTitle>
-                            <div className="w-64">
-                                <Select
-                                    value={filters.staff_id ? String(filters.staff_id) : '__all__'}
-                                    onValueChange={(value) => onFilter({ staff_id: value === '__all__' ? null : value })}
-                                >
-                                    <SelectTrigger><SelectValue placeholder="All staff" /></SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="__all__">All staff</SelectItem>
-                                        {staff.map((row) => (
-                                            <SelectItem key={row.id} value={String(row.id)}>{row.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
-                    </CardHeader>
-                </Card>
+                {/* Quick-nav links */}
+                <div className="flex flex-wrap gap-2">
+                    <Link href="/hr/performance/reviews">
+                        <Button size="sm" variant="outline" disabled={processing}>
+                            <ClipboardList className="mr-1.5 h-4 w-4" /> Reviews
+                        </Button>
+                    </Link>
+                    <Link href="/hr/performance/competencies">
+                        <Button size="sm" variant="outline" disabled={processing}>
+                            <Target className="mr-1.5 h-4 w-4" /> Competencies
+                        </Button>
+                    </Link>
+                    <Link href="/hr/performance/pips">
+                        <Button size="sm" variant="outline" disabled={processing}>
+                            <ShieldAlert className="mr-1.5 h-4 w-4" /> PIPs {pipSummary.active > 0 && <Badge className="ml-1.5 bg-red-100 text-red-700 border-red-200 text-[10px] px-1.5">{pipSummary.active}</Badge>}
+                        </Button>
+                    </Link>
+                    <Link href="/hr/feedback">
+                        <Button size="sm" variant="outline" disabled={processing}>
+                            <MessageSquare className="mr-1.5 h-4 w-4" /> Feedback {feedbackSummary.pending > 0 && <Badge className="ml-1.5 bg-amber-100 text-amber-700 border-amber-200 text-[10px] px-1.5">{feedbackSummary.pending}</Badge>}
+                        </Button>
+                    </Link>
+                </div>
 
-                <Card>
-                    <CardHeader>
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2 text-base">
-                                <Calendar className="h-5 w-5 text-blue-500" />
-                                Upcoming Reviews
-                            </CardTitle>
-                            <Link href="/hr/performance/reviews">
-                                <Button variant="ghost" size="sm" disabled={processing} className="text-slate-500 hover:text-slate-700">
-                                    View All
-                                    <ArrowRight className="ml-1.5 h-4 w-4" />
-                                </Button>
-                            </Link>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        {upcomingReviews.length > 0 ? (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Staff Member</TableHead>
-                                        <TableHead>Reviewer</TableHead>
-                                        <TableHead>Scheduled</TableHead>
-                                        <TableHead>Status</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {upcomingReviews.map((review) => (
-                                        <TableRow key={review.id}>
-                                            <TableCell className="font-medium">{review.staff_user.name}</TableCell>
-                                            <TableCell>{review.reviewer.name}</TableCell>
-                                            <TableCell>{formatDate(review.scheduled_at)}</TableCell>
-                                            <TableCell>
-                                                <Badge className={getStatusColor(review.status)}>
-                                                    {review.status.replace(/_/g, ' ')}
-                                                </Badge>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center py-10 text-center">
-                                <Calendar className="mb-3 h-10 w-10 text-slate-300" />
-                                <p className="text-sm font-medium text-slate-500">No upcoming reviews</p>
-                                <p className="mt-1 text-xs text-slate-400">All reviews are up to date for the current filters.</p>
-                            </div>
+                {/* Charts - only rendered when data exists */}
+                {hasAnyCharts && (
+                    <div className="grid gap-6 lg:grid-cols-2">
+                        {/* Review Completion Trend */}
+                        {hasReviewTrend && (
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                        <BarChart3 className="h-4 w-4 text-blue-500" />
+                                        Review Completion Trend
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <ResponsiveContainer width="100%" height={220}>
+                                        <AreaChart data={reviewCompletionTrend} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                            <Tooltip />
+                                            <Area type="monotone" dataKey="total" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.08} name="Total" />
+                                            <Area type="monotone" dataKey="completed" stroke="#10b981" fill="#10b981" fillOpacity={0.2} name="Completed" />
+                                            <Legend />
+                                        </AreaChart>
+                                    </ResponsiveContainer>
+                                </CardContent>
+                            </Card>
                         )}
-                    </CardContent>
-                </Card>
 
-                <div className="grid gap-4 lg:grid-cols-2">
+                        {/* Rating Distribution */}
+                        {hasRatings && (
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                        <Star className="h-4 w-4 text-amber-500" />
+                                        Rating Distribution
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <ResponsiveContainer width="100%" height={220}>
+                                        <BarChart data={ratingDistribution} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <XAxis dataKey="rating" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                            <Tooltip formatter={(value: any) => [value, 'Reviews']} />
+                                            <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={48} name="Reviews">
+                                                {ratingDistribution.map((_, idx) => (
+                                                    <Cell key={idx} fill={RATING_COLORS[idx % RATING_COLORS.length]} />
+                                                ))}
+                                            </Bar>
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Notes Frequency */}
+                        {hasNotesTrend && (
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                        <FileText className="h-4 w-4 text-blue-500" />
+                                        Supervision Notes Frequency
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <ResponsiveContainer width="100%" height={200}>
+                                        <BarChart data={notesPerMonth} margin={{ top: 5, right: 10, bottom: 0, left: -20 }}>
+                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                            <XAxis dataKey="month" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                                            <YAxis tick={{ fontSize: 11 }} axisLine={false} tickLine={false} allowDecimals={false} />
+                                            <Tooltip formatter={(value: any) => [value, 'Notes']} />
+                                            <Bar dataKey="count" fill="#3b82f6" radius={[4, 4, 0, 0]} maxBarSize={40} name="Notes" />
+                                        </BarChart>
+                                    </ResponsiveContainer>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Competency Gaps */}
+                        {hasCompetencyGaps && (
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                            <Target className="h-4 w-4 text-amber-500" />
+                                            Competency Gaps
+                                        </CardTitle>
+                                        <Link href="/hr/development/goals">
+                                            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-700">
+                                                View All <ArrowRight className="ml-1 h-3 w-3" />
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <HorizontalBarChart items={competencyChartItems} />
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* PIP Status */}
+                        {hasPips && (
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                            <ShieldAlert className="h-4 w-4 text-red-500" />
+                                            PIP Status
+                                        </CardTitle>
+                                        <Link href="/hr/performance/pips">
+                                            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-700">
+                                                View All <ArrowRight className="ml-1 h-3 w-3" />
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex items-center gap-6">
+                                        <div style={{ width: 160, height: 160 }}>
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <PieChart>
+                                                <Pie data={pipChartData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={70} innerRadius={42} paddingAngle={2}>
+                                                    {pipChartData.map((entry, idx) => (
+                                                        <Cell key={idx} fill={entry.color} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                        <div className="space-y-2 text-sm">
+                                            {pipChartData.map((d) => (
+                                                <div key={d.name} className="flex items-center gap-2">
+                                                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                                                    <span className="text-slate-600">{d.name}: <span className="font-medium text-foreground">{d.value}</span></span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Feedback Summary */}
+                        {hasFeedback && (
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <div className="flex items-center justify-between">
+                                        <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                            <MessageSquare className="h-4 w-4 text-purple-500" />
+                                            360 Feedback
+                                        </CardTitle>
+                                        <Link href="/hr/feedback">
+                                            <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-700">
+                                                View All <ArrowRight className="ml-1 h-3 w-3" />
+                                            </Button>
+                                        </Link>
+                                    </div>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex items-center gap-6">
+                                        <ProgressRing value={feedbackCompletionPct} size={120} color="#8b5cf6" label="Completed" />
+                                        <div className="space-y-2 text-sm">
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-slate-500">Pending</span>
+                                                <span className="font-medium">{feedbackSummary.pending}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-4">
+                                                <span className="text-slate-500">Completed</span>
+                                                <span className="font-medium text-green-600">{feedbackSummary.completed}</span>
+                                            </div>
+                                            {feedbackSummary.overdue > 0 && (
+                                                <div className="flex items-center justify-between gap-4">
+                                                    <span className="text-slate-500">Overdue</span>
+                                                    <span className="font-medium text-red-600">{feedbackSummary.overdue}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                )}
+
+                {/* Upcoming Reviews + 1:1 Follow-up side by side */}
+                <div className="grid gap-6 lg:grid-cols-2">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-base">Competency Gaps</CardTitle>
-                                <Link href="/hr/development/goals">
-                                    <Button variant="ghost" size="sm" disabled={processing} className="text-slate-500 hover:text-slate-700">
-                                        View All
-                                        <ArrowRight className="ml-1.5 h-4 w-4" />
+                                <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                    <Calendar className="h-4 w-4 text-blue-500" />
+                                    Upcoming Reviews
+                                </CardTitle>
+                                <Link href="/hr/performance/reviews">
+                                    <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-700">
+                                        View All <ArrowRight className="ml-1 h-3 w-3" />
                                     </Button>
                                 </Link>
                             </div>
                         </CardHeader>
-                        <CardContent className="space-y-2">
-                            {competencyGaps.length > 0 ? (
-                                competencyGaps.map((gap) => (
-                                    <div key={gap.id} className="rounded-md border p-3">
-                                        <p className="font-medium">{gap.employee_name}</p>
-                                        <p className="text-xs text-slate-500">{gap.title}</p>
-                                        <p className="text-xs text-slate-500">
-                                            {gap.competency_area ?? 'General'} - Level {gap.current_level ?? '-'} to {gap.target_level ?? '-'} (gap {gap.gap})
-                                        </p>
-                                    </div>
-                                ))
+                        <CardContent className="p-0">
+                            {upcomingReviews.length > 0 ? (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Staff</TableHead>
+                                            <TableHead>Scheduled</TableHead>
+                                            <TableHead>Status</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {upcomingReviews.slice(0, 5).map((review) => (
+                                            <TableRow key={review.id}>
+                                                <TableCell className="font-medium">{review.staff_user.name}</TableCell>
+                                                <TableCell className="text-sm text-slate-600">{formatDate(review.scheduled_at)}</TableCell>
+                                                <TableCell>
+                                                    <Badge className={getStatusColor(review.status)}>
+                                                        {review.status.replace(/_/g, ' ')}
+                                                    </Badge>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                                    <Target className="mb-3 h-10 w-10 text-slate-300" />
-                                    <p className="text-sm font-medium text-slate-500">No competency gaps</p>
-                                    <p className="mt-1 text-xs text-slate-400">All staff are meeting their target competency levels.</p>
+                                    <Calendar className="mb-2 h-8 w-8 text-slate-300" />
+                                    <p className="text-sm text-slate-500">No upcoming reviews</p>
                                 </div>
                             )}
                         </CardContent>
                     </Card>
 
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="pb-2">
                             <div className="flex items-center justify-between">
-                                <CardTitle className="text-base">1:1 Session Follow-up</CardTitle>
-                                <Link href="/hr/wellbeing">
-                                    <Button variant="ghost" size="sm" disabled={processing} className="text-slate-500 hover:text-slate-700">
-                                        View All
-                                        <ArrowRight className="ml-1.5 h-4 w-4" />
-                                    </Button>
-                                </Link>
+                                <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                    <Users className="h-4 w-4 text-blue-500" />
+                                    1:1 Session Follow-up
+                                </CardTitle>
+                                {can.manage && (
+                                    <Link href="/hr/performance/supervision/create">
+                                        <Button variant="ghost" size="sm" className="text-slate-500 hover:text-slate-700">
+                                            Schedule <ArrowRight className="ml-1 h-3 w-3" />
+                                        </Button>
+                                    </Link>
+                                )}
                             </div>
                         </CardHeader>
                         <CardContent className="space-y-2">
                             {oneToOneSla.due_rows.length > 0 ? (
-                                <>
-                                    {oneToOneSla.due_rows.slice(0, 8).map((row) => (
-                                        <div key={row.id} className="flex items-center justify-between rounded-md border p-3">
-                                            <div>
-                                                <p className="font-medium">{row.employee_name}</p>
-                                                <p className="text-xs text-slate-500">Supervisor: {row.supervisor_name}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-xs text-slate-500">{formatDate(row.next_session_date)}</p>
-                                                <Badge className={row.is_overdue ? 'bg-red-100 text-red-800 border-red-200' : 'bg-blue-100 text-blue-800 border-blue-200'}>
-                                                    {row.is_overdue ? 'overdue' : 'scheduled'}
-                                                </Badge>
-                                            </div>
+                                oneToOneSla.due_rows.slice(0, 5).map((row) => (
+                                    <div key={row.id} className="flex items-center justify-between rounded-md border p-2.5">
+                                        <div>
+                                            <p className="text-sm font-medium">{row.employee_name}</p>
+                                            <p className="text-xs text-slate-500">{row.supervisor_name}</p>
                                         </div>
-                                    ))}
-                                    {can.manage && (
-                                        <div className="pt-1">
-                                            <Link href="/hr/performance/supervision/create">
-                                                <Button variant="outline" size="sm" disabled={processing}>Schedule 1:1</Button>
-                                            </Link>
+                                        <div className="text-right">
+                                            <p className="text-xs text-slate-500">{formatDate(row.next_session_date)}</p>
+                                            <Badge className={`text-[10px] ${row.is_overdue ? 'bg-red-100 text-red-800 border-red-200' : 'bg-blue-100 text-blue-800 border-blue-200'}`}>
+                                                {row.is_overdue ? 'overdue' : 'scheduled'}
+                                            </Badge>
                                         </div>
-                                    )}
-                                </>
+                                    </div>
+                                ))
                             ) : (
                                 <div className="flex flex-col items-center justify-center py-8 text-center">
-                                    <Users className="mb-3 h-10 w-10 text-slate-300" />
-                                    <p className="text-sm font-medium text-slate-500">No upcoming 1:1 sessions</p>
-                                    <p className="mt-1 text-xs text-slate-400">No sessions are due or overdue for the current filters.</p>
-                                    {can.manage && (
-                                        <Link href="/hr/performance/supervision/create" className="mt-3">
-                                            <Button variant="outline" size="sm" disabled={processing}>Schedule 1:1</Button>
-                                        </Link>
-                                    )}
+                                    <Users className="mb-2 h-8 w-8 text-slate-300" />
+                                    <p className="text-sm text-slate-500">No upcoming 1:1 sessions</p>
                                 </div>
                             )}
                         </CardContent>
                     </Card>
                 </div>
 
+                {/* Supervision Notes */}
                 <Card>
-                    <CardHeader>
+                    <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">Supervision Notes</CardTitle>
-                            <div className="w-64">
+                            <CardTitle className="text-sm font-medium">Supervision Notes</CardTitle>
+                            <div className="w-56">
                                 <div className="relative">
-                                    <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-slate-400" />
+                                    <Search className="absolute left-2.5 top-2 h-4 w-4 text-slate-400" />
                                     <Input
                                         placeholder="Search notes..."
                                         value={filters.q || ''}
                                         onChange={(e) => onFilter({ q: e.target.value })}
-                                        className="pl-9"
+                                        className="h-8 pl-9 text-xs"
                                         disabled={processing}
                                     />
                                 </div>
@@ -406,7 +630,7 @@ export default function PerformanceIndex({
                                         <TableHead>Supervisor</TableHead>
                                         <TableHead>Date</TableHead>
                                         <TableHead>Summary</TableHead>
-                                        <TableHead className="w-20"></TableHead>
+                                        <TableHead className="w-16"></TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -415,14 +639,10 @@ export default function PerformanceIndex({
                                             <TableCell className="font-medium">{note.staff_user.name}</TableCell>
                                             <TableCell>{note.supervisor.name}</TableCell>
                                             <TableCell>{formatDate(note.date)}</TableCell>
-                                            <TableCell className="max-w-xs truncate text-sm text-slate-600">
-                                                {note.summary}
-                                            </TableCell>
+                                            <TableCell className="max-w-xs truncate text-sm text-slate-600">{note.summary}</TableCell>
                                             <TableCell>
                                                 <Link href={`/hr/performance/supervision/${note.id}`}>
-                                                    <Button variant="ghost" size="sm" disabled={processing}>
-                                                        View
-                                                    </Button>
+                                                    <Button variant="ghost" size="sm" disabled={processing}>View</Button>
                                                 </Link>
                                             </TableCell>
                                         </TableRow>
@@ -430,17 +650,15 @@ export default function PerformanceIndex({
                                 </TableBody>
                             </Table>
                         ) : (
-                            <div className="flex flex-col items-center justify-center py-10 text-center">
-                                <FileText className="mb-3 h-10 w-10 text-slate-300" />
-                                <p className="text-sm font-medium text-slate-500">No supervision notes found</p>
-                                <p className="mt-1 text-xs text-slate-400">
-                                    {filters.q ? 'Try adjusting your search terms.' : 'Create a supervision note to get started.'}
+                            <div className="flex flex-col items-center justify-center py-8 text-center">
+                                <FileText className="mb-2 h-8 w-8 text-slate-300" />
+                                <p className="text-sm text-slate-500">
+                                    {filters.q ? 'No notes match your search.' : 'No supervision notes yet.'}
                                 </p>
                                 {can.manage && !filters.q && (
-                                    <Link href="/hr/performance/supervision/create" className="mt-3">
+                                    <Link href="/hr/performance/supervision/create" className="mt-2">
                                         <Button variant="outline" size="sm" disabled={processing}>
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            Add Note
+                                            <Plus className="mr-1.5 h-4 w-4" /> Add Note
                                         </Button>
                                     </Link>
                                 )}

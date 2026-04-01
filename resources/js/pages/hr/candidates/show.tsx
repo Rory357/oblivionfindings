@@ -1,16 +1,28 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
-import { useState } from 'react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from '@/components/ui/select';
 import { type BreadcrumbItem } from '@/types';
 import {
     User, Mail, Phone, Briefcase, Calendar, MessageSquare,
     CheckCircle2, Clock, ArrowRight, FileText, UserCheck,
     Star, Send, Gift, ExternalLink, Shield,
+    Upload, Download, Trash2, FolderOpen, AlertTriangle, File, FileImage, Plus,
+    ChevronDown, ChevronUp, Activity, StickyNote,
 } from 'lucide-react';
 import { StatusBadge } from '@/components/recruitment/status-badge';
 import { PipelineStepper } from '@/components/recruitment/pipeline-stepper';
@@ -67,7 +79,17 @@ interface Offer {
     signed_full_name: string | null;
     signed_at: string | null;
     portal_url: string | null;
+    offer_letter_name: string | null;
+    offer_letter_id: number | null;
     primary_site: { id: number; name: string } | null;
+}
+
+interface JobPosting {
+    id: number;
+    title: string;
+    slug: string;
+    department: string | null;
+    location: string | null;
 }
 
 interface Application {
@@ -82,6 +104,10 @@ interface Application {
     interviews: Interview[];
     reference_checks: ReferenceCheck[];
     offer: Offer | null;
+    job_posting: JobPosting | null;
+    cover_letter: string | null;
+    screening_answers: Record<string, string> | null;
+    cv_original_name: string | null;
 }
 
 interface ActivityEntry {
@@ -89,6 +115,17 @@ interface ActivityEntry {
     description: string;
     timestamp: string;
     actor?: string;
+}
+
+interface CandidateDocument {
+    id: number;
+    original_name: string;
+    category: string;
+    formatted_size: string;
+    uploaded_by: string | null;
+    created_at: string;
+    expires_at: string | null;
+    notes: string | null;
 }
 
 interface Candidate {
@@ -110,6 +147,9 @@ interface Props {
     activityLog?: ActivityEntry[];
     totalDaysInPipeline?: number;
     can: { manage: boolean };
+    documents: CandidateDocument[];
+    documentCategories: Record<string, string>;
+    stages?: string[];
 }
 
 const interviewStatusVariants: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
@@ -121,10 +161,37 @@ const recColors: Record<string, string> = {
     neutral: 'text-amber-500', no: 'text-orange-500', strong_no: 'text-red-500',
 };
 
-export default function CandidateShow({ candidate, activityLog, totalDaysInPipeline, can }: Props) {
+function formatNZDate(dateStr: string): string {
+    return new Date(dateStr).toLocaleDateString('en-NZ', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+    });
+}
+
+function formatNZDateTime(dateStr: string): string {
+    return new Date(dateStr).toLocaleDateString('en-NZ', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+function isExpired(dateStr: string | null): boolean {
+    if (!dateStr) return false;
+    return new Date(dateStr) < new Date();
+}
+
+export default function CandidateShow({ candidate, activityLog, totalDaysInPipeline, can, documents, documentCategories, stages }: Props) {
     const fullName = `${candidate.first_name} ${candidate.last_name}`;
     const initials = ((candidate.first_name?.[0] ?? '') + (candidate.last_name?.[0] ?? '')).toUpperCase();
     const [noteText, setNoteText] = useState('');
+    const [expandedCoverLetters, setExpandedCoverLetters] = useState<Record<number, boolean>>({});
+    const [expandedScreening, setExpandedScreening] = useState<Record<number, boolean>>({});
+    const [showUploadDialog, setShowUploadDialog] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr/people' },
@@ -133,6 +200,34 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
     ];
 
     const currentStatus = candidate.applications[0]?.stage ?? 'new';
+
+    // Document upload form
+    const documentForm = useForm<{
+        file: File | null;
+        category: string;
+        notes: string;
+        expires_at: string;
+    }>({
+        file: null,
+        category: '',
+        notes: '',
+        expires_at: '',
+    });
+
+    // Interview scheduling form
+    const interviewForm = useForm({
+        interview_type: 'phone',
+        scheduled_at: '',
+        duration_minutes: 45,
+        location: '',
+    });
+
+    // Reference form
+    const referenceForm = useForm({
+        referee_name: '',
+        referee_email: '',
+        referee_relationship: 'professional',
+    });
 
     function advanceStage(applicationId: number) {
         router.post(`/hr/recruitment/applications/${applicationId}/advance`, {}, { preserveScroll: true });
@@ -162,378 +257,959 @@ export default function CandidateShow({ candidate, activityLog, totalDaysInPipel
         router.post(`/hr/recruitment/offers/${offerId}/convert`, {}, { preserveScroll: true });
     }
 
+    function handleDocumentUpload(e: React.FormEvent) {
+        e.preventDefault();
+        if (!documentForm.data.file || !documentForm.data.category) return;
+        documentForm.post(`/hr/recruitment/candidates/${candidate.id}/documents`, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => {
+                documentForm.reset();
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
+            },
+        });
+    }
+
+    function deleteDocument(docId: number) {
+        if (confirm('Are you sure you want to delete this document?')) {
+            router.delete(`/hr/recruitment/documents/${docId}`, { preserveScroll: true });
+        }
+    }
+
+    function handleScheduleInterview(applicationId: number) {
+        interviewForm.post(`/hr/recruitment/applications/${applicationId}/interviews`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                interviewForm.reset();
+            },
+        });
+    }
+
+    function handleAddReference(applicationId: number) {
+        referenceForm.post(`/hr/recruitment/applications/${applicationId}/references`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                referenceForm.reset();
+            },
+        });
+    }
+
     const formatCurrency = (amount: number | null) => {
         if (!amount) return '-';
         return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
     };
 
+    const { flash } = usePage().props as any;
+
+    // Group documents by category
+    const groupedDocuments = (documents ?? []).reduce<Record<string, CandidateDocument[]>>((acc, doc) => {
+        const cat = doc.category || 'uncategorised';
+        if (!acc[cat]) acc[cat] = [];
+        acc[cat].push(doc);
+        return acc;
+    }, {});
+
+    // Get the primary (first) application for workflow
+    const primaryApp = candidate.applications[0] ?? null;
+    const upcomingInterview = primaryApp?.interviews.find((i) => i.status === 'scheduled') ?? null;
+    const allReferencesComplete = primaryApp
+        ? primaryApp.reference_checks.length > 0 && primaryApp.reference_checks.every((r) => r.status === 'completed')
+        : false;
+
+    const totalInterviews = candidate.applications.reduce((sum, app) => sum + app.interviews.length, 0);
+
+    function toggleCoverLetter(appId: number) {
+        setExpandedCoverLetters((prev) => ({ ...prev, [appId]: !prev[appId] }));
+    }
+
+    function toggleScreening(appId: number) {
+        setExpandedScreening((prev) => ({ ...prev, [appId]: !prev[appId] }));
+    }
+
+    /** Render the stage-aware "Next Steps" card content for a given application */
+    function renderNextSteps(app: Application) {
+        if (!can.manage || app.status !== 'active') return null;
+
+        return (
+            <Card className="h-full">
+                <CardHeader className="pb-2">
+                    <CardTitle className="text-sm flex items-center gap-2">
+                        <ArrowRight className="h-4 w-4" />
+                        Next Steps
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                    {/* Stage: new */}
+                    {app.stage === 'new' && (
+                        <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground">Review the application and move to screening when ready.</p>
+                            <Button
+                                size="sm"
+                                className="w-full"
+                                onClick={() => advanceStage(app.id)}
+                            >
+                                <ArrowRight className="mr-1 h-3.5 w-3.5" /> Move to Screening
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* Stage: screening */}
+                    {app.stage === 'screening' && (
+                        <div className="space-y-3">
+                            <p className="text-xs text-muted-foreground">Schedule an interview to proceed.</p>
+                            <div className="space-y-2 rounded-lg border p-3">
+                                <h5 className="text-xs font-semibold">Schedule Interview</h5>
+                                <div className="space-y-2">
+                                    <div className="space-y-1">
+                                        <Label htmlFor={`interview-type-${app.id}`} className="text-xs">Type</Label>
+                                        <Select
+                                            value={interviewForm.data.interview_type}
+                                            onValueChange={(value) => interviewForm.setData('interview_type', value)}
+                                        >
+                                            <SelectTrigger id={`interview-type-${app.id}`} className="h-8 text-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="phone">Phone</SelectItem>
+                                                <SelectItem value="video">Video</SelectItem>
+                                                <SelectItem value="in_person">In Person</SelectItem>
+                                                <SelectItem value="panel">Panel</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor={`interview-datetime-${app.id}`} className="text-xs">Date & Time</Label>
+                                        <Input
+                                            id={`interview-datetime-${app.id}`}
+                                            type="datetime-local"
+                                            className="h-8 text-xs"
+                                            value={interviewForm.data.scheduled_at}
+                                            onChange={(e) => interviewForm.setData('scheduled_at', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor={`interview-location-${app.id}`} className="text-xs">Location</Label>
+                                        <Input
+                                            id={`interview-location-${app.id}`}
+                                            type="text"
+                                            className="h-8 text-xs"
+                                            placeholder="e.g. Office, Zoom link..."
+                                            value={interviewForm.data.location}
+                                            onChange={(e) => interviewForm.setData('location', e.target.value)}
+                                        />
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        className="w-full h-7 text-xs"
+                                        disabled={!interviewForm.data.scheduled_at || interviewForm.processing}
+                                        onClick={() => handleScheduleInterview(app.id)}
+                                    >
+                                        {interviewForm.processing ? 'Scheduling...' : 'Schedule Interview'}
+                                    </Button>
+                                    {interviewForm.errors.scheduled_at && (
+                                        <p className="text-xs text-red-500">{interviewForm.errors.scheduled_at}</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Stage: interview_scheduled */}
+                    {app.stage === 'interview_scheduled' && (() => {
+                        const upcoming = app.interviews.find((i) => i.status === 'scheduled') ?? null;
+                        return (
+                            <div className="space-y-2">
+                                {upcoming ? (
+                                    <div className="rounded-lg border p-3 space-y-2">
+                                        <p className="text-xs font-semibold">Upcoming Interview</p>
+                                        <div className="text-xs text-muted-foreground space-y-1">
+                                            <p className="capitalize">{upcoming.type.replace('_', ' ')}</p>
+                                            <p>{formatNZDateTime(upcoming.scheduled_at)}</p>
+                                            {upcoming.interviewer_name && <p>with {upcoming.interviewer_name}</p>}
+                                        </div>
+                                        <div className="flex gap-1 pt-1">
+                                            <Button
+                                                size="sm"
+                                                className="h-7 text-xs flex-1"
+                                                onClick={() => updateInterviewStatus(upcoming.id, 'completed')}
+                                            >
+                                                <CheckCircle2 className="mr-1 h-3 w-3" /> Mark Completed
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                className="h-7 text-xs"
+                                                onClick={() => updateInterviewStatus(upcoming.id, 'no_show')}
+                                            >
+                                                No Show
+                                            </Button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p className="text-xs text-muted-foreground">No upcoming interviews found. Check the interview list below.</p>
+                                )}
+                            </div>
+                        );
+                    })()}
+
+                    {/* Stage: interview_completed */}
+                    {app.stage === 'interview_completed' && (
+                        <div className="space-y-3">
+                            <p className="text-xs text-muted-foreground">Add reference checks to proceed.</p>
+                            <div className="space-y-2 rounded-lg border p-3">
+                                <h5 className="text-xs font-semibold">Add Reference</h5>
+                                <div className="space-y-2">
+                                    <div className="space-y-1">
+                                        <Label htmlFor={`ref-name-${app.id}`} className="text-xs">Referee Name</Label>
+                                        <Input
+                                            id={`ref-name-${app.id}`}
+                                            type="text"
+                                            className="h-8 text-xs"
+                                            placeholder="Full name"
+                                            value={referenceForm.data.referee_name}
+                                            onChange={(e) => referenceForm.setData('referee_name', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor={`ref-email-${app.id}`} className="text-xs">Email</Label>
+                                        <Input
+                                            id={`ref-email-${app.id}`}
+                                            type="email"
+                                            className="h-8 text-xs"
+                                            placeholder="referee@example.com"
+                                            value={referenceForm.data.referee_email}
+                                            onChange={(e) => referenceForm.setData('referee_email', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="space-y-1">
+                                        <Label htmlFor={`ref-relationship-${app.id}`} className="text-xs">Relationship</Label>
+                                        <Select
+                                            value={referenceForm.data.referee_relationship}
+                                            onValueChange={(value) => referenceForm.setData('referee_relationship', value)}
+                                        >
+                                            <SelectTrigger id={`ref-relationship-${app.id}`} className="h-8 text-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="professional">Professional</SelectItem>
+                                                <SelectItem value="manager">Manager</SelectItem>
+                                                <SelectItem value="colleague">Colleague</SelectItem>
+                                                <SelectItem value="academic">Academic</SelectItem>
+                                                <SelectItem value="personal">Personal</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Button
+                                        size="sm"
+                                        className="w-full h-7 text-xs"
+                                        disabled={!referenceForm.data.referee_name || !referenceForm.data.referee_email || referenceForm.processing}
+                                        onClick={() => handleAddReference(app.id)}
+                                    >
+                                        {referenceForm.processing ? 'Adding...' : 'Add Reference'}
+                                    </Button>
+                                    {referenceForm.errors.referee_name && (
+                                        <p className="text-xs text-red-500">{referenceForm.errors.referee_name}</p>
+                                    )}
+                                    {referenceForm.errors.referee_email && (
+                                        <p className="text-xs text-red-500">{referenceForm.errors.referee_email}</p>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Stage: reference_check */}
+                    {app.stage === 'reference_check' && (
+                        <div className="space-y-2">
+                            <p className="text-xs font-semibold">Reference Progress</p>
+                            {app.reference_checks.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">No references added yet.</p>
+                            ) : (
+                                <div className="space-y-1.5">
+                                    {app.reference_checks.map((ref) => (
+                                        <div key={ref.id} className="flex items-center gap-2 text-xs">
+                                            {ref.status === 'completed' ? (
+                                                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                                            ) : (
+                                                <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                            )}
+                                            <span className={ref.status === 'completed' ? 'line-through text-muted-foreground' : ''}>
+                                                {ref.referee_name}
+                                            </span>
+                                            <Badge variant={ref.status === 'completed' ? 'default' : 'outline'} className="text-[10px] capitalize ml-auto">
+                                                {ref.status}
+                                            </Badge>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            {allReferencesComplete && app.id === primaryApp?.id && (
+                                <Button
+                                    size="sm"
+                                    className="w-full mt-2"
+                                    onClick={() => advanceStage(app.id)}
+                                >
+                                    <Gift className="mr-1 h-3.5 w-3.5" /> Prepare Offer
+                                </Button>
+                            )}
+                            {!allReferencesComplete && app.reference_checks.length > 0 && (
+                                <p className="text-xs text-amber-500">Complete all references to prepare an offer.</p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Stage: offer_pending */}
+                    {app.stage === 'offer_pending' && (
+                        <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground">Create an offer for this candidate.</p>
+                            <Button size="sm" className="w-full" asChild>
+                                <Link href={`/hr/recruitment/applications/${app.id}/offer/create`}>
+                                    <Gift className="mr-1 h-3.5 w-3.5" /> Create Offer
+                                </Link>
+                            </Button>
+                        </div>
+                    )}
+
+                    {/* Stage: offer_sent */}
+                    {app.stage === 'offer_sent' && (
+                        <div className="space-y-2">
+                            <div className="rounded-lg border p-3 text-center">
+                                <Send className="mx-auto h-6 w-6 text-primary mb-1.5" />
+                                <p className="text-xs font-medium">Awaiting Response</p>
+                                {app.offer?.sent_at && (
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                        Sent on {formatNZDate(app.offer.sent_at)}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Stage: offer_accepted */}
+                    {app.stage === 'offer_accepted' && (
+                        <div className="space-y-2">
+                            <p className="text-xs text-muted-foreground">Offer accepted. Convert to employee record.</p>
+                            {app.offer && (
+                                <Button
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={() => convertOffer(app.offer!.id)}
+                                >
+                                    <UserCheck className="mr-1 h-3.5 w-3.5" /> Convert to Employee
+                                </Button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Persistent action links */}
+                    <div className="border-t pt-3 space-y-2">
+                        <Button variant="outline" size="sm" className="w-full justify-start" asChild>
+                            <Link href={`/hr/recruitment/candidates/${candidate.id}`}>
+                                <Mail className="mr-2 h-3.5 w-3.5" /> Email Candidate
+                            </Link>
+                        </Button>
+                        <Button variant="outline" size="sm" className="w-full justify-start" asChild>
+                            <Link href={`/hr/recruitment/applications/${app.id}/scorecard-summary`}>
+                                <Star className="mr-2 h-3.5 w-3.5" /> View Scorecards
+                            </Link>
+                        </Button>
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    }
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={fullName} />
             <div className="flex flex-col gap-6 p-6">
-                {/* Hero Header */}
-                <Card className="overflow-hidden">
-                    <div className="bg-gradient-to-r from-primary/5 via-primary/10 to-transparent p-6">
-                        <div className="flex flex-col sm:flex-row items-start gap-5">
-                            <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-2xl font-bold text-primary border-2 border-primary/20">
+                {flash?.success && (
+                    <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-400">
+                        {flash.success}
+                    </div>
+                )}
+                {flash?.error && (
+                    <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">
+                        {flash.error}
+                    </div>
+                )}
+
+                {/* Hero Header - Gradient Purple Banner */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
+                    {/* Decorative circles */}
+                    <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -left-20 -bottom-20 h-72 w-72 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute right-1/3 -bottom-10 h-48 w-48 rounded-full bg-white/5" />
+
+                    <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
+                        <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
+                            {/* Avatar */}
+                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border-4 border-white/20 text-2xl font-bold shadow-xl bg-primary-foreground/20">
                                 {initials}
                             </div>
-                            <div className="flex-1 min-w-0">
-                                <div className="flex flex-wrap items-start justify-between gap-4">
-                                    <div>
-                                        <h1 className="text-2xl font-bold">{fullName}</h1>
-                                        {candidate.preferred_name && (
-                                            <p className="text-sm text-muted-foreground">Goes by "{candidate.preferred_name}"</p>
-                                        )}
-                                        <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-                                            <a href={`mailto:${candidate.personal_email}`} className="flex items-center gap-1.5 hover:text-primary transition-colors">
-                                                <Mail className="h-3.5 w-3.5" />
-                                                {candidate.personal_email}
-                                            </a>
-                                            {candidate.personal_phone && (
-                                                <a href={`tel:${candidate.personal_phone}`} className="flex items-center gap-1.5 hover:text-primary transition-colors">
-                                                    <Phone className="h-3.5 w-3.5" />
-                                                    {candidate.personal_phone}
-                                                </a>
-                                            )}
-                                        </div>
-                                    </div>
-                                    {can.manage && candidate.applications[0]?.status === 'active' && (
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <Button size="sm" onClick={() => advanceStage(candidate.applications[0].id)}>
-                                                Advance <ArrowRight className="ml-1 h-3.5 w-3.5" />
-                                            </Button>
-                                            <Button size="sm" variant="destructive" onClick={() => rejectApplication(candidate.applications[0].id)}>
-                                                Reject
-                                            </Button>
-                                        </div>
+                            <div className="min-w-0">
+                                <h1 className="text-2xl font-bold md:text-3xl">{fullName}</h1>
+                                {candidate.preferred_name && (
+                                    <p className="mt-0.5 text-sm text-white/70">Goes by &ldquo;{candidate.preferred_name}&rdquo;</p>
+                                )}
+                                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-white/80">
+                                    <a href={`mailto:${candidate.personal_email}`} className="flex items-center gap-1.5 hover:text-white transition-colors">
+                                        <Mail className="h-3.5 w-3.5" />
+                                        {candidate.personal_email}
+                                    </a>
+                                    {candidate.personal_phone && (
+                                        <a href={`tel:${candidate.personal_phone}`} className="flex items-center gap-1.5 hover:text-white transition-colors">
+                                            <Phone className="h-3.5 w-3.5" />
+                                            {candidate.personal_phone}
+                                        </a>
                                     )}
                                 </div>
                                 <div className="mt-3 flex flex-wrap items-center gap-2">
-                                    <StatusBadge status={currentStatus} />
-                                    <Badge variant="outline" className="capitalize">{candidate.source.replace(/_/g, ' ')}</Badge>
-                                    {candidate.source_detail && <Badge variant="secondary">{candidate.source_detail}</Badge>}
-                                    <Badge variant="secondary" className="gap-1">
-                                        <Clock className="h-3 w-3" />
-                                        {totalDaysInPipeline ?? Math.round((Date.now() - new Date(candidate.created_at).getTime()) / 86400000)}d in pipeline
+                                    <Badge className="bg-white/10 text-white/90 border-white/20 capitalize">
+                                        {currentStatus.replace(/_/g, ' ')}
                                     </Badge>
-                                    <Badge variant="secondary">{candidate.applications.length} application{candidate.applications.length !== 1 ? 's' : ''}</Badge>
+                                    <Badge className="bg-white/10 text-white/90 border-white/20 capitalize">
+                                        {candidate.source.replace(/_/g, ' ')}
+                                    </Badge>
+                                    {candidate.source_detail && (
+                                        <Badge className="bg-white/10 text-white/90 border-white/20">
+                                            {candidate.source_detail}
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="flex flex-col items-end gap-4">
+                            {/* Action buttons */}
+                            {can.manage && candidate.applications[0]?.status === 'active' && (
+                                <div className="flex items-center gap-2">
+                                    <Button
+                                        size="sm"
+                                        className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+                                        variant="outline"
+                                        onClick={() => advanceStage(candidate.applications[0].id)}
+                                    >
+                                        Advance <ArrowRight className="ml-1 h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        className="bg-white/10 hover:bg-white/20 text-white border-white/20"
+                                        variant="outline"
+                                        onClick={() => rejectApplication(candidate.applications[0].id)}
+                                    >
+                                        Reject
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Right side KPIs */}
+                            <div className="hidden md:flex items-center gap-6">
+                                <div className="text-center">
+                                    <p className="text-2xl font-bold">{totalDaysInPipeline ?? Math.round((Date.now() - new Date(candidate.created_at).getTime()) / 86400000)}</p>
+                                    <p className="text-xs text-white/70">Days in Pipeline</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-2xl font-bold">{candidate.applications.length}</p>
+                                    <p className="text-xs text-white/70">Applications</p>
+                                </div>
+                                <div className="text-center">
+                                    <p className="text-2xl font-bold">{totalInterviews}</p>
+                                    <p className="text-xs text-white/70">Interviews</p>
                                 </div>
                             </div>
                         </div>
                     </div>
-                </Card>
+                </div>
 
-                {/* Main Content */}
-                <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-                    <Tabs defaultValue="applications" className="space-y-4">
-                        <TabsList>
-                            <TabsTrigger value="applications">Applications ({candidate.applications.length})</TabsTrigger>
-                            <TabsTrigger value="timeline">Timeline</TabsTrigger>
-                            <TabsTrigger value="notes">Notes</TabsTrigger>
-                        </TabsList>
+                {/* Tab bar - Full width, no sidebar */}
+                <Tabs defaultValue="applications" className="space-y-4">
+                    <TabsList className="flex flex-wrap h-auto gap-1 w-full">
+                        <TabsTrigger value="applications" className="gap-1.5">
+                            <Briefcase className="h-4 w-4" />
+                            Applications
+                            <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-semibold">
+                                {candidate.applications.length}
+                            </span>
+                        </TabsTrigger>
+                        <TabsTrigger value="documents" className="gap-1.5">
+                            <FolderOpen className="h-4 w-4" />
+                            Documents
+                            <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-semibold">
+                                {(documents ?? []).length}
+                            </span>
+                        </TabsTrigger>
+                        <TabsTrigger value="timeline" className="gap-1.5">
+                            <Activity className="h-4 w-4" />
+                            Timeline
+                            <span className="ml-1.5 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-muted px-1.5 text-[10px] font-semibold">
+                                {(activityLog ?? []).length}
+                            </span>
+                        </TabsTrigger>
+                        <TabsTrigger value="notes" className="gap-1.5">
+                            <StickyNote className="h-4 w-4" />
+                            Notes
+                        </TabsTrigger>
+                    </TabsList>
 
-                        <TabsContent value="applications" className="space-y-6">
-                            {candidate.applications.length === 0 ? (
-                                <Card>
-                                    <CardContent className="py-8 text-center text-muted-foreground">
-                                        <Briefcase className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                        <p>No applications yet.</p>
-                                    </CardContent>
-                                </Card>
-                            ) : (
-                                candidate.applications.map((app) => (
-                                    <Card key={app.id} className="overflow-hidden">
-                                        <CardHeader className="bg-muted/30 border-b">
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div>
-                                                    <CardTitle className="flex items-center gap-2 text-base">
-                                                        <Briefcase className="h-4 w-4" />
-                                                        {app.position_title}
-                                                        {app.position_role && <Badge variant="outline" className="text-xs">{app.position_role}</Badge>}
-                                                    </CardTitle>
-                                                    <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                                                        <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{app.applied_at}</span>
-                                                        {app.target_site && <span>Site: {app.target_site.name}</span>}
-                                                        {app.interview_kit && <span>Kit: {app.interview_kit.name}</span>}
+                    {/* Applications Tab */}
+                    <TabsContent value="applications" className="space-y-6">
+                        {candidate.applications.length === 0 ? (
+                            <Card>
+                                <CardContent className="py-8 text-center text-muted-foreground">
+                                    <Briefcase className="mx-auto mb-3 h-12 w-12 opacity-50" />
+                                    <p>No applications yet.</p>
+                                </CardContent>
+                            </Card>
+                        ) : (
+                            candidate.applications.map((app) => (
+                                <Card key={app.id} className="overflow-hidden">
+                                    <CardHeader className="bg-muted/30 border-b">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div>
+                                                <CardTitle className="flex items-center gap-2 text-base">
+                                                    <Briefcase className="h-4 w-4" />
+                                                    {app.position_title}
+                                                    {app.position_role && <Badge variant="outline" className="text-xs">{app.position_role}</Badge>}
+                                                </CardTitle>
+                                                {/* Job posting link */}
+                                                {app.job_posting ? (
+                                                    <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
+                                                        <Link
+                                                            href={`/hr/job-postings/${app.job_posting.id}`}
+                                                            className="text-primary hover:underline font-medium"
+                                                        >
+                                                            {app.job_posting.title}
+                                                        </Link>
+                                                        {app.job_posting.department && (
+                                                            <Badge variant="secondary" className="text-xs">{app.job_posting.department}</Badge>
+                                                        )}
+                                                        {app.job_posting.location && (
+                                                            <span className="text-xs text-muted-foreground">{app.job_posting.location}</span>
+                                                        )}
                                                     </div>
-                                                </div>
-                                                <div className="flex items-center gap-2">
-                                                    <Badge variant={app.status === 'active' ? 'default' : app.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">{app.status}</Badge>
-                                                    {can.manage && app.status === 'active' && (
-                                                        <>
-                                                            {app.stage === 'offer_pending' && !app.offer && (
-                                                                <Button size="sm" variant="outline" asChild>
-                                                                    <Link href={`/hr/recruitment/applications/${app.id}/offer/create`}>
-                                                                        <Gift className="mr-1 h-3 w-3" /> Create Offer
-                                                                    </Link>
-                                                                </Button>
-                                                            )}
-                                                        </>
+                                                ) : (
+                                                    <div className="mt-1.5">
+                                                        <Badge variant="outline" className="text-xs">Direct Application</Badge>
+                                                    </div>
+                                                )}
+                                                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                                    <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{app.applied_at}</span>
+                                                    {app.target_site && <span>Site: {app.target_site.name}</span>}
+                                                    {app.interview_kit && <span>Kit: {app.interview_kit.name}</span>}
+                                                    {app.cv_original_name && (
+                                                        <span className="flex items-center gap-1">
+                                                            <FileText className="h-3 w-3" />
+                                                            {app.cv_original_name}
+                                                        </span>
                                                     )}
                                                 </div>
                                             </div>
-                                        </CardHeader>
-                                        <CardContent className="p-5 space-y-5">
-                                            <PipelineStepper currentStage={app.stage} />
+                                            <div className="flex items-center gap-2">
+                                                <Badge variant={app.status === 'active' ? 'default' : app.status === 'rejected' ? 'destructive' : 'secondary'} className="capitalize">{app.status}</Badge>
+                                                {can.manage && app.status === 'active' && (
+                                                    <>
+                                                        {app.stage === 'offer_pending' && !app.offer && (
+                                                            <Button size="sm" variant="outline" asChild>
+                                                                <Link href={`/hr/recruitment/applications/${app.id}/offer/create`}>
+                                                                    <Gift className="mr-1 h-3 w-3" /> Create Offer
+                                                                </Link>
+                                                            </Button>
+                                                        )}
+                                                    </>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="p-5 space-y-5">
+                                        {/* Pipeline + Next Steps side by side */}
+                                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                            <div>
+                                                <PipelineStepper currentStage={app.stage} />
+                                            </div>
+                                            <div>
+                                                {renderNextSteps(app)}
+                                            </div>
+                                        </div>
 
-                                            {/* Interviews */}
-                                            {app.interviews.length > 0 && (
-                                                <div>
-                                                    <h4 className="mb-3 text-sm font-semibold flex items-center gap-1.5">
-                                                        <UserCheck className="h-4 w-4" />
-                                                        Interviews ({app.interviews.length})
-                                                    </h4>
-                                                    <div className="space-y-2">
-                                                        {app.interviews.map((interview) => (
-                                                            <div key={interview.id} className="rounded-lg border p-3 hover:bg-muted/30 transition-colors">
-                                                                <div className="flex items-start justify-between gap-3">
-                                                                    <div className="min-w-0">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className="font-medium text-sm capitalize">{interview.type.replace('_', ' ')}</span>
-                                                                            <Badge variant={interviewStatusVariants[interview.status] || 'outline'} className="capitalize text-xs">
-                                                                                {interview.status.replace('_', ' ')}
-                                                                            </Badge>
-                                                                        </div>
-                                                                        <div className="mt-1 text-xs text-muted-foreground">
-                                                                            <span>{interview.scheduled_at}</span>
-                                                                            {interview.interviewer_name && <span> with {interview.interviewer_name}</span>}
-                                                                        </div>
-                                                                        {interview.scores.length > 0 && (
-                                                                            <div className="mt-2 flex flex-wrap gap-2">
-                                                                                {interview.scores.map((score) => (
-                                                                                    <div key={score.id} className="inline-flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1 text-xs">
-                                                                                        <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
-                                                                                        <span>{score.overall_score ?? '-'}</span>
-                                                                                        {score.recommendation && (
-                                                                                            <span className={recColors[score.recommendation] ?? 'text-muted-foreground'}>
-                                                                                                {score.recommendation.replace('_', ' ')}
-                                                                                            </span>
-                                                                                        )}
-                                                                                        {score.interviewer_name && <span className="text-muted-foreground">- {score.interviewer_name}</span>}
-                                                                                    </div>
-                                                                                ))}
-                                                                            </div>
-                                                                        )}
+                                        {/* Cover Letter (collapsible) */}
+                                        {app.cover_letter && (
+                                            <div className="rounded-lg border">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleCoverLetter(app.id)}
+                                                    className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/30 transition-colors"
+                                                >
+                                                    <span className="flex items-center gap-1.5">
+                                                        <FileText className="h-3.5 w-3.5" />
+                                                        Cover Letter
+                                                    </span>
+                                                    {expandedCoverLetters[app.id] ? (
+                                                        <ChevronUp className="h-4 w-4" />
+                                                    ) : (
+                                                        <ChevronDown className="h-4 w-4" />
+                                                    )}
+                                                </button>
+                                                {expandedCoverLetters[app.id] && (
+                                                    <div className="border-t px-4 py-3 text-sm whitespace-pre-wrap text-muted-foreground">
+                                                        {app.cover_letter}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Screening Answers (collapsible) */}
+                                        {app.screening_answers && Object.keys(app.screening_answers).length > 0 && (
+                                            <div className="rounded-lg border">
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleScreening(app.id)}
+                                                    className="flex w-full items-center justify-between px-4 py-2.5 text-sm font-medium hover:bg-muted/30 transition-colors"
+                                                >
+                                                    <span className="flex items-center gap-1.5">
+                                                        <MessageSquare className="h-3.5 w-3.5" />
+                                                        Screening Answers ({Object.keys(app.screening_answers).length})
+                                                    </span>
+                                                    {expandedScreening[app.id] ? (
+                                                        <ChevronUp className="h-4 w-4" />
+                                                    ) : (
+                                                        <ChevronDown className="h-4 w-4" />
+                                                    )}
+                                                </button>
+                                                {expandedScreening[app.id] && (
+                                                    <div className="border-t px-4 py-3 space-y-3">
+                                                        {Object.entries(app.screening_answers).map(([question, answer]) => (
+                                                            <div key={question}>
+                                                                <p className="text-xs font-medium text-muted-foreground">{question}</p>
+                                                                <p className="mt-0.5 text-sm">{answer}</p>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        {/* Interviews */}
+                                        {app.interviews.length > 0 && (
+                                            <div>
+                                                <h4 className="mb-3 text-sm font-semibold flex items-center gap-1.5">
+                                                    <UserCheck className="h-4 w-4" />
+                                                    Interviews ({app.interviews.length})
+                                                </h4>
+                                                <div className="space-y-2">
+                                                    {app.interviews.map((interview) => (
+                                                        <div key={interview.id} className="rounded-lg border p-3 hover:bg-muted/30 transition-colors">
+                                                            <div className="flex items-start justify-between gap-3">
+                                                                <div className="min-w-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-medium text-sm capitalize">{interview.type.replace('_', ' ')}</span>
+                                                                        <Badge variant={interviewStatusVariants[interview.status] || 'outline'} className="capitalize text-xs">
+                                                                            {interview.status.replace('_', ' ')}
+                                                                        </Badge>
                                                                     </div>
-                                                                    {can.manage && (
-                                                                        <div className="flex items-center gap-1 shrink-0">
-                                                                            {interview.status === 'scheduled' && (
-                                                                                <>
-                                                                                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => updateInterviewStatus(interview.id, 'completed')}>Complete</Button>
-                                                                                    <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => updateInterviewStatus(interview.id, 'no_show')}>No Show</Button>
-                                                                                </>
-                                                                            )}
-                                                                            <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
-                                                                                <Link href={`/hr/recruitment/interviews/${interview.id}/scorecard`}>
-                                                                                    <Star className="mr-1 h-3 w-3" /> Score
-                                                                                </Link>
-                                                                            </Button>
+                                                                    <div className="mt-1 text-xs text-muted-foreground">
+                                                                        <span>{interview.scheduled_at}</span>
+                                                                        {interview.interviewer_name && <span> with {interview.interviewer_name}</span>}
+                                                                    </div>
+                                                                    {interview.scores.length > 0 && (
+                                                                        <div className="mt-2 flex flex-wrap gap-2">
+                                                                            {interview.scores.map((score) => (
+                                                                                <div key={score.id} className="inline-flex items-center gap-1.5 rounded-md bg-muted/50 px-2 py-1 text-xs">
+                                                                                    <Star className="h-3 w-3 fill-amber-400 text-amber-400" />
+                                                                                    <span>{score.overall_score ?? '-'}</span>
+                                                                                    {score.recommendation && (
+                                                                                        <span className={recColors[score.recommendation] ?? 'text-muted-foreground'}>
+                                                                                            {score.recommendation.replace('_', ' ')}
+                                                                                        </span>
+                                                                                    )}
+                                                                                    {score.interviewer_name && <span className="text-muted-foreground">- {score.interviewer_name}</span>}
+                                                                                </div>
+                                                                            ))}
                                                                         </div>
                                                                     )}
                                                                 </div>
-                                                            </div>
-                                                        ))}
-                                                    </div>
-                                                </div>
-                                            )}
-
-                                            {/* References */}
-                                            {app.reference_checks.length > 0 && (
-                                                <div>
-                                                    <h4 className="mb-3 text-sm font-semibold flex items-center gap-1.5">
-                                                        <Shield className="h-4 w-4" />
-                                                        Reference Checks ({app.reference_checks.length})
-                                                    </h4>
-                                                    <div className="space-y-2">
-                                                        {app.reference_checks.map((ref) => (
-                                                            <div key={ref.id} className="flex items-start justify-between gap-3 rounded-lg border p-3">
-                                                                <div>
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span className="font-medium text-sm">{ref.referee_name}</span>
-                                                                        <Badge variant={ref.status === 'completed' ? 'default' : 'outline'} className="capitalize text-xs">{ref.status}</Badge>
-                                                                    </div>
-                                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                                        {ref.referee_relationship}
-                                                                        {ref.referee_phone && <span> - {ref.referee_phone}</span>}
-                                                                    </div>
-                                                                </div>
-                                                                {can.manage && ref.status !== 'completed' && (
-                                                                    <div className="flex gap-1 shrink-0">
-                                                                        <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => updateReferenceStatus(ref.id, 'contacted')}>Contacted</Button>
-                                                                        <Button size="sm" className="h-7 text-xs" onClick={() => updateReferenceStatus(ref.id, 'completed')}>Complete</Button>
+                                                                {can.manage && (
+                                                                    <div className="flex items-center gap-1 shrink-0">
+                                                                        {interview.status === 'scheduled' && (
+                                                                            <>
+                                                                                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => updateInterviewStatus(interview.id, 'completed')}>Complete</Button>
+                                                                                <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => updateInterviewStatus(interview.id, 'no_show')}>No Show</Button>
+                                                                            </>
+                                                                        )}
+                                                                        <Button size="sm" variant="outline" className="h-7 text-xs" asChild>
+                                                                            <Link href={`/hr/recruitment/interviews/${interview.id}/scorecard`}>
+                                                                                <Star className="mr-1 h-3 w-3" /> Score
+                                                                            </Link>
+                                                                        </Button>
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                        ))}
-                                                    </div>
+                                                        </div>
+                                                    ))}
                                                 </div>
-                                            )}
+                                            </div>
+                                        )}
 
-                                            {/* Offer */}
-                                            {app.offer && (
-                                                <div className="rounded-xl border-2 border-emerald-500/20 bg-emerald-500/5 p-4">
-                                                    <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
-                                                        <Gift className="h-4 w-4 text-emerald-500" />
-                                                        Employment Offer
-                                                    </h4>
-                                                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
-                                                        <div><span className="text-xs text-muted-foreground block">Position</span>{app.offer.position_title}</div>
-                                                        <div><span className="text-xs text-muted-foreground block">Type</span><span className="capitalize">{app.offer.employment_type.replace('_', ' ')}</span></div>
-                                                        <div><span className="text-xs text-muted-foreground block">Start Date</span>{app.offer.proposed_start_date}</div>
-                                                        {app.offer.annual_salary && <div><span className="text-xs text-muted-foreground block">Annual Salary</span>{formatCurrency(app.offer.annual_salary)}</div>}
-                                                        {app.offer.hourly_rate && <div><span className="text-xs text-muted-foreground block">Hourly Rate</span>{formatCurrency(app.offer.hourly_rate)}</div>}
-                                                        {app.offer.hours_per_week && <div><span className="text-xs text-muted-foreground block">Hours/Week</span>{app.offer.hours_per_week}h</div>}
-                                                        {app.offer.primary_site && <div><span className="text-xs text-muted-foreground block">Site</span>{app.offer.primary_site.name}</div>}
-                                                    </div>
-                                                    <div className="mt-3 flex flex-wrap items-center gap-2">
-                                                        <Badge variant={app.offer.approval_status === 'approved' ? 'default' : 'secondary'} className="capitalize">{app.offer.approval_status}</Badge>
-                                                        {app.offer.sent_at && <Badge variant="outline"><Send className="mr-1 h-3 w-3" />Sent {app.offer.sent_at}</Badge>}
-                                                        {app.offer.response && (
-                                                            <Badge variant={app.offer.response === 'accepted' ? 'default' : 'destructive'} className="capitalize">{app.offer.response}</Badge>
-                                                        )}
-                                                        {app.offer.portal_url && (
-                                                            <a href={app.offer.portal_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
-                                                                <ExternalLink className="h-3 w-3" /> Candidate Portal
-                                                            </a>
-                                                        )}
-                                                    </div>
-                                                    {can.manage && (
-                                                        <div className="mt-3 flex flex-wrap gap-2">
-                                                            {app.offer.approval_status !== 'approved' && (
-                                                                <Button size="sm" variant="outline" onClick={() => approveOffer(app.offer!.id)}>Approve</Button>
-                                                            )}
-                                                            {app.offer.approval_status === 'approved' && !app.offer.sent_at && (
-                                                                <Button size="sm" onClick={() => sendOffer(app.offer!.id)}><Send className="mr-1 h-3.5 w-3.5" />Send Offer</Button>
-                                                            )}
-                                                            {app.offer.sent_at && !app.offer.response && (
-                                                                <>
-                                                                    <Button size="sm" onClick={() => recordOfferResponse(app.offer!.id, 'accepted')}>Mark Accepted</Button>
-                                                                    <Button size="sm" variant="secondary" onClick={() => recordOfferResponse(app.offer!.id, 'declined')}>Declined</Button>
-                                                                    <Button size="sm" variant="ghost" onClick={() => recordOfferResponse(app.offer!.id, 'withdrawn')}>Withdrawn</Button>
-                                                                </>
-                                                            )}
-                                                            {app.offer.response === 'accepted' && (
-                                                                <Button size="sm" variant="outline" onClick={() => convertOffer(app.offer!.id)}>
-                                                                    <UserCheck className="mr-1 h-3.5 w-3.5" /> Convert to Employee
-                                                                </Button>
+                                        {/* References */}
+                                        {app.reference_checks.length > 0 && (
+                                            <div>
+                                                <h4 className="mb-3 text-sm font-semibold flex items-center gap-1.5">
+                                                    <Shield className="h-4 w-4" />
+                                                    Reference Checks ({app.reference_checks.length})
+                                                </h4>
+                                                <div className="space-y-2">
+                                                    {app.reference_checks.map((ref) => (
+                                                        <div key={ref.id} className="flex items-start justify-between gap-3 rounded-lg border p-3">
+                                                            <div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-medium text-sm">{ref.referee_name}</span>
+                                                                    <Badge variant={ref.status === 'completed' ? 'default' : 'outline'} className="capitalize text-xs">{ref.status}</Badge>
+                                                                </div>
+                                                                <div className="mt-1 text-xs text-muted-foreground">
+                                                                    {ref.referee_relationship}
+                                                                    {ref.referee_phone && <span> - {ref.referee_phone}</span>}
+                                                                </div>
+                                                            </div>
+                                                            {can.manage && ref.status !== 'completed' && (
+                                                                <div className="flex gap-1 shrink-0">
+                                                                    <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => updateReferenceStatus(ref.id, 'contacted')}>Contacted</Button>
+                                                                    <Button size="sm" className="h-7 text-xs" onClick={() => updateReferenceStatus(ref.id, 'completed')}>Complete</Button>
+                                                                </div>
                                                             )}
                                                         </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* Offer */}
+                                        {app.offer && (
+                                            <div className="rounded-xl border-2 border-emerald-500/20 bg-emerald-500/5 p-4">
+                                                <h4 className="text-sm font-semibold flex items-center gap-2 mb-3">
+                                                    <Gift className="h-4 w-4 text-emerald-500" />
+                                                    Employment Offer
+                                                </h4>
+                                                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 text-sm">
+                                                    <div><span className="text-xs text-muted-foreground block">Position</span>{app.offer.position_title}</div>
+                                                    <div><span className="text-xs text-muted-foreground block">Type</span><span className="capitalize">{app.offer.employment_type.replace('_', ' ')}</span></div>
+                                                    <div><span className="text-xs text-muted-foreground block">Start Date</span>{app.offer.proposed_start_date}</div>
+                                                    {app.offer.annual_salary && <div><span className="text-xs text-muted-foreground block">Annual Salary</span>{formatCurrency(app.offer.annual_salary)}</div>}
+                                                    {app.offer.hourly_rate && <div><span className="text-xs text-muted-foreground block">Hourly Rate</span>{formatCurrency(app.offer.hourly_rate)}</div>}
+                                                    {app.offer.hours_per_week && <div><span className="text-xs text-muted-foreground block">Hours/Week</span>{app.offer.hours_per_week}h</div>}
+                                                    {app.offer.primary_site && <div><span className="text-xs text-muted-foreground block">Site</span>{app.offer.primary_site.name}</div>}
+                                                </div>
+                                                <div className="mt-3 flex flex-wrap items-center gap-2">
+                                                    <Badge variant={app.offer.approval_status === 'approved' ? 'default' : 'secondary'} className="capitalize">{app.offer.approval_status}</Badge>
+                                                    {app.offer.sent_at && <Badge variant="outline"><Send className="mr-1 h-3 w-3" />Sent {app.offer.sent_at}</Badge>}
+                                                    {app.offer.response && (
+                                                        <Badge variant={app.offer.response === 'accepted' ? 'default' : 'destructive'} className="capitalize">{app.offer.response}</Badge>
                                                     )}
-                                                    {app.offer.signed_full_name && (
-                                                        <p className="mt-2 text-xs text-muted-foreground">Signed by: {app.offer.signed_full_name} {app.offer.signed_at && `on ${app.offer.signed_at}`}</p>
+                                                    {app.offer.portal_url && (
+                                                        <a href={app.offer.portal_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                                                            <ExternalLink className="h-3 w-3" /> Candidate Portal
+                                                        </a>
+                                                    )}
+                                                    {app.offer.offer_letter_name && (
+                                                        <a href={`/hr/recruitment/offers/${app.offer.id}/letter`} className="inline-flex items-center gap-1 text-xs text-primary hover:underline">
+                                                            <FileText className="h-3 w-3" /> {app.offer.offer_letter_name}
+                                                        </a>
                                                     )}
                                                 </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                ))
+                                                {can.manage && (
+                                                    <div className="mt-3 flex flex-wrap gap-2">
+                                                        {app.offer.approval_status !== 'approved' && (
+                                                            <Button size="sm" variant="outline" onClick={() => approveOffer(app.offer!.id)}>Approve</Button>
+                                                        )}
+                                                        {app.offer.approval_status === 'approved' && !app.offer.sent_at && (
+                                                            <Button size="sm" onClick={() => sendOffer(app.offer!.id)}><Send className="mr-1 h-3.5 w-3.5" />Send Offer</Button>
+                                                        )}
+                                                        {app.offer.sent_at && !app.offer.response && (
+                                                            <>
+                                                                <Button size="sm" onClick={() => recordOfferResponse(app.offer!.id, 'accepted')}>Mark Accepted</Button>
+                                                                <Button size="sm" variant="secondary" onClick={() => recordOfferResponse(app.offer!.id, 'declined')}>Declined</Button>
+                                                                <Button size="sm" variant="ghost" onClick={() => recordOfferResponse(app.offer!.id, 'withdrawn')}>Withdrawn</Button>
+                                                            </>
+                                                        )}
+                                                        {app.offer.response === 'accepted' && (
+                                                            <Button size="sm" variant="outline" onClick={() => convertOffer(app.offer!.id)}>
+                                                                <UserCheck className="mr-1 h-3.5 w-3.5" /> Convert to Employee
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                )}
+                                                {app.offer.signed_full_name && (
+                                                    <p className="mt-2 text-xs text-muted-foreground">Signed by: {app.offer.signed_full_name} {app.offer.signed_at && `on ${app.offer.signed_at}`}</p>
+                                                )}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            ))
+                        )}
+                    </TabsContent>
+
+                    {/* Documents Tab */}
+                    <TabsContent value="documents" className="space-y-4">
+                        {/* Header with upload button */}
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-lg font-semibold">Documents</h3>
+                                <p className="text-sm text-muted-foreground">{documents.length} document{documents.length !== 1 ? 's' : ''} on file</p>
+                            </div>
+                            {can.manage && (
+                                <Button onClick={() => setShowUploadDialog(true)} className="gap-1.5">
+                                    <Upload className="h-4 w-4" /> Upload Document
+                                </Button>
                             )}
-                        </TabsContent>
+                        </div>
 
-                        <TabsContent value="timeline" className="space-y-4">
-                            <Card>
-                                <CardHeader><CardTitle className="text-base">Activity Timeline</CardTitle></CardHeader>
-                                <CardContent>
-                                    {activityLog && activityLog.length > 0 ? (
-                                        <div className="space-y-0">
-                                            {activityLog.map((entry, i) => (
-                                                <ActivityItem key={i} type={entry.type} description={entry.description} timestamp={entry.timestamp} actor={entry.actor} />
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
+                        {/* Summary stat cards */}
+                        {documents.length > 0 && (
+                            <div className="grid grid-cols-3 gap-3">
+                                <Card><CardContent className="pt-4 text-center"><p className="text-2xl font-bold text-primary">{documents.length}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Total</p></CardContent></Card>
+                                <Card><CardContent className="pt-4 text-center"><p className="text-2xl font-bold text-amber-600">{documents.filter(d => d.expires_at && !isExpired(d.expires_at) && new Date(d.expires_at) <= new Date(Date.now() + 30 * 86400000)).length}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Expiring</p></CardContent></Card>
+                                <Card><CardContent className="pt-4 text-center"><p className="text-2xl font-bold text-red-600">{documents.filter(d => d.is_expired).length}</p><p className="text-xs text-muted-foreground uppercase tracking-wider">Expired</p></CardContent></Card>
+                            </div>
+                        )}
 
-                        <TabsContent value="notes" className="space-y-4">
+                        {/* Document Grid */}
+                        {documents.length === 0 ? (
                             <Card>
-                                <CardHeader><CardTitle className="text-base">Candidate Notes</CardTitle></CardHeader>
-                                <CardContent className="space-y-4">
-                                    {candidate.notes && (
-                                        <div className="rounded-lg bg-muted/50 p-4 text-sm whitespace-pre-wrap">{candidate.notes}</div>
-                                    )}
+                                <CardContent className="py-12 text-center text-muted-foreground">
+                                    <FolderOpen className="mx-auto mb-3 h-12 w-12 opacity-50" />
+                                    <p className="font-medium">No documents uploaded yet</p>
+                                    <p className="text-sm mt-1">Upload CVs, qualifications, police vetting, and other documents.</p>
                                     {can.manage && (
-                                        <div className="space-y-2">
-                                            <Textarea placeholder="Add a note..." value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={3} />
-                                            <Button size="sm" disabled={!noteText.trim()} onClick={() => {
-                                                router.put(`/hr/recruitment/candidates/${candidate.id}`, { notes: (candidate.notes ? candidate.notes + '\n\n' : '') + noteText.trim() }, { preserveScroll: true, onSuccess: () => setNoteText('') });
-                                            }}>
-                                                <MessageSquare className="mr-1 h-3.5 w-3.5" /> Add Note
-                                            </Button>
-                                        </div>
+                                        <Button onClick={() => setShowUploadDialog(true)} variant="outline" size="sm" className="mt-4 gap-1.5">
+                                            <Upload className="h-4 w-4" /> Upload Document
+                                        </Button>
                                     )}
                                 </CardContent>
                             </Card>
-                        </TabsContent>
-                    </Tabs>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                                {documents.map((doc) => {
+                                    const docExpired = isExpired(doc.expires_at);
+                                    const iconClass = doc.mime_type?.includes('pdf') ? 'text-red-500' : doc.mime_type?.includes('image') ? 'text-blue-500' : 'text-slate-400';
+                                    const IconComp = doc.mime_type?.includes('pdf') ? FileText : doc.mime_type?.includes('image') ? FileImage : File;
+                                    return (
+                                        <div key={doc.id} className="group relative flex flex-col items-center gap-2 rounded-xl border bg-card p-4 transition-colors hover:bg-muted/50">
+                                            <IconComp className={`h-8 w-8 ${iconClass}`} />
+                                            <p className="text-xs font-medium text-center truncate w-full">{doc.original_name}</p>
+                                            <div className="flex flex-wrap justify-center gap-1">
+                                                <Badge variant="outline" className="text-[10px]">{doc.category_label}</Badge>
+                                                {docExpired && <Badge variant="outline" className="text-[10px] border-red-200 bg-red-50 text-red-600">Expired</Badge>}
+                                            </div>
+                                            <p className="text-[10px] text-muted-foreground">{doc.formatted_size}</p>
+                                            {doc.notes && <p className="text-[10px] text-muted-foreground italic text-center truncate w-full">{doc.notes}</p>}
+                                            {/* Hover actions */}
+                                            <div className="absolute right-1 top-1 flex gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                                                <a href={`/hr/recruitment/documents/${doc.id}/download`}>
+                                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0"><Download className="h-3 w-3" /></Button>
+                                                </a>
+                                                {can.manage && (
+                                                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600" onClick={() => deleteDocument(doc.id)}>
+                                                        <Trash2 className="h-3 w-3" />
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
 
-                    {/* Sidebar */}
-                    <div className="space-y-4">
+                        {/* Upload Dialog */}
+                        <Dialog open={showUploadDialog} onOpenChange={v => !v && setShowUploadDialog(false)}>
+                            <DialogContent className="sm:max-w-lg">
+                                <DialogHeader>
+                                    <DialogTitle>Upload Document</DialogTitle>
+                                    <DialogDescription>Upload a document for {fullName}. Accepted formats: PDF, DOC, DOCX, JPG, PNG (max 20MB).</DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={(e) => { e.preventDefault(); handleDocumentUpload(e); setShowUploadDialog(false); }} className="space-y-4">
+                                    <div className="space-y-2">
+                                        <Label>File *</Label>
+                                        <div className="rounded-lg border-2 border-dashed border-muted-foreground/25 p-4 text-center hover:border-primary/50 transition-colors">
+                                            <Upload className="mx-auto h-8 w-8 text-muted-foreground/50 mb-2" />
+                                            <Input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png" className="mx-auto max-w-xs" onChange={(e) => documentForm.setData('file', e.target.files?.[0] ?? null)} />
+                                        </div>
+                                        {documentForm.errors.file && <p className="text-xs text-red-600">{documentForm.errors.file}</p>}
+                                    </div>
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        <div className="space-y-2">
+                                            <Label>Category *</Label>
+                                            <Select value={documentForm.data.category} onValueChange={(value) => documentForm.setData('category', value)}>
+                                                <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                                                <SelectContent>
+                                                    {Object.entries(documentCategories ?? {}).map(([key, label]) => (
+                                                        <SelectItem key={key} value={key}>{label as string}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                            {documentForm.errors.category && <p className="text-xs text-red-600">{documentForm.errors.category}</p>}
+                                        </div>
+                                        <div className="space-y-2">
+                                            <Label>Expiry Date</Label>
+                                            <Input type="date" value={documentForm.data.expires_at} onChange={(e) => documentForm.setData('expires_at', e.target.value)} />
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label>Notes</Label>
+                                        <Input placeholder="Brief description or context..." value={documentForm.data.notes} onChange={(e) => documentForm.setData('notes', e.target.value)} />
+                                    </div>
+                                    <DialogFooter>
+                                        <Button type="button" variant="outline" onClick={() => setShowUploadDialog(false)}>Cancel</Button>
+                                        <Button type="submit" disabled={!documentForm.data.file || !documentForm.data.category || documentForm.processing}>
+                                            {documentForm.processing ? 'Uploading...' : 'Upload'}
+                                        </Button>
+                                    </DialogFooter>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                    </TabsContent>
+
+                    {/* Timeline Tab */}
+                    <TabsContent value="timeline" className="space-y-4">
                         <Card>
-                            <CardHeader className="pb-2">
-                                <CardTitle className="text-sm">Quick Details</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3 text-sm">
-                                <div>
-                                    <span className="text-xs text-muted-foreground block">Status</span>
-                                    <StatusBadge status={currentStatus} />
-                                </div>
-                                <div>
-                                    <span className="text-xs text-muted-foreground block">Source</span>
-                                    <span className="capitalize">{candidate.source.replace(/_/g, ' ')}</span>
-                                    {candidate.source_detail && <span className="text-muted-foreground"> ({candidate.source_detail})</span>}
-                                </div>
-                                <div>
-                                    <span className="text-xs text-muted-foreground block">Created</span>
-                                    {new Date(candidate.created_at).toLocaleDateString('en-NZ', { year: 'numeric', month: 'long', day: 'numeric' })}
-                                </div>
-                                <div>
-                                    <span className="text-xs text-muted-foreground block">Days in Pipeline</span>
-                                    {totalDaysInPipeline ?? Math.round((Date.now() - new Date(candidate.created_at).getTime()) / 86400000)} days
-                                </div>
-                                <div>
-                                    <span className="text-xs text-muted-foreground block">Applications</span>
-                                    {candidate.applications.length}
-                                </div>
-                                <div>
-                                    <span className="text-xs text-muted-foreground block">Interviews</span>
-                                    {candidate.applications.reduce((sum, app) => sum + app.interviews.length, 0)}
-                                </div>
+                            <CardHeader><CardTitle className="text-base">Activity Timeline</CardTitle></CardHeader>
+                            <CardContent>
+                                {activityLog && activityLog.length > 0 ? (
+                                    <div className="space-y-0">
+                                        {activityLog.map((entry, i) => (
+                                            <ActivityItem key={i} type={entry.type} description={entry.description} timestamp={entry.timestamp} actor={entry.actor} />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground">No activity recorded yet.</p>
+                                )}
                             </CardContent>
                         </Card>
+                    </TabsContent>
 
-                        {can.manage && (
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm">Actions</CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                    <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                                        <Link href={`/hr/recruitment/candidates/${candidate.id}`}>
-                                            <Mail className="mr-2 h-3.5 w-3.5" /> Email Candidate
-                                        </Link>
-                                    </Button>
-                                    {candidate.applications[0] && (
-                                        <>
-                                            <Button variant="outline" size="sm" className="w-full justify-start"
-                                                onClick={() => advanceStage(candidate.applications[0].id)}>
-                                                <ArrowRight className="mr-2 h-3.5 w-3.5" /> Advance Stage
-                                            </Button>
-                                            <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                                                <Link href={`/hr/recruitment/applications/${candidate.applications[0].id}/scorecard-summary`}>
-                                                    <Star className="mr-2 h-3.5 w-3.5" /> View Scorecards
-                                                </Link>
-                                            </Button>
-                                        </>
-                                    )}
-                                </CardContent>
-                            </Card>
-                        )}
-                    </div>
-                </div>
+                    {/* Notes Tab */}
+                    <TabsContent value="notes" className="space-y-4">
+                        <Card>
+                            <CardHeader><CardTitle className="text-base">Candidate Notes</CardTitle></CardHeader>
+                            <CardContent className="space-y-4">
+                                {candidate.notes && (
+                                    <div className="rounded-lg bg-muted/50 p-4 text-sm whitespace-pre-wrap">{candidate.notes}</div>
+                                )}
+                                {can.manage && (
+                                    <div className="space-y-2">
+                                        <Textarea placeholder="Add a note..." value={noteText} onChange={(e) => setNoteText(e.target.value)} rows={3} />
+                                        <Button size="sm" disabled={!noteText.trim()} onClick={() => {
+                                            router.put(`/hr/recruitment/candidates/${candidate.id}`, { notes: (candidate.notes ? candidate.notes + '\n\n' : '') + noteText.trim() }, { preserveScroll: true, onSuccess: () => setNoteText('') });
+                                        }}>
+                                            <MessageSquare className="mr-1 h-3.5 w-3.5" /> Add Note
+                                        </Button>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </TabsContent>
+                </Tabs>
             </div>
         </AppLayout>
     );

@@ -139,6 +139,13 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/recruitment/applications/{application}/reject', [CandidateController::class, 'rejectApplication'])->name('applications.reject')
             ->middleware('permission:hr.recruitment.manage');
 
+        // Candidate Documents
+        Route::post('/recruitment/candidates/{candidate}/documents', [CandidateController::class, 'storeDocument'])->name('candidate.documents.store')
+            ->middleware('permission:hr.recruitment.manage');
+        Route::get('/recruitment/documents/{document}/download', [CandidateController::class, 'downloadDocument'])->name('candidate.documents.download');
+        Route::delete('/recruitment/documents/{document}', [CandidateController::class, 'destroyDocument'])->name('candidate.documents.destroy')
+            ->middleware('permission:hr.recruitment.manage');
+
         // Offers
         Route::get('/recruitment/applications/{application}/offer/create', [CandidateController::class, 'createOffer'])->name('offers.create')
             ->middleware('permission:hr.recruitment.manage');
@@ -146,6 +153,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/send', [CandidateController::class, 'sendOffer'])->name('offers.send')
             ->middleware('permission:hr.recruitment.manage');
+        Route::get('/recruitment/offers/{offer}/letter', [CandidateController::class, 'downloadOfferLetter'])->name('offers.letter');
         Route::post('/recruitment/offers/{offer}/approve', [CandidateController::class, 'approveOffer'])->name('offers.approve')
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/offers/{offer}/respond', [CandidateController::class, 'respondOffer'])->name('offers.respond')
@@ -600,8 +608,12 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::put('/{posting}', [JobPostingController::class, 'update'])->name('update');
             Route::post('/{posting}/publish', [JobPostingController::class, 'publish'])->name('publish');
             Route::post('/{posting}/close', [JobPostingController::class, 'close'])->name('close');
+            Route::post('/{posting}/duplicate', [JobPostingController::class, 'duplicate'])->name('duplicate');
+            Route::post('/{posting}/approve', [JobPostingController::class, 'approve'])->name('approve');
+            Route::post('/{posting}/reject-approval', [JobPostingController::class, 'rejectApproval'])->name('reject-approval');
         });
 
+        Route::get('/{posting}/preview', [JobPostingController::class, 'preview'])->name('preview');
         Route::get('/{posting}', [JobPostingController::class, 'show'])->name('show');
     });
 
@@ -753,6 +765,11 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/', [GoalController::class, 'store'])->name('store');
             Route::put('/{goal}', [GoalController::class, 'update'])->name('update');
             Route::post('/{goal}/progress', [GoalController::class, 'updateProgress'])->name('progress');
+
+            // Key Results
+            Route::post('/{goal}/key-results', [GoalController::class, 'storeKeyResult'])->name('key-results.store');
+            Route::put('/key-results/{keyResult}', [GoalController::class, 'updateKeyResult'])->name('key-results.update');
+            Route::delete('/key-results/{keyResult}', [GoalController::class, 'destroyKeyResult'])->name('key-results.destroy');
         });
 
         Route::get('/{goal}', [GoalController::class, 'show'])->name('show');

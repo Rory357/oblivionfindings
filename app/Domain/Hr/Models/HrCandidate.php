@@ -49,6 +49,11 @@ class HrCandidate extends Model
         return $this->hasMany(HrApplication::class, 'candidate_id');
     }
 
+    public function documents(): HasMany
+    {
+        return $this->hasMany(HrCandidateDocument::class, 'candidate_id');
+    }
+
     public function creator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

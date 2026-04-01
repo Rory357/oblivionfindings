@@ -15,6 +15,7 @@ type KanbanCard = {
     name: string;
     email?: string;
     position: string;
+    job_posting_title?: string | null;
     days_in_stage: number;
     source: string;
     created_at: string;
@@ -106,6 +107,7 @@ export default function RecruitmentKanban({ columns, stages, can }: Props) {
                                                 id={card.id}
                                                 name={card.name}
                                                 position={card.position}
+                                                jobPostingTitle={card.job_posting_title}
                                                 daysInStage={card.days_in_stage}
                                                 source={card.source}
                                                 email={card.email}

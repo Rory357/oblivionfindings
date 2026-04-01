@@ -20,14 +20,43 @@ class PipController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
 
-        $pips = HrPerformanceImprovementPlan::with(['employee:id,name', 'manager:id,name'])
+        $pips = HrPerformanceImprovementPlan::with(['employeeProfile.user:id,name', 'manager:id,name'])
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
 
+        // Transform to provide employee from profile
+        $pips->through(fn ($pip) => [
+            'id' => $pip->id,
+            'title' => $pip->title,
+            'status' => $pip->status,
+            'start_date' => $pip->start_date,
+            'end_date' => $pip->end_date,
+            'outcome' => $pip->outcome_notes,
+            'employee' => $pip->employeeProfile?->user
+                ? ['id' => $pip->employeeProfile->user->id, 'name' => $pip->employeeProfile->user->name]
+                : null,
+            'manager' => $pip->manager
+                ? ['id' => $pip->manager->id, 'name' => $pip->manager->name]
+                : null,
+        ]);
+
+        // Stats
+        $statusCounts = HrPerformanceImprovementPlan::selectRaw('status, COUNT(*) as cnt')
+            ->groupBy('status')
+            ->pluck('cnt', 'status');
+
+        $stats = [
+            'active' => (int) (($statusCounts['active'] ?? 0) + ($statusCounts['in_progress'] ?? 0)),
+            'completed' => (int) ($statusCounts['completed'] ?? 0),
+            'cancelled' => (int) ($statusCounts['cancelled'] ?? 0),
+            'total' => (int) $statusCounts->sum(),
+        ];
+
         return Inertia::render('hr/performance/pips/index', [
             'pips' => $pips,
+            'stats' => $stats,
             'filters' => [
                 'status' => $request->query('status'),
             ],

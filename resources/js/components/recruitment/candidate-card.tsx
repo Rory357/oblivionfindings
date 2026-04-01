@@ -7,6 +7,7 @@ interface CandidateCardProps {
     id: number;
     name: string;
     position: string;
+    jobPostingTitle?: string | null;
     daysInStage: number;
     source: string;
     email?: string;
@@ -23,7 +24,7 @@ function getInitials(name: string) {
     return (parts[0]?.[0] ?? '') + (parts[1]?.[0] ?? '');
 }
 
-export function CandidateCard({ id, name, position, daysInStage, source, email }: CandidateCardProps) {
+export function CandidateCard({ id, name, position, jobPostingTitle, daysInStage, source, email }: CandidateCardProps) {
     return (
         <Link href={`/hr/recruitment/candidates/${id}`} className="block">
             <Card className="hover:bg-muted/50 hover:shadow-md transition-all cursor-pointer group">
@@ -35,6 +36,9 @@ export function CandidateCard({ id, name, position, daysInStage, source, email }
                         <div className="min-w-0 flex-1">
                             <p className="font-medium text-sm truncate group-hover:text-primary transition-colors">{name}</p>
                             <p className="text-xs text-muted-foreground truncate">{position}</p>
+                            {jobPostingTitle && (
+                                <p className="text-[10px] text-primary/70 truncate">{jobPostingTitle}</p>
+                            )}
                             {email && (
                                 <p className="text-xs text-muted-foreground truncate flex items-center gap-1 mt-0.5">
                                     <Mail className="h-2.5 w-2.5 shrink-0" />

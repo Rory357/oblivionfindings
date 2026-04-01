@@ -78,6 +78,9 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                     </div>
 
                     <div className="flex gap-2">
+                        <Link href="/hr/performance">
+                            <Button size="sm" variant="outline">Dashboard</Button>
+                        </Link>
                         {can.manage && (
                             <>
                                 <Button size="sm" asChild variant="outline">
@@ -93,6 +96,37 @@ export default function CompetencyIndex({ competencies, grouped, staff, can }: P
                             </>
                         )}
                     </div>
+                </div>
+
+                {/* KPI Summary Cards */}
+                <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
+                    <Card className="border-l-4 border-l-blue-500 bg-blue-50/40">
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-medium text-blue-700">Total Competencies</p>
+                                <div className="rounded-full bg-blue-100 p-1.5"><Target className="h-4 w-4 text-blue-600" /></div>
+                            </div>
+                            <span className="mt-1.5 block text-2xl font-bold text-blue-900">{competencies.length}</span>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-l-4 border-l-purple-500 bg-purple-50/40">
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-medium text-purple-700">Categories</p>
+                                <div className="rounded-full bg-purple-100 p-1.5"><Target className="h-4 w-4 text-purple-600" /></div>
+                            </div>
+                            <span className="mt-1.5 block text-2xl font-bold text-purple-900">{categories.length}</span>
+                        </CardContent>
+                    </Card>
+                    <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/40">
+                        <CardContent className="p-4">
+                            <div className="flex items-center justify-between">
+                                <p className="text-xs font-medium text-emerald-700">Staff Profiles</p>
+                                <div className="rounded-full bg-emerald-100 p-1.5"><Users className="h-4 w-4 text-emerald-600" /></div>
+                            </div>
+                            <span className="mt-1.5 block text-2xl font-bold text-emerald-900">{staff.length}</span>
+                        </CardContent>
+                    </Card>
                 </div>
 
                 {showForm && (

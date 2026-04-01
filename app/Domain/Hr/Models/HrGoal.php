@@ -74,6 +74,11 @@ class HrGoal extends Model
         return $this->hasMany(HrGoalUpdate::class, 'goal_id');
     }
 
+    public function keyResults(): HasMany
+    {
+        return $this->hasMany(HrKeyResult::class, 'goal_id');
+    }
+
     public function performanceReview(): BelongsTo
     {
         return $this->belongsTo(HrPerformanceReview::class, 'performance_review_id');

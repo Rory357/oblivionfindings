@@ -25,10 +25,16 @@ class PerformanceReviewController extends Controller
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
+        $search = trim((string) $request->query('q', ''));
+
         $reviews = HrPerformanceReview::with(['employee:id,name', 'reviewer:id,name'])
             ->where('tenant_id', $tenantId)
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->query('employee'), fn ($q, $empId) => $q->where('employee_user_id', $empId))
+            ->when($search !== '', fn ($q) => $q->where(function ($q2) use ($search) {
+                $q2->whereHas('employee', fn ($e) => $e->where('name', 'like', "%{$search}%"))
+                   ->orWhereHas('reviewer', fn ($e) => $e->where('name', 'like', "%{$search}%"));
+            }))
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
@@ -39,12 +45,53 @@ class PerformanceReviewController extends Controller
             ->limit(20)
             ->get();
 
+        // Summary stats
+        $allReviews = HrPerformanceReview::where('tenant_id', $tenantId);
+        $totalCount = (clone $allReviews)->count();
+        $completedCount = (clone $allReviews)->whereIn('status', ['completed', 'signed_off'])->count();
+        $overdueCount = (clone $allReviews)->whereIn('status', ['draft', 'scheduled', 'in_progress'])
+            ->whereNotNull('next_review_date')
+            ->where('next_review_date', '<', now())
+            ->count();
+        $draftCount = (clone $allReviews)->where('status', 'draft')->count();
+
+        // Rating distribution
+        $ratingDistribution = HrPerformanceReview::where('tenant_id', $tenantId)
+            ->whereIn('status', ['completed', 'signed_off'])
+            ->whereNotNull('overall_rating')
+            ->selectRaw('overall_rating as rating, COUNT(*) as count')
+            ->groupBy('overall_rating')
+            ->orderBy('overall_rating')
+            ->pluck('count', 'rating');
+
+        $ratingData = collect(range(1, 5))->map(fn ($r) => [
+            'rating' => $r,
+            'count' => (int) ($ratingDistribution[$r] ?? 0),
+        ]);
+
+        // Status distribution
+        $statusDistribution = HrPerformanceReview::where('tenant_id', $tenantId)
+            ->selectRaw('status, COUNT(*) as count')
+            ->groupBy('status')
+            ->pluck('count', 'status');
+
         return Inertia::render('hr/performance/reviews', [
             'reviews' => $reviews,
             'probationReviews' => $probationReviews,
+            'stats' => [
+                'total' => $totalCount,
+                'completed' => $completedCount,
+                'overdue' => $overdueCount,
+                'draft' => $draftCount,
+            ],
+            'ratingDistribution' => $ratingData,
+            'statusDistribution' => collect($statusDistribution)->map(fn ($count, $status) => [
+                'status' => $status,
+                'count' => (int) $count,
+            ])->values(),
             'filters' => [
                 'status' => $request->query('status'),
-                'employee' => $request->query('employee'),
+                'q' => $search,
             ],
             'can' => [
                 'manage' => $user->canDo('hr.performance.manage'),

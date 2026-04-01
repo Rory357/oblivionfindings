@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrCandidateDocument;
 use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrInterviewScore;
 use App\Domain\Hr\Models\HrOffer;
@@ -153,12 +154,14 @@ class CandidateController extends Controller
 
         $candidate->load([
             'applications.targetSite:id,name',
+            'applications.jobPosting:id,title,slug,department,location',
             'applications.interviewKit:id,name,role,criteria',
             'applications.interviews.completedBy:id,name',
             'applications.interviews.scores.interviewer:id,name',
             'applications.referenceChecks',
             'applications.offer.approvedBy:id,name',
             'applications.offer.primarySite:id,name',
+            'documents.uploader:id,name',
             'creator:id,name',
         ]);
 
@@ -189,6 +192,16 @@ class CandidateController extends Controller
                     'position_role' => $application->position_role,
                     'stage' => $candidateStage,
                     'status' => $status,
+                    'job_posting' => $application->jobPosting ? [
+                        'id' => $application->jobPosting->id,
+                        'title' => $application->jobPosting->title,
+                        'slug' => $application->jobPosting->slug,
+                        'department' => $application->jobPosting->department,
+                        'location' => $application->jobPosting->location,
+                    ] : null,
+                    'cover_letter' => $application->cover_letter,
+                    'screening_answers' => $application->screening_answers,
+                    'cv_original_name' => $application->cv_original_name,
                     'interview_kit' => $application->interviewKit ? [
                         'id' => $application->interviewKit->id,
                         'name' => $application->interviewKit->name,
@@ -248,6 +261,8 @@ class CandidateController extends Controller
                         'response_notes' => $application->offer->response_notes,
                         'signed_full_name' => $application->offer->signed_full_name,
                         'signed_at' => optional($application->offer->signed_at)->toDateTimeString(),
+                        'offer_letter_name' => $application->offer->offer_letter_name,
+                        'offer_letter_id' => $application->offer->offer_letter_path ? $application->offer->id : null,
                         'portal_url' => $application->offer->candidate_portal_token
                             ? route('careers.offer.show', ['token' => $application->offer->candidate_portal_token])
                             : null,
@@ -292,8 +307,25 @@ class CandidateController extends Controller
             }
         }
 
+        $documents = $candidate->documents->map(fn (HrCandidateDocument $doc) => [
+            'id' => $doc->id,
+            'category' => $doc->category,
+            'category_label' => $doc->category_label,
+            'title' => $doc->title,
+            'original_name' => $doc->original_name,
+            'mime_type' => $doc->mime_type,
+            'formatted_size' => $doc->formatted_size,
+            'uploaded_by' => $doc->uploader?->name,
+            'notes' => $doc->notes,
+            'expires_at' => $doc->expires_at?->toDateString(),
+            'is_expired' => $doc->isExpired(),
+            'created_at' => $doc->created_at?->toDateString(),
+        ])->values();
+
         return Inertia::render('hr/candidates/show', [
             'candidate' => $candidateData,
+            'documents' => $documents,
+            'documentCategories' => HrCandidateDocument::CATEGORIES,
             'activityLog' => $activityLog,
             'totalDaysInPipeline' => $candidate->created_at ? (int) $candidate->created_at->diffInDays(now()) : 0,
             'stages' => RecruitmentService::STAGES,
@@ -584,7 +616,14 @@ class CandidateController extends Controller
         $this->assertHrTenantAccess($tenantId, $application->tenant_id);
 
 
-        $application->load('candidate:id,first_name,last_name,personal_email');
+        $application->load([
+            'candidate.documents',
+            'jobPosting:id,title,department,location,salary_range_min,salary_range_max,show_salary',
+            'interviews.scores',
+            'referenceChecks',
+        ]);
+
+        $candidate = $application->candidate;
 
         $sites = Site::query()
             ->when($tenantId !== null, fn ($query) => $query->where('tenant_id', $tenantId))
@@ -600,13 +639,42 @@ class CandidateController extends Controller
                 'id' => $application->id,
                 'position_title' => $application->position_title,
                 'position_role' => $application->position_role,
-                'stage' => $application->candidate?->status,
+                'stage' => $candidate?->status,
                 'candidate' => [
-                    'id' => $application->candidate?->id,
-                    'first_name' => $application->candidate?->first_name,
-                    'last_name' => $application->candidate?->last_name,
-                    'personal_email' => $application->candidate?->personal_email,
+                    'id' => $candidate?->id,
+                    'first_name' => $candidate?->first_name,
+                    'last_name' => $candidate?->last_name,
+                    'personal_email' => $candidate?->personal_email,
+                    'personal_phone' => $candidate?->personal_phone,
+                    'source' => $candidate?->source,
                 ],
+                'job_posting' => $application->jobPosting ? [
+                    'title' => $application->jobPosting->title,
+                    'department' => $application->jobPosting->department,
+                    'location' => $application->jobPosting->location,
+                    'salary_range_min' => $application->jobPosting->salary_range_min,
+                    'salary_range_max' => $application->jobPosting->salary_range_max,
+                    'show_salary' => $application->jobPosting->show_salary,
+                ] : null,
+                'interviews' => $application->interviews->map(fn ($i) => [
+                    'type' => $i->interview_type,
+                    'status' => $i->status,
+                    'rating' => $i->rating,
+                    'outcome' => $i->outcome,
+                    'scores' => $i->scores->map(fn ($s) => [
+                        'overall_score' => $s->overall_score ? (float) $s->overall_score : null,
+                        'recommendation' => $s->recommendation,
+                    ])->values(),
+                ])->values(),
+                'reference_checks' => $application->referenceChecks->map(fn ($r) => [
+                    'referee_name' => $r->referee_name,
+                    'status' => $r->status,
+                ])->values(),
+                'documents' => $candidate?->documents?->map(fn ($d) => [
+                    'category' => $d->category,
+                    'category_label' => $d->category_label,
+                    'original_name' => $d->original_name,
+                ])->values() ?? [],
             ],
             'sites' => $sites,
             'roles' => $roles,
@@ -638,6 +706,7 @@ class CandidateController extends Controller
             'annual_salary'      => ['nullable', 'numeric', 'min:0'],
             'primary_site_id'    => ['required', 'integer', $siteRule],
             'conditions'         => ['nullable', 'string', 'max:5000'],
+            'offer_letter'       => ['nullable', 'file', 'mimes:pdf,doc,docx', 'max:20480'],
         ]);
 
         $application = HrApplication::query()
@@ -656,6 +725,15 @@ class CandidateController extends Controller
             return redirect()->back()->with('error', 'An offer already exists for this application.');
         }
 
+        // Handle offer letter upload
+        $letterPath = null;
+        $letterName = null;
+        if ($request->hasFile('offer_letter')) {
+            $file = $request->file('offer_letter');
+            $letterPath = $file->store("offers/{$application->id}", 'private');
+            $letterName = $file->getClientOriginalName();
+        }
+
         HrOffer::create([
             'application_id'      => $application->id,
             'position_title'      => $validated['position_title'],
@@ -667,6 +745,8 @@ class CandidateController extends Controller
             'annual_salary'       => $validated['annual_salary'] ?? null,
             'primary_site_id'     => $validated['primary_site_id'],
             'conditions'          => $validated['conditions'] ?? null,
+            'offer_letter_path'   => $letterPath,
+            'offer_letter_name'   => $letterName,
             'approval_status'     => 'draft',
             'created_by'          => $user->id,
         ]);
@@ -733,6 +813,19 @@ class CandidateController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Offer sent to candidate.');
+    }
+
+    public function downloadOfferLetter(Request $request, HrOffer $offer)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
+
+        abort_unless($offer->offer_letter_path, 404);
+
+        $disk = \Illuminate\Support\Facades\Storage::disk('private');
+        abort_unless($disk->exists($offer->offer_letter_path), 404);
+
+        return $disk->download($offer->offer_letter_path, $offer->offer_letter_name ?? 'offer-letter.pdf');
     }
 
     public function approveOffer(Request $request, HrOffer $offer)
@@ -982,5 +1075,71 @@ class CandidateController extends Controller
         $weightedTotal = (float) $weighted->sum(fn (array $row) => $row['score'] * $row['weight']);
 
         return round($weightedTotal / $totalWeight, 2);
+    }
+
+    /* ================================================================== */
+    /*  CANDIDATE DOCUMENTS                                                */
+    /* ================================================================== */
+
+    public function storeDocument(Request $request, HrCandidate $candidate)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $candidate->tenant_id);
+
+        $validated = $request->validate([
+            'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,jpg,jpeg,png'],
+            'category' => ['required', 'string', Rule::in(array_keys(HrCandidateDocument::CATEGORIES))],
+            'notes' => ['nullable', 'string', 'max:500'],
+            'expires_at' => ['nullable', 'date'],
+        ]);
+
+        $file = $request->file('file');
+        $path = $file->store("candidates/{$candidate->id}/documents", 'private');
+
+        $categoryLabel = HrCandidateDocument::CATEGORIES[$validated['category']] ?? $validated['category'];
+
+        HrCandidateDocument::create([
+            'tenant_id' => $candidate->tenant_id,
+            'candidate_id' => $candidate->id,
+            'category' => $validated['category'],
+            'title' => $categoryLabel . ' - ' . $file->getClientOriginalName(),
+            'storage_path' => $path,
+            'original_name' => $file->getClientOriginalName(),
+            'mime_type' => $file->getMimeType(),
+            'size_bytes' => $file->getSize(),
+            'uploaded_by' => $user->id,
+            'notes' => $validated['notes'] ?? null,
+            'expires_at' => $validated['expires_at'] ?? null,
+        ]);
+
+        return redirect()->back()->with('success', 'Document uploaded.');
+    }
+
+    public function downloadDocument(Request $request, HrCandidateDocument $document)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
+
+        $disk = \Illuminate\Support\Facades\Storage::disk('private');
+        abort_unless($disk->exists($document->storage_path), 404);
+
+        return $disk->download($document->storage_path, $document->original_name);
+    }
+
+    public function destroyDocument(Request $request, HrCandidateDocument $document)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.recruitment.manage'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $this->assertHrTenantAccess($tenantId, $document->tenant_id);
+
+        \Illuminate\Support\Facades\Storage::disk('private')->delete($document->storage_path);
+        $document->delete();
+
+        return redirect()->back()->with('success', 'Document deleted.');
     }
 }

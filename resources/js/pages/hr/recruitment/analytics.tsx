@@ -5,7 +5,7 @@ import { Head, Link } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { KpiCard } from '@/components/recruitment/kpi-card';
 import { stageLabels, statusConfig } from '@/components/recruitment/status-badge';
 import { Users, Clock, TrendingUp, Briefcase, ArrowLeft } from 'lucide-react';

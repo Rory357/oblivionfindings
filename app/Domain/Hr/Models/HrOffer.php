@@ -25,6 +25,8 @@ class HrOffer extends Model
         'annual_salary',
         'primary_site_id',
         'conditions',
+        'offer_letter_path',
+        'offer_letter_name',
         'approval_status',
         'approved_by',
         'approved_at',

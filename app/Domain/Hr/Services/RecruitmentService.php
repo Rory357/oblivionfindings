@@ -209,6 +209,7 @@ class RecruitmentService
         }
 
         return DB::transaction(function () use ($candidate, $offer, $convertedBy) {
+            $candidate->loadMissing('documents');
             $workEmail = $offer->work_email ?: $candidate->personal_email;
             $user = User::query()->firstOrCreate(
                 ['email' => $workEmail],
@@ -248,10 +249,56 @@ class RecruitmentService
             $this->advanceStage($candidate, 'hired', $convertedBy);
             $offer->application()->update(['status' => 'hired']);
 
+            // Copy candidate documents to employee documents
+            $this->transferCandidateDocuments($candidate, $profile, $convertedBy);
+
             $this->onboardingService->generateChecklist($profile, $convertedBy);
 
             return $profile->fresh();
         });
+    }
+
+    /**
+     * Copy candidate recruitment documents to the employee profile's HR documents.
+     */
+    protected function transferCandidateDocuments(HrCandidate $candidate, HrEmployeeProfile $profile, int $createdBy): void
+    {
+        $candidateDocs = $candidate->documents ?? collect();
+        if ($candidateDocs->isEmpty()) {
+            return;
+        }
+
+        // Map candidate document categories to HrDocument categories
+        $categoryMap = [
+            'cv' => 'other',
+            'cover_letter' => 'other',
+            'qualification' => 'certificate',
+            'certification' => 'certificate',
+            'police_vetting' => 'certificate',
+            'first_aid' => 'certificate',
+            'driver_licence' => 'certificate',
+            'reference_letter' => 'other',
+            'portfolio' => 'other',
+            'other' => 'other',
+        ];
+
+        foreach ($candidateDocs as $doc) {
+            \App\Domain\Hr\Models\HrDocument::create([
+                'tenant_id' => $profile->tenant_id,
+                'employee_profile_id' => $profile->id,
+                'title' => $doc->title ?: ($doc->category_label . ' - ' . $doc->original_name),
+                'category' => $categoryMap[$doc->category] ?? 'other',
+                'folder' => 'Recruitment',
+                'storage_disk' => 'private',
+                'storage_path' => $doc->storage_path,
+                'original_name' => $doc->original_name,
+                'mime_type' => $doc->mime_type,
+                'size_bytes' => $doc->size_bytes,
+                'expires_at' => $doc->expires_at,
+                'created_by' => $createdBy,
+                'uploaded_by' => $doc->uploaded_by,
+            ]);
+        }
     }
 
     /**

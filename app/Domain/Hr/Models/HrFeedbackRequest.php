@@ -19,6 +19,8 @@ class HrFeedbackRequest extends Model
         'reviewer_user_id',
         'review_type',
         'performance_review_id',
+        'template_id',
+        'questions_snapshot',
         'status',
         'due_date',
         'completed_at',
@@ -27,6 +29,7 @@ class HrFeedbackRequest extends Model
     protected $casts = [
         'due_date' => 'date',
         'completed_at' => 'datetime',
+        'questions_snapshot' => 'array',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -51,6 +54,23 @@ class HrFeedbackRequest extends Model
     public function performanceReview(): BelongsTo
     {
         return $this->belongsTo(HrPerformanceReview::class, 'performance_review_id');
+    }
+
+    public function template(): BelongsTo
+    {
+        return $this->belongsTo(HrFeedbackTemplate::class, 'template_id');
+    }
+
+    /**
+     * Get the questions for this request (from snapshot or fallback to standard).
+     */
+    public function getQuestionsMap(): array
+    {
+        if ($this->questions_snapshot) {
+            return collect($this->questions_snapshot)->pluck('question', 'key')->all();
+        }
+
+        return \App\Domain\Hr\Services\FeedbackService::FEEDBACK_QUESTIONS;
     }
 
     public function responses(): HasMany

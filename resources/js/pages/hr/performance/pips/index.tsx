@@ -1,14 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
-import PageHeader from '@/components/page-header';
 import { Head, Link, router } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Plus, ClipboardList } from 'lucide-react';
+import { Plus, ShieldAlert, CheckCircle, XCircle, AlertTriangle } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
+import { PieChart, Pie, Cell, Tooltip } from 'recharts';
 
 interface Pip {
     id: number;
@@ -23,6 +22,7 @@ interface Pip {
 
 interface Props {
     pips: { data: Pip[]; links: any[] };
+    stats?: { active: number; completed: number; cancelled: number; total: number };
     filters: { status: string | null };
     can: { manage: boolean };
 }
@@ -46,16 +46,24 @@ const outcomeColors: Record<string, string> = {
     extended: 'bg-yellow-100 text-yellow-800',
 };
 
+const PIP_COLORS = { active: '#ef4444', completed: '#10b981', cancelled: '#94a3b8' };
+
 const formatDate = (value?: string | null) => {
     if (!value) return '-';
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short', year: 'numeric' });
 };
 
-export default function PipIndex({ pips, filters, can }: Props) {
+export default function PipIndex({ pips, stats, filters, can }: Props) {
     const onFilter = (next: Partial<typeof filters>) => {
         router.get('/hr/performance/pips', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
     };
+
+    const pieData = stats ? [
+        { name: 'Active', value: stats.active, color: PIP_COLORS.active },
+        { name: 'Completed', value: stats.completed, color: PIP_COLORS.completed },
+        { name: 'Cancelled', value: stats.cancelled, color: PIP_COLORS.cancelled },
+    ].filter((d) => d.value > 0) : [];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -65,31 +73,87 @@ export default function PipIndex({ pips, filters, can }: Props) {
                 <div className="flex items-start justify-between gap-3">
                     <div>
                         <h1 className="text-lg font-semibold">Performance Improvement Plans</h1>
-                        <div className="mt-1 text-sm text-slate-500">
-                            Manage and track employee improvement plans
-                        </div>
+                        <p className="mt-0.5 text-sm text-slate-500">Manage and track employee improvement plans</p>
                     </div>
-
-                    {can.manage && (
-                        <Button size="sm" asChild>
-                            <Link href="/hr/performance/pips/create">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New PIP
-                            </Link>
-                        </Button>
-                    )}
+                    <div className="flex items-center gap-2">
+                        <Link href="/hr/performance">
+                            <Button size="sm" variant="outline">Dashboard</Button>
+                        </Link>
+                        {can.manage && (
+                            <Button size="sm" asChild>
+                                <Link href="/hr/performance/pips/create"><Plus className="mr-1.5 h-4 w-4" /> New PIP</Link>
+                            </Button>
+                        )}
+                    </div>
                 </div>
 
+                {/* KPI Cards + Chart */}
+                {stats && (
+                    <div className="grid gap-4 lg:grid-cols-5">
+                        <Card className="border-l-4 border-l-red-500 bg-red-50/40">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs font-medium text-red-700">Active</p>
+                                    <div className="rounded-full bg-red-100 p-1.5"><AlertTriangle className="h-4 w-4 text-red-600" /></div>
+                                </div>
+                                <span className="mt-1.5 block text-2xl font-bold text-red-800">{stats.active}</span>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-l-4 border-l-emerald-500 bg-emerald-50/40">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs font-medium text-emerald-700">Completed</p>
+                                    <div className="rounded-full bg-emerald-100 p-1.5"><CheckCircle className="h-4 w-4 text-emerald-600" /></div>
+                                </div>
+                                <span className="mt-1.5 block text-2xl font-bold text-emerald-900">{stats.completed}</span>
+                            </CardContent>
+                        </Card>
+                        <Card className="border-l-4 border-l-orange-400 bg-orange-50/40">
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs font-medium text-orange-700">Cancelled</p>
+                                    <div className="rounded-full bg-orange-100 p-1.5"><XCircle className="h-4 w-4 text-orange-500" /></div>
+                                </div>
+                                <span className="mt-1.5 block text-2xl font-bold text-orange-800">{stats.cancelled}</span>
+                            </CardContent>
+                        </Card>
+                        {pieData.length > 0 && (
+                            <Card className="lg:col-span-2">
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="text-sm font-medium">Status Breakdown</CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex items-center gap-4">
+                                        <div className="flex-shrink-0" style={{ width: 120, height: 120, minWidth: 120 }}>
+                                            <PieChart width={120} height={120}>
+                                                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={55} innerRadius={35} paddingAngle={2}>
+                                                    {pieData.map((entry, idx) => <Cell key={idx} fill={entry.color} />)}
+                                                </Pie>
+                                                <Tooltip />
+                                            </PieChart>
+                                        </div>
+                                        <div className="space-y-1.5 text-sm">
+                                            {pieData.map((d) => (
+                                                <div key={d.name} className="flex items-center gap-2">
+                                                    <div className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                                                    <span className="text-slate-600">{d.name}: <span className="font-medium">{d.value}</span></span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                )}
+
                 <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">Filters</CardTitle>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Filters</CardTitle>
                     </CardHeader>
                     <CardContent>
                         <div className="max-w-xs">
-                            <Select
-                                value={filters.status || 'all'}
-                                onValueChange={(val) => onFilter({ status: val === 'all' ? null : val })}
-                            >
+                            <Select value={filters.status || 'all'} onValueChange={(val) => onFilter({ status: val === 'all' ? null : val })}>
                                 <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="all">All Statuses</SelectItem>
@@ -118,33 +182,19 @@ export default function PipIndex({ pips, filters, can }: Props) {
                             </TableHeader>
                             <TableBody>
                                 {pips.data.length === 0 && (
-                                    <TableRow>
-                                        <TableCell colSpan={6} className="text-center text-slate-400">No PIPs found</TableCell>
-                                    </TableRow>
+                                    <TableRow><TableCell colSpan={6} className="text-center text-slate-400 py-8">No PIPs found</TableCell></TableRow>
                                 )}
                                 {pips.data.map((pip) => (
                                     <TableRow key={pip.id}>
                                         <TableCell>
-                                            <Link href={`/hr/performance/pips/${pip.id}`} className="font-medium text-blue-600 hover:underline">
-                                                {pip.title}
-                                            </Link>
+                                            <Link href={`/hr/performance/pips/${pip.id}`} className="font-medium text-blue-600 hover:underline">{pip.title}</Link>
                                         </TableCell>
                                         <TableCell>{pip.employee?.name ?? '-'}</TableCell>
                                         <TableCell>{pip.manager?.name ?? '-'}</TableCell>
-                                        <TableCell className="text-sm text-slate-500">
-                                            {formatDate(pip.start_date)} - {formatDate(pip.end_date)}
-                                        </TableCell>
+                                        <TableCell className="text-sm text-slate-500">{formatDate(pip.start_date)} - {formatDate(pip.end_date)}</TableCell>
+                                        <TableCell><Badge className={statusColors[pip.status] || 'bg-slate-100'} variant="outline">{pip.status.replace('_', ' ')}</Badge></TableCell>
                                         <TableCell>
-                                            <Badge className={statusColors[pip.status] || 'bg-slate-100'} variant="outline">
-                                                {pip.status.replace('_', ' ')}
-                                            </Badge>
-                                        </TableCell>
-                                        <TableCell>
-                                            {pip.outcome ? (
-                                                <Badge className={outcomeColors[pip.outcome] || 'bg-slate-100'} variant="outline">
-                                                    {pip.outcome}
-                                                </Badge>
-                                            ) : '-'}
+                                            {pip.outcome ? <Badge className={outcomeColors[pip.outcome] || 'bg-slate-100'} variant="outline">{pip.outcome}</Badge> : '-'}
                                         </TableCell>
                                     </TableRow>
                                 ))}

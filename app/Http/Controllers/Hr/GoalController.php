@@ -4,10 +4,11 @@ namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrGoal;
-use App\Domain\Hr\Models\HrPerformanceReview;
+use App\Domain\Hr\Models\HrKeyResult;
 use App\Domain\Hr\Services\GoalService;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class GoalController extends Controller
@@ -16,17 +17,20 @@ class GoalController extends Controller
         protected GoalService $goalService,
     ) {}
 
-    /**
-     * List all goals with progress bars.
-     */
+    /* ------------------------------------------------------------------ */
+    /*  Index — Dashboard + List                                           */
+    /* ------------------------------------------------------------------ */
+
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.goals.view'), 403);
 
+        $tenantId = $user->tenant_id ?? 1;
+
         $goals = HrGoal::query()
-            ->forTenant($user->tenant_id)
-            ->with(['user:id,name', 'parentGoal:id,title'])
+            ->forTenant($tenantId)
+            ->with(['user:id,name', 'parentGoal:id,title', 'keyResults'])
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->query('goal_type'), fn ($q, $type) => $q->where('goal_type', $type))
             ->when($request->query('priority'), fn ($q, $p) => $q->where('priority', $p))
@@ -35,11 +39,32 @@ class GoalController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        $goals->through(fn (HrGoal $g) => [
+            'id' => $g->id,
+            'title' => $g->title,
+            'goal_type' => $g->goal_type,
+            'status' => $g->status,
+            'priority' => $g->priority,
+            'progress_percentage' => $g->progress_percentage,
+            'target_value' => $g->target_value,
+            'current_value' => $g->current_value,
+            'unit' => $g->unit,
+            'start_date' => $g->start_date?->toDateString(),
+            'due_date' => $g->due_date?->toDateString(),
+            'user' => $g->user ? ['id' => $g->user->id, 'name' => $g->user->name] : null,
+            'parent_goal' => $g->parentGoal ? ['id' => $g->parentGoal->id, 'title' => $g->parentGoal->title] : null,
+            'key_results_count' => $g->keyResults->count(),
+        ]);
+
         $users = User::orderBy('name')->get(['id', 'name']);
+        $analytics = $this->goalService->getGoalAnalytics($tenantId);
+        $cascadeTree = $this->goalService->getCompanyGoalTree($tenantId);
 
         return Inertia::render('hr/goals/index', [
             'goals' => $goals,
             'users' => $users,
+            'analytics' => $analytics,
+            'cascadeTree' => $cascadeTree,
             'filters' => [
                 'status' => $request->query('status'),
                 'goal_type' => $request->query('goal_type'),
@@ -52,27 +77,49 @@ class GoalController extends Controller
         ]);
     }
 
-    /**
-     * Show create goal form.
-     */
+    /* ------------------------------------------------------------------ */
+    /*  Create                                                             */
+    /* ------------------------------------------------------------------ */
+
     public function create(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.goals.manage'), 403);
 
+        $tenantId = $user->tenant_id ?? 1;
+
         $users = User::orderBy('name')->get(['id', 'name']);
-        $parentGoals = HrGoal::forTenant($user->tenant_id)
-            ->whereNull('parent_goal_id')
-            ->active()
-            ->get(['id', 'title']);
+
+        $parentGoals = HrGoal::forTenant($tenantId)
+            ->where(fn ($q) => $q->where('status', 'active')->orWhere('status', 'draft'))
+            ->get(['id', 'title', 'goal_type'])
+            ->map(fn ($g) => ['id' => $g->id, 'title' => $g->title, 'goal_type' => $g->goal_type]);
+
+        // If creating under a parent, load parent context
+        $parentContext = null;
+        if ($request->query('parent_id')) {
+            $parent = HrGoal::with('user:id,name', 'keyResults')->find($request->query('parent_id'));
+            if ($parent) {
+                $parentContext = [
+                    'id' => $parent->id,
+                    'title' => $parent->title,
+                    'goal_type' => $parent->goal_type,
+                    'progress_percentage' => $parent->progress_percentage,
+                    'status' => $parent->status,
+                    'user' => $parent->user ? ['name' => $parent->user->name] : null,
+                    'key_results_count' => $parent->keyResults->count(),
+                ];
+            }
+        }
 
         return Inertia::render('hr/goals/create', [
             'users' => $users,
             'parentGoals' => $parentGoals,
+            'parentContext' => $parentContext,
             'goalTypes' => [
-                ['value' => 'individual', 'label' => 'Individual'],
-                ['value' => 'team', 'label' => 'Team'],
                 ['value' => 'company', 'label' => 'Company'],
+                ['value' => 'team', 'label' => 'Team'],
+                ['value' => 'individual', 'label' => 'Individual'],
             ],
             'priorities' => [
                 ['value' => 'low', 'label' => 'Low'],
@@ -82,9 +129,10 @@ class GoalController extends Controller
         ]);
     }
 
-    /**
-     * Store a new goal.
-     */
+    /* ------------------------------------------------------------------ */
+    /*  Store                                                              */
+    /* ------------------------------------------------------------------ */
+
     public function store(Request $request)
     {
         $user = $request->user();
@@ -105,18 +153,19 @@ class GoalController extends Controller
             'status' => ['sometimes', 'string', 'in:draft,active'],
         ]);
 
-        $this->goalService->createGoal([
-            'tenant_id' => $user->tenant_id,
+        $goal = $this->goalService->createGoal([
+            'tenant_id' => $user->tenant_id ?? 1,
             'created_by' => $user->id,
             ...$data,
         ]);
 
-        return redirect()->route('hr.goals.index')->with('success', 'Goal created.');
+        return redirect("/hr/goals/{$goal->id}")->with('success', 'Objective created. Add key results below.');
     }
 
-    /**
-     * Show goal detail with progress updates.
-     */
+    /* ------------------------------------------------------------------ */
+    /*  Show — Objective Detail                                            */
+    /* ------------------------------------------------------------------ */
+
     public function show(Request $request, HrGoal $goal)
     {
         $user = $request->user();
@@ -125,14 +174,65 @@ class GoalController extends Controller
         $goal->load([
             'user:id,name',
             'creator:id,name',
-            'parentGoal:id,title',
-            'childGoals:id,title,progress_percentage,status',
-            'updates' => fn ($q) => $q->with('user:id,name')->orderByDesc('created_at'),
-            'performanceReview:id,review_type,status',
+            'parentGoal:id,title,goal_type',
+            'childGoals' => fn ($q) => $q->with('user:id,name', 'keyResults')->orderBy('priority', 'desc'),
+            'keyResults.owner:id,name',
+            'updates' => fn ($q) => $q->with('user:id,name')->orderByDesc('created_at')->limit(20),
         ]);
 
+        $users = User::orderBy('name')->get(['id', 'name']);
+
         return Inertia::render('hr/goals/show', [
-            'goal' => $goal,
+            'goal' => [
+                'id' => $goal->id,
+                'title' => $goal->title,
+                'description' => $goal->description,
+                'goal_type' => $goal->goal_type,
+                'category' => $goal->category,
+                'status' => $goal->status,
+                'priority' => $goal->priority,
+                'progress_percentage' => $goal->progress_percentage,
+                'target_value' => $goal->target_value,
+                'current_value' => $goal->current_value,
+                'unit' => $goal->unit,
+                'start_date' => $goal->start_date?->toDateString(),
+                'due_date' => $goal->due_date?->toDateString(),
+                'completed_at' => $goal->completed_at?->toDateString(),
+                'user' => $goal->user ? ['id' => $goal->user->id, 'name' => $goal->user->name] : null,
+                'creator' => $goal->creator?->name,
+                'parent_goal' => $goal->parentGoal ? ['id' => $goal->parentGoal->id, 'title' => $goal->parentGoal->title, 'goal_type' => $goal->parentGoal->goal_type] : null,
+                'child_goals' => $goal->childGoals->map(fn ($c) => [
+                    'id' => $c->id,
+                    'title' => $c->title,
+                    'goal_type' => $c->goal_type,
+                    'status' => $c->status,
+                    'priority' => $c->priority,
+                    'progress_percentage' => $c->progress_percentage,
+                    'user' => $c->user ? ['name' => $c->user->name] : null,
+                    'key_results_count' => $c->keyResults->count(),
+                ])->values(),
+                'key_results' => $goal->keyResults->map(fn ($kr) => [
+                    'id' => $kr->id,
+                    'title' => $kr->title,
+                    'target_value' => (float) $kr->target_value,
+                    'current_value' => (float) $kr->current_value,
+                    'unit' => $kr->unit,
+                    'progress_percentage' => $kr->progress_percentage,
+                    'status' => $kr->status,
+                    'due_date' => $kr->due_date?->toDateString(),
+                    'owner' => $kr->owner ? ['id' => $kr->owner->id, 'name' => $kr->owner->name] : null,
+                ])->values(),
+                'updates' => $goal->updates->map(fn ($u) => [
+                    'id' => $u->id,
+                    'user_name' => $u->user?->name,
+                    'previous_value' => $u->previous_value,
+                    'new_value' => $u->new_value,
+                    'progress_percentage' => $u->progress_percentage,
+                    'comment' => $u->comment,
+                    'created_at' => $u->created_at?->diffForHumans(),
+                ])->values(),
+            ],
+            'users' => $users,
             'can' => [
                 'manage' => $user->canDo('hr.goals.manage'),
                 'updateProgress' => $user->canDo('hr.goals.manage') || $goal->user_id === $user->id,
@@ -140,9 +240,10 @@ class GoalController extends Controller
         ]);
     }
 
-    /**
-     * Update goal details.
-     */
+    /* ------------------------------------------------------------------ */
+    /*  Update                                                             */
+    /* ------------------------------------------------------------------ */
+
     public function update(Request $request, HrGoal $goal)
     {
         $user = $request->user();
@@ -167,9 +268,10 @@ class GoalController extends Controller
         return redirect()->back()->with('success', 'Goal updated.');
     }
 
-    /**
-     * Update progress on a goal.
-     */
+    /* ------------------------------------------------------------------ */
+    /*  Update Progress                                                    */
+    /* ------------------------------------------------------------------ */
+
     public function updateProgress(Request $request, HrGoal $goal)
     {
         $user = $request->user();
@@ -190,5 +292,67 @@ class GoalController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Progress updated.');
+    }
+
+    /* ================================================================== */
+    /*  KEY RESULTS CRUD                                                   */
+    /* ================================================================== */
+
+    public function storeKeyResult(Request $request, HrGoal $goal)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.goals.manage'), 403);
+
+        $data = $request->validate([
+            'title' => ['required', 'string', 'max:500'],
+            'target_value' => ['required', 'numeric', 'min:0'],
+            'unit' => ['nullable', 'string', 'max:50'],
+            'due_date' => ['nullable', 'date'],
+            'owner_id' => ['nullable', 'integer', 'exists:users,id'],
+        ]);
+
+        HrKeyResult::create([
+            'tenant_id' => $goal->tenant_id,
+            'goal_id' => $goal->id,
+            'title' => $data['title'],
+            'target_value' => $data['target_value'],
+            'unit' => $data['unit'] ?? null,
+            'due_date' => $data['due_date'] ?? $goal->due_date,
+            'owner_id' => $data['owner_id'] ?? $goal->user_id,
+            'status' => 'not_started',
+        ]);
+
+        return redirect()->back()->with('success', 'Key result added.');
+    }
+
+    public function updateKeyResult(Request $request, HrKeyResult $keyResult)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.goals.manage'), 403);
+
+        $data = $request->validate([
+            'current_value' => ['sometimes', 'numeric', 'min:0'],
+            'title' => ['sometimes', 'string', 'max:500'],
+            'target_value' => ['sometimes', 'numeric', 'min:0'],
+            'status' => ['sometimes', 'string', Rule::in(['not_started', 'in_progress', 'completed', 'cancelled'])],
+        ]);
+
+        $this->goalService->updateKeyResultProgress($keyResult, $data);
+
+        return redirect()->back()->with('success', 'Key result updated.');
+    }
+
+    public function destroyKeyResult(Request $request, HrKeyResult $keyResult)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.goals.manage'), 403);
+
+        $goal = $keyResult->goal;
+        $keyResult->delete();
+
+        // Recalculate parent after deletion
+        $this->goalService->recalculateGoalProgress($goal);
+
+        return redirect()->back()->with('success', 'Key result removed.');
     }
 }

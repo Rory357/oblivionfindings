@@ -38,7 +38,7 @@ class RecruitmentController extends Controller
                         ->orWhere('personal_email', 'like', "%{$search}%");
                 });
             })
-            ->with('applications')
+            ->with(['applications.jobPosting:id,title,slug'])
             ->orderByDesc('created_at')
             ->paginate(20)
             ->withQueryString();
@@ -89,8 +89,8 @@ class RecruitmentController extends Controller
         $kanbanStages = ['new', 'screening', 'interview_scheduled', 'interview_completed', 'reference_check', 'offer_pending', 'offer_sent', 'offer_accepted', 'hired', 'withdrawn', 'rejected'];
 
         $candidates = HrCandidate::with(['applications' => function ($q) {
-            $q->select('id', 'candidate_id', 'position_title', 'status');
-        }])
+            $q->select('id', 'candidate_id', 'position_title', 'job_posting_id', 'status');
+        }, 'applications.jobPosting:id,title'])
             ->when($tenantId !== null, fn ($q) => $q->where('tenant_id', $tenantId))
             ->whereIn('status', $kanbanStages)
             ->orderByDesc('current_stage_entered_at')
@@ -105,11 +105,14 @@ class RecruitmentController extends Controller
                         ? (int) $candidate->current_stage_entered_at->diffInDays(now())
                         : 0;
 
+                    $firstApp = $candidate->applications->first();
+
                     return [
                         'id' => $candidate->id,
                         'name' => $candidate->full_name,
                         'email' => $candidate->personal_email,
-                        'position' => $candidate->applications->first()?->position_title ?? 'No position',
+                        'position' => $firstApp?->position_title ?? 'No position',
+                        'job_posting_title' => $firstApp?->jobPosting?->title,
                         'days_in_stage' => $daysInStage,
                         'source' => $candidate->source,
                         'created_at' => $candidate->created_at->toISOString(),

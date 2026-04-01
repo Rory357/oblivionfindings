@@ -55,6 +55,11 @@ return [
         'HR Reports' => [
             'hr.reports.scheduled_ready',
         ],
+        'HR Recruitment' => [
+            'hr.recruitment.application_received',
+            'hr.recruitment.posting_approval_requested',
+            'hr.recruitment.posting_closing_soon',
+        ],
 
         // --- Governance Module ---
         'Governance - Board' => [

@@ -263,6 +263,8 @@ class EmployeeProfileController extends Controller
                 'period_start' => $r->review_period_start?->toDateString(),
                 'period_end' => $r->review_period_end?->toDateString(),
                 'reviewer_name' => $r->reviewer?->name, 'next_review_date' => $r->next_review_date?->toDateString(),
+                'employee_signed_off' => (bool) $r->employee_signed_off,
+                'manager_signed_off' => (bool) $r->manager_signed_off,
             ]);
 
         // Probation reviews
@@ -294,7 +296,20 @@ class EmployeeProfileController extends Controller
                 'id' => $g->id, 'title' => $g->title, 'status' => $g->status,
                 'progress_percent' => $g->progress_percent ?? 0,
                 'due_date' => $g->due_date?->toDateString(),
+                'category' => $g->category,
+                'competency_area' => $g->competency_area,
             ]);
+
+        // Performance summary
+        $activeGoals = HrDevelopmentGoal::where('employee_user_id', $userId)
+            ->whereIn('status', ['not_started', 'in_progress', 'blocked']);
+        $performanceSummary = [
+            'latest_rating' => $performanceReviews->first()['overall_rating'] ?? null,
+            'next_review_date' => $performanceReviews->pluck('next_review_date')->filter()->sort()->first(),
+            'active_goals_count' => (clone $activeGoals)->count(),
+            'active_goals_avg' => (int) round((clone $activeGoals)->avg('progress_percent') ?? 0),
+            'has_active_pip' => $pips->whereIn('status', ['active', 'in_progress'])->isNotEmpty(),
+        ];
 
         // Training
         $courseEnrollments = HrCourseEnrollment::where('user_id', $userId)
@@ -436,6 +451,7 @@ class EmployeeProfileController extends Controller
             'probationReviews' => $probationReviews,
             'pips' => $pips,
             'developmentGoals' => $developmentGoals,
+            'performanceSummary' => $performanceSummary,
             'courseEnrollments' => $courseEnrollments,
             'employeeSkills' => $employeeSkills,
             'competencyAssessments' => $competencyAssessments,

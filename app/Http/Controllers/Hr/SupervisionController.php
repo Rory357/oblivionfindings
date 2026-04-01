@@ -7,10 +7,14 @@ use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEngagementActionPlan;
+use App\Domain\Hr\Models\HrFeedbackRequest;
+use App\Domain\Hr\Models\HrPerformanceImprovementPlan;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class SupervisionController extends Controller
@@ -139,6 +143,113 @@ class SupervisionController extends Controller
                 && $plan->due_date->isBetween(now()->startOfDay(), now()->addDays(7)->endOfDay()))->count(),
         ];
 
+        // ── Chart aggregations ──────────────────────────────────────────
+
+        $sixMonthsAgo = Carbon::now()->subMonths(5)->startOfMonth();
+
+        // Review completion trend (last 6 months)
+        $reviewTrendRaw = HrPerformanceReview::query()
+            ->where('tenant_id', $tenantId)
+            ->where('created_at', '>=', $sixMonthsAgo)
+            ->when($staffId, fn ($q) => $q->where('employee_user_id', (int) $staffId))
+            ->selectRaw("DATE_FORMAT(created_at, '%Y-%m') as month, COUNT(*) as total, SUM(CASE WHEN status = 'completed' OR status = 'signed_off' THEN 1 ELSE 0 END) as completed")
+            ->groupByRaw("DATE_FORMAT(created_at, '%Y-%m')")
+            ->orderBy('month')
+            ->get();
+
+        $reviewCompletionTrend = collect();
+        for ($i = 5; $i >= 0; $i--) {
+            $m = Carbon::now()->subMonths($i)->format('Y-m');
+            $label = Carbon::now()->subMonths($i)->format('M Y');
+            $row = $reviewTrendRaw->firstWhere('month', $m);
+            $reviewCompletionTrend->push([
+                'month' => $label,
+                'completed' => (int) ($row->completed ?? 0),
+                'total' => (int) ($row->total ?? 0),
+            ]);
+        }
+
+        // Notes per month trend (last 6 months)
+        $notesTrendRaw = HrSupervisionNote::query()
+            ->forTenant($tenantId)
+            ->where('session_date', '>=', $sixMonthsAgo)
+            ->when($staffId, fn ($q) => $q->where('employee_user_id', (int) $staffId))
+            ->selectRaw("DATE_FORMAT(session_date, '%Y-%m') as month, COUNT(*) as cnt")
+            ->groupByRaw("DATE_FORMAT(session_date, '%Y-%m')")
+            ->orderBy('month')
+            ->get();
+
+        $notesPerMonth = collect();
+        for ($i = 5; $i >= 0; $i--) {
+            $m = Carbon::now()->subMonths($i)->format('Y-m');
+            $label = Carbon::now()->subMonths($i)->format('M Y');
+            $row = $notesTrendRaw->firstWhere('month', $m);
+            $notesPerMonth->push([
+                'month' => $label,
+                'count' => (int) ($row->cnt ?? 0),
+            ]);
+        }
+
+        // Rating distribution for completed reviews
+        $ratingDistribution = HrPerformanceReview::query()
+            ->where('tenant_id', $tenantId)
+            ->whereIn('status', ['completed', 'signed_off'])
+            ->whereNotNull('overall_rating')
+            ->when($staffId, fn ($q) => $q->where('employee_user_id', (int) $staffId))
+            ->selectRaw('overall_rating as rating, COUNT(*) as count')
+            ->groupBy('overall_rating')
+            ->orderBy('overall_rating')
+            ->get()
+            ->map(fn ($r) => ['rating' => (int) $r->rating, 'count' => (int) $r->count]);
+
+        // Ensure all 5 ratings present
+        $ratingMap = $ratingDistribution->keyBy('rating');
+        $ratingDistribution = collect(range(1, 5))->map(fn ($r) => [
+            'rating' => $r,
+            'count' => (int) ($ratingMap[$r]['count'] ?? 0),
+        ]);
+
+        // PIP summary
+        $pipRows = HrPerformanceImprovementPlan::query()
+            ->where('tenant_id', $tenantId)
+            ->when($staffId, fn ($q) => $q->where('employee_user_id', (int) $staffId))
+            ->selectRaw('status, COUNT(*) as cnt')
+            ->groupBy('status')
+            ->pluck('cnt', 'status');
+
+        $pipSummary = [
+            'active' => (int) (($pipRows['active'] ?? 0) + ($pipRows['in_progress'] ?? 0)),
+            'completed' => (int) ($pipRows['completed'] ?? 0),
+            'cancelled' => (int) ($pipRows['cancelled'] ?? 0),
+            'total' => (int) $pipRows->sum(),
+        ];
+
+        // Feedback summary
+        $feedbackRows = HrFeedbackRequest::query()
+            ->where('tenant_id', $tenantId)
+            ->when($staffId, fn ($q) => $q->where('subject_user_id', (int) $staffId))
+            ->selectRaw("status, COUNT(*) as cnt, SUM(CASE WHEN status = 'pending' AND due_date < CURDATE() THEN 1 ELSE 0 END) as overdue_cnt")
+            ->groupBy('status')
+            ->get();
+
+        $feedbackSummary = [
+            'pending' => (int) $feedbackRows->where('status', 'pending')->sum('cnt'),
+            'completed' => (int) $feedbackRows->where('status', 'completed')->sum('cnt'),
+            'overdue' => (int) $feedbackRows->sum('overdue_cnt'),
+        ];
+
+        // Previous month note count (for trend indicator)
+        $previousMonthNoteCount = HrSupervisionNote::query()
+            ->forTenant($tenantId)
+            ->whereBetween('session_date', [
+                Carbon::now()->subMonth()->startOfMonth(),
+                Carbon::now()->subMonth()->endOfMonth(),
+            ])
+            ->when($staffId, fn ($q) => $q->where('employee_user_id', (int) $staffId))
+            ->count();
+
+        // ── End chart aggregations ──────────────────────────────────────
+
         $staffQuery = User::query()->staff();
         $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
         $staffQuery->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds));
@@ -165,6 +276,12 @@ class SupervisionController extends Controller
             ],
             'competencyGaps' => $competencyGaps,
             'engagementActionPlanSla' => $engagementActionPlanSla,
+            'reviewCompletionTrend' => $reviewCompletionTrend->values(),
+            'notesPerMonth' => $notesPerMonth->values(),
+            'ratingDistribution' => $ratingDistribution->values(),
+            'pipSummary' => $pipSummary,
+            'feedbackSummary' => $feedbackSummary,
+            'previousMonthNoteCount' => $previousMonthNoteCount,
             'filters' => [
                 'q' => $search,
                 'staff_id' => $staffId,

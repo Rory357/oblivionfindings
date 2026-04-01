@@ -49,12 +49,16 @@ class HrPerformanceImprovementPlan extends Model
 
     public function employeeProfile(): BelongsTo
     {
-        return $this->belongsTo(HrEmployeeProfile::class, 'employee_user_id', 'user_id');
+        return $this->belongsTo(HrEmployeeProfile::class, 'employee_profile_id');
     }
 
+    /**
+     * Get the employee user through the employee profile.
+     * Note: employee_profile_id -> hr_employee_profiles.id -> users.user_id
+     */
     public function employee(): BelongsTo
     {
-        return $this->belongsTo(User::class, 'employee_user_id');
+        return $this->belongsTo(User::class, 'employee_profile_id');
     }
 
     public function manager(): BelongsTo

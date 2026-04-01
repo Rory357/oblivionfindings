@@ -125,6 +125,17 @@ return [
             'target_groups' => ['entity_user', 'managers_core'],
         ],
 
+        // --- HR: Recruitment ---
+        'hr.recruitment.application_received' => [
+            'target_groups' => ['managers_core'],
+        ],
+        'hr.recruitment.posting_approval_requested' => [
+            'target_groups' => ['managers_core'],
+        ],
+        'hr.recruitment.posting_closing_soon' => [
+            'target_groups' => ['managers_core'],
+        ],
+
         // --- Governance: Board ---
         'governance.board.digest' => [
             'target_groups' => ['board_members'],
