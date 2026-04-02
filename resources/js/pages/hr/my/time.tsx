@@ -6,9 +6,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { type BreadcrumbItem } from '@/types';
-import { Clock, Loader2, Play, Square, Timer } from 'lucide-react';
+import {
+    Clock,
+    Loader2,
+    Play,
+    Square,
+    Timer,
+    Calendar,
+    MapPin,
+    TrendingUp,
+    AlertTriangle,
+    Users,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { useState } from 'react';
+import { KpiCard } from '@/components/recruitment/kpi-card';
 
 interface TimeEntry {
     id: number;
@@ -19,7 +31,15 @@ interface TimeEntry {
     total_hours: number | null;
     entry_type: string;
     status: string;
+    pay_type: string;
     notes: string | null;
+    shift: {
+        id: number;
+        starts_at: string;
+        ends_at: string;
+        client_name: string;
+    } | null;
+    client_name: string | null;
 }
 
 interface WeeklySummary {
@@ -30,10 +50,21 @@ interface WeeklySummary {
     total_entries: number;
 }
 
+interface UpcomingShift {
+    id: number;
+    starts_at: string;
+    ends_at: string;
+    shift_type: string;
+    client_name: string;
+    location: string | null;
+    status: string;
+}
+
 interface Props {
     activeClock: { id: number; clock_in: string; notes: string | null } | null;
     todayEntries: TimeEntry[];
     weeklySummary: WeeklySummary;
+    upcomingShifts: UpcomingShift[];
 }
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -49,29 +80,56 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     rejected: { className: 'border-red-500/30 text-red-400 bg-red-500/10', label: 'Rejected' },
 };
 
+const shiftTypeConfig: Record<string, { className: string; label: string }> = {
+    standard: { className: 'border-slate-500/30 text-slate-400 bg-slate-500/10', label: 'Standard' },
+    sleepover: { className: 'border-indigo-500/30 text-indigo-400 bg-indigo-500/10', label: 'Sleepover' },
+    on_call: { className: 'border-purple-500/30 text-purple-400 bg-purple-500/10', label: 'On-Call' },
+    split: { className: 'border-cyan-500/30 text-cyan-400 bg-cyan-500/10', label: 'Split' },
+    travel: { className: 'border-amber-500/30 text-amber-400 bg-amber-500/10', label: 'Travel' },
+};
+
 const dayLabels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-export default function MyTime({ activeClock, todayEntries, weeklySummary }: Props) {
+export default function MyTime({ activeClock, todayEntries, weeklySummary, upcomingShifts }: Props) {
     const [processing, setProcessing] = useState(false);
 
-    function handleClockIn() {
+    const todayTotal = todayEntries
+        .filter((e) => e.total_hours != null)
+        .reduce((sum, e) => sum + (e.total_hours ?? 0), 0);
+
+    const pendingCount = todayEntries.filter((e) => e.status === 'submitted').length;
+
+    const nextShift = upcomingShifts.length > 0 ? upcomingShifts[0] : null;
+    const nextShiftLabel = nextShift
+        ? `${nextShift.starts_at.slice(11, 16)} - ${nextShift.client_name || 'Unassigned'}`
+        : 'None scheduled';
+
+    function handleClockIn(shiftId?: number) {
         setProcessing(true);
-        router.post('/hr/my/time/clock-in', {}, {
-            preserveScroll: true,
-            onSuccess: () => toast.success('Clocked in successfully'),
-            onError: () => toast.error('Failed to clock in'),
-            onFinish: () => setProcessing(false),
-        });
+        router.post(
+            '/hr/my/time/clock-in',
+            { shift_id: shiftId ?? null },
+            {
+                preserveScroll: true,
+                onSuccess: () => toast.success('Clocked in successfully'),
+                onError: () => toast.error('Failed to clock in'),
+                onFinish: () => setProcessing(false),
+            },
+        );
     }
 
     function handleClockOut() {
         setProcessing(true);
-        router.post('/hr/my/time/clock-out', {}, {
-            preserveScroll: true,
-            onSuccess: () => toast.success('Clocked out successfully'),
-            onError: () => toast.error('Failed to clock out'),
-            onFinish: () => setProcessing(false),
-        });
+        router.post(
+            '/hr/my/time/clock-out',
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => toast.success('Clocked out successfully'),
+                onError: () => toast.error('Failed to clock out'),
+                onFinish: () => setProcessing(false),
+            },
+        );
     }
 
     return (
@@ -81,141 +139,228 @@ export default function MyTime({ activeClock, todayEntries, weeklySummary }: Pro
             <PageShell>
                 <PageHeader title="My Time" backHref="/hr/my" backLabel="Back to My HR" />
 
-                <div className="grid gap-4 md:grid-cols-2">
-                    {/* Clock In/Out */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Clock className="h-5 w-5" />
-                                Clock Status
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {activeClock ? (
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-3 w-3 rounded-full bg-emerald-400 animate-pulse" />
-                                        <span className="text-sm font-medium">
-                                            Clocked in since {activeClock.clock_in}
-                                        </span>
-                                    </div>
-                                    {activeClock.notes && (
-                                        <p className="text-sm text-muted-foreground">{activeClock.notes}</p>
-                                    )}
-                                    <Button onClick={handleClockOut} variant="destructive" className="w-full" disabled={processing}>
-                                        {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Square className="mr-2 h-4 w-4" />}
-                                        {processing ? 'Clocking Out...' : 'Clock Out'}
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    <div className="flex items-center gap-2">
-                                        <div className="h-3 w-3 rounded-full bg-slate-400" />
-                                        <span className="text-sm text-muted-foreground">Not clocked in</span>
-                                    </div>
-                                    <Button onClick={handleClockIn} className="w-full" disabled={processing}>
-                                        {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
-                                        {processing ? 'Clocking In...' : 'Clock In'}
-                                    </Button>
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {/* Weekly Total */}
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center gap-2">
-                                <Timer className="h-5 w-5" />
-                                This Week
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="mb-4 text-center">
-                                <p className="text-3xl font-bold">{weeklySummary.total_hours}h</p>
-                                <p className="text-sm text-muted-foreground">
-                                    {weeklySummary.week_start} to {weeklySummary.week_end}
-                                </p>
-                            </div>
-                            <div className="flex items-end justify-between gap-1">
-                                {Object.entries(weeklySummary.daily_hours ?? {}).map(([date, hours], i) => {
-                                    const safeHours = Number(hours) || 0;
-                                    const maxHours = Math.max(
-                                        10,
-                                        ...Object.values(weeklySummary.daily_hours ?? {}).map((h) => Number(h) || 0),
-                                    );
-                                    const barHeight = maxHours > 0 ? (safeHours / maxHours) * 60 : 0;
-                                    return (
-                                        <div key={date} className="flex flex-1 flex-col items-center gap-1">
-                                            <div
-                                                className="w-full rounded bg-primary/20"
-                                                style={{ height: `${Math.max(4, barHeight)}px` }}
-                                            >
-                                                <div
-                                                    className="w-full rounded bg-primary"
-                                                    style={{ height: `${barHeight}px` }}
-                                                />
-                                            </div>
-                                            <span className="text-[10px] text-muted-foreground">
-                                                {dayLabels[i] ?? date.slice(5)}
-                                            </span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </CardContent>
-                    </Card>
+                {/* KPI Cards */}
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    <KpiCard
+                        label="Today's Hours"
+                        value={Number(todayTotal.toFixed(1))}
+                        icon={Clock}
+                        suffix="h"
+                        decimals={1}
+                        color="bg-primary/10 text-primary"
+                    />
+                    <KpiCard
+                        label="This Week"
+                        value={weeklySummary.total_hours}
+                        icon={TrendingUp}
+                        suffix="h"
+                        decimals={1}
+                        description={`Target: 40h`}
+                        color="bg-emerald-500/10 text-emerald-500"
+                    />
+                    <KpiCard
+                        label="Pending Entries"
+                        value={pendingCount}
+                        icon={AlertTriangle}
+                        description="Awaiting approval"
+                        color="bg-amber-500/10 text-amber-500"
+                    />
+                    <KpiCard
+                        label="Next Shift"
+                        value={upcomingShifts.length}
+                        icon={Calendar}
+                        description={nextShiftLabel}
+                        color="bg-blue-500/10 text-blue-500"
+                    />
                 </div>
 
-                {/* Today's Entries */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Today's Entries</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        {todayEntries.length === 0 ? (
-                            <div className="py-12 text-center text-muted-foreground">
-                                <Clock className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                <p className="font-medium">No time entries recorded today</p>
-                                <p className="mt-1 text-sm">Clock in above to start tracking your hours.</p>
-                            </div>
-                        ) : (
-                            <table className="w-full text-sm">
-                                <thead className="border-b bg-muted/50">
-                                    <tr>
-                                        <th className="px-4 py-3 text-left font-medium">In</th>
-                                        <th className="px-4 py-3 text-left font-medium">Out</th>
-                                        <th className="px-4 py-3 text-right font-medium">Break</th>
-                                        <th className="px-4 py-3 text-right font-medium">Hours</th>
-                                        <th className="px-4 py-3 text-left font-medium">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y">
-                                    {todayEntries.map((entry) => {
-                                        const config = statusConfig[entry.status] || statusConfig.active;
+                <div className="grid gap-6 lg:grid-cols-3">
+                    <div className="space-y-4 lg:col-span-2">
+                        {/* Clock In/Out */}
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Clock className="h-4 w-4" />
+                                        Clock Status
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {activeClock ? (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-3 w-3 animate-pulse rounded-full bg-emerald-400" />
+                                                <span className="text-sm font-medium">Clocked in since {activeClock.clock_in}</span>
+                                            </div>
+                                            {activeClock.notes && (
+                                                <p className="text-sm text-muted-foreground">{activeClock.notes}</p>
+                                            )}
+                                            <Button onClick={handleClockOut} variant="destructive" className="w-full" size="sm" disabled={processing}>
+                                                {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Square className="mr-2 h-4 w-4" />}
+                                                {processing ? 'Clocking Out...' : 'Clock Out'}
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <div className="space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="h-3 w-3 rounded-full bg-slate-400" />
+                                                <span className="text-sm text-muted-foreground">Not clocked in</span>
+                                            </div>
+                                            <Button onClick={() => handleClockIn()} className="w-full" size="sm" disabled={processing}>
+                                                {processing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Play className="mr-2 h-4 w-4" />}
+                                                {processing ? 'Clocking In...' : 'Clock In'}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Weekly Chart */}
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Timer className="h-4 w-4" />
+                                        Weekly Hours
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="mb-3 text-center">
+                                        <p className="text-3xl font-bold">{weeklySummary.total_hours}h</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {weeklySummary.week_start} to {weeklySummary.week_end}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-end justify-between gap-1">
+                                        {Object.entries(weeklySummary.daily_hours ?? {}).map(([date, hours], i) => {
+                                            const safeHours = Number(hours) || 0;
+                                            const maxHours = Math.max(10, ...Object.values(weeklySummary.daily_hours ?? {}).map((h) => Number(h) || 0));
+                                            const barHeight = maxHours > 0 ? (safeHours / maxHours) * 50 : 0;
+                                            return (
+                                                <div key={date} className="flex flex-1 flex-col items-center gap-1">
+                                                    <div className="w-full rounded bg-primary/20" style={{ height: `${Math.max(4, barHeight)}px` }}>
+                                                        <div className="w-full rounded bg-primary" style={{ height: `${barHeight}px` }} />
+                                                    </div>
+                                                    <span className="text-[10px] text-muted-foreground">{dayLabels[i] ?? date.slice(5)}</span>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+
+                        {/* Today's Entries */}
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="text-base">Today's Entries</CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                {todayEntries.length === 0 ? (
+                                    <div className="py-12 text-center">
+                                        <Clock className="mx-auto mb-3 h-12 w-12 text-muted-foreground/40" />
+                                        <p className="font-medium text-muted-foreground">No time entries recorded today</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">Clock in above to start tracking your hours.</p>
+                                    </div>
+                                ) : (
+                                    <div className="overflow-hidden rounded-b-xl">
+                                        <table className="w-full text-sm">
+                                            <thead className="border-b bg-muted/50">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left font-medium">In</th>
+                                                    <th className="px-4 py-3 text-left font-medium">Out</th>
+                                                    <th className="px-4 py-3 text-left font-medium">Client</th>
+                                                    <th className="px-4 py-3 text-right font-medium">Break</th>
+                                                    <th className="px-4 py-3 text-right font-medium">Hours</th>
+                                                    <th className="px-4 py-3 text-left font-medium">Status</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y">
+                                                {todayEntries.map((entry) => {
+                                                    const config = statusConfig[entry.status] || statusConfig.active;
+                                                    return (
+                                                        <tr key={entry.id} className="hover:bg-muted/30">
+                                                            <td className="px-4 py-3">{entry.clock_in}</td>
+                                                            <td className="px-4 py-3">{entry.clock_out ?? '-'}</td>
+                                                            <td className="px-4 py-3 text-muted-foreground">
+                                                                {entry.client_name || entry.shift?.client_name || '-'}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right text-muted-foreground">
+                                                                {entry.break_minutes > 0 ? `${entry.break_minutes}m` : '-'}
+                                                            </td>
+                                                            <td className="px-4 py-3 text-right font-medium">
+                                                                {entry.total_hours != null ? `${entry.total_hours}h` : '-'}
+                                                            </td>
+                                                            <td className="px-4 py-3">
+                                                                <Badge variant="outline" className={config.className}>
+                                                                    {config.label}
+                                                                </Badge>
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Sidebar — Upcoming Shifts */}
+                    <div className="space-y-4">
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Calendar className="h-4 w-4" />
+                                    Upcoming Shifts
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                                {upcomingShifts.length === 0 ? (
+                                    <p className="text-sm text-muted-foreground">No upcoming shifts in the next 3 days.</p>
+                                ) : (
+                                    upcomingShifts.map((shift) => {
+                                        const typeConfig = shiftTypeConfig[shift.shift_type] || shiftTypeConfig.standard;
                                         return (
-                                            <tr key={entry.id} className="hover:bg-muted/30">
-                                                <td className="px-4 py-3">{entry.clock_in}</td>
-                                                <td className="px-4 py-3">{entry.clock_out ?? '-'}</td>
-                                                <td className="px-4 py-3 text-right text-muted-foreground">
-                                                    {entry.break_minutes > 0 ? `${entry.break_minutes}m` : '-'}
-                                                </td>
-                                                <td className="px-4 py-3 text-right font-medium">
-                                                    {entry.total_hours != null ? `${entry.total_hours}h` : '-'}
-                                                </td>
-                                                <td className="px-4 py-3">
-                                                    <Badge variant="outline" className={config.className}>
-                                                        {config.label}
+                                            <div
+                                                key={shift.id}
+                                                className="rounded-lg border p-3 transition-colors hover:bg-accent/30"
+                                            >
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <div className="min-w-0 flex-1">
+                                                        <p className="text-sm font-medium">{shift.client_name || 'Unassigned'}</p>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {shift.starts_at} — {shift.ends_at?.slice(11, 16)}
+                                                        </p>
+                                                        {shift.location && (
+                                                            <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                                                                <MapPin className="h-3 w-3" /> {shift.location}
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                    <Badge variant="outline" className={`shrink-0 text-[10px] ${typeConfig.className}`}>
+                                                        {typeConfig.label}
                                                     </Badge>
-                                                </td>
-                                            </tr>
+                                                </div>
+                                                {!activeClock && (
+                                                    <Button
+                                                        variant="outline"
+                                                        size="sm"
+                                                        className="mt-2 w-full"
+                                                        onClick={() => handleClockIn(shift.id)}
+                                                        disabled={processing}
+                                                    >
+                                                        <Play className="mr-1 h-3 w-3" /> Clock In to This Shift
+                                                    </Button>
+                                                )}
+                                            </div>
                                         );
-                                    })}
-                                </tbody>
-                            </table>
-                        )}
-                    </CardContent>
-                </Card>
+                                    })
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+                </div>
             </PageShell>
         </AppLayout>
     );

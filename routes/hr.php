@@ -96,6 +96,10 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::put('/goals/{goal}', [MyHrController::class, 'updateGoal'])->name('goals.update');
         Route::get('/surveys', [MyHrController::class, 'surveys'])->name('surveys');
         Route::post('/surveys/{survey}', [MyHrController::class, 'submitSurvey'])->name('surveys.submit');
+
+        Route::get('/time', [MyHrController::class, 'time'])->name('time');
+        Route::post('/time/clock-in', [MyHrController::class, 'clockIn'])->name('time.clock-in');
+        Route::post('/time/clock-out', [MyHrController::class, 'clockOut'])->name('time.clock-out');
     });
 
     /*
@@ -951,10 +955,20 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/entries', [TimeTrackingController::class, 'store'])->name('entries.store');
         Route::get('/timesheets', [TimeTrackingController::class, 'timesheets'])->name('timesheets');
 
-        Route::middleware('permission:hr.timeTracking.manage')->group(function () {
-            Route::post('/timesheets/{timesheet}/submit', [TimeTrackingController::class, 'submitTimesheet'])->name('timesheets.submit');
+        // Staff can submit their own timesheets (controller checks ownership)
+        Route::post('/timesheets/{timesheet}/submit', [TimeTrackingController::class, 'submitTimesheet'])->name('timesheets.submit');
+
+        // Manager / Team Leader actions
+        Route::middleware('permission:hr.time.manage|hr.time.approveTeam')->group(function () {
             Route::post('/timesheets/{timesheet}/approve', [TimeTrackingController::class, 'approveTimesheet'])->name('timesheets.approve');
             Route::post('/timesheets/{timesheet}/reject', [TimeTrackingController::class, 'rejectTimesheet'])->name('timesheets.reject');
+            Route::post('/timesheets/{timesheet}/return', [TimeTrackingController::class, 'returnTimesheet'])->name('timesheets.return');
+            Route::post('/timesheets/bulk-approve', [TimeTrackingController::class, 'bulkApproveTimesheets'])->name('timesheets.bulk-approve');
+            Route::post('/timesheets/bulk-reject', [TimeTrackingController::class, 'bulkRejectTimesheets'])->name('timesheets.bulk-reject');
+            Route::post('/timesheets/bulk-return', [TimeTrackingController::class, 'bulkReturnTimesheets'])->name('timesheets.bulk-return');
+            Route::put('/entries/{entry}', [TimeTrackingController::class, 'updateEntry'])->name('entries.update');
+            Route::get('/entries/{entry}/amendments', [TimeTrackingController::class, 'entryAmendments'])->name('entries.amendments');
+            Route::post('/clock-on-behalf', [TimeTrackingController::class, 'clockOnBehalf'])->name('clock-on-behalf');
         });
     });
 

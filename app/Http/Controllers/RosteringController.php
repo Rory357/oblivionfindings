@@ -189,6 +189,83 @@ class RosteringController extends Controller
             }
         }
 
+        // --- Analytics Data ---
+
+        // Daily shift coverage (scheduled vs filled per day)
+        $dailyCoverage = [];
+        for ($d = 0; $d < 7; $d++) {
+            $day = (clone $weekStart)->addDays($d);
+            $dayEnd = (clone $day)->addDay();
+            $dayShifts = $shifts->filter(fn ($s) => $s->starts_at && $s->starts_at->gte($day) && $s->starts_at->lt($dayEnd));
+            $dailyCoverage[] = [
+                'day' => $day->format('D'),
+                'date' => $day->toDateString(),
+                'scheduled' => $dayShifts->count(),
+                'filled' => $dayShifts->whereNotNull('user_id')->count(),
+                'open' => $dayShifts->whereNull('user_id')->count(),
+            ];
+        }
+
+        // Shift type distribution
+        $shiftTypeDistribution = $shifts
+            ->where('status', '!=', 'cancelled')
+            ->groupBy(fn ($s) => $s->shift_type ?? 'standard')
+            ->map(fn ($group, $type) => [
+                'type' => ucfirst(str_replace('_', ' ', $type)),
+                'value' => $group->count(),
+            ])
+            ->values()
+            ->all();
+
+        // Staff on leave this week
+        $onLeaveCount = $canManageAny ? HrLeaveRequest::where('status', 'approved')
+            ->where('starts_at', '<', $weekEnd)
+            ->where('ends_at', '>', $weekStart)
+            ->distinct('user_id')
+            ->count('user_id') : 0;
+
+        // Compliance overview
+        $complianceExpiring = 0;
+        $complianceExpired = 0;
+        if ($canManageAny && $auth->tenant_id) {
+            $complianceExpiring = HrStaffComplianceStatus::where('tenant_id', $auth->tenant_id)
+                ->where('status', 'expiring_soon')
+                ->count();
+            $complianceExpired = HrStaffComplianceStatus::where('tenant_id', $auth->tenant_id)
+                ->where('status', 'expired')
+                ->whereHas('requirement', fn ($q) => $q->where('hard_stop', true))
+                ->count();
+        }
+
+        // 4-week historical trend (shifts completed vs cancelled per week)
+        $historicalTrend = [];
+        if ($canManageAny) {
+            for ($w = 3; $w >= 0; $w--) {
+                $wStart = (clone $weekStart)->subWeeks($w);
+                $wEnd = (clone $wStart)->addDays(7);
+                $weekShifts = Shift::where('starts_at', '>=', $wStart)
+                    ->where('starts_at', '<', $wEnd)
+                    ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
+                    ->selectRaw("SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled")
+                    ->selectRaw('COUNT(*) as total')
+                    ->first();
+                $historicalTrend[] = [
+                    'week' => $wStart->format('d M'),
+                    'completed' => (int) ($weekShifts->completed ?? 0),
+                    'cancelled' => (int) ($weekShifts->cancelled ?? 0),
+                    'total' => (int) ($weekShifts->total ?? 0),
+                ];
+            }
+        }
+
+        // Coverage rate
+        $totalShiftsThisWeek = $shifts->where('status', '!=', 'cancelled')->count();
+        $filledShiftsThisWeek = $shifts->where('status', '!=', 'cancelled')->whereNotNull('user_id')->count();
+        $coverageRate = $totalShiftsThisWeek > 0 ? round(($filledShiftsThisWeek / $totalShiftsThisWeek) * 100, 0) : 100;
+
+        // Unique staff rostered
+        $staffRostered = $shifts->where('status', '!=', 'cancelled')->whereNotNull('user_id')->pluck('user_id')->unique()->count();
+
         return inertia('operations/rostering/index', [
             'canManageAny' => $canManageAny,
             'weekStart' => $weekStart->toDateString(),
@@ -252,6 +329,18 @@ class RosteringController extends Controller
 
             // HR compliance badges per staff member
             'complianceBadges' => $canManageAny ? $this->getComplianceBadges($auth->tenant_id) : [],
+
+            // Analytics data
+            'analytics' => [
+                'dailyCoverage' => $dailyCoverage,
+                'shiftTypeDistribution' => $shiftTypeDistribution,
+                'historicalTrend' => $historicalTrend,
+                'coverageRate' => $coverageRate,
+                'staffRostered' => $staffRostered,
+                'onLeaveCount' => $onLeaveCount,
+                'complianceExpiring' => $complianceExpiring,
+                'complianceExpired' => $complianceExpired,
+            ],
         ]);
     }
 

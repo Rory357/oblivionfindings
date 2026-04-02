@@ -23,6 +23,9 @@ class HrTimesheet extends Model
         'approved_by',
         'approved_at',
         'rejection_reason',
+        'returned_by',
+        'returned_at',
+        'returned_notes',
         'created_by',
     ];
 
@@ -32,6 +35,7 @@ class HrTimesheet extends Model
         'total_hours' => 'decimal:2',
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
+        'returned_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
@@ -48,7 +52,20 @@ class HrTimesheet extends Model
         return $this->belongsTo(User::class, 'approved_by');
     }
 
+    public function returnedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'returned_by');
+    }
+
     public function entries(): HasMany
+    {
+        return $this->hasMany(HrTimeEntry::class, 'hr_timesheet_id');
+    }
+
+    /**
+     * Legacy relationship: entries matched by user_id + date range (no FK).
+     */
+    public function entriesByDateRange(): HasMany
     {
         return $this->hasMany(HrTimeEntry::class, 'user_id', 'user_id')
             ->whereBetween('entry_date', [$this->period_start, $this->period_end]);
@@ -72,5 +89,22 @@ class HrTimesheet extends Model
     {
         return $query->where('period_start', '>=', $start)
             ->where('period_end', '<=', $end);
+    }
+
+    public function scopeForTeam($query, int $managerUserId)
+    {
+        $teamUserIds = \App\Domain\Hr\Models\HrEmployeeProfile::where('manager_user_id', $managerUserId)
+            ->where('is_active', true)
+            ->pluck('user_id');
+
+        return $query->whereIn('user_id', $teamUserIds);
+    }
+
+    public function scopeForUserOrTeam($query, int $userId, array $teamUserIds)
+    {
+        return $query->where(function ($q) use ($userId, $teamUserIds) {
+            $q->where('user_id', $userId)
+              ->orWhereIn('user_id', $teamUserIds);
+        });
     }
 }

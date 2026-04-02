@@ -2,7 +2,9 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Models\HrTimeEntryAmendment;
 use App\Domain\Hr\Models\HrTimesheet;
 use App\Models\User;
 use Carbon\Carbon;
@@ -10,12 +12,17 @@ use Illuminate\Support\Facades\DB;
 
 class TimeTrackingService
 {
+    public function __construct(
+        private readonly AttendanceService $attendanceService,
+    ) {}
+
     /**
-     * Clock in a user, creating a new active time entry.
+     * Clock in a user via the attendance system, creating both an
+     * HrAttendanceSession and a corresponding HrTimeEntry.
      */
-    public function clockIn(User $user, ?string $notes = null, ?string $projectCode = null): HrTimeEntry
+    public function clockIn(User $user, ?string $notes = null, ?string $projectCode = null, ?int $shiftId = null): HrTimeEntry
     {
-        // Ensure no existing active clock-in
+        // Check HrTimeEntry level for active clock
         $existing = HrTimeEntry::forTenant($user->tenant_id)
             ->forUser($user->id)
             ->active()
@@ -25,13 +32,28 @@ class TimeTrackingService
             throw new \LogicException('You are already clocked in. Please clock out first.');
         }
 
+        $session = $this->attendanceService->clockIn($user, [
+            'shift_id' => $shiftId,
+            'notes' => $notes,
+            'source' => 'hr_module',
+        ]);
+
         return HrTimeEntry::create([
             'tenant_id' => $user->tenant_id,
             'user_id' => $user->id,
-            'entry_date' => now()->toDateString(),
-            'clock_in' => now(),
+            'shift_id' => $session->shift_id,
+            'attendance_session_id' => $session->id,
+            'site_id' => $session->site_id,
+            'client_id' => $session->shift?->client_id,
+            'entry_date' => $session->clock_in_at->toDateString(),
+            'clock_in' => $session->clock_in_at,
             'entry_type' => 'clock',
             'status' => 'active',
+            'source_type' => 'attendance',
+            'source_id' => $session->id,
+            'pay_type' => $session->shift?->is_sleepover ? 'sleepover' : ($session->shift?->is_on_call ? 'on_call' : 'standard'),
+            'is_sleepover' => (bool) $session->shift?->is_sleepover,
+            'is_on_call' => (bool) $session->shift?->is_on_call,
             'notes' => $notes,
             'project_code' => $projectCode,
             'created_by' => $user->id,
@@ -39,9 +61,10 @@ class TimeTrackingService
     }
 
     /**
-     * Clock out a user, calculating total hours.
+     * Clock out a user via the attendance system, updating the
+     * HrTimeEntry with calculated hours and break compliance.
      */
-    public function clockOut(User $user, int $breakMinutes = 0, ?string $notes = null): HrTimeEntry
+    public function clockOut(User $user, int $breakMinutes = 0, ?string $notes = null, ?float $mileageKm = null): HrTimeEntry
     {
         $entry = HrTimeEntry::forTenant($user->tenant_id)
             ->forUser($user->id)
@@ -52,14 +75,27 @@ class TimeTrackingService
             throw new \LogicException('No active clock-in found.');
         }
 
-        $clockOut = now();
+        // Clock out via attendance service (creates Operations Timesheet too)
+        $session = $this->attendanceService->clockOut($user, null, [
+            'break_minutes' => $breakMinutes,
+            'notes' => $notes,
+        ]);
+
+        $clockOut = $session->clock_out_at ?? now();
         $totalMinutes = $entry->clock_in->diffInMinutes($clockOut) - $breakMinutes;
         $totalHours = max(0, round($totalMinutes / 60, 2));
+
+        // NZ break compliance check
+        $workedHours = $totalMinutes / 60;
+        $requiredBreak = $workedHours >= 4 ? 30 : ($workedHours >= 2 ? 10 : 0);
+        $breakCompliant = $breakMinutes >= $requiredBreak;
 
         $entry->update([
             'clock_out' => $clockOut,
             'break_minutes' => $breakMinutes,
             'total_hours' => $totalHours,
+            'mileage_km' => $mileageKm,
+            'break_compliance_met' => $breakCompliant,
             'notes' => $notes ?? $entry->notes,
             'status' => 'submitted',
         ]);
@@ -234,5 +270,222 @@ class TimeTrackingService
             'total_hours' => round($entries->sum('total_hours'), 2),
             'total_entries' => $entries->count(),
         ];
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Team helpers                                                        */
+    /* ------------------------------------------------------------------ */
+
+    public function getTeamUserIds(User $manager): array
+    {
+        return HrEmployeeProfile::where('manager_user_id', $manager->id)
+            ->where('is_active', true)
+            ->pluck('user_id')
+            ->all();
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Edit / Amend time entry                                            */
+    /* ------------------------------------------------------------------ */
+
+    public function editTimeEntry(HrTimeEntry $entry, User $editor, array $data, string $reason): HrTimeEntry
+    {
+        if (in_array($entry->status, ['approved'], true)) {
+            throw new \LogicException('Cannot edit an approved time entry.');
+        }
+
+        return DB::transaction(function () use ($entry, $editor, $data, $reason) {
+            $editableFields = ['clock_in', 'clock_out', 'break_minutes', 'pay_type', 'notes', 'is_sleepover', 'is_on_call', 'mileage_km'];
+            $originalValues = [];
+            $tenantId = $entry->tenant_id;
+
+            foreach ($editableFields as $field) {
+                if (! array_key_exists($field, $data)) {
+                    continue;
+                }
+
+                $oldValue = $entry->getOriginal($field);
+                $newValue = $data[$field];
+
+                if ((string) $oldValue === (string) $newValue) {
+                    continue;
+                }
+
+                $originalValues[$field] = $oldValue;
+
+                HrTimeEntryAmendment::create([
+                    'tenant_id' => $tenantId,
+                    'hr_time_entry_id' => $entry->id,
+                    'amended_by' => $editor->id,
+                    'field_name' => $field,
+                    'old_value' => $oldValue !== null ? (string) $oldValue : null,
+                    'new_value' => $newValue !== null ? (string) $newValue : null,
+                    'reason' => $reason,
+                ]);
+            }
+
+            if (empty($originalValues)) {
+                return $entry;
+            }
+
+            // Parse time fields
+            if (isset($data['clock_in'])) {
+                $data['clock_in'] = Carbon::parse($data['clock_in']);
+                $data['entry_date'] = $data['clock_in']->toDateString();
+            }
+            if (isset($data['clock_out'])) {
+                $data['clock_out'] = Carbon::parse($data['clock_out']);
+            }
+
+            // Recalculate hours if times changed
+            $clockIn = $data['clock_in'] ?? $entry->clock_in;
+            $clockOut = $data['clock_out'] ?? $entry->clock_out;
+            $breakMinutes = $data['break_minutes'] ?? $entry->break_minutes;
+
+            if ($clockIn && $clockOut) {
+                $totalMinutes = Carbon::parse($clockIn)->diffInMinutes(Carbon::parse($clockOut)) - (int) $breakMinutes;
+                $data['total_hours'] = max(0, round($totalMinutes / 60, 2));
+
+                // NZ break compliance check
+                $workedHours = $totalMinutes / 60;
+                $requiredBreak = $workedHours >= 4 ? 30 : ($workedHours >= 2 ? 10 : 0);
+                $data['break_compliance_met'] = (int) $breakMinutes >= $requiredBreak;
+            }
+
+            $data['amended_by'] = $editor->id;
+            $data['amended_at'] = now();
+            $data['amendment_reason'] = $reason;
+            $data['original_values'] = array_merge($entry->original_values ?? [], $originalValues);
+
+            $entry->update($data);
+
+            return $entry->fresh();
+        });
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Clock on behalf                                                    */
+    /* ------------------------------------------------------------------ */
+
+    public function clockOnBehalf(User $manager, int $targetUserId, array $data): HrTimeEntry
+    {
+        $teamUserIds = $this->getTeamUserIds($manager);
+        $isAdmin = $manager->canDo('hr.time.manage');
+
+        if (! $isAdmin && ! in_array($targetUserId, $teamUserIds, true)) {
+            throw new \LogicException('You can only clock on behalf of your direct reports.');
+        }
+
+        $clockIn = Carbon::parse($data['clock_in']);
+        $clockOut = isset($data['clock_out']) ? Carbon::parse($data['clock_out']) : null;
+        $breakMinutes = (int) ($data['break_minutes'] ?? 0);
+
+        $totalHours = null;
+        $breakCompliant = null;
+        if ($clockOut) {
+            $totalMinutes = $clockIn->diffInMinutes($clockOut) - $breakMinutes;
+            $totalHours = max(0, round($totalMinutes / 60, 2));
+            $workedHours = $totalMinutes / 60;
+            $requiredBreak = $workedHours >= 4 ? 30 : ($workedHours >= 2 ? 10 : 0);
+            $breakCompliant = $breakMinutes >= $requiredBreak;
+        }
+
+        return HrTimeEntry::create([
+            'tenant_id' => $manager->tenant_id,
+            'user_id' => $targetUserId,
+            'shift_id' => $data['shift_id'] ?? null,
+            'client_id' => $data['client_id'] ?? null,
+            'entry_date' => $clockIn->toDateString(),
+            'clock_in' => $clockIn,
+            'clock_out' => $clockOut,
+            'break_minutes' => $breakMinutes,
+            'total_hours' => $totalHours,
+            'entry_type' => 'admin_clock',
+            'status' => $clockOut ? 'submitted' : 'active',
+            'pay_type' => $data['pay_type'] ?? 'standard',
+            'is_sleepover' => (bool) ($data['is_sleepover'] ?? false),
+            'is_on_call' => (bool) ($data['is_on_call'] ?? false),
+            'mileage_km' => $data['mileage_km'] ?? null,
+            'break_compliance_met' => $breakCompliant,
+            'notes' => $data['notes'] ?? null,
+            'created_by' => $manager->id,
+        ]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Return timesheet for changes                                       */
+    /* ------------------------------------------------------------------ */
+
+    public function returnTimesheet(HrTimesheet $timesheet, User $reviewer, string $notes): HrTimesheet
+    {
+        if ($timesheet->status !== 'submitted') {
+            throw new \LogicException("Cannot return a '{$timesheet->status}' timesheet.");
+        }
+
+        return DB::transaction(function () use ($timesheet, $reviewer, $notes) {
+            $timesheet->update([
+                'status' => 'draft',
+                'returned_by' => $reviewer->id,
+                'returned_at' => now(),
+                'returned_notes' => $notes,
+                'approved_by' => null,
+                'approved_at' => null,
+            ]);
+
+            // Reset related entries to active
+            HrTimeEntry::forTenant($timesheet->tenant_id)
+                ->forUser($timesheet->user_id)
+                ->forDateRange(
+                    $timesheet->period_start->toDateString(),
+                    $timesheet->period_end->toDateString()
+                )
+                ->where('status', 'submitted')
+                ->update(['status' => 'active']);
+
+            return $timesheet->fresh();
+        });
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Bulk timesheet actions                                             */
+    /* ------------------------------------------------------------------ */
+
+    public function bulkApproveTimesheets(array $ids, User $approver, ?string $notes = null): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            $ts = HrTimesheet::find($id);
+            if ($ts && $ts->status === 'submitted') {
+                $this->approveTimesheet($ts, $approver);
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function bulkRejectTimesheets(array $ids, User $reviewer, string $reason): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            $ts = HrTimesheet::find($id);
+            if ($ts && $ts->status === 'submitted') {
+                $this->rejectTimesheet($ts, $reviewer, $reason);
+                $count++;
+            }
+        }
+        return $count;
+    }
+
+    public function bulkReturnTimesheets(array $ids, User $reviewer, string $notes): int
+    {
+        $count = 0;
+        foreach ($ids as $id) {
+            $ts = HrTimesheet::find($id);
+            if ($ts && $ts->status === 'submitted') {
+                $this->returnTimesheet($ts, $reviewer, $notes);
+                $count++;
+            }
+        }
+        return $count;
     }
 }

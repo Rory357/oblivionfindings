@@ -27,15 +27,26 @@ class TimesheetHrSyncService
                 'source_id' => $timesheet->id,
             ],
             [
+                'tenant_id' => $timesheet->user?->tenant_id,
                 'user_id' => $timesheet->user_id,
-                'date' => $timesheet->work_date,
-                'hours' => $hours,
+                'shift_id' => $timesheet->shift_id,
+                'client_id' => $timesheet->client_id,
+                'entry_date' => $timesheet->work_date,
+                'clock_in' => $timesheet->starts_at,
+                'clock_out' => $timesheet->ends_at,
+                'break_minutes' => $timesheet->break_minutes ?? 0,
+                'total_hours' => $hours,
+                'entry_type' => 'timesheet',
+                'status' => 'approved',
                 'pay_type' => $payType,
-                'description' => sprintf(
+                'is_sleepover' => (bool) $timesheet->sleepover,
+                'is_on_call' => (bool) $timesheet->on_call,
+                'is_public_holiday' => (bool) $timesheet->public_holiday,
+                'mileage_km' => $timesheet->mileage_km ?? 0,
+                'notes' => sprintf(
                     'Shift timesheet — %s',
                     $timesheet->client?->full_name ?? 'Unknown client'
                 ),
-                'mileage_km' => $timesheet->mileage_km ?? 0,
                 'approved_by' => $timesheet->approved_by,
                 'approved_at' => $timesheet->approved_at,
             ]

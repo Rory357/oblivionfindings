@@ -22,8 +22,15 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs } from '@/components/ui/tabs';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
-import { ChevronLeft, ChevronRight, Plus } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, Calendar, AlertTriangle, Users, TrendingUp, CalendarOff, BarChart3 } from 'lucide-react';
 import { Fragment, useMemo, useState } from 'react';
+import { KpiCard } from '@/components/recruitment/kpi-card';
+import {
+    BarChart, Bar, PieChart, Pie, Cell, AreaChart, Area,
+    XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+} from 'recharts';
+
+const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ef4444', '#06b6d4', '#94a3b8'];
 
 type Staff = { id: number; name: string; email?: string };
 type Client = { id: number; first_name: string; last_name: string };
@@ -86,6 +93,16 @@ type Props = {
         hours: number;
         warn: 'medium' | 'high' | null;
     }>;
+    analytics: {
+        dailyCoverage: Array<{ day: string; date: string; scheduled: number; filled: number; open: number }>;
+        shiftTypeDistribution: Array<{ type: string; value: number }>;
+        historicalTrend: Array<{ week: string; completed: number; cancelled: number; total: number }>;
+        coverageRate: number;
+        staffRostered: number;
+        onLeaveCount: number;
+        complianceExpiring: number;
+        complianceExpired: number;
+    };
 };
 
 function addDays(date: Date, days: number) {
@@ -461,6 +478,15 @@ export default function RosteringIndex(props: Props) {
                     </div>
                 </div>
 
+                {/* KPI Cards */}
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+                    <KpiCard label="Total Shifts" value={props.stats.total} icon={Calendar} color="bg-primary/10 text-primary" />
+                    <KpiCard label="Open / Unfilled" value={props.stats.open} icon={AlertTriangle} description="Need assignment" color="bg-red-500/10 text-red-500" />
+                    <KpiCard label="Staff Rostered" value={props.analytics.staffRostered} icon={Users} color="bg-emerald-500/10 text-emerald-500" />
+                    <KpiCard label="Coverage Rate" value={props.analytics.coverageRate} icon={TrendingUp} suffix="%" description="Filled / Total" color="bg-blue-500/10 text-blue-500" />
+                    <KpiCard label="On Leave" value={props.analytics.onLeaveCount} icon={CalendarOff} description="Approved this week" color="bg-amber-500/10 text-amber-500" />
+                </div>
+
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                     <Card>
                         <CardHeader className="pb-2">
@@ -576,6 +602,7 @@ export default function RosteringIndex(props: Props) {
                                 </span>
                             ),
                             content: (
+                                <div className="space-y-4">
                                 <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
                                     <Card className="lg:col-span-2">
                                         <CardHeader className="pb-2">
@@ -911,62 +938,9 @@ export default function RosteringIndex(props: Props) {
                                             </CardContent>
                                         </Card>
 
-                                        <Card>
-                                            <CardHeader className="pb-2">
-                                                <CardTitle className="text-base">Coverage heatmap</CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="space-y-3">
-                                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                                    <div className="text-xs text-muted-foreground">Hourly view for this week. Understaffed = open demand not assigned.</div>
-                                                    <div className="flex items-center gap-2">
-                                                        <Button size="sm" variant={coverageMode === 'understaffed' ? 'default' : 'outline'} onClick={() => setCoverageMode('understaffed')}>
-                                                            Understaffed
-                                                        </Button>
-                                                        <Button size="sm" variant={coverageMode === 'assigned' ? 'default' : 'outline'} onClick={() => setCoverageMode('assigned')}>
-                                                            Assigned
-                                                        </Button>
-                                                    </div>
-                                                </div>
-
-                                                <div className="overflow-x-auto">
-                                                    <div className="min-w-[720px]">
-                                                        <div className="grid grid-cols-[72px_repeat(7,1fr)] gap-1">
-                                                            <div className="text-[10px] text-muted-foreground"></div>
-                                                            {days.map((d) => (
-                                                                <div key={ymd(d)} className="text-[10px] font-medium text-slate-700">{fmtDay(d)}</div>
-                                                            ))}
-
-                                                            {Array.from({ length: 24 }).map((_, h) => (
-                                                                <Fragment key={h}>
-                                                                    <div className="text-[10px] text-muted-foreground">{String(h).padStart(2, '0')}:00</div>
-                                                                    {days.map((d) => {
-                                                                        const dk = ymd(d);
-                                                                        const cell = coverageHeatmap.grid[dk]?.assigned ? {
-                                                                            assigned: coverageHeatmap.grid[dk].assigned[h] ?? 0,
-                                                                            open: coverageHeatmap.grid[dk].open[h] ?? 0,
-                                                                        } : { assigned: 0, open: 0 };
-                                                                        const v = coverageMode === 'assigned' ? cell.assigned : cell.open;
-                                                                        const bg = coverageMode === 'assigned'
-                                                                            ? (v >= 3 ? 'bg-slate-200' : v === 2 ? 'bg-slate-100' : v === 1 ? 'bg-slate-50' : 'bg-transparent')
-                                                                            : (v >= 3 ? 'bg-amber-200' : v === 2 ? 'bg-amber-100' : v === 1 ? 'bg-amber-50' : 'bg-transparent');
-                                                                        return (
-                                                                            <div key={`${dk}-${h}`} className={`h-7 rounded border ${bg} flex items-center justify-center`}>
-                                                                                <span className="text-[10px] text-slate-700">{v > 0 ? v : ''}</span>
-                                                                            </div>
-                                                                        );
-                                                                    })}
-                                                                </Fragment>
-                                                            ))}
-                                                        </div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex flex-wrap gap-2 text-[10px] text-muted-foreground">
-                                                    <span>Tip: Understaffed cells indicate hours where an open shift exists.</span>
-                                                </div>
-                                            </CardContent>
-                                        </Card>
                                     </div>
+                                </div>
+
                                 </div>
                             ),
                         },
@@ -1350,6 +1324,197 @@ export default function RosteringIndex(props: Props) {
                                         )}
                                     </CardContent>
                                 </Card>
+                            ),
+                        },
+                        {
+                            key: 'heatmap',
+                            label: 'Heatmap',
+                            content: (
+                                <Card>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="flex items-center justify-between text-base">
+                                            <span>Coverage Heatmap — 24-Hour View</span>
+                                            <div className="flex items-center gap-2">
+                                                <Button size="sm" variant={coverageMode === 'understaffed' ? 'default' : 'outline'} onClick={() => setCoverageMode('understaffed')}>
+                                                    Understaffed
+                                                </Button>
+                                                <Button size="sm" variant={coverageMode === 'assigned' ? 'default' : 'outline'} onClick={() => setCoverageMode('assigned')}>
+                                                    Assigned
+                                                </Button>
+                                            </div>
+                                        </CardTitle>
+                                        <p className="text-xs text-muted-foreground">Full 24-hour hourly breakdown for the roster week. Each cell shows the number of {coverageMode === 'assigned' ? 'assigned staff' : 'open/unfilled shifts'} per hour.</p>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="overflow-x-auto">
+                                            <div className="min-w-[800px]">
+                                                <div className="grid grid-cols-[56px_repeat(7,1fr)] gap-px rounded-lg border bg-border/50 overflow-hidden">
+                                                    {/* Header row */}
+                                                    <div className="bg-muted/80 px-2 py-1.5 text-[10px] font-semibold text-muted-foreground">Hour</div>
+                                                    {days.map((d) => (
+                                                        <div key={ymd(d)} className="bg-muted/80 py-1.5 text-center text-[10px] font-semibold">{fmtDay(d)}</div>
+                                                    ))}
+
+                                                    {/* 24 hour rows */}
+                                                    {Array.from({ length: 24 }).map((_, h) => (
+                                                        <Fragment key={h}>
+                                                            <div className="flex items-center bg-background px-2 text-[10px] text-muted-foreground">{String(h).padStart(2, '0')}:00</div>
+                                                            {days.map((d) => {
+                                                                const dk = ymd(d);
+                                                                const cell = coverageHeatmap.grid[dk]?.assigned ? {
+                                                                    assigned: coverageHeatmap.grid[dk].assigned[h] ?? 0,
+                                                                    open: coverageHeatmap.grid[dk].open[h] ?? 0,
+                                                                } : { assigned: 0, open: 0 };
+                                                                const v = coverageMode === 'assigned' ? cell.assigned : cell.open;
+                                                                const bg = coverageMode === 'assigned'
+                                                                    ? (v >= 3 ? 'bg-blue-400/60' : v === 2 ? 'bg-blue-300/50' : v === 1 ? 'bg-blue-200/40' : 'bg-background')
+                                                                    : (v >= 3 ? 'bg-amber-400/60' : v === 2 ? 'bg-amber-300/50' : v === 1 ? 'bg-amber-200/40' : 'bg-background');
+                                                                return (
+                                                                    <div key={`${dk}-${h}`} className={`flex h-6 items-center justify-center ${bg}`}>
+                                                                        <span className="text-[10px] font-medium">{v > 0 ? v : ''}</span>
+                                                                    </div>
+                                                                );
+                                                            })}
+                                                        </Fragment>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                                            <span className="flex items-center gap-1.5"><span className="inline-block h-3.5 w-3.5 rounded border bg-background" /> No coverage</span>
+                                            <span className="flex items-center gap-1.5"><span className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-blue-200/40' : 'bg-amber-200/40'}`} /> 1 staff</span>
+                                            <span className="flex items-center gap-1.5"><span className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-blue-300/50' : 'bg-amber-300/50'}`} /> 2 staff</span>
+                                            <span className="flex items-center gap-1.5"><span className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-blue-400/60' : 'bg-amber-400/60'}`} /> 3+ staff</span>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ),
+                        },
+                        {
+                            key: 'analytics',
+                            label: (
+                                <span className="flex items-center gap-2">
+                                    <BarChart3 className="h-3.5 w-3.5" /> Analytics
+                                </span>
+                            ),
+                            content: (
+                                <div className="space-y-4">
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        {/* Daily Coverage Chart */}
+                                        <Card>
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-base">Daily Shift Coverage</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {props.analytics.dailyCoverage.length > 0 ? (
+                                                    <ResponsiveContainer width="100%" height={220}>
+                                                        <BarChart data={props.analytics.dailyCoverage}>
+                                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                                            <XAxis dataKey="day" tick={{ fontSize: 12 }} />
+                                                            <YAxis tick={{ fontSize: 12 }} />
+                                                            <Tooltip />
+                                                            <Bar dataKey="filled" stackId="a" fill="#10b981" name="Filled" radius={[0, 0, 0, 0]} />
+                                                            <Bar dataKey="open" stackId="a" fill="#ef4444" name="Open" radius={[4, 4, 0, 0]} />
+                                                            <Legend />
+                                                        </BarChart>
+                                                    </ResponsiveContainer>
+                                                ) : (
+                                                    <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">No shift data</div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+
+                                        {/* Shift Type Distribution */}
+                                        <Card>
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-base">Shift Type Distribution</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {props.analytics.shiftTypeDistribution.length > 0 ? (
+                                                    <ResponsiveContainer width="100%" height={220}>
+                                                        <PieChart>
+                                                            <Pie data={props.analytics.shiftTypeDistribution} dataKey="value" nameKey="type" cx="50%" cy="50%" outerRadius={70} innerRadius={40} paddingAngle={2}>
+                                                                {props.analytics.shiftTypeDistribution.map((entry, i) => (
+                                                                    <Cell key={entry.type} fill={CHART_COLORS[i % CHART_COLORS.length]} />
+                                                                ))}
+                                                            </Pie>
+                                                            <Tooltip />
+                                                            <Legend />
+                                                        </PieChart>
+                                                    </ResponsiveContainer>
+                                                ) : (
+                                                    <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">No shift data</div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    </div>
+
+                                    <div className="grid gap-4 sm:grid-cols-2">
+                                        {/* 4-Week Historical Trend */}
+                                        <Card>
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-base">4-Week Trend</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                {props.analytics.historicalTrend.length > 0 ? (
+                                                    <ResponsiveContainer width="100%" height={200}>
+                                                        <AreaChart data={props.analytics.historicalTrend}>
+                                                            <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
+                                                            <XAxis dataKey="week" tick={{ fontSize: 12 }} />
+                                                            <YAxis tick={{ fontSize: 12 }} />
+                                                            <Tooltip />
+                                                            <Area type="monotone" dataKey="completed" stroke="#10b981" fill="#10b981" fillOpacity={0.3} name="Completed" />
+                                                            <Area type="monotone" dataKey="cancelled" stroke="#ef4444" fill="#ef4444" fillOpacity={0.3} name="Cancelled" />
+                                                            <Legend />
+                                                        </AreaChart>
+                                                    </ResponsiveContainer>
+                                                ) : (
+                                                    <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">No historical data</div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+
+                                        {/* Compliance & Leave Sidebar */}
+                                        <div className="space-y-4">
+                                            <Card className={props.analytics.complianceExpired > 0 ? 'border-red-500/20' : ''}>
+                                                <CardHeader className="pb-3">
+                                                    <CardTitle className="flex items-center gap-2 text-base">
+                                                        <AlertTriangle className="h-4 w-4" /> Compliance Alerts
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent className="space-y-2">
+                                                    <div className="flex items-center justify-between rounded-md border p-2 text-sm">
+                                                        <span>Expired (hard-stop)</span>
+                                                        <Badge variant={props.analytics.complianceExpired > 0 ? 'destructive' : 'outline'}>
+                                                            {props.analytics.complianceExpired}
+                                                        </Badge>
+                                                    </div>
+                                                    <div className="flex items-center justify-between rounded-md border p-2 text-sm">
+                                                        <span>Expiring soon</span>
+                                                        <Badge variant={props.analytics.complianceExpiring > 0 ? 'default' : 'outline'}>
+                                                            {props.analytics.complianceExpiring}
+                                                        </Badge>
+                                                    </div>
+                                                </CardContent>
+                                            </Card>
+
+                                            <Card>
+                                                <CardHeader className="pb-3">
+                                                    <CardTitle className="flex items-center gap-2 text-base">
+                                                        <CalendarOff className="h-4 w-4" /> Leave This Week
+                                                    </CardTitle>
+                                                </CardHeader>
+                                                <CardContent>
+                                                    <p className="text-2xl font-bold">{props.analytics.onLeaveCount}</p>
+                                                    <p className="text-xs text-muted-foreground">staff members on approved leave</p>
+                                                    <Button variant="outline" size="sm" className="mt-3 w-full" asChild>
+                                                        <Link href="/hr/leave">View Leave Dashboard</Link>
+                                                    </Button>
+                                                </CardContent>
+                                            </Card>
+                                        </div>
+                                    </div>
+                                </div>
                             ),
                         },
                     ]}

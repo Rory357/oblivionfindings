@@ -19,9 +19,11 @@ use App\Domain\Hr\Models\HrPolicy;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\AttendanceService;
 use App\Domain\Hr\Services\EngagementService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\TimeTrackingService;
+use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -35,6 +37,7 @@ class MyHrController extends Controller
         private readonly LeaveService $leaveService,
         private readonly EngagementService $engagementService,
         private readonly TimeTrackingService $timeTrackingService,
+        private readonly AttendanceService $attendanceService,
     ) {}
 
     public function index(Request $request)
@@ -629,6 +632,177 @@ class MyHrController extends Controller
         }
 
         return redirect()->back()->with('success', 'Survey response submitted.');
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Time Tracking (Self-Service)                                       */
+    /* ------------------------------------------------------------------ */
+
+    public function time(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $activeClock = HrTimeEntry::forTenant($tenantId)
+            ->forUser($user->id)
+            ->active()
+            ->first(['id', 'clock_in', 'notes', 'shift_id']);
+
+        $todayEntries = HrTimeEntry::forTenant($tenantId)
+            ->forUser($user->id)
+            ->where('entry_date', now()->toDateString())
+            ->with('shift:id,starts_at,ends_at', 'shift.client:id,first_name,last_name', 'client:id,first_name,last_name')
+            ->orderBy('clock_in')
+            ->get()
+            ->map(fn ($entry) => [
+                'id' => $entry->id,
+                'entry_date' => $entry->entry_date->toDateString(),
+                'clock_in' => $entry->clock_in->format('H:i'),
+                'clock_out' => $entry->clock_out?->format('H:i'),
+                'break_minutes' => $entry->break_minutes,
+                'total_hours' => $entry->total_hours,
+                'entry_type' => $entry->entry_type,
+                'status' => $entry->status,
+                'pay_type' => $entry->pay_type ?? 'standard',
+                'notes' => $entry->notes,
+                'shift' => $entry->shift ? [
+                    'id' => $entry->shift->id,
+                    'starts_at' => $entry->shift->starts_at?->format('H:i'),
+                    'ends_at' => $entry->shift->ends_at?->format('H:i'),
+                    'client_name' => trim(($entry->shift->client?->first_name ?? '') . ' ' . ($entry->shift->client?->last_name ?? '')),
+                ] : null,
+                'client_name' => $entry->client
+                    ? trim(($entry->client->first_name ?? '') . ' ' . ($entry->client->last_name ?? ''))
+                    : null,
+            ]);
+
+        $weeklySummary = $this->timeTrackingService->getWeeklySummary($tenantId, $user->id);
+
+        // Upcoming shifts for the next 3 days
+        $upcomingShifts = Shift::where('user_id', $user->id)
+            ->whereIn('status', ['scheduled', 'draft'])
+            ->where('starts_at', '>=', now())
+            ->where('starts_at', '<=', now()->addDays(3))
+            ->with('client:id,first_name,last_name')
+            ->orderBy('starts_at')
+            ->limit(10)
+            ->get()
+            ->map(fn ($shift) => [
+                'id' => $shift->id,
+                'starts_at' => $shift->starts_at?->format('Y-m-d H:i'),
+                'ends_at' => $shift->ends_at?->format('Y-m-d H:i'),
+                'shift_type' => $shift->shift_type ?? 'standard',
+                'client_name' => trim(($shift->client?->first_name ?? '') . ' ' . ($shift->client?->last_name ?? '')),
+                'location' => $shift->location,
+                'status' => $shift->status,
+            ]);
+
+        return Inertia::render('hr/my/time', [
+            'activeClock' => $activeClock ? [
+                'id' => $activeClock->id,
+                'clock_in' => $activeClock->clock_in->format('Y-m-d H:i'),
+                'notes' => $activeClock->notes,
+            ] : null,
+            'todayEntries' => $todayEntries,
+            'weeklySummary' => $weeklySummary,
+            'upcomingShifts' => $upcomingShifts,
+        ]);
+    }
+
+    public function clockIn(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        try {
+            $session = $this->attendanceService->clockIn($user, [
+                'shift_id' => $validated['shift_id'] ?? null,
+                'notes' => $validated['notes'] ?? null,
+                'source' => 'self_service',
+            ]);
+
+            // Create corresponding HrTimeEntry
+            HrTimeEntry::create([
+                'tenant_id' => $user->tenant_id,
+                'user_id' => $user->id,
+                'shift_id' => $session->shift_id,
+                'attendance_session_id' => $session->id,
+                'site_id' => $session->site_id,
+                'client_id' => $session->shift?->client_id,
+                'entry_date' => $session->clock_in_at->toDateString(),
+                'clock_in' => $session->clock_in_at,
+                'entry_type' => 'clock',
+                'status' => 'active',
+                'source_type' => 'attendance',
+                'source_id' => $session->id,
+                'pay_type' => $session->shift?->is_sleepover ? 'sleepover' : ($session->shift?->is_on_call ? 'on_call' : 'standard'),
+                'is_sleepover' => (bool) $session->shift?->is_sleepover,
+                'is_on_call' => (bool) $session->shift?->is_on_call,
+                'notes' => $validated['notes'] ?? null,
+                'created_by' => $user->id,
+            ]);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Clocked in successfully.');
+    }
+
+    public function clockOut(Request $request)
+    {
+        $user = $request->user();
+
+        $validated = $request->validate([
+            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
+            'mileage_km' => ['nullable', 'numeric', 'min:0', 'max:9999'],
+            'notes' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        try {
+            $session = $this->attendanceService->clockOut($user, null, [
+                'break_minutes' => $validated['break_minutes'] ?? 0,
+                'notes' => $validated['notes'] ?? null,
+            ]);
+
+            // Update corresponding HrTimeEntry
+            $entry = HrTimeEntry::where('attendance_session_id', $session->id)
+                ->where('user_id', $user->id)
+                ->first();
+
+            if ($entry) {
+                $totalMinutes = $session->clock_in_at->diffInMinutes($session->clock_out_at) - ($session->break_minutes ?? 0);
+                $totalHours = max(0, round($totalMinutes / 60, 2));
+
+                // Check break compliance (NZ: 10min rest per 2h, 30min meal per 4h)
+                $workedHours = $totalMinutes / 60;
+                $breakMinutes = $session->break_minutes ?? 0;
+                $requiredBreak = 0;
+                if ($workedHours >= 4) {
+                    $requiredBreak = 30;
+                } elseif ($workedHours >= 2) {
+                    $requiredBreak = 10;
+                }
+                $breakCompliant = $breakMinutes >= $requiredBreak;
+
+                $entry->update([
+                    'clock_out' => $session->clock_out_at,
+                    'break_minutes' => $session->break_minutes ?? 0,
+                    'total_hours' => $totalHours,
+                    'mileage_km' => $validated['mileage_km'] ?? null,
+                    'break_compliance_met' => $breakCompliant,
+                    'notes' => $validated['notes'] ?? $entry->notes,
+                    'status' => 'submitted',
+                ]);
+            }
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Clocked out successfully.');
     }
 
     public function documents(Request $request)

@@ -8,11 +8,15 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Services\HrWebhookService;
+use App\Domain\Hr\Services\LeaveReportService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Http\Requests\Hr\StoreLeaveRequestFormRequest;
+use App\Models\Shift;
 use App\Models\User;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
@@ -115,6 +119,111 @@ class LeaveController extends Controller
             ])
             ->values();
 
+        // --- Dashboard Analytics ---
+
+        // Monthly leave trend (last 6 months)
+        $monthlyTrend = HrLeaveRequest::forTenant($tenantId)
+            ->where('submitted_at', '>=', now()->subMonths(6)->startOfMonth())
+            ->selectRaw("DATE_FORMAT(submitted_at, '%Y-%m') as month")
+            ->selectRaw("SUM(CASE WHEN status = 'approved' THEN 1 ELSE 0 END) as approved")
+            ->selectRaw("SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending")
+            ->selectRaw("SUM(CASE WHEN status = 'declined' THEN 1 ELSE 0 END) as declined")
+            ->selectRaw('SUM(hours_requested) as total_hours')
+            ->groupByRaw("DATE_FORMAT(submitted_at, '%Y-%m')")
+            ->orderBy('month')
+            ->get()
+            ->map(fn ($row) => [
+                'month' => Carbon::parse($row->month . '-01')->format('M'),
+                'approved' => (int) $row->approved,
+                'pending' => (int) $row->pending,
+                'declined' => (int) $row->declined,
+                'total_hours' => round((float) $row->total_hours, 1),
+            ]);
+
+        // Leave type breakdown (current year)
+        $typeBreakdown = HrLeaveRequest::forTenant($tenantId)
+            ->whereIn('status', ['approved', 'pending'])
+            ->whereYear('submitted_at', now()->year)
+            ->selectRaw('leave_type, COUNT(*) as count')
+            ->groupBy('leave_type')
+            ->get()
+            ->map(fn ($row) => [
+                'type' => ucwords(str_replace('_', ' ', $row->leave_type)),
+                'value' => (int) $row->count,
+            ]);
+
+        // Top 5 absentees (sick leave this year)
+        $topAbsentees = HrLeaveRequest::forTenant($tenantId)
+            ->where('status', 'approved')
+            ->where('leave_type', 'sick')
+            ->whereYear('starts_at', now()->year)
+            ->with('user:id,name')
+            ->selectRaw('user_id, SUM(hours_requested) as total_hours, COUNT(*) as occurrences')
+            ->groupBy('user_id')
+            ->orderByDesc('total_hours')
+            ->limit(5)
+            ->get()
+            ->map(fn ($row) => [
+                'name' => $row->user?->name ?? 'Unknown',
+                'hours' => round((float) $row->total_hours, 1),
+                'occurrences' => (int) $row->occurrences,
+            ]);
+
+        // Staff on leave today
+        $onLeaveToday = HrLeaveRequest::forTenant($tenantId)
+            ->where('status', 'approved')
+            ->where('starts_at', '<=', now())
+            ->where('ends_at', '>=', now())
+            ->with('user:id,name')
+            ->get()
+            ->map(fn ($req) => [
+                'id' => $req->id,
+                'name' => $req->user?->name ?? 'Unknown',
+                'leave_type' => $req->leave_type,
+                'end_date' => $req->ends_at?->toDateString(),
+            ]);
+
+        // Upcoming leave this week
+        $upcomingLeaveThisWeek = HrLeaveRequest::forTenant($tenantId)
+            ->where('status', 'approved')
+            ->where('starts_at', '>', now())
+            ->where('starts_at', '<=', now()->endOfWeek())
+            ->with('user:id,name')
+            ->orderBy('starts_at')
+            ->limit(10)
+            ->get()
+            ->map(fn ($req) => [
+                'id' => $req->id,
+                'name' => $req->user?->name ?? 'Unknown',
+                'leave_type' => $req->leave_type,
+                'start_date' => $req->starts_at?->toDateString(),
+            ]);
+
+        // Leave utilisation overview
+        $totalActiveStaff = HrEmployeeProfile::where('tenant_id', $tenantId)->where('is_active', true)->count();
+
+        // Absence rate (last 30 days)
+        $sickDaysLast30 = HrLeaveRequest::forTenant($tenantId)
+            ->where('status', 'approved')
+            ->where('leave_type', 'sick')
+            ->where('starts_at', '>=', now()->subDays(30))
+            ->sum('hours_requested');
+        $possibleHours = max(1, $totalActiveStaff * 160); // ~20 working days × 8h
+        $absenceRate = round(((float) $sickDaysLast30 / $possibleHours) * 100, 1);
+
+        // Roster impact: shifts affected by pending leave
+        $pendingLeaveUserIds = HrLeaveRequest::forTenant($tenantId)
+            ->where('status', 'pending')
+            ->pluck('user_id')
+            ->unique();
+        $rosterImpact = 0;
+        if ($pendingLeaveUserIds->isNotEmpty()) {
+            $rosterImpact = Shift::whereIn('user_id', $pendingLeaveUserIds)
+                ->whereIn('status', ['scheduled', 'draft'])
+                ->where('starts_at', '>=', now())
+                ->count();
+        }
+
         return Inertia::render('hr/leave/index', [
             'requests' => $requests,
             'filters' => [
@@ -124,6 +233,16 @@ class LeaveController extends Controller
             ],
             'sla' => $sla,
             'pendingAging' => $pendingAging,
+            'dashboardData' => [
+                'monthlyTrend' => $monthlyTrend,
+                'typeBreakdown' => $typeBreakdown,
+                'topAbsentees' => $topAbsentees,
+                'onLeaveToday' => $onLeaveToday,
+                'upcomingLeaveThisWeek' => $upcomingLeaveThisWeek,
+                'absenceRate' => $absenceRate,
+                'totalActiveStaff' => $totalActiveStaff,
+                'rosterImpact' => $rosterImpact,
+            ],
             'can' => [
                 'approve' => $canApprove,
                 'manage'  => $canManage,
