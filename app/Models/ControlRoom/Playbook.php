@@ -3,12 +3,20 @@
 namespace App\Models\ControlRoom;
 
 use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Playbook extends Model
 {
+    use HasFactory;
+
+    protected static function newFactory(): \Database\Factories\PlaybookFactory
+    {
+        return \Database\Factories\PlaybookFactory::new();
+    }
+
     protected $table = 'control_room_playbooks';
 
     protected $fillable = [

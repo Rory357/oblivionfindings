@@ -12,24 +12,16 @@ class ClientMedicationFactory extends Factory
 
     public function definition(): array
     {
-        $isPrn = fake()->boolean(30);
-        
         return [
             'client_id' => Client::factory(),
             'name' => fake()->randomElement(['Paracetamol', 'Ibuprofen', 'Aspirin', 'Metformin', 'Omeprazole']),
-            'generic_name' => fake()->optional()->word(),
             'dosage' => fake()->randomElement(['500mg', '1000mg', '10mg', '20mg']),
+            'frequency' => fake()->randomElement(['Once daily', 'Twice daily', 'Three times daily']),
             'route' => fake()->randomElement(['oral', 'sublingual', 'topical', 'inhalation']),
-            'frequency' => $isPrn ? null : fake()->randomElement(['Once daily', 'Twice daily', 'Three times daily']),
-            'prescribed_time' => $isPrn ? null : fake()->time('H:i'),
-            'is_prn' => $isPrn,
-            'prn_reason' => $isPrn ? fake()->sentence() : null,
-            'instructions' => fake()->optional()->paragraph(),
             'prescriber' => fake()->name(),
-            'prescribed_date' => fake()->date(),
-            'is_controlled' => fake()->boolean(10),
-            'stock_count' => fake()->optional()->numberBetween(0, 100),
-            'is_active' => true,
+            'start_date' => fake()->date(),
+            'end_date' => fake()->optional(0.3)->date(),
+            'instructions' => fake()->optional()->paragraph(),
         ];
     }
 }

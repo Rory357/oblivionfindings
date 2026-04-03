@@ -13,6 +13,11 @@ class HrPerformanceReview extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Hr\HrPerformanceReviewFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'employee_user_id',

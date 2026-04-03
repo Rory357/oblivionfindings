@@ -13,6 +13,11 @@ class FinPettyCashFund extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinPettyCashFundFactory::new();
+    }
+
     protected $table = 'fin_petty_cash_funds';
 
     protected $fillable = [

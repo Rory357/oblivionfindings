@@ -14,6 +14,11 @@ class HrPosition extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Hr\HrPositionFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'title',

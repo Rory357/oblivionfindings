@@ -14,6 +14,11 @@ class HrAnnouncement extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Hr\HrAnnouncementFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'title',

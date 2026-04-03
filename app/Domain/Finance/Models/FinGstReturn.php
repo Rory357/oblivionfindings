@@ -13,6 +13,11 @@ class FinGstReturn extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinGstReturnFactory::new();
+    }
+
     protected $table = 'fin_gst_returns';
 
     protected $fillable = [

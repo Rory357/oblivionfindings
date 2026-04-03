@@ -14,6 +14,11 @@ class FinVendor extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinVendorFactory::new();
+    }
+
     protected $table = 'fin_vendors';
 
     protected $fillable = [

@@ -4,6 +4,7 @@ namespace App\Domain\Governance\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -11,7 +12,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class GovernancePolicy extends Model
 {
-    use AuditableChanges, SoftDeletes;
+    use AuditableChanges, HasFactory, SoftDeletes;
+
+    protected static function newFactory()
+    {
+        return \Database\Factories\Governance\GovernancePolicyFactory::new();
+    }
 
     protected $fillable = [
         'policy_code', 'title', 'category', 'purpose', 'content',

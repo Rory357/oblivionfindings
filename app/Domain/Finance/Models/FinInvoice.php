@@ -14,6 +14,11 @@ class FinInvoice extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinInvoiceFactory::new();
+    }
+
     protected $table = 'fin_invoices';
 
     protected $fillable = [

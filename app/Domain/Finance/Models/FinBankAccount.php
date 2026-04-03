@@ -14,6 +14,11 @@ class FinBankAccount extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinBankAccountFactory::new();
+    }
+
     protected $table = 'fin_bank_accounts';
 
     protected $fillable = [

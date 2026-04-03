@@ -14,6 +14,11 @@ class FinJournal extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinJournalFactory::new();
+    }
+
     protected $table = 'fin_journals';
 
     protected $fillable = [

@@ -14,6 +14,11 @@ class HrJobPosting extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Hr\HrJobPostingFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'position_id',

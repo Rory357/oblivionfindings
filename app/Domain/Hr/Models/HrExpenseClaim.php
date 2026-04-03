@@ -12,6 +12,11 @@ class HrExpenseClaim extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Hr\HrExpenseClaimFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'user_id',

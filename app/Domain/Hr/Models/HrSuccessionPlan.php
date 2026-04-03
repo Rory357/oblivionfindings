@@ -14,6 +14,11 @@ class HrSuccessionPlan extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Hr\HrSuccessionPlanFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'position_id',

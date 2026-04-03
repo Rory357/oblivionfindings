@@ -14,12 +14,10 @@ class ClientMedicalProfileFactory extends Factory
     {
         return [
             'client_id' => Client::factory(),
-            'nhi_number' => fake()->regexify('[A-Z]{3}[0-9]{4}'),
-            'blood_type' => fake()->randomElement(['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-']),
+            'medical_history' => fake()->optional()->paragraph(),
+            'disabilities' => fake()->optional()->paragraph(),
             'allergies' => fake()->optional()->paragraph(),
-            'dietary_requirements' => fake()->optional()->paragraph(),
-            'mobility_notes' => fake()->optional()->paragraph(),
-            'communication_notes' => fake()->optional()->paragraph(),
+            'notes' => fake()->optional()->paragraph(),
         ];
     }
 }

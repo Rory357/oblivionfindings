@@ -13,6 +13,11 @@ class HrOnboardingChecklist extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Hr\HrOnboardingChecklistFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'employee_profile_id',

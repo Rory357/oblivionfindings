@@ -13,6 +13,11 @@ class FinPaymentRun extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinPaymentRunFactory::new();
+    }
+
     protected $table = 'fin_payment_runs';
 
     protected $fillable = [

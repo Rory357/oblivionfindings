@@ -14,6 +14,11 @@ class FinCreditNote extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinCreditNoteFactory::new();
+    }
+
     protected $table = 'fin_credit_notes';
 
     protected $fillable = [

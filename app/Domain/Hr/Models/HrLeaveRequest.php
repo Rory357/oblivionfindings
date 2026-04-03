@@ -12,6 +12,11 @@ class HrLeaveRequest extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Hr\HrLeaveRequestFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'user_id',

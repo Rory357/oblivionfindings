@@ -14,6 +14,11 @@ class FinCashFlowForecast extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinCashFlowForecastFactory::new();
+    }
+
     protected $table = 'fin_cash_flow_forecasts';
 
     protected $fillable = [

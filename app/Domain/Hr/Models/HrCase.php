@@ -15,6 +15,11 @@ class HrCase extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Hr\HrCaseFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'case_number',

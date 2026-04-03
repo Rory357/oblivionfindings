@@ -14,6 +14,11 @@ class FinPurchaseOrder extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinPurchaseOrderFactory::new();
+    }
+
     protected $table = 'fin_purchase_orders';
 
     protected $fillable = [

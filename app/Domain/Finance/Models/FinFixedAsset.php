@@ -14,6 +14,11 @@ class FinFixedAsset extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinFixedAssetFactory::new();
+    }
+
     protected $table = 'fin_fixed_assets';
 
     protected $fillable = [

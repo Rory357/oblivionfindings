@@ -15,6 +15,11 @@ class FinDonorFund extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinDonorFundFactory::new();
+    }
+
     protected $table = 'fin_donor_funds';
 
     protected $fillable = [

@@ -15,6 +15,11 @@ class GovernanceMeeting extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Governance\GovernanceMeetingFactory::new();
+    }
+
     protected $fillable = [
         'meeting_type',
         'board_committee_id',

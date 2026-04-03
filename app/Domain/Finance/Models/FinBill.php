@@ -15,6 +15,11 @@ class FinBill extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Finance\FinBillFactory::new();
+    }
+
     protected $table = 'fin_bills';
 
     protected $fillable = [

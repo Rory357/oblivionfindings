@@ -3,12 +3,13 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class FleetWorkOrder extends Model
 {
-    use AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'tenant_id',

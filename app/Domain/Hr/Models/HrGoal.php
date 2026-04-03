@@ -15,6 +15,11 @@ class HrGoal extends Model
 {
     use HasFactory, SoftDeletes, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\Hr\HrGoalFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'user_id',
