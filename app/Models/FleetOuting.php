@@ -14,7 +14,6 @@ class FleetOuting extends Model
     use AuditableChanges, HasFactory;
 
     protected $fillable = [
-        'organisation_id',
         'title',
         'destination',
         'purpose',

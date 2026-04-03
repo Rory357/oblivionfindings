@@ -12,7 +12,6 @@ class FleetShiftHandover extends Model
     use AuditableChanges, HasFactory;
 
     protected $fillable = [
-        'organisation_id',
         'asset_id',
         'outgoing_user_id',
         'incoming_user_id',

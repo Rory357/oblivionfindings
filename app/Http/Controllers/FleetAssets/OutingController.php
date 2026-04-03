@@ -218,7 +218,6 @@ class OutingController extends Controller
 
         $outing = DB::transaction(function () use ($data, $request) {
             $outing = FleetOuting::create([
-                'organisation_id' => $request->user()->organisation_id ?? $request->user()->organization_id ?? 1,
                 'title' => $data['title'],
                 'destination' => $data['destination'],
                 'purpose' => $data['purpose'] ?? null,

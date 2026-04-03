@@ -19,7 +19,13 @@ class RespiteStay extends Model
         'status',
         'actual_start',
         'actual_end',
+        'arrival_checklist',
+        'arrival_checklist_complete',
         'discharge_summary',
+        'discharge_checklist',
+        'discharge_checklist_complete',
+        'post_respite_summary',
+        'transport_arrangements',
         'evidence_pack_id',
         'created_by',
         'updated_by',
@@ -28,6 +34,11 @@ class RespiteStay extends Model
     protected $casts = [
         'actual_start' => 'datetime',
         'actual_end' => 'datetime',
+        'arrival_checklist' => 'array',
+        'arrival_checklist_complete' => 'boolean',
+        'discharge_checklist' => 'array',
+        'discharge_checklist_complete' => 'boolean',
+        'transport_arrangements' => 'array',
     ];
 
     public function booking(): BelongsTo
@@ -53,5 +64,20 @@ class RespiteStay extends Model
     public function communications(): HasMany
     {
         return $this->hasMany(RespiteCommunicationLog::class, 'stay_id');
+    }
+
+    public function dailyNotes(): HasMany
+    {
+        return $this->hasMany(RespiteDailyNote::class, 'stay_id');
+    }
+
+    public function riskPlanActivations(): HasMany
+    {
+        return $this->hasMany(RespiteRiskPlanActivation::class, 'stay_id');
+    }
+
+    public function createdByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
     }
 }

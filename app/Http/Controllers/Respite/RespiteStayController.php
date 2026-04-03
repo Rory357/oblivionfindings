@@ -12,6 +12,17 @@ use Inertia\Response;
 
 class RespiteStayController extends Controller
 {
+    public function index(): Response
+    {
+        $stays = RespiteStay::with(['client', 'booking'])
+            ->latest()
+            ->paginate(25);
+
+        return Inertia::render('respite/stays/index', [
+            'stays' => $stays,
+        ]);
+    }
+
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
@@ -38,7 +49,16 @@ class RespiteStayController extends Controller
 
     public function show(RespiteStay $stay): Response
     {
-        $stay->load(['client', 'booking', 'evidencePack', 'handovers', 'communications']);
+        $stay->load([
+            'client',
+            'booking.coordinator',
+            'evidencePack',
+            'handovers',
+            'communications',
+            'dailyNotes',
+            'riskPlanActivations',
+            'createdByUser',
+        ]);
 
         return Inertia::render('respite/stays/show', [
             'stay' => $stay,

@@ -11,7 +11,6 @@ class FleetIncident extends Model
     use AuditableChanges;
 
     protected $fillable = [
-        'organisation_id',
         'asset_id',
         'reported_by_user_id',
         'driver_user_id',

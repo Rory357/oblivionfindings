@@ -117,6 +117,7 @@ class RbacSeeder extends Seeder
             ['key' => 'settings.access.create_roles', 'description' => 'Create custom roles', 'group' => 'access_control', 'module' => 'System'],
             ['key' => 'settings.access.edit_roles', 'description' => 'Edit role permissions', 'group' => 'access_control', 'module' => 'System'],
             ['key' => 'settings.access.delete_roles', 'description' => 'Delete custom roles', 'group' => 'access_control', 'module' => 'System'],
+            ['key' => 'settings.access.impersonate', 'description' => 'Impersonate other users', 'group' => 'access_control', 'module' => 'System'],
             
             // Sites
             ['key' => 'sites.viewAny', 'description' => 'View sites', 'group' => 'sites', 'module' => 'Operations'],

@@ -73,6 +73,11 @@ class HandleInertiaRequests extends Middleware
 
                 // NEW: capability map for the UI
                 'can' => $can,
+
+                'impersonating' => $user ? app('impersonate')->isImpersonating() : false,
+                'impersonator' => $user && app('impersonate')->isImpersonating()
+                    ? \App\Models\User::find(app('impersonate')->getImpersonatorId())?->only('id', 'name')
+                    : null,
             ],
 
             'labels' => $labels,
@@ -345,6 +350,7 @@ class HandleInertiaRequests extends Middleware
                     'sitesManage' => $user->canDo('settings.sites.manage'),
                     'templatesManage' => $user->canDo('settings.templates.manage'),
                     'rbacManage' => $user->canDo('settings.rbac.manage'),
+                    'impersonate' => $user->canDo('settings.access.impersonate'),
                 ],
 
                 'safeguarding' => [

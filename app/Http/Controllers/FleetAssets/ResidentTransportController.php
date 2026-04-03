@@ -270,15 +270,12 @@ class ResidentTransportController extends Controller
         $data['driver_user_id'] = $request->user()->id;
         $data['status'] = 'in_progress';
         $data['passengers_count'] = $data['passengers_count'] ?? 1;
-        $data['tenant_id'] = $request->user()->organisation_id ?? $request->user()->organization_id ?? 1;
-
         $transport = FleetResidentTransport::create(collect($data)->except(['medications', 'client_id'])->toArray());
 
         // Create medication transit logs if medications were packed
         if (!empty($data['medications']) && !empty($data['client_id']) && Schema::hasTable('fleet_medication_transit_logs')) {
             foreach ($data['medications'] as $med) {
                 FleetMedicationTransitLog::create([
-                    'tenant_id' => $request->user()->organisation_id ?? $request->user()->organization_id ?? 1,
                     'transport_id' => $transport->id,
                     'client_id' => $data['client_id'],
                     'medication_id' => $med['medication_id'],
@@ -559,7 +556,6 @@ class ResidentTransportController extends Controller
         ]);
 
         $log = FleetMedicationTransitLog::create([
-            'tenant_id' => $request->user()->organisation_id ?? $request->user()->organization_id ?? 1,
             'transport_id' => $transport->id,
             'client_id' => $data['client_id'],
             'medication_id' => $data['medication_id'] ?? null,

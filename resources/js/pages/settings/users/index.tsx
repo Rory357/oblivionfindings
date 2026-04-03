@@ -14,6 +14,13 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -33,8 +40,8 @@ import {
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import SettingsLayout from '@/layouts/settings/layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     CheckCircle,
     Clock,
@@ -46,6 +53,7 @@ import {
     Shield,
     ShieldCheck,
     ShieldAlert,
+    UserCog,
     UserMinus,
     UserPlus,
     Users,
@@ -164,6 +172,8 @@ export default function UsersIndex({
     const [activityFilter, setActivityFilter] = useState(filters.activity ?? 'all');
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [inviteOpen, setInviteOpen] = useState(false);
+    const { auth } = usePage<SharedData>().props;
+    const canImpersonate = (auth.can as any)?.settings?.impersonate;
 
     const inviteForm = useForm({
         name: '',
@@ -237,6 +247,10 @@ export default function UsersIndex({
                 inviteForm.reset();
             },
         });
+    }
+
+    function handleImpersonate(userId: number) {
+        router.post(`/system/users/${userId}/impersonate`);
     }
 
     function handleSuspend(userId: number) {
@@ -528,7 +542,7 @@ export default function UsersIndex({
                                             <TableHead>Last Login</TableHead>
                                             <TableHead className="w-20">Sessions</TableHead>
                                             <TableHead className="w-10">2FA</TableHead>
-                                            <TableHead className="w-20">Actions</TableHead>
+                                            <TableHead className="w-14">Actions</TableHead>
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
@@ -605,37 +619,47 @@ export default function UsersIndex({
                                                     )}
                                                 </TableCell>
                                                 <TableCell onClick={(e) => e.stopPropagation()}>
-                                                    <div className="flex gap-1">
-                                                        <Button
-                                                            size="icon"
-                                                            variant="ghost"
-                                                            className="h-8 w-8"
-                                                            asChild
-                                                        >
-                                                            <Link href={`/settings/users/${user.id}`}>
-                                                                <Pencil className="h-3.5 w-3.5" />
-                                                            </Link>
-                                                        </Button>
-                                                        {user.is_active ? (
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                className="h-8 w-8 text-red-600 hover:bg-red-50 hover:text-red-700"
-                                                                onClick={() => handleSuspend(user.id)}
-                                                            >
-                                                                <UserMinus className="h-3.5 w-3.5" />
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button size="icon" variant="ghost" className="h-8 w-8">
+                                                                <MoreHorizontal className="h-4 w-4" />
                                                             </Button>
-                                                        ) : (
-                                                            <Button
-                                                                size="icon"
-                                                                variant="ghost"
-                                                                className="h-8 w-8 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700"
-                                                                onClick={() => handleApprove(user.id)}
-                                                            >
-                                                                <CheckCircle className="h-3.5 w-3.5" />
-                                                            </Button>
-                                                        )}
-                                                    </div>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end">
+                                                            <DropdownMenuItem asChild>
+                                                                <Link href={`/settings/users/${user.id}`}>
+                                                                    <Pencil className="mr-2 h-4 w-4" />
+                                                                    Edit
+                                                                </Link>
+                                                            </DropdownMenuItem>
+                                                            {canImpersonate &&
+                                                             user.id !== auth.user.id &&
+                                                             !user.roles?.some((r) => r.label === 'Administrator') && (
+                                                                <DropdownMenuItem onClick={() => handleImpersonate(user.id)}>
+                                                                    <UserCog className="mr-2 h-4 w-4" />
+                                                                    Impersonate
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                            <DropdownMenuSeparator />
+                                                            {user.is_active ? (
+                                                                <DropdownMenuItem
+                                                                    className="text-red-600 focus:text-red-600"
+                                                                    onClick={() => handleSuspend(user.id)}
+                                                                >
+                                                                    <UserMinus className="mr-2 h-4 w-4" />
+                                                                    Suspend
+                                                                </DropdownMenuItem>
+                                                            ) : (
+                                                                <DropdownMenuItem
+                                                                    className="text-emerald-600 focus:text-emerald-600"
+                                                                    onClick={() => handleApprove(user.id)}
+                                                                >
+                                                                    <CheckCircle className="mr-2 h-4 w-4" />
+                                                                    Approve
+                                                                </DropdownMenuItem>
+                                                            )}
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
                                                 </TableCell>
                                             </TableRow>
                                         ))}

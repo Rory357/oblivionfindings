@@ -69,6 +69,9 @@ Route::middleware(['auth'])->group(function () {
         ->name('respite.bookings.update');
 
     // Stays
+    Route::get('/respite/stays', [RespiteStayController::class, 'index'])
+        ->middleware('permission:respite.viewAny')
+        ->name('respite.stays.index');
     Route::middleware('permission:respite.stays.manage')->group(function () {
         Route::post('/respite/stays', [RespiteStayController::class, 'store'])->name('respite.stays.store');
         Route::post('/respite/stays/{stay}/check-in', [RespiteStayController::class, 'checkIn'])->name('respite.stays.checkin');

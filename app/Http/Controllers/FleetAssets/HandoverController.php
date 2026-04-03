@@ -136,7 +136,6 @@ class HandoverController extends Controller
         ]);
 
         $handover = FleetShiftHandover::create([
-            'organisation_id' => $request->user()->organisation_id ?? $request->user()->organization_id ?? 1,
             'asset_id' => $data['asset_id'],
             'outgoing_user_id' => $request->user()->id,
             'incoming_user_id' => $data['incoming_user_id'] ?? null,

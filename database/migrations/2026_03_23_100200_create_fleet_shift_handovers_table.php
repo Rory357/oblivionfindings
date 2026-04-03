@@ -13,7 +13,6 @@ return new class extends Migration
         }
         Schema::create('fleet_shift_handovers', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('organisation_id')->constrained()->cascadeOnDelete();
             $table->foreignId('asset_id')->constrained('assets');
             $table->foreignId('outgoing_user_id')->constrained('users');
             $table->foreignId('incoming_user_id')->nullable()->constrained('users');

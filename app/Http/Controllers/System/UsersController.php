@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
+use App\Services\AuditLogger;
 use Inertia\Inertia;
 
 class UsersController extends Controller
@@ -457,6 +458,53 @@ class UsersController extends Controller
             ->delete();
 
         return back()->with('success', 'All other sessions terminated.');
+    }
+
+    /**
+     * Impersonate a user
+     */
+    public function impersonate(Request $request, User $target)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('settings.access.impersonate'), 403);
+        abort_if($user->id === $target->id, 403, 'You cannot impersonate yourself.');
+        abort_if($target->hasRole('admin'), 403, 'Cannot impersonate administrators.');
+        abort_unless($target->canBeImpersonated(), 403, 'This user cannot be impersonated.');
+
+        AuditLogger::log('user.impersonate.start', $target, [
+            'impersonator_id' => $user->id,
+            'impersonator_name' => $user->name,
+            'target_id' => $target->id,
+            'target_name' => $target->name,
+        ]);
+
+        $user->impersonate($target);
+
+        return redirect()->route('dashboard')
+            ->with('info', "You are now impersonating {$target->name}.");
+    }
+
+    /**
+     * Stop impersonating
+     */
+    public function stopImpersonating(Request $request)
+    {
+        $manager = app('impersonate');
+        abort_unless($manager->isImpersonating(), 403, 'You are not impersonating anyone.');
+
+        $impersonatedUser = $request->user();
+        $impersonatorId = $manager->getImpersonatorId();
+
+        AuditLogger::log('user.impersonate.stop', $impersonatedUser, [
+            'impersonator_id' => $impersonatorId,
+            'target_id' => $impersonatedUser?->id,
+            'target_name' => $impersonatedUser?->name,
+        ]);
+
+        $manager->leave();
+
+        return redirect()->route('system.users.index')
+            ->with('success', 'You have stopped impersonating.');
     }
 
     /**

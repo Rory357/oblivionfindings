@@ -11,7 +11,6 @@ class FleetKeyLog extends Model
     use AuditableChanges;
 
     protected $fillable = [
-        'organisation_id',
         'asset_id',
         'user_id',
         'action',

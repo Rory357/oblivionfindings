@@ -4,6 +4,8 @@ import { LucideIcon } from 'lucide-react';
 export interface Auth {
     user: User;
     can?: Record<string, unknown>;
+    impersonating?: boolean;
+    impersonator?: { id: number; name: string } | null;
 }
 
 export interface BreadcrumbItem {

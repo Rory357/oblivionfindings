@@ -53,6 +53,13 @@ Route::middleware(['auth', 'verified'])->prefix('system')->group(function () {
         ->middleware('permission:settings.access.manage')
         ->name('system.access.assignments.update');
     
+    // Impersonation (must be before /users/{target} routes)
+    Route::post('/users/stop-impersonating', [UsersController::class, 'stopImpersonating'])
+        ->name('system.users.stop-impersonating');
+    Route::post('/users/{target}/impersonate', [UsersController::class, 'impersonate'])
+        ->middleware('permission:settings.access.impersonate')
+        ->name('system.users.impersonate');
+
     // Users Management
     Route::get('/users', [UsersController::class, 'index'])
         ->middleware('permission:settings.access.manage')

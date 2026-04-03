@@ -8,12 +8,11 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasTable('fleet_key_logs') || !Schema::hasTable('organisations')) {
+        if (Schema::hasTable('fleet_key_logs')) {
             return;
         }
         Schema::create('fleet_key_logs', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('organisation_id')->constrained()->cascadeOnDelete();
             $table->foreignId('asset_id')->constrained('assets');
             $table->foreignId('user_id')->constrained('users');
             $table->string('action'); // checked_out, returned, transferred

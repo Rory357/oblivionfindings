@@ -105,7 +105,6 @@ class KeyController extends Controller
         ]);
 
         $log = FleetKeyLog::create([
-            'organisation_id' => $request->user()->organisation_id ?? $request->user()->organization_id ?? 1,
             'asset_id' => $request->input('asset_id'),
             'user_id' => $request->input('user_id'),
             'action' => 'checked_out',
@@ -132,7 +131,6 @@ class KeyController extends Controller
         ]);
 
         $log = FleetKeyLog::create([
-            'organisation_id' => $request->user()->organisation_id ?? $request->user()->organization_id ?? 1,
             'asset_id' => $request->input('asset_id'),
             'user_id' => $request->user()->id,
             'action' => 'returned',
@@ -159,7 +157,6 @@ class KeyController extends Controller
         ]);
 
         $log = FleetKeyLog::create([
-            'organisation_id' => $request->user()->organisation_id ?? $request->user()->organization_id ?? 1,
             'asset_id' => $request->input('asset_id'),
             'user_id' => $request->user()->id,
             'action' => 'transferred',

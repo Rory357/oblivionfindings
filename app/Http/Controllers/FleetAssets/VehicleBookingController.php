@@ -253,8 +253,6 @@ class VehicleBookingController extends Controller
 
         $data['user_id'] = $request->user()->id;
         $data['status'] = 'pending';
-        $data['tenant_id'] = $request->user()->organisation_id ?? $request->user()->organization_id ?? 1;
-
         $booking = FleetVehicleBooking::create($data);
 
         AuditLogger::log('fleet.booking.create', $booking, [

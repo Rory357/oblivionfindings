@@ -193,8 +193,6 @@ class ServiceScheduleController extends Controller
             'next_due_km' => ['nullable', 'numeric', 'min:0'],
         ]);
 
-        $data['tenant_id'] = $request->user()->organisation_id ?? $request->user()->organization_id ?? 1;
-
         $schedule = FleetServiceSchedule::create($data);
 
         AuditLogger::log('fleet.service_schedule.create', $schedule, [

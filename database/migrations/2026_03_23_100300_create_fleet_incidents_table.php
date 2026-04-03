@@ -13,7 +13,6 @@ return new class extends Migration
         }
         Schema::create('fleet_incidents', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('organisation_id')->constrained()->cascadeOnDelete();
             $table->foreignId('asset_id')->constrained('assets');
             $table->foreignId('reported_by_user_id')->constrained('users');
             $table->foreignId('driver_user_id')->nullable()->constrained('users');

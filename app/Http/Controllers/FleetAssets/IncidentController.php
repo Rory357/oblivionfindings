@@ -191,7 +191,6 @@ class IncidentController extends Controller
         ]);
 
         $incident = FleetIncident::create([
-            'organisation_id' => $request->user()->organisation_id ?? $request->user()->organization_id ?? 1,
             'asset_id' => $data['asset_id'],
             'reported_by_user_id' => $request->user()->id,
             'driver_user_id' => $data['driver_user_id'] ?? null,
