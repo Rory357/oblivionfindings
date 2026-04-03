@@ -430,6 +430,22 @@ class ClientController extends Controller
                 'create_shift' => $request->user()?->canDo('shifts.create') ?? false,
                 'manage_onboarding_workflow' => $request->user()?->canDo('onboarding.edit') ?? false,
             ],
+            'photos' => \App\Models\ClientPhoto::where('client_id', $client->id)
+                ->with('uploadedBy:id,name')
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(fn($p) => [
+                    'id' => $p->id,
+                    'url' => $p->url,
+                    'thumbnail_url' => $p->thumbnail_url,
+                    'caption' => $p->caption,
+                    'tags' => $p->tags,
+                    'visibility' => $p->visibility,
+                    'status' => $p->status,
+                    'original_name' => $p->original_name,
+                    'uploaded_by' => $p->uploadedBy?->name,
+                    'created_at' => $p->created_at?->toISOString(),
+                ])->values(),
             'emar_summary' => [
                 'active_medications_count' => ClientMedication::where('client_id', $client->id)
                     ->where('active', true)
@@ -760,6 +776,97 @@ class ClientController extends Controller
         $client->forceFill(['profile_photo_path' => null])->save();
 
         return back()->with('success', 'Client photo removed.');
+    }
+
+    /**
+     * Upload a gallery photo for a client.
+     */
+    public function storeGalleryPhoto(Request $request, Client $client)
+    {
+        $this->authorize('update', $client);
+
+        $request->validate([
+            'photo' => 'required|image|max:10240',
+            'caption' => 'nullable|string|max:500',
+            'tags' => 'nullable|array',
+            'visibility' => 'nullable|in:staff_only,family,all_portal_users',
+        ]);
+
+        $file = $request->file('photo');
+        $dir = "client-photos/{$client->id}";
+        $path = $file->store($dir, 'public');
+
+        // Generate thumbnail
+        $thumbPath = null;
+        try {
+            $data = file_get_contents($file->getRealPath());
+            $src = @imagecreatefromstring($data);
+            if ($src) {
+                $w = imagesx($src);
+                $h = imagesy($src);
+                $max = 400;
+                if ($w > $max || $h > $max) {
+                    $ratio = min($max / $w, $max / $h);
+                    $nw = (int) round($w * $ratio);
+                    $nh = (int) round($h * $ratio);
+                    $thumb = imagecreatetruecolor($nw, $nh);
+                    imagecopyresampled($thumb, $src, 0, 0, 0, 0, $nw, $nh, $w, $h);
+                } else {
+                    $thumb = $src;
+                }
+                $thumbDir = "client-photos/{$client->id}/thumbs";
+                $thumbName = pathinfo($path, PATHINFO_FILENAME) . '.jpg';
+                $thumbPath = "{$thumbDir}/{$thumbName}";
+                $absPath = \Storage::disk('public')->path($thumbPath);
+                if (!is_dir(dirname($absPath))) {
+                    mkdir(dirname($absPath), 0755, true);
+                }
+                imagejpeg($thumb, $absPath, 85);
+                if ($thumb !== $src) imagedestroy($thumb);
+                imagedestroy($src);
+            }
+        } catch (\Throwable $e) {
+            // Thumbnail generation failed, continue without it
+        }
+
+        \App\Models\ClientPhoto::create([
+            'client_id' => $client->id,
+            'uploaded_by_user_id' => $request->user()->id,
+            'storage_path' => $path,
+            'thumbnail_path' => $thumbPath,
+            'original_name' => $file->getClientOriginalName(),
+            'mime_type' => $file->getMimeType(),
+            'size_bytes' => $file->getSize(),
+            'caption' => $request->input('caption'),
+            'tags' => $request->input('tags'),
+            'visibility' => $request->input('visibility', 'family'),
+            'status' => 'approved',
+            'approved_by_user_id' => $request->user()->id,
+            'approved_at' => now(),
+        ]);
+
+        \App\Services\AuditLogger::log('client.photo.upload', $client);
+
+        return back()->with('success', 'Photo uploaded.');
+    }
+
+    /**
+     * Delete a gallery photo.
+     */
+    public function destroyGalleryPhoto(Request $request, Client $client, \App\Models\ClientPhoto $photo)
+    {
+        $this->authorize('update', $client);
+        abort_unless($photo->client_id === $client->id, 404);
+
+        \Storage::disk('public')->delete($photo->storage_path);
+        if ($photo->thumbnail_path) {
+            \Storage::disk('public')->delete($photo->thumbnail_path);
+        }
+        $photo->delete();
+
+        \App\Services\AuditLogger::log('client.photo.delete', $client);
+
+        return back()->with('success', 'Photo deleted.');
     }
 
     /**

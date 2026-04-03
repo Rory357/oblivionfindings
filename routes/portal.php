@@ -12,6 +12,15 @@ use App\Http\Controllers\RagController;
 use App\Http\Controllers\NotificationInboxController;
 use App\Http\Controllers\AnnouncementInboxController;
 use App\Http\Controllers\CalendarController;
+use App\Http\Controllers\Portal\FamilyDashboardController;
+use App\Http\Controllers\Portal\PortalTimelineController;
+use App\Http\Controllers\Portal\PortalHealthController;
+use App\Http\Controllers\Portal\PortalScheduleController;
+use App\Http\Controllers\Portal\PortalDocumentController;
+use App\Http\Controllers\Portal\PortalPhotoController;
+use App\Http\Controllers\Portal\PortalMessageController;
+use App\Http\Controllers\Portal\PortalNotificationController;
+use App\Http\Controllers\Portal\PortalPreferenceController;
 
 /**
  * Portal & Shared Features Routes
@@ -39,6 +48,55 @@ Route::middleware(['auth'])->group(function () {
         ->name('portal.clients.rag.ask');
     Route::get('/portal/clients/{client}/documents/{document}/download', [ClientDocumentController::class, 'download'])
         ->name('portal.clients.documents.download');
+
+    // Family Dashboard
+    Route::get('/portal/clients/{client}/dashboard', [FamilyDashboardController::class, 'show'])
+        ->name('portal.clients.dashboard');
+    Route::post('/portal/clients/{client}/visit-requests', [FamilyDashboardController::class, 'storeVisitRequest'])
+        ->name('portal.clients.visit-requests.store');
+    Route::post('/portal/clients/{client}/visit-requests/{visit}/cancel', [FamilyDashboardController::class, 'cancelVisitRequest'])
+        ->name('portal.clients.visit-requests.cancel');
+
+    // Portal Tab Pages
+    Route::get('/portal/clients/{client}/timeline', [PortalTimelineController::class, 'index'])
+        ->name('portal.clients.timeline');
+    Route::get('/portal/clients/{client}/health', [PortalHealthController::class, 'index'])
+        ->name('portal.clients.health');
+    Route::get('/portal/clients/{client}/schedule', [PortalScheduleController::class, 'index'])
+        ->name('portal.clients.schedule');
+    Route::get('/portal/clients/{client}/documents', [PortalDocumentController::class, 'index'])
+        ->name('portal.clients.documents');
+    Route::post('/portal/clients/{client}/documents', [PortalDocumentController::class, 'store'])
+        ->name('portal.clients.documents.store');
+
+    // Photo Gallery
+    Route::get('/portal/clients/{client}/photos', [PortalPhotoController::class, 'index'])
+        ->name('portal.clients.photos');
+    Route::post('/portal/clients/{client}/photos', [PortalPhotoController::class, 'store'])
+        ->name('portal.clients.photos.store');
+
+    // Messaging
+    Route::get('/portal/clients/{client}/messages', [PortalMessageController::class, 'index'])
+        ->name('portal.clients.messages');
+    Route::post('/portal/clients/{client}/messages/start', [PortalMessageController::class, 'startConversation'])
+        ->name('portal.clients.messages.start');
+    Route::get('/portal/clients/{client}/messages/{conversation}', [PortalMessageController::class, 'show'])
+        ->name('portal.clients.messages.show');
+    Route::post('/portal/clients/{client}/messages/{conversation}', [PortalMessageController::class, 'storeMessage'])
+        ->name('portal.clients.messages.send');
+
+    // Portal Notifications & Preferences
+    Route::get('/portal/notifications', [PortalNotificationController::class, 'index'])
+        ->name('portal.notifications');
+    Route::post('/portal/notifications/{notification}/read', [PortalNotificationController::class, 'markRead'])
+        ->name('portal.notifications.read');
+    Route::post('/portal/notifications/read-all', [PortalNotificationController::class, 'markAllRead'])
+        ->name('portal.notifications.readAll');
+    Route::get('/portal/preferences', [PortalPreferenceController::class, 'index'])
+        ->name('portal.preferences');
+    Route::post('/portal/preferences', [PortalPreferenceController::class, 'update'])
+        ->name('portal.preferences.update');
+
     Route::post('/portal/summaries/generate', [SummaryController::class, 'generate'])
         ->name('portal.summaries.generate');
 

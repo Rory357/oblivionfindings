@@ -78,6 +78,16 @@ class HandleInertiaRequests extends Middleware
                 'impersonator' => $user && app('impersonate')->isImpersonating()
                     ? \App\Models\User::find(app('impersonate')->getImpersonatorId())?->only('id', 'name')
                     : null,
+
+                // Portal client data for sidebar navigation
+                'portalClients' => $user && $user->hasRole('client', 'next_of_kin')
+                    ? $user->portalClients()->get(['clients.id', 'clients.first_name', 'clients.last_name', 'clients.profile_photo_path'])->map(fn ($c) => [
+                        'id' => $c->id,
+                        'name' => trim($c->first_name . ' ' . $c->last_name),
+                        'avatar' => $c->profile_photo_url,
+                        'relation' => $c->pivot->relation ?? null,
+                    ])->values()->all()
+                    : null,
             ],
 
             'labels' => $labels,

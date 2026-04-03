@@ -1,0 +1,1097 @@
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
+import { useInitials } from '@/hooks/use-initials';
+import AppLayout from '@/layouts/app-layout';
+import { Head, useForm, router } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    Calendar,
+    CalendarDays,
+    CalendarPlus,
+    CheckCircle2,
+    ClipboardList,
+    Clock,
+    Heart,
+    Home,
+    MapPin,
+    Phone,
+    ShieldAlert,
+    Star,
+    Target,
+    User,
+    Users,
+    Video,
+    X,
+} from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { toast } from 'sonner';
+
+type Staff = { id: number; name: string; avatar?: string | null; email?: string };
+type ShiftItem = {
+    id: number;
+    starts_at: string;
+    ends_at: string;
+    status: string;
+    type: string;
+    staff?: { id: number; name: string; avatar?: string | null } | null;
+};
+type MonthShift = {
+    id: number;
+    date: string;
+    starts_at: string;
+    ends_at: string;
+    status: string;
+    type: string;
+    staff_name?: string | null;
+};
+type EventItem = {
+    id: number;
+    type: string;
+    subject: string;
+    body?: string | null;
+    occurred_at: string;
+    actor_name?: string | null;
+};
+type IncidentItem = {
+    id: number;
+    type: string;
+    severity: string;
+    occurred_at: string;
+    description?: string | null;
+};
+type VisitRequest = {
+    id: number;
+    requested_date: string;
+    preferred_time_start?: string | null;
+    preferred_time_end?: string | null;
+    visit_type: string;
+    notes?: string | null;
+    status: string;
+    review_notes?: string | null;
+};
+
+type Props = {
+    client: {
+        id: number;
+        first_name: string;
+        last_name: string;
+        preferred_name?: string | null;
+        date_of_birth?: string | null;
+        status: string;
+        avatar?: string | null;
+        profile_photo_url?: string | null;
+        phone?: string | null;
+        address_line_1?: string | null;
+        city?: string | null;
+        interests_hobbies?: string | null;
+        dietary_requirements?: string | null;
+        mobility_needs?: string | null;
+    };
+    site?: { id: number; name: string; address?: string | null; city?: string | null } | null;
+    keyWorker?: Staff | null;
+    supportWorkers: Staff[];
+    todayShifts: ShiftItem[];
+    weekShifts: ShiftItem[];
+    monthShifts: MonthShift[];
+    recentEvents: EventItem[];
+    recentIncidents: IncidentItem[];
+    visitRequests: VisitRequest[];
+    stats: {
+        shiftsToday: number;
+        shiftsThisWeek: number;
+        shiftsThisMonth: number;
+        pendingVisitRequests: number;
+        incidentsLast30Days: number;
+    };
+    relation?: string | null;
+    medicalSummary?: {
+        allergies?: string | null;
+        disabilities?: string | null;
+        notes?: string | null;
+    } | null;
+    criticalAlerts: IncidentItem[];
+    dailySummary: {
+        completedToday: number;
+        scheduledToday: number;
+        lastEvent?: { subject: string; occurred_at: string } | null;
+    };
+    carePlan?: {
+        title?: string | null;
+        goals_count: number;
+        goals_completed: number;
+        important_to_me?: string | null;
+        ideal_day?: string | null;
+        how_to_support?: string | null;
+        likes?: string | null;
+        dislikes?: string | null;
+    } | null;
+};
+
+function formatTime(iso: string): string {
+    return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
+function formatDate(dateStr: string): string {
+    return new Date(dateStr + 'T00:00:00').toLocaleDateString([], {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+    });
+}
+
+function formatFullDate(iso: string): string {
+    return new Date(iso).toLocaleDateString([], {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
+}
+
+const statusColors: Record<string, string> = {
+    scheduled: 'bg-blue-100 text-blue-800',
+    in_progress: 'bg-amber-100 text-amber-800',
+    completed: 'bg-emerald-100 text-emerald-800',
+    cancelled: 'bg-gray-100 text-gray-600',
+    pending: 'bg-yellow-100 text-yellow-800',
+    approved: 'bg-emerald-100 text-emerald-800',
+    declined: 'bg-red-100 text-red-800',
+};
+
+const visitTypeLabels: Record<string, { label: string; icon: typeof Calendar }> = {
+    in_person: { label: 'In Person', icon: Users },
+    video_call: { label: 'Video Call', icon: Video },
+    outing: { label: 'Outing', icon: MapPin },
+};
+
+const severityColors: Record<string, string> = {
+    low: 'bg-blue-100 text-blue-800',
+    medium: 'bg-yellow-100 text-yellow-800',
+    high: 'bg-orange-100 text-orange-800',
+    critical: 'bg-red-100 text-red-800',
+};
+
+function calculateAge(dob: string): number {
+    const birth = new Date(dob);
+    const now = new Date();
+    let age = now.getFullYear() - birth.getFullYear();
+    const m = now.getMonth() - birth.getMonth();
+    if (m < 0 || (m === 0 && now.getDate() < birth.getDate())) age--;
+    return age;
+}
+
+export default function FamilyDashboard({
+    client,
+    site,
+    keyWorker,
+    supportWorkers,
+    todayShifts,
+    weekShifts,
+    monthShifts,
+    recentEvents,
+    recentIncidents,
+    visitRequests,
+    stats,
+    relation,
+    medicalSummary,
+    criticalAlerts,
+    dailySummary,
+    carePlan,
+}: Props) {
+    const getInitials = useInitials();
+    const name = client.preferred_name || `${client.first_name} ${client.last_name}`.trim();
+    const fullName = `${client.first_name} ${client.last_name}`.trim();
+    const [bookingOpen, setBookingOpen] = useState(false);
+    const [calendarView, setCalendarView] = useState<'week' | 'month'>('week');
+
+    const form = useForm({
+        requested_date: '',
+        preferred_time_start: '',
+        preferred_time_end: '',
+        visit_type: 'in_person' as string,
+        notes: '',
+    });
+
+    const submitVisit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.post(`/portal/clients/${client.id}/visit-requests`, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setBookingOpen(false);
+                form.reset();
+                toast.success('Visit request submitted!');
+            },
+            onError: () => toast.error('Please check the form and try again.'),
+        });
+    };
+
+    const cancelVisit = (visitId: number) => {
+        router.post(`/portal/clients/${client.id}/visit-requests/${visitId}/cancel`, {}, {
+            preserveScroll: true,
+            onSuccess: () => toast.success('Visit request cancelled.'),
+        });
+    };
+
+    // Build calendar grid for month view
+    const calendarDays = useMemo(() => {
+        const today = new Date();
+        const days: { date: string; isToday: boolean; shifts: MonthShift[] }[] = [];
+        for (let i = 0; i < 28; i++) {
+            const d = new Date(today);
+            d.setDate(d.getDate() + i);
+            const dateStr = d.toISOString().split('T')[0];
+            days.push({
+                date: dateStr,
+                isToday: i === 0,
+                shifts: monthShifts.filter((s) => s.date === dateStr),
+            });
+        }
+        return days;
+    }, [monthShifts]);
+
+    return (
+        <AppLayout
+            breadcrumbs={[
+                { title: 'Portal', href: '/portal' },
+                { title: name, href: `/portal/clients/${client.id}/dashboard` },
+            ]}
+        >
+            <Head title={`${name} - Family Portal`} />
+
+            <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
+                {/* ── Hero header ──────────────────────────────── */}
+                <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-r from-primary/5 via-primary/3 to-transparent p-6">
+                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-4">
+                            <Avatar className="h-16 w-16 ring-2 ring-primary/20 ring-offset-2">
+                                <AvatarImage src={client.avatar ?? client.profile_photo_url ?? undefined} alt={fullName} />
+                                <AvatarFallback className="bg-primary/10 text-lg font-semibold text-primary">
+                                    {getInitials(fullName)}
+                                </AvatarFallback>
+                            </Avatar>
+                            <div>
+                                <h1 className="text-2xl font-bold tracking-tight">{name}</h1>
+                                {client.preferred_name && client.preferred_name !== fullName && (
+                                    <p className="text-sm text-muted-foreground">{fullName}</p>
+                                )}
+                                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                                    {relation && (
+                                        <Badge variant="outline" className="capitalize">
+                                            <Heart className="mr-1 h-3 w-3" />
+                                            {relation}
+                                        </Badge>
+                                    )}
+                                    {client.date_of_birth && (
+                                        <span>Age {calculateAge(client.date_of_birth)}</span>
+                                    )}
+                                    {client.status && (
+                                        <Badge
+                                            variant="secondary"
+                                            className={
+                                                client.status === 'active'
+                                                    ? 'bg-emerald-100 text-emerald-800'
+                                                    : ''
+                                            }
+                                        >
+                                            {client.status}
+                                        </Badge>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                        <Dialog open={bookingOpen} onOpenChange={setBookingOpen}>
+                            <DialogTrigger asChild>
+                                <Button size="lg" className="gap-2 shadow-md">
+                                    <CalendarPlus className="h-5 w-5" />
+                                    Book a Visit
+                                </Button>
+                            </DialogTrigger>
+                            <DialogContent className="sm:max-w-md">
+                                <DialogHeader>
+                                    <DialogTitle>Request a Visit</DialogTitle>
+                                    <DialogDescription>
+                                        Submit a visit request to see {name}. The care team will review and confirm.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                <form onSubmit={submitVisit} className="space-y-4">
+                                    <div>
+                                        <Label htmlFor="visit-date">Date *</Label>
+                                        <Input
+                                            id="visit-date"
+                                            type="date"
+                                            value={form.data.requested_date}
+                                            onChange={(e) => form.setData('requested_date', e.target.value)}
+                                            min={new Date().toISOString().split('T')[0]}
+                                        />
+                                        {form.errors.requested_date && (
+                                            <p className="mt-1 text-xs text-red-500">{form.errors.requested_date}</p>
+                                        )}
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div>
+                                            <Label htmlFor="time-start">From</Label>
+                                            <Input
+                                                id="time-start"
+                                                type="time"
+                                                value={form.data.preferred_time_start}
+                                                onChange={(e) => form.setData('preferred_time_start', e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <Label htmlFor="time-end">To</Label>
+                                            <Input
+                                                id="time-end"
+                                                type="time"
+                                                value={form.data.preferred_time_end}
+                                                onChange={(e) => form.setData('preferred_time_end', e.target.value)}
+                                            />
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <Label>Visit Type *</Label>
+                                        <div className="mt-2 grid grid-cols-3 gap-2">
+                                            {(['in_person', 'video_call', 'outing'] as const).map((type) => {
+                                                const { label, icon: Icon } = visitTypeLabels[type];
+                                                const selected = form.data.visit_type === type;
+                                                return (
+                                                    <button
+                                                        key={type}
+                                                        type="button"
+                                                        onClick={() => form.setData('visit_type', type)}
+                                                        className={`flex flex-col items-center gap-1.5 rounded-lg border-2 p-3 text-xs font-medium transition-all ${
+                                                            selected
+                                                                ? 'border-primary bg-primary/5 text-primary'
+                                                                : 'border-border hover:border-primary/30 text-muted-foreground'
+                                                        }`}
+                                                    >
+                                                        <Icon className="h-5 w-5" />
+                                                        {label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="visit-notes">Notes</Label>
+                                        <textarea
+                                            id="visit-notes"
+                                            className="mt-1 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                            rows={3}
+                                            placeholder="Any special requests or things to note..."
+                                            value={form.data.notes}
+                                            onChange={(e) => form.setData('notes', e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="flex justify-end gap-2 pt-2">
+                                        <Button type="button" variant="outline" onClick={() => setBookingOpen(false)}>
+                                            Cancel
+                                        </Button>
+                                        <Button type="submit" disabled={form.processing || !form.data.requested_date}>
+                                            {form.processing ? 'Submitting...' : 'Submit Request'}
+                                        </Button>
+                                    </div>
+                                </form>
+                            </DialogContent>
+                        </Dialog>
+                    </div>
+                </div>
+
+                {/* ── KPI Stats Row ────────────────────────────── */}
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    <StatCard icon={Clock} label="Today's Shifts" value={stats.shiftsToday} color="blue" />
+                    <StatCard icon={CalendarDays} label="This Week" value={stats.shiftsThisWeek} color="indigo" />
+                    <StatCard icon={Calendar} label="This Month" value={stats.shiftsThisMonth} color="violet" />
+                    <StatCard
+                        icon={CalendarPlus}
+                        label="Pending Visits"
+                        value={stats.pendingVisitRequests}
+                        color="amber"
+                    />
+                </div>
+
+                {/* ── Main content grid ──────────────────────── */}
+                <div className="grid gap-6 lg:grid-cols-3">
+                    {/* Left column: 2/3 width */}
+                    <div className="space-y-6 lg:col-span-2">
+                        {/* Today's Schedule */}
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between pb-3">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Clock className="h-4 w-4 text-primary" />
+                                    Today's Schedule
+                                </CardTitle>
+                                <span className="text-sm text-muted-foreground">
+                                    {new Date().toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric' })}
+                                </span>
+                            </CardHeader>
+                            <CardContent>
+                                {todayShifts.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {todayShifts.map((shift) => (
+                                            <ShiftRow key={shift.id} shift={shift} />
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                                        <Calendar className="mb-2 h-8 w-8 text-muted-foreground/40" />
+                                        <p className="text-sm text-muted-foreground">No shifts scheduled for today</p>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Daily Summary */}
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <ClipboardList className="h-4 w-4 text-primary" />
+                                    Daily Summary
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                <div className="space-y-3">
+                                    <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
+                                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
+                                            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                                        </div>
+                                        <div>
+                                            <p className="text-sm font-medium">
+                                                {dailySummary.completedToday} shift{dailySummary.completedToday !== 1 ? 's' : ''} completed, {dailySummary.scheduledToday} scheduled
+                                            </p>
+                                            {dailySummary.lastEvent && (
+                                                <p className="text-xs text-muted-foreground">
+                                                    Last activity: {dailySummary.lastEvent.subject} at{' '}
+                                                    {new Date(dailySummary.lastEvent.occurred_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                </p>
+                                            )}
+                                            {!dailySummary.lastEvent && dailySummary.completedToday === 0 && dailySummary.scheduledToday === 0 && (
+                                                <p className="text-xs text-muted-foreground">No activity recorded today</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+
+                        {/* Care Plan Summary */}
+                        {carePlan && (
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Target className="h-4 w-4 text-primary" />
+                                        {carePlan.title || 'Care Plan'}
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-4">
+                                    {carePlan.goals_count > 0 && (
+                                        <div>
+                                            <div className="flex items-center justify-between text-sm">
+                                                <span className="font-medium">Goals Progress</span>
+                                                <span className="text-muted-foreground">
+                                                    {carePlan.goals_completed}/{carePlan.goals_count}
+                                                </span>
+                                            </div>
+                                            <div className="mt-2 h-2 overflow-hidden rounded-full bg-muted">
+                                                <div
+                                                    className="h-full rounded-full bg-primary transition-all"
+                                                    style={{ width: `${carePlan.goals_count > 0 ? (carePlan.goals_completed / carePlan.goals_count) * 100 : 0}%` }}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                    {carePlan.important_to_me && (
+                                        <div className="rounded-lg bg-primary/5 p-3">
+                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-primary">
+                                                What's Important to Me
+                                            </p>
+                                            <p className="text-sm leading-relaxed">{carePlan.important_to_me}</p>
+                                        </div>
+                                    )}
+                                    {carePlan.ideal_day && (
+                                        <div>
+                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                                My Ideal Day
+                                            </p>
+                                            <p className="text-sm leading-relaxed">{carePlan.ideal_day}</p>
+                                        </div>
+                                    )}
+                                    {carePlan.how_to_support && (
+                                        <div>
+                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                                How to Support Me
+                                            </p>
+                                            <p className="text-sm leading-relaxed">{carePlan.how_to_support}</p>
+                                        </div>
+                                    )}
+                                    {(carePlan.likes || carePlan.dislikes) && (
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {carePlan.likes && (
+                                                <div className="rounded-lg bg-emerald-50 p-3">
+                                                    <p className="mb-1 text-xs font-medium text-emerald-700">Likes</p>
+                                                    <p className="text-xs leading-relaxed text-emerald-800">{carePlan.likes}</p>
+                                                </div>
+                                            )}
+                                            {carePlan.dislikes && (
+                                                <div className="rounded-lg bg-rose-50 p-3">
+                                                    <p className="mb-1 text-xs font-medium text-rose-700">Dislikes</p>
+                                                    <p className="text-xs leading-relaxed text-rose-800">{carePlan.dislikes}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Week/Month Calendar Toggle */}
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between pb-3">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <CalendarDays className="h-4 w-4 text-primary" />
+                                    Schedule Overview
+                                </CardTitle>
+                                <div className="flex gap-1 rounded-lg border p-0.5">
+                                    <button
+                                        onClick={() => setCalendarView('week')}
+                                        className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                                            calendarView === 'week'
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'text-muted-foreground hover:text-foreground'
+                                        }`}
+                                    >
+                                        Week
+                                    </button>
+                                    <button
+                                        onClick={() => setCalendarView('month')}
+                                        className={`rounded-md px-3 py-1 text-xs font-medium transition-colors ${
+                                            calendarView === 'month'
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'text-muted-foreground hover:text-foreground'
+                                        }`}
+                                    >
+                                        Month
+                                    </button>
+                                </div>
+                            </CardHeader>
+                            <CardContent>
+                                {calendarView === 'week' ? (
+                                    <div className="space-y-3">
+                                        {weekShifts.length > 0 ? (
+                                            weekShifts.map((shift) => (
+                                                <ShiftRow key={shift.id} shift={shift} showDate />
+                                            ))
+                                        ) : (
+                                            <p className="py-6 text-center text-sm text-muted-foreground">
+                                                No shifts scheduled this week
+                                            </p>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-7 gap-1">
+                                        {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((d) => (
+                                            <div key={d} className="pb-2 text-center text-xs font-medium text-muted-foreground">
+                                                {d}
+                                            </div>
+                                        ))}
+                                        {/* Pad start */}
+                                        {(() => {
+                                            const firstDay = new Date(calendarDays[0].date + 'T00:00:00').getDay();
+                                            const offset = firstDay === 0 ? 6 : firstDay - 1;
+                                            return Array.from({ length: offset }).map((_, i) => (
+                                                <div key={`pad-${i}`} className="h-16" />
+                                            ));
+                                        })()}
+                                        {calendarDays.map((day) => (
+                                            <div
+                                                key={day.date}
+                                                className={`relative flex h-16 flex-col items-center rounded-lg border p-1 text-xs transition-colors ${
+                                                    day.isToday
+                                                        ? 'border-primary/50 bg-primary/5'
+                                                        : day.shifts.length > 0
+                                                          ? 'border-border bg-card'
+                                                          : 'border-transparent bg-muted/30'
+                                                }`}
+                                            >
+                                                <span
+                                                    className={`font-medium ${
+                                                        day.isToday ? 'text-primary' : 'text-foreground'
+                                                    }`}
+                                                >
+                                                    {new Date(day.date + 'T00:00:00').getDate()}
+                                                </span>
+                                                {day.shifts.length > 0 && (
+                                                    <div className="mt-auto flex gap-0.5">
+                                                        {day.shifts.slice(0, 3).map((s) => (
+                                                            <div
+                                                                key={s.id}
+                                                                className={`h-1.5 w-1.5 rounded-full ${
+                                                                    s.status === 'completed'
+                                                                        ? 'bg-emerald-500'
+                                                                        : s.status === 'in_progress'
+                                                                          ? 'bg-amber-500'
+                                                                          : 'bg-blue-500'
+                                                                }`}
+                                                                title={`${s.staff_name ?? 'Staff'} - ${s.status}`}
+                                                            />
+                                                        ))}
+                                                        {day.shifts.length > 3 && (
+                                                            <span className="text-[9px] text-muted-foreground">
+                                                                +{day.shifts.length - 3}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Visit Requests */}
+                        <Card>
+                            <CardHeader className="flex flex-row items-center justify-between pb-3">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <CalendarPlus className="h-4 w-4 text-primary" />
+                                    Your Visit Requests
+                                </CardTitle>
+                                <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setBookingOpen(true)}>
+                                    <CalendarPlus className="h-3.5 w-3.5" />
+                                    New Request
+                                </Button>
+                            </CardHeader>
+                            <CardContent>
+                                {visitRequests.length > 0 ? (
+                                    <div className="space-y-3">
+                                        {visitRequests.map((visit) => {
+                                            const vt = visitTypeLabels[visit.visit_type] ?? visitTypeLabels.in_person;
+                                            const VtIcon = vt.icon;
+                                            return (
+                                                <div
+                                                    key={visit.id}
+                                                    className="flex items-center justify-between gap-3 rounded-lg border p-3"
+                                                >
+                                                    <div className="flex items-center gap-3">
+                                                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                                                            <VtIcon className="h-5 w-5 text-primary" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-sm font-medium">
+                                                                {formatDate(visit.requested_date)}
+                                                                {visit.preferred_time_start && (
+                                                                    <span className="ml-2 font-normal text-muted-foreground">
+                                                                        {visit.preferred_time_start}
+                                                                        {visit.preferred_time_end && ` - ${visit.preferred_time_end}`}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="text-xs text-muted-foreground">
+                                                                {vt.label}
+                                                                {visit.notes && ` \u2022 ${visit.notes}`}
+                                                            </div>
+                                                            {visit.review_notes && (
+                                                                <div className="mt-1 text-xs text-muted-foreground italic">
+                                                                    Staff note: {visit.review_notes}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <Badge
+                                                            className={`${statusColors[visit.status] ?? ''} border-0 capitalize`}
+                                                        >
+                                                            {visit.status}
+                                                        </Badge>
+                                                        {visit.status === 'pending' && (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 w-7 p-0 text-muted-foreground hover:text-red-500"
+                                                                onClick={() => cancelVisit(visit.id)}
+                                                            >
+                                                                <X className="h-4 w-4" />
+                                                            </Button>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div className="flex flex-col items-center justify-center py-8 text-center">
+                                        <CalendarPlus className="mb-2 h-8 w-8 text-muted-foreground/40" />
+                                        <p className="text-sm text-muted-foreground">No upcoming visit requests</p>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="mt-3 gap-1.5"
+                                            onClick={() => setBookingOpen(true)}
+                                        >
+                                            <CalendarPlus className="h-3.5 w-3.5" />
+                                            Book a Visit
+                                        </Button>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Recent Activity */}
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <Star className="h-4 w-4 text-primary" />
+                                    Recent Activity
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent>
+                                {recentEvents.length > 0 ? (
+                                    <div className="relative space-y-0">
+                                        {recentEvents.map((event, idx) => (
+                                            <div key={event.id} className="relative flex gap-4 pb-4 last:pb-0">
+                                                {/* Timeline line */}
+                                                {idx < recentEvents.length - 1 && (
+                                                    <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border" />
+                                                )}
+                                                {/* Dot */}
+                                                <div className="relative z-10 mt-1.5 h-[9px] w-[9px] shrink-0 rounded-full border-2 border-primary bg-background" />
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <p className="text-sm font-medium leading-tight">
+                                                            {event.subject || event.type}
+                                                        </p>
+                                                        <span className="shrink-0 text-xs text-muted-foreground">
+                                                            {formatFullDate(event.occurred_at)}
+                                                        </span>
+                                                    </div>
+                                                    {event.body && (
+                                                        <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">
+                                                            {event.body}
+                                                        </p>
+                                                    )}
+                                                    {event.actor_name && (
+                                                        <p className="mt-0.5 text-xs text-muted-foreground/70">
+                                                            By {event.actor_name}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="py-6 text-center text-sm text-muted-foreground">No recent activity</p>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
+
+                    {/* Right column: 1/3 width */}
+                    <div className="space-y-6">
+                        {/* Quick Info */}
+                        <Card>
+                            <CardHeader className="pb-3">
+                                <CardTitle className="flex items-center gap-2 text-base">
+                                    <User className="h-4 w-4 text-primary" />
+                                    About {name}
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3 text-sm">
+                                {client.phone && (
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <Phone className="h-3.5 w-3.5" />
+                                        <span>{client.phone}</span>
+                                    </div>
+                                )}
+                                {(client.address_line_1 || client.city) && (
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <MapPin className="h-3.5 w-3.5" />
+                                        <span>{[client.address_line_1, client.city].filter(Boolean).join(', ')}</span>
+                                    </div>
+                                )}
+                                {site && (
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <Home className="h-3.5 w-3.5" />
+                                        <span>{site.name}</span>
+                                    </div>
+                                )}
+                                {client.interests_hobbies && (
+                                    <>
+                                        <Separator />
+                                        <div>
+                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                                Interests & Hobbies
+                                            </p>
+                                            <p className="text-sm">{client.interests_hobbies}</p>
+                                        </div>
+                                    </>
+                                )}
+                                {client.dietary_requirements && (
+                                    <div>
+                                        <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            Dietary Requirements
+                                        </p>
+                                        <p className="text-sm">{client.dietary_requirements}</p>
+                                    </div>
+                                )}
+                                {client.mobility_needs && (
+                                    <div>
+                                        <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                            Mobility Needs
+                                        </p>
+                                        <p className="text-sm">{client.mobility_needs}</p>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+
+                        {/* Key Worker */}
+                        {keyWorker && (
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Star className="h-4 w-4 text-amber-500" />
+                                        Key Worker
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="flex items-center gap-3">
+                                        <Avatar className="h-11 w-11 ring-2 ring-amber-100 ring-offset-1">
+                                            <AvatarImage src={keyWorker.avatar ?? undefined} alt={keyWorker.name} />
+                                            <AvatarFallback className="bg-amber-50 text-amber-700">
+                                                {getInitials(keyWorker.name)}
+                                            </AvatarFallback>
+                                        </Avatar>
+                                        <div>
+                                            <p className="font-medium">{keyWorker.name}</p>
+                                            {keyWorker.email && (
+                                                <p className="text-xs text-muted-foreground">{keyWorker.email}</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Support Team */}
+                        {supportWorkers.length > 0 && (
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Users className="h-4 w-4 text-primary" />
+                                        Support Team
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-3">
+                                        {supportWorkers.map((worker) => (
+                                            <div key={worker.id} className="flex items-center gap-3">
+                                                <Avatar className="h-9 w-9">
+                                                    <AvatarImage src={worker.avatar ?? undefined} alt={worker.name} />
+                                                    <AvatarFallback className="text-xs">
+                                                        {getInitials(worker.name)}
+                                                    </AvatarFallback>
+                                                </Avatar>
+                                                <p className="text-sm font-medium">{worker.name}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Medical Summary */}
+                        {medicalSummary && (medicalSummary.allergies || medicalSummary.disabilities) && (
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <Heart className="h-4 w-4 text-rose-500" />
+                                        Medical Summary
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3 text-sm">
+                                    {medicalSummary.allergies && (
+                                        <div>
+                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-rose-600">
+                                                Allergies
+                                            </p>
+                                            <p className="rounded-md bg-rose-50 px-3 py-2 text-rose-800">
+                                                {medicalSummary.allergies}
+                                            </p>
+                                        </div>
+                                    )}
+                                    {medicalSummary.disabilities && (
+                                        <div>
+                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                                Disabilities
+                                            </p>
+                                            <p>{medicalSummary.disabilities}</p>
+                                        </div>
+                                    )}
+                                    {medicalSummary.notes && (
+                                        <div>
+                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+                                                Notes
+                                            </p>
+                                            <p className="text-muted-foreground">{medicalSummary.notes}</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Critical Alerts */}
+                        {criticalAlerts.length > 0 && (
+                            <Card className="border-red-200 bg-red-50/30">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base text-red-700">
+                                        <ShieldAlert className="h-4 w-4" />
+                                        Critical Alerts
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-3">
+                                        {criticalAlerts.map((alert) => (
+                                            <div key={alert.id} className="rounded-lg border border-red-200 bg-white p-3">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <span className="text-sm font-medium">{alert.type}</span>
+                                                    <Badge className={`${severityColors[alert.severity] ?? ''} border-0 text-[10px]`}>
+                                                        {alert.severity}
+                                                    </Badge>
+                                                </div>
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {formatFullDate(alert.occurred_at)}
+                                                </p>
+                                                {alert.description && (
+                                                    <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
+                                                        {alert.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Recent Incidents */}
+                        {recentIncidents.length > 0 && (
+                            <Card>
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <AlertTriangle className="h-4 w-4 text-amber-500" />
+                                        Recent Incidents
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="space-y-3">
+                                        {recentIncidents.map((inc) => (
+                                            <div key={inc.id} className="rounded-lg border p-3">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <span className="text-sm font-medium">{inc.type}</span>
+                                                    <Badge
+                                                        className={`${severityColors[inc.severity] ?? ''} border-0 text-[10px]`}
+                                                    >
+                                                        {inc.severity}
+                                                    </Badge>
+                                                </div>
+                                                <p className="mt-1 text-xs text-muted-foreground">
+                                                    {formatFullDate(inc.occurred_at)}
+                                                </p>
+                                                {inc.description && (
+                                                    <p className="mt-1.5 line-clamp-2 text-xs text-muted-foreground">
+                                                        {inc.description}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                </div>
+            </div>
+        </AppLayout>
+    );
+}
+
+/* ── Subcomponents ─────────────────────────────────────────────────── */
+
+function StatCard({
+    icon: Icon,
+    label,
+    value,
+    color,
+}: {
+    icon: typeof Clock;
+    label: string;
+    value: number;
+    color: string;
+}) {
+    const bgColors: Record<string, string> = {
+        blue: 'bg-blue-50',
+        indigo: 'bg-indigo-50',
+        violet: 'bg-violet-50',
+        amber: 'bg-amber-50',
+    };
+    const iconColors: Record<string, string> = {
+        blue: 'text-blue-600',
+        indigo: 'text-indigo-600',
+        violet: 'text-violet-600',
+        amber: 'text-amber-600',
+    };
+
+    return (
+        <div className="relative overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
+            <div className={`absolute right-3 top-3 rounded-lg ${bgColors[color] ?? ''} p-2`}>
+                <Icon className={`h-4 w-4 ${iconColors[color] ?? ''}`} />
+            </div>
+            <div className="text-2xl font-bold tracking-tight">{value}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
+        </div>
+    );
+}
+
+function ShiftRow({ shift, showDate }: { shift: ShiftItem; showDate?: boolean }) {
+    const getInitials = useInitials();
+    return (
+        <div className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50">
+            {shift.staff && (
+                <Avatar className="h-9 w-9">
+                    <AvatarImage src={shift.staff.avatar ?? undefined} alt={shift.staff.name} />
+                    <AvatarFallback className="text-xs">{getInitials(shift.staff.name)}</AvatarFallback>
+                </Avatar>
+            )}
+            <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">{shift.staff?.name ?? 'Staff TBC'}</span>
+                    <Badge className={`${statusColors[shift.status] ?? ''} border-0 text-[10px]`}>
+                        {shift.status.replace('_', ' ')}
+                    </Badge>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                    {showDate && (
+                        <span className="mr-1.5">
+                            {new Date(shift.starts_at).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' })}
+                            {' \u2022 '}
+                        </span>
+                    )}
+                    {formatTime(shift.starts_at)} - {formatTime(shift.ends_at)}
+                </div>
+            </div>
+        </div>
+    );
+}

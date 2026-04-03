@@ -86,6 +86,13 @@ import AppLogoIcon from './app-logo-icon';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
+type PortalClient = {
+    id: number;
+    name: string;
+    avatar?: string | null;
+    relation?: string | null;
+};
+
 type PageProps = {
     auth: {
         user: null | {
@@ -97,6 +104,7 @@ type PageProps = {
             organization_id?: number | null;
         };
         can?: any;
+        portalClients?: PortalClient[] | null;
     };
     labels?: Record<string, string>;
     branding?: { name?: string; logoUrl?: string | null };
@@ -171,13 +179,44 @@ function isSubItemActive(currentUrl: string, href: NavItem['href']): boolean {
 
 // ── Build icon nav items ───────────────────────────────────────────────────
 
+function buildPortalNavItems(portalClients?: PortalClient[] | null): IconNavItem[] {
+    const clients = portalClients ?? [];
+    if (clients.length === 1) {
+        const cid = clients[0].id;
+        return [
+            { id: 'dashboard', icon: LayoutGrid, label: 'Dashboard', href: `/portal/clients/${cid}/dashboard` },
+            { id: 'timeline', icon: Clock, label: 'Timeline', href: `/portal/clients/${cid}/timeline` },
+            { id: 'schedule', icon: CalendarDays, label: 'Visits & Schedule', href: `/portal/clients/${cid}/schedule` },
+            { id: 'messages', icon: MessageSquareText, label: 'Messages', href: `/portal/clients/${cid}/messages`, dividerAfter: true },
+            { id: 'health', icon: Heart, label: 'Health & Care', href: `/portal/clients/${cid}/health` },
+            { id: 'documents', icon: FileText, label: 'Documents', href: `/portal/clients/${cid}/documents` },
+            { id: 'photos', icon: Clipboard, label: 'Photo Gallery', href: `/portal/clients/${cid}/photos`, dividerAfter: true },
+            { id: 'notifications', icon: Bell, label: 'Notifications', href: '/portal/notifications' },
+            { id: 'preferences', icon: Settings, label: 'Preferences', href: '/portal/preferences' },
+        ];
+    }
+    // Multi-client: minimal nav, they pick a client from the home page
+    return [
+        { id: 'home', icon: LayoutGrid, label: 'Home', href: '/portal' },
+        { id: 'notifications', icon: Bell, label: 'Notifications', href: '/portal/notifications' },
+        { id: 'preferences', icon: Settings, label: 'Preferences', href: '/portal/preferences' },
+    ];
+}
+
 function buildIconNavItems({
     role,
     can,
+    portalClients,
 }: {
     role?: string | null;
     can?: any;
+    portalClients?: PortalClient[] | null;
 }): IconNavItem[] {
+    // Portal users (family members / clients) get a dedicated sidebar
+    if (role === 'next_of_kin' || role === 'client') {
+        return buildPortalNavItems(portalClients);
+    }
+
     const items: IconNavItem[] = [
         { id: 'dashboard', icon: LayoutGrid, label: 'Dashboard', href: '/dashboard' },
         { id: 'today', icon: ClipboardList, label: 'Today', href: '/today' },
@@ -987,6 +1026,7 @@ export function AppSidebar() {
     const { auth, branding, name: appName, labels } = page.props;
     const role = auth.user?.role ?? null;
     const can = auth?.can;
+    const portalClients = auth?.portalClients ?? null;
     const currentUrl = page.url;
     const getInitials = useInitials();
     const displayName: string = (branding as any)?.name ?? appName ?? 'Oblivion Findings';
@@ -994,7 +1034,7 @@ export function AppSidebar() {
 
     const [openPanelId, setOpenPanelId] = useState<string | null>(null);
 
-    const iconNavItems = useMemo(() => buildIconNavItems({ role, can }), [role, can]);
+    const iconNavItems = useMemo(() => buildIconNavItems({ role, can, portalClients }), [role, can, portalClients]);
 
     const subPanelMap = useMemo(() => ({
         sites: buildSitesSubPanelGroups({ can }),
@@ -1178,9 +1218,10 @@ export function AppSidebarMobile({
     const { auth, labels } = page.props as any;
     const role = auth.user?.role ?? null;
     const can = auth?.can;
+    const portalClients = auth?.portalClients ?? null;
     const currentUrl = page.url;
 
-    const iconNavItems = useMemo(() => buildIconNavItems({ role, can }), [role, can]);
+    const iconNavItems = useMemo(() => buildIconNavItems({ role, can, portalClients }), [role, can, portalClients]);
 
     const mobileSubPanelMap = useMemo(() => ({
         sites: buildSitesSubPanelGroups({ can }),

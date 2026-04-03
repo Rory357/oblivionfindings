@@ -96,6 +96,7 @@ type Props = {
     support_plan: any | null;
     assessments: Array<any>;
     documents: Array<any>;
+    photos: GalleryPhoto[];
     portal_users: Array<any>;
     events: Array<any>;
     handover: Array<any>;
@@ -154,10 +155,24 @@ type TabKey =
     | 'assessments'
     | 'timeline'
     | 'documents'
+    | 'photos'
     | 'consents'
     | 'portal'
     | 'respite'
     | 'assignments';
+
+type GalleryPhoto = {
+    id: number;
+    url: string;
+    thumbnail_url?: string | null;
+    caption?: string | null;
+    tags?: string[] | null;
+    visibility: string;
+    status: string;
+    original_name: string;
+    uploaded_by?: string | null;
+    created_at: string;
+};
 
 export default function ClientShow({
     client,
@@ -165,6 +180,7 @@ export default function ClientShow({
     support_plan,
     assessments,
     documents,
+    photos,
     portal_users,
     events,
     handover,
@@ -195,6 +211,7 @@ export default function ClientShow({
             { key: 'assessments', label: 'Assessments', show: true },
             { key: 'timeline', label: 'Timeline', show: true },
             { key: 'documents', label: 'Documents', show: true },
+            { key: 'photos', label: 'Photo Gallery', show: true },
             { key: 'consents', label: 'Consents', show: true },
             { key: 'portal', label: 'Next of Kin / Portal', show: true },
             { key: 'respite', label: 'Respite', show: !!respiteCan?.viewAny },
@@ -2250,6 +2267,10 @@ export default function ClientShow({
                     );
                 })()}
 
+                {tab === 'photos' && (
+                    <PhotoGalleryTab clientId={client.id} photos={photos} canEdit={can.edit} />
+                )}
+
                 {tab === 'respite' && (
                     <Card>
                         <CardHeader>
@@ -2961,6 +2982,116 @@ function AssessmentsTab({
                         </div>
                     )}
                 </div>
+            </CardContent>
+        </Card>
+    );
+}
+
+function PhotoGalleryTab({ clientId, photos, canEdit }: { clientId: number; photos: GalleryPhoto[]; canEdit: boolean }) {
+    const [showUpload, setShowUpload] = useState(false);
+    const photoForm = useForm<{ photo: File | null; caption: string; visibility: string }>({
+        photo: null,
+        caption: '',
+        visibility: 'family',
+    });
+    const submitPhoto = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!photoForm.data.photo) return;
+        photoForm.post(`/operations/clients/${clientId}/gallery-photos`, {
+            forceFormData: true,
+            preserveScroll: true,
+            onSuccess: () => { setShowUpload(false); photoForm.reset(); },
+        });
+    };
+    const deletePhoto = (photoId: number) => {
+        if (!confirm('Delete this photo?')) return;
+        router.delete(`/operations/clients/${clientId}/gallery-photos/${photoId}`, { preserveScroll: true });
+    };
+    return (
+        <Card>
+            <CardHeader>
+                <CardTitle className="flex items-center justify-between text-base">
+                    <span>Photo Gallery</span>
+                    {canEdit && (
+                        <Button size="sm" onClick={() => setShowUpload(!showUpload)}>
+                            {showUpload ? 'Cancel' : 'Upload Photo'}
+                        </Button>
+                    )}
+                </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {showUpload && (
+                    <form onSubmit={submitPhoto} className="space-y-3 rounded-lg border bg-muted/30 p-4">
+                        <div>
+                            <Label>Photo *</Label>
+                            <Input
+                                type="file"
+                                accept="image/*"
+                                onChange={(e) => photoForm.setData('photo', e.target.files?.[0] ?? null)}
+                            />
+                        </div>
+                        <div>
+                            <Label>Caption</Label>
+                            <Input
+                                value={photoForm.data.caption}
+                                onChange={(e) => photoForm.setData('caption', e.target.value)}
+                                placeholder="Add a caption..."
+                            />
+                        </div>
+                        <div>
+                            <Label>Visibility</Label>
+                            <Select value={photoForm.data.visibility} onValueChange={(v) => photoForm.setData('visibility', v)}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="staff_only">Staff Only</SelectItem>
+                                    <SelectItem value="family">Family & Staff</SelectItem>
+                                    <SelectItem value="all_portal_users">All Portal Users</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <Button type="submit" disabled={photoForm.processing || !photoForm.data.photo}>
+                            {photoForm.processing ? 'Uploading...' : 'Upload'}
+                        </Button>
+                    </form>
+                )}
+
+                {photos.length > 0 ? (
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                        {photos.map((p) => (
+                            <div key={p.id} className="group relative overflow-hidden rounded-lg border bg-card">
+                                <a href={p.url} target="_blank" rel="noopener noreferrer">
+                                    <img
+                                        src={p.thumbnail_url || p.url}
+                                        alt={p.caption || p.original_name}
+                                        className="aspect-square w-full object-cover"
+                                        loading="lazy"
+                                    />
+                                </a>
+                                <div className="p-2">
+                                    {p.caption && <p className="text-xs font-medium line-clamp-2">{p.caption}</p>}
+                                    <div className="mt-1 flex items-center gap-1 flex-wrap">
+                                        <Badge className="h-4 border-0 px-1 text-[8px] bg-slate-100 text-slate-600">{p.visibility.replace(/_/g, ' ')}</Badge>
+                                        {p.status === 'pending_approval' && <Badge className="h-4 border-0 px-1 text-[8px] bg-amber-100 text-amber-600">Pending</Badge>}
+                                    </div>
+                                    <p className="mt-1 text-[10px] text-muted-foreground">{p.uploaded_by} &middot; {new Date(p.created_at).toLocaleDateString()}</p>
+                                </div>
+                                {canEdit && (
+                                    <button
+                                        onClick={() => deletePhoto(p.id)}
+                                        className="absolute top-1 right-1 rounded-full bg-black/50 p-1 text-white opacity-0 transition-opacity group-hover:opacity-100 hover:bg-red-600"
+                                        title="Delete photo"
+                                    >
+                                        <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    </button>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    <div className="text-sm text-muted-foreground text-center py-12">
+                        No photos yet. Upload the first one!
+                    </div>
+                )}
             </CardContent>
         </Card>
     );

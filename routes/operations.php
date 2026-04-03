@@ -142,6 +142,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::delete('/clients/{client}/photo', [ClientController::class, 'destroyPhoto'])
             ->name('operations.clients.photo.destroy');
 
+        // Gallery photos
+        Route::post('/clients/{client}/gallery-photos', [ClientController::class, 'storeGalleryPhoto'])
+            ->name('operations.clients.gallery-photos.store');
+        Route::delete('/clients/{client}/gallery-photos/{photo}', [ClientController::class, 'destroyGalleryPhoto'])
+            ->name('operations.clients.gallery-photos.destroy');
+
         // Document management
         Route::post('/clients/{client}/documents', [ClientDocumentController::class, 'store'])
             ->name('operations.clients.documents.store');

@@ -26,20 +26,19 @@ class DashboardController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
-        // Client/next-of-kin portal users
+        // Client/next-of-kin portal users → family dashboard
         if ($user->hasRole('client', 'next_of_kin')) {
-            // If they're linked to exactly one client, drop them straight into that profile.
-            // If they're linked to multiple (common for next-of-kin), show a picker.
             $portalClients = $user->portalClients();
             $count = (clone $portalClients)->count();
 
             if ($count === 1) {
                 $first = (clone $portalClients)->first();
                 if ($first) {
-                    return redirect()->route('portal.clients.show', ['client' => $first->id]);
+                    return redirect()->route('portal.clients.dashboard', ['client' => $first->id]);
                 }
             }
 
+            // Multiple clients → show picker
             return redirect()->route('portal.index');
         }
 

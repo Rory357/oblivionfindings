@@ -32,6 +32,7 @@ class NextOfKinSeeder extends Seeder
                     'name' => "{$firstName} {$lastName}",
                     'email' => strtolower("{$firstName}.{$lastName}" . rand(1, 999) . '@example.com'),
                     'password' => $password,
+                    'role' => 'next_of_kin',
                     'approved_at' => now(),
                     'email_verified_at' => now(),
                 ]);
@@ -41,19 +42,15 @@ class NextOfKinSeeder extends Seeder
                     $user->roles()->attach($nokRole->id);
                 }
 
+                // Link to client portal
+                $relationship = fake()->randomElement(['Parent', 'Spouse', 'Sibling', 'Child', 'Guardian', 'Partner']);
+                $user->portalClients()->syncWithoutDetaching([$client->id => ['relation' => strtolower($relationship)]]);
+
                 // Create NOK record
                 NextOfKin::create([
                     'user_id' => $user->id,
                     'client_id' => $client->id,
-                    'relationship' => fake()->randomElement([
-                        'Parent',
-                        'Spouse',
-                        'Sibling',
-                        'Child',
-                        'Guardian',
-                        'Partner',
-                        'Other',
-                    ]),
+                    'relationship' => $relationship,
                     'is_primary_contact' => $i === 0,
                     'is_emergency_contact' => true,
                     'phone' => fake()->phoneNumber(),

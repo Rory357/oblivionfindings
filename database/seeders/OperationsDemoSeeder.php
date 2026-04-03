@@ -14,12 +14,12 @@ class OperationsDemoSeeder extends Seeder
 {
     public function run(): void
     {
-        $userId = 28;
-        $user = User::find($userId);
+        $user = User::where('role', 'admin')->first() ?? User::first();
         if (!$user) {
-            $this->command->error("User {$userId} not found");
+            $this->command->error("No users found - run SystemUsersSeeder first");
             return;
         }
+        $userId = $user->id;
 
         $clients = Client::take(10)->get();
         $staffIds = User::pluck('id')->toArray();
