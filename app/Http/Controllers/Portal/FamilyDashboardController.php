@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\FamilyVisitRequest;
+use App\Models\ProgressNote;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
 use Illuminate\Http\Request;
@@ -80,7 +81,7 @@ class FamilyDashboardController extends Controller
             ->where('visibility', 'portal')
             ->orderByDesc('occurred_at')
             ->limit(10)
-            ->with(['actor:id,name'])
+            ->with(['actor:id,name', 'reactions'])
             ->get()
             ->map(fn ($e) => [
                 'id' => $e->id,
@@ -89,6 +90,16 @@ class FamilyDashboardController extends Controller
                 'body' => $e->body,
                 'occurred_at' => $e->occurred_at?->toISOString(),
                 'actor_name' => $e->actor?->name,
+                'meta' => $e->meta ?? [],
+                'reactions' => $e->reactions
+                    ->groupBy('emoji')
+                    ->map(fn ($group, $emoji) => [
+                        'emoji' => $emoji,
+                        'count' => $group->count(),
+                        'user_ids' => $group->pluck('user_id')->all(),
+                    ])
+                    ->values()
+                    ->all(),
             ]);
 
         // Recent incidents (portal-visible, reviewed only)
@@ -182,6 +193,29 @@ class FamilyDashboardController extends Controller
             ->where('clients.id', $client->id)
             ->first()?->pivot?->relation;
 
+        // Emotion summaries for family portal
+        $getTopEmotions = function ($since) use ($client) {
+            $notes = ProgressNote::where('client_id', $client->id)
+                ->where('created_at', '>=', $since)
+                ->whereNotNull('emotions')
+                ->where('visibility', '!=', 'private')
+                ->get(['emotions']);
+            $counts = [];
+            foreach ($notes as $n) {
+                foreach ($n->emotions ?? [] as $e) {
+                    $counts[$e] = ($counts[$e] ?? 0) + 1;
+                }
+            }
+            arsort($counts);
+            return $counts;
+        };
+
+        $emotionSummary = [
+            'today' => $getTopEmotions($today),
+            'week' => $getTopEmotions(now()->startOfWeek()),
+            'month' => $getTopEmotions(now()->startOfMonth()),
+        ];
+
         return inertia('portal/family-dashboard', [
             'client' => [
                 'id' => $client->id,
@@ -248,6 +282,7 @@ class FamilyDashboardController extends Controller
                 'likes' => $carePlan->content['about_me']['likes'] ?? null,
                 'dislikes' => $carePlan->content['about_me']['dislikes'] ?? null,
             ] : null,
+            'emotionSummary' => $emotionSummary,
         ]);
     }
 
@@ -271,6 +306,29 @@ class FamilyDashboardController extends Controller
             ...$validated,
         ]);
 
+        $visitTypeLabel = str_replace('_', ' ', $validated['visit_type']);
+        $dateLabel = \Carbon\Carbon::parse($validated['requested_date'])->format('j M');
+        TimelineEvent::create([
+            'source_type' => FamilyVisitRequest::class,
+            'source_id' => $visit->id,
+            'occurred_at' => now(),
+            'type' => 'visit_requested',
+            'actor_user_id' => $user->id,
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'subject' => 'Visit request: ' . ucfirst($visitTypeLabel) . ' on ' . $dateLabel,
+            'body' => $validated['notes'] ?? null,
+            'meta' => array_filter([
+                'visit_type' => $validated['visit_type'],
+                'requested_date' => $validated['requested_date'],
+                'preferred_time_start' => $validated['preferred_time_start'] ?? null,
+                'preferred_time_end' => $validated['preferred_time_end'] ?? null,
+            ]),
+            'visibility' => 'portal',
+            'is_pinned' => false,
+            'created_by' => $user->id,
+        ]);
+
         return redirect()->back()->with('success', 'Visit request submitted successfully.');
     }
 
@@ -282,6 +340,21 @@ class FamilyDashboardController extends Controller
         abort_unless($visit->status === 'pending', 422);
 
         $visit->update(['status' => 'cancelled']);
+
+        TimelineEvent::create([
+            'source_type' => FamilyVisitRequest::class,
+            'source_id' => $visit->id,
+            'occurred_at' => now(),
+            'type' => 'visit_cancelled',
+            'actor_user_id' => $user->id,
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'subject' => 'Visit request cancelled',
+            'body' => null,
+            'visibility' => 'portal',
+            'is_pinned' => false,
+            'created_by' => $user->id,
+        ]);
 
         return redirect()->back()->with('success', 'Visit request cancelled.');
     }

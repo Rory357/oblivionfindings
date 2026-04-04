@@ -8,6 +8,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationAllergy;
 use App\Models\MedicationDashboardAlert;
+use App\Models\TimelineEvent;
 use App\Services\EnhancedMarService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
@@ -194,6 +195,32 @@ class MedicationsApiController extends Controller
 
         $administration = $result['administration'];
 
+        // Timeline event
+        $statusLabel = ucfirst(str_replace('_', ' ', $data['status']));
+        TimelineEvent::create([
+            'source_type' => ClientMedicationAdministration::class,
+            'source_id' => $administration->id,
+            'occurred_at' => $administration->administered_at ?? now(),
+            'type' => 'medication_' . $data['status'],
+            'actor_user_id' => $user->id,
+            'client_id' => $client->id,
+            'shift_id' => $data['shift_id'] ?? null,
+            'site_id' => $client->site_id,
+            'subject' => $statusLabel . ': ' . $medication->name . ($medication->dosage ? ' ' . $medication->dosage : ''),
+            'body' => $data['notes'] ?? null,
+            'meta' => array_filter([
+                'medication_name' => $medication->name,
+                'dosage' => $medication->dosage,
+                'dose_given' => $data['dose_given'] ?? null,
+                'status' => $data['status'],
+                'reason' => $data['reason'] ?? null,
+                'witnessed_by' => $data['witnessed_by'] ?? null,
+            ]),
+            'visibility' => 'internal',
+            'is_pinned' => false,
+            'created_by' => $user->id,
+        ]);
+
         // Handle incident creation for specific outcomes
         if ($data['status'] === 'missed') {
             $this->incidentService->handleMissedDose($administration, $user->id);
@@ -273,6 +300,28 @@ class MedicationsApiController extends Controller
         $correction->administered_at = $data['administered_at'] ?? $administration->administered_at;
         $correction->administered_by = $user->id;
         $correction->save();
+
+        // Timeline event
+        TimelineEvent::create([
+            'source_type' => ClientMedicationAdministration::class,
+            'source_id' => $correction->id,
+            'occurred_at' => now(),
+            'type' => 'medication_correction',
+            'actor_user_id' => $user->id,
+            'client_id' => $client->id,
+            'shift_id' => $administration->shift_id,
+            'site_id' => $client->site_id,
+            'subject' => 'Medication corrected: ' . ($administration->medication?->name ?? 'Unknown'),
+            'body' => $data['correction_reason'],
+            'meta' => array_filter([
+                'corrected_from' => $administration->status,
+                'corrected_to' => $data['status'],
+                'original_administration_id' => $administration->id,
+            ]),
+            'visibility' => 'internal',
+            'is_pinned' => false,
+            'created_by' => $user->id,
+        ]);
 
         // Handle incident for significant corrections
         if ($minutesSince > 240) { // 4 hours

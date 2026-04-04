@@ -15,6 +15,7 @@ class DatabaseSeeder extends Seeder
         // RBAC + full demo dataset for realistic end-to-end testing.
         // Run with: php artisan migrate:fresh --seed
         $this->call(RbacSeeder::class);
+        $this->call(OperationsPermissionsSeeder::class);
         $this->call(SystemCatalogSeeder::class);
         $this->call(SystemUsersSeeder::class);
         $this->call(SystemClientsSeeder::class);
@@ -53,5 +54,6 @@ class DatabaseSeeder extends Seeder
         // Additional demo/debug seeders kept in main seeding flow for full dataset coverage.
         $this->call(DemoSeeder::class);
         $this->call(DebugMedicalData::class);
+        $this->call(FamilyPortalDemoSeeder::class);
     }
 }

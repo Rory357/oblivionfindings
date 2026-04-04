@@ -1,9 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { TimelineInteractions, type Comment, type ReactionGroup } from '@/components/timeline-interactions';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router } from '@inertiajs/react';
-import { Clock, Filter, Inbox } from 'lucide-react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { Filter } from 'lucide-react';
 
 type EventItem = {
     id: number;
@@ -12,6 +13,9 @@ type EventItem = {
     body?: string | null;
     occurred_at: string;
     actor_name?: string | null;
+    meta?: any;
+    comments: Comment[];
+    reactions: ReactionGroup[];
 };
 
 type Props = {
@@ -24,16 +28,6 @@ type Props = {
     filter?: string | null;
 };
 
-function formatFullDate(iso: string): string {
-    return new Date(iso).toLocaleDateString([], {
-        weekday: 'short',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-}
-
 function relativeTime(iso: string): string {
     const now = new Date();
     const date = new Date(iso);
@@ -45,7 +39,13 @@ function relativeTime(iso: string): string {
     if (diffHours < 24) return `${diffHours}h ago`;
     const diffDays = Math.floor(diffHours / 24);
     if (diffDays < 7) return `${diffDays}d ago`;
-    return formatFullDate(iso);
+    return new Date(iso).toLocaleDateString([], {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+    });
 }
 
 const filterPills = [
@@ -55,9 +55,17 @@ const filterPills = [
     { label: 'Other', value: 'other' },
 ] as const;
 
+const eventTypeEmojis: Record<string, string> = {
+    care: '💊',
+    visits: '👋',
+    other: '📌',
+};
+
 export default function Timeline({ client, events, filter }: Props) {
     const clientName = `${client.first_name} ${client.last_name}`.trim();
     const currentFilter = filter || 'all';
+    const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
+    const currentUserId = auth.user.id;
 
     const applyFilter = (type: string) => {
         router.get(
@@ -108,53 +116,84 @@ export default function Timeline({ client, events, filter }: Props) {
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-base">
-                            <Clock className="h-4 w-4 text-primary" />
+                            <span>📰</span>
                             Activity Timeline
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
                         {events.data.length > 0 ? (
                             <div className="relative space-y-0">
-                                {events.data.map((event, idx) => (
-                                    <div key={event.id} className="relative flex gap-4 pb-4 last:pb-0">
-                                        {/* Timeline line */}
-                                        {idx < events.data.length - 1 && (
-                                            <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border" />
-                                        )}
-                                        {/* Dot */}
-                                        <div className="relative z-10 mt-1.5 h-[9px] w-[9px] shrink-0 rounded-full border-2 border-primary bg-background" />
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-start justify-between gap-2">
-                                                <p className="text-sm font-medium leading-tight">
-                                                    {event.subject || event.type}
-                                                </p>
-                                                <span className="shrink-0 text-xs text-muted-foreground">
-                                                    {relativeTime(event.occurred_at)}
-                                                </span>
-                                            </div>
-                                            {event.body && (
-                                                <p className="mt-0.5 line-clamp-3 text-xs text-muted-foreground">
-                                                    {event.body}
-                                                </p>
+                                {events.data.map((event, idx) => {
+                                    const typeEmoji = eventTypeEmojis[event.type] ?? '📌';
+                                    return (
+                                        <div key={event.id} className="relative flex gap-4 pb-5 last:pb-0">
+                                            {/* Timeline line */}
+                                            {idx < events.data.length - 1 && (
+                                                <div className="absolute left-[11px] top-6 bottom-0 w-px bg-border" />
                                             )}
-                                            <div className="mt-1 flex items-center gap-2">
-                                                {event.actor_name && (
-                                                    <p className="text-xs text-muted-foreground/70">
-                                                        By {event.actor_name}
+                                            {/* Dot */}
+                                            <div className="relative z-10 mt-1.5 h-[9px] w-[9px] shrink-0 rounded-full border-2 border-primary bg-background" />
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-start justify-between gap-2">
+                                                    <p className="text-sm font-medium leading-tight">
+                                                        <span className="mr-1">{typeEmoji}</span>
+                                                        {event.subject || event.type}
+                                                    </p>
+                                                    <span className="shrink-0 text-xs text-muted-foreground">
+                                                        {relativeTime(event.occurred_at)}
+                                                    </span>
+                                                </div>
+                                                {event.body && (
+                                                    <p className="mt-0.5 line-clamp-3 text-xs text-muted-foreground">
+                                                        {event.body}
                                                     </p>
                                                 )}
-                                                <Badge variant="outline" className="text-[10px] capitalize">
-                                                    {event.type}
-                                                </Badge>
+                                                <div className="mt-1 flex items-center gap-2">
+                                                    {event.actor_name && (
+                                                        <p className="text-xs text-muted-foreground/70">
+                                                            By {event.actor_name}
+                                                        </p>
+                                                    )}
+                                                    <Badge variant="outline" className="text-[10px] capitalize">
+                                                        {event.type === 'progress_note' ? 'note' : event.type}
+                                                    </Badge>
+                                                </div>
+                                                {event.meta?.emotions && (event.meta.emotions as string[]).length > 0 && (
+                                                    <div className="mt-1.5 flex flex-wrap gap-1">
+                                                        {(event.meta.emotions as string[]).map((em: string) => {
+                                                            const emojiMap: Record<string, string> = { happy: '😊', calm: '😌', excited: '🤩', tired: '😴', anxious: '😰', sad: '😢', frustrated: '😤', confused: '😕' };
+                                                            const colorMap: Record<string, string> = { happy: 'bg-emerald-100 text-emerald-700', calm: 'bg-sky-100 text-sky-700', excited: 'bg-amber-100 text-amber-700', tired: 'bg-indigo-100 text-indigo-700', anxious: 'bg-orange-100 text-orange-700', sad: 'bg-blue-100 text-blue-700', frustrated: 'bg-red-100 text-red-700', confused: 'bg-purple-100 text-purple-700' };
+                                                            return (
+                                                                <span key={em} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${colorMap[em] ?? 'bg-muted'}`}>
+                                                                    {emojiMap[em] ?? em} {em}
+                                                                </span>
+                                                            );
+                                                        })}
+                                                    </div>
+                                                )}
+
+                                                <TimelineInteractions
+                                                    eventId={event.id}
+                                                    comments={event.comments}
+                                                    reactions={event.reactions}
+                                                    currentUserId={currentUserId}
+                                                    commentUrl={`/portal/clients/${client.id}/timeline/${event.id}/comments`}
+                                                    deleteCommentUrl={`/portal/clients/${client.id}/timeline/comments`}
+                                                    likeCommentUrl={`/portal/clients/${client.id}/timeline/comments`}
+                                                    reactUrl={`/portal/clients/${client.id}/timeline/${event.id}/react`}
+                                                    canComment={true}
+                                                    canReact={true}
+                                                    showStaffBadge={true}
+                                                />
                                             </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         ) : (
                             <div className="flex flex-col items-center justify-center py-12 text-center">
-                                <Inbox className="mb-2 h-8 w-8 text-muted-foreground/40" />
-                                <p className="text-sm text-muted-foreground">No activity to show</p>
+                                <span className="mb-2 text-3xl">🌻</span>
+                                <p className="text-sm text-muted-foreground">Nothing to show here yet &mdash; check back soon!</p>
                                 {currentFilter !== 'all' && (
                                     <Button
                                         size="sm"

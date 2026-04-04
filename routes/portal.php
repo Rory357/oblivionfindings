@@ -19,8 +19,13 @@ use App\Http\Controllers\Portal\PortalScheduleController;
 use App\Http\Controllers\Portal\PortalDocumentController;
 use App\Http\Controllers\Portal\PortalPhotoController;
 use App\Http\Controllers\Portal\PortalMessageController;
+use App\Http\Controllers\Portal\PortalCalendarController;
 use App\Http\Controllers\Portal\PortalNotificationController;
+use App\Http\Controllers\TimelineInteractionController;
+use App\Http\Controllers\ClientCalendarController;
+use App\Http\Controllers\ClientVisitRequestController;
 use App\Http\Controllers\Portal\PortalPreferenceController;
+use App\Http\Controllers\Portal\PortalTimelineInteractionController;
 
 /**
  * Portal & Shared Features Routes
@@ -57,9 +62,25 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/portal/clients/{client}/visit-requests/{visit}/cancel', [FamilyDashboardController::class, 'cancelVisitRequest'])
         ->name('portal.clients.visit-requests.cancel');
 
+    // Portal Calendar
+    Route::get('/portal/clients/{client}/calendar', [PortalCalendarController::class, 'index'])
+        ->name('portal.clients.calendar');
+    Route::get('/portal/clients/{client}/calendar/events', [PortalCalendarController::class, 'events'])
+        ->name('portal.clients.calendar.events');
+
     // Portal Tab Pages
     Route::get('/portal/clients/{client}/timeline', [PortalTimelineController::class, 'index'])
         ->name('portal.clients.timeline');
+
+    // Timeline Interactions (comments & reactions)
+    Route::post('/portal/clients/{client}/timeline/{timelineEvent}/comments', [PortalTimelineInteractionController::class, 'storeComment'])
+        ->name('portal.clients.timeline.comments.store');
+    Route::delete('/portal/clients/{client}/timeline/comments/{timelineEventComment}', [PortalTimelineInteractionController::class, 'destroyComment'])
+        ->name('portal.clients.timeline.comments.destroy');
+    Route::post('/portal/clients/{client}/timeline/comments/{timelineEventComment}/like', [PortalTimelineInteractionController::class, 'toggleCommentLike'])
+        ->name('portal.clients.timeline.comments.like');
+    Route::post('/portal/clients/{client}/timeline/{timelineEvent}/react', [PortalTimelineInteractionController::class, 'toggleReaction'])
+        ->name('portal.clients.timeline.react');
     Route::get('/portal/clients/{client}/health', [PortalHealthController::class, 'index'])
         ->name('portal.clients.health');
     Route::get('/portal/clients/{client}/schedule', [PortalScheduleController::class, 'index'])
@@ -158,6 +179,34 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/timeline', [TimelineController::class, 'my'])->name('timeline.my');
     Route::get('/staff/{user}/timeline', [TimelineController::class, 'staff'])->name('timeline.staff');
     Route::get('/clients/{client}/timeline', [TimelineController::class, 'client'])->name('timeline.client');
+
+    // Client Calendar
+    Route::get('/operations/clients/{client}/calendar', function (\Illuminate\Http\Request $request, \App\Models\Client $client) {
+        app(\App\Http\Controllers\ClientCalendarController::class)->authorize('view', $client);
+        return inertia('operations/clients/calendar', [
+            'client' => ['id' => $client->id, 'first_name' => $client->first_name, 'last_name' => $client->last_name],
+            'pending_visit_count' => \App\Models\FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
+        ]);
+    })->name('client.calendar');
+    Route::get('/clients/{client}/calendar/events', [ClientCalendarController::class, 'events'])->name('client.calendar.events');
+    Route::post('/clients/{client}/calendar/appointments', [ClientCalendarController::class, 'storeAppointment'])->name('client.calendar.appointments.store');
+    Route::put('/clients/{client}/calendar/appointments/{appointment}', [ClientCalendarController::class, 'updateAppointment'])->name('client.calendar.appointments.update');
+    Route::delete('/clients/{client}/calendar/appointments/{appointment}', [ClientCalendarController::class, 'destroyAppointment'])->name('client.calendar.appointments.destroy');
+
+    // Visit Request Approval
+    Route::get('/operations/clients/{client}/visit-requests', [ClientVisitRequestController::class, 'index'])->name('client.visit-requests.index');
+    Route::post('/operations/clients/{client}/visit-requests/{visit}/approve', [ClientVisitRequestController::class, 'approve'])->name('client.visit-requests.approve');
+    Route::post('/operations/clients/{client}/visit-requests/{visit}/decline', [ClientVisitRequestController::class, 'decline'])->name('client.visit-requests.decline');
+
+    // Staff Timeline Interactions (comments & reactions)
+    Route::post('/clients/{client}/timeline/{timelineEvent}/comments', [TimelineInteractionController::class, 'storeComment'])
+        ->name('timeline.comments.store');
+    Route::delete('/clients/{client}/timeline/comments/{timelineEventComment}', [TimelineInteractionController::class, 'destroyComment'])
+        ->name('timeline.comments.destroy');
+    Route::post('/clients/{client}/timeline/comments/{timelineEventComment}/like', [TimelineInteractionController::class, 'toggleCommentLike'])
+        ->name('timeline.comments.like');
+    Route::post('/clients/{client}/timeline/{timelineEvent}/react', [TimelineInteractionController::class, 'toggleReaction'])
+        ->name('timeline.react');
 
     // Summaries
     Route::get('/summaries', fn() => redirect('/summaries/me'))->name('summaries.home');

@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientPhoto;
 use App\Models\FamilyPortalSetting;
+use App\Models\TimelineEvent;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -145,6 +146,21 @@ class PortalPhotoController extends Controller
             'tags' => $validated['tags'] ?? null,
             'visibility' => 'family',
             'status' => $status,
+        ]);
+
+        TimelineEvent::create([
+            'source_type' => ClientPhoto::class,
+            'source_id' => $photo->id,
+            'occurred_at' => now(),
+            'type' => 'photo_uploaded',
+            'actor_user_id' => $user->id,
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'subject' => 'Photo uploaded by family',
+            'body' => $validated['caption'] ?? null,
+            'visibility' => 'portal',
+            'is_pinned' => false,
+            'created_by' => $user->id,
         ]);
 
         AuditLogger::log('portal.photo.upload', $photo);

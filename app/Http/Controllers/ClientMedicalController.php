@@ -13,6 +13,7 @@ use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientDocument;
 use App\Models\ServiceContext;
+use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -335,6 +336,30 @@ class ClientMedicalController extends Controller
             $m->client_id = $client->id;
             $m->fill($this->buildMedicationPayload($data));
             $m->save();
+
+            TimelineEvent::create([
+                'source_type' => ClientMedication::class,
+                'source_id' => $m->id,
+                'occurred_at' => now(),
+                'type' => 'medication_prescribed',
+                'actor_user_id' => $user->id,
+                'client_id' => $client->id,
+                'site_id' => $client->site_id,
+                'subject' => 'Medication added: ' . $m->name . ($m->dosage ? ' ' . $m->dosage : ''),
+                'body' => $m->instructions,
+                'meta' => array_filter([
+                    'medication_name' => $m->name,
+                    'dosage' => $m->dosage,
+                    'frequency' => $m->frequency,
+                    'route' => $m->route,
+                    'is_prn' => $m->is_prn,
+                    'controlled_drug' => $m->controlled_drug,
+                    'high_risk' => $m->high_risk,
+                ]),
+                'visibility' => 'internal',
+                'is_pinned' => false,
+                'created_by' => $user->id,
+            ]);
 
             app(NotificationService::class)->notifyCrud($request->user(), 'created', 'medication', $m, $client, [
                 'title' => 'Medication added: ' . $m->name,
@@ -702,6 +727,22 @@ class ClientMedicalController extends Controller
             $c->client_id = $client->id;
             $c->fill($data);
             $c->save();
+
+            TimelineEvent::create([
+                'source_type' => ClientCondition::class,
+                'source_id' => $c->id,
+                'occurred_at' => now(),
+                'type' => 'condition_added',
+                'actor_user_id' => $request->user()?->id,
+                'client_id' => $client->id,
+                'site_id' => $client->site_id,
+                'subject' => 'Condition added: ' . $c->label,
+                'body' => $c->notes,
+                'meta' => array_filter(['severity' => $c->severity]),
+                'visibility' => 'internal',
+                'is_pinned' => false,
+                'created_by' => $request->user()?->id,
+            ]);
 
             app(NotificationService::class)->notifyCrud($request->user(), 'created', 'condition', $c, $client, [
                 'title' => 'Condition added: ' . $c->label,

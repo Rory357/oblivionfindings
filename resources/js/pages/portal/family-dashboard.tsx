@@ -15,29 +15,31 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, router } from '@inertiajs/react';
+import { Head, Link, useForm, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
-    CalendarDays,
     CalendarPlus,
-    CheckCircle2,
-    ClipboardList,
-    Clock,
     Heart,
     Home,
     MapPin,
+    MessageSquare,
     Phone,
     ShieldAlert,
-    Star,
-    Target,
-    User,
     Users,
     Video,
     X,
 } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { toast } from 'sonner';
+
+function getGreeting(): { text: string; emoji: string } {
+    const hour = new Date().getHours();
+    if (hour < 12) return { text: 'Good morning', emoji: '☀️' };
+    if (hour < 17) return { text: 'Good afternoon', emoji: '🌤️' };
+    if (hour < 21) return { text: 'Good evening', emoji: '🌙' };
+    return { text: 'Good night', emoji: '✨' };
+}
 
 type Staff = { id: number; name: string; avatar?: string | null; email?: string };
 type ShiftItem = {
@@ -57,6 +59,11 @@ type MonthShift = {
     type: string;
     staff_name?: string | null;
 };
+type ReactionGroup = {
+    emoji: string;
+    count: number;
+    user_ids: number[];
+};
 type EventItem = {
     id: number;
     type: string;
@@ -64,6 +71,7 @@ type EventItem = {
     body?: string | null;
     occurred_at: string;
     actor_name?: string | null;
+    reactions?: ReactionGroup[];
 };
 type IncidentItem = {
     id: number;
@@ -138,6 +146,22 @@ type Props = {
         likes?: string | null;
         dislikes?: string | null;
     } | null;
+    emotionSummary?: {
+        today: Record<string, number>;
+        week: Record<string, number>;
+        month: Record<string, number>;
+    };
+};
+
+const EMOTION_INFO: Record<string, { emoji: string; label: string; color: string }> = {
+    happy: { emoji: '😊', label: 'Happy', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+    calm: { emoji: '😌', label: 'Calm', color: 'bg-sky-100 text-sky-700 border-sky-200' },
+    excited: { emoji: '🤩', label: 'Excited', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+    tired: { emoji: '😴', label: 'Tired', color: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+    anxious: { emoji: '😰', label: 'Anxious', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+    sad: { emoji: '😢', label: 'Sad', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+    frustrated: { emoji: '😤', label: 'Frustrated', color: 'bg-red-100 text-red-700 border-red-200' },
+    confused: { emoji: '😕', label: 'Confused', color: 'bg-purple-100 text-purple-700 border-purple-200' },
 };
 
 function formatTime(iso: string): string {
@@ -211,12 +235,14 @@ export default function FamilyDashboard({
     criticalAlerts,
     dailySummary,
     carePlan,
+    emotionSummary,
 }: Props) {
     const getInitials = useInitials();
     const name = client.preferred_name || `${client.first_name} ${client.last_name}`.trim();
     const fullName = `${client.first_name} ${client.last_name}`.trim();
     const [bookingOpen, setBookingOpen] = useState(false);
     const [calendarView, setCalendarView] = useState<'week' | 'month'>('week');
+    const greeting = getGreeting();
 
     const form = useForm({
         requested_date: '',
@@ -274,23 +300,25 @@ export default function FamilyDashboard({
 
             <div className="mx-auto max-w-7xl space-y-6 p-4 md:p-6">
                 {/* ── Hero header ──────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-r from-primary/5 via-primary/3 to-transparent p-6">
+                <div className="relative overflow-hidden rounded-2xl border bg-gradient-to-r from-amber-50 via-orange-50/30 to-rose-50/20 p-6 dark:from-amber-950/20 dark:via-orange-950/10 dark:to-rose-950/10">
                     <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                         <div className="flex items-center gap-4">
-                            <Avatar className="h-16 w-16 ring-2 ring-primary/20 ring-offset-2">
+                            <Avatar className="h-16 w-16 ring-2 ring-amber-200 ring-offset-2 dark:ring-amber-700">
                                 <AvatarImage src={client.avatar ?? client.profile_photo_url ?? undefined} alt={fullName} />
-                                <AvatarFallback className="bg-primary/10 text-lg font-semibold text-primary">
+                                <AvatarFallback className="bg-amber-100 text-lg font-semibold text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                                     {getInitials(fullName)}
                                 </AvatarFallback>
                             </Avatar>
                             <div>
-                                <h1 className="text-2xl font-bold tracking-tight">{name}</h1>
-                                {client.preferred_name && client.preferred_name !== fullName && (
-                                    <p className="text-sm text-muted-foreground">{fullName}</p>
-                                )}
+                                <h1 className="text-2xl font-bold tracking-tight">
+                                    {greeting.emoji} {greeting.text}!
+                                </h1>
+                                <p className="text-sm text-muted-foreground">
+                                    Here's how {name} is doing today
+                                </p>
                                 <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                                     {relation && (
-                                        <Badge variant="outline" className="capitalize">
+                                        <Badge variant="outline" className="capitalize border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-300">
                                             <Heart className="mr-1 h-3 w-3" />
                                             {relation}
                                         </Badge>
@@ -303,7 +331,7 @@ export default function FamilyDashboard({
                                             variant="secondary"
                                             className={
                                                 client.status === 'active'
-                                                    ? 'bg-emerald-100 text-emerald-800'
+                                                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300'
                                                     : ''
                                             }
                                         >
@@ -317,7 +345,7 @@ export default function FamilyDashboard({
                             <DialogTrigger asChild>
                                 <Button size="lg" className="gap-2 shadow-md">
                                     <CalendarPlus className="h-5 w-5" />
-                                    Book a Visit
+                                    Plan a Visit 💛
                                 </Button>
                             </DialogTrigger>
                             <DialogContent className="sm:max-w-md">
@@ -410,18 +438,119 @@ export default function FamilyDashboard({
                     </div>
                 </div>
 
-                {/* ── KPI Stats Row ────────────────────────────── */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-                    <StatCard icon={Clock} label="Today's Shifts" value={stats.shiftsToday} color="blue" />
-                    <StatCard icon={CalendarDays} label="This Week" value={stats.shiftsThisWeek} color="indigo" />
-                    <StatCard icon={Calendar} label="This Month" value={stats.shiftsThisMonth} color="violet" />
-                    <StatCard
-                        icon={CalendarPlus}
-                        label="Pending Visits"
-                        value={stats.pendingVisitRequests}
-                        color="amber"
+                {/* ── Quick Actions Bar ────────────────────────── */}
+                <div className="flex flex-wrap gap-2 sm:gap-3">
+                    <Link
+                        href={`/portal/clients/${client.id}/messages`}
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                    >
+                        <span>💬</span> Send a Message
+                    </Link>
+                    <button
+                        onClick={() => setBookingOpen(true)}
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                    >
+                        <span>📅</span> Plan a Visit
+                    </button>
+                    <Link
+                        href={`/portal/clients/${client.id}/photos`}
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                    >
+                        <span>📸</span> Photos
+                    </Link>
+                    <Link
+                        href={`/portal/clients/${client.id}/timeline`}
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                    >
+                        <span>📋</span> Timeline
+                    </Link>
+                    <Link
+                        href={`/portal/clients/${client.id}/documents`}
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                    >
+                        <span>📄</span> Documents
+                    </Link>
+                    <Link
+                        href={`/portal/clients/${client.id}/health`}
+                        className="inline-flex items-center gap-2 rounded-full border bg-card px-4 py-2 text-sm font-medium shadow-sm transition-all hover:shadow-md hover:border-primary/30"
+                    >
+                        <span>🏥</span> Health
+                    </Link>
+                </div>
+
+                {/* ── Glance Cards ────────────────────────────── */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                    <GlanceCard
+                        emoji={stats.shiftsToday > 0 ? '😊' : '🌿'}
+                        message={
+                            stats.shiftsToday > 0
+                                ? `${stats.shiftsToday} visit${stats.shiftsToday !== 1 ? 's' : ''} planned for today`
+                                : 'A quiet day \u2014 no visits scheduled'
+                        }
+                        bgClass="bg-gradient-to-r from-sky-50 to-blue-50 dark:from-sky-950/20 dark:to-blue-950/20"
+                    />
+                    <GlanceCard
+                        emoji={stats.shiftsThisWeek > 3 ? '📅' : stats.shiftsThisWeek > 0 ? '🗓️' : '🌈'}
+                        message={
+                            stats.shiftsThisWeek > 3
+                                ? `A busy week with ${stats.shiftsThisWeek} visits!`
+                                : stats.shiftsThisWeek > 0
+                                  ? `${stats.shiftsThisWeek} visit${stats.shiftsThisWeek !== 1 ? 's' : ''} this week`
+                                  : 'A clear week ahead \u2014 enjoy!'
+                        }
+                        bgClass="bg-gradient-to-r from-violet-50 to-purple-50 dark:from-violet-950/20 dark:to-purple-950/20"
+                    />
+                    <GlanceCard
+                        emoji={stats.pendingVisitRequests > 0 ? '⏳' : '✅'}
+                        message={
+                            stats.pendingVisitRequests > 0
+                                ? `${stats.pendingVisitRequests} visit request${stats.pendingVisitRequests !== 1 ? 's' : ''} being reviewed`
+                                : 'All caught up! No pending requests'
+                        }
+                        bgClass="bg-gradient-to-r from-amber-50 to-yellow-50 dark:from-amber-950/20 dark:to-yellow-950/20"
                     />
                 </div>
+
+                {/* ── Mood Summary ────────────────────────────── */}
+                {emotionSummary && (Object.keys(emotionSummary.today).length > 0 || Object.keys(emotionSummary.week).length > 0 || Object.keys(emotionSummary.month).length > 0) && (() => {
+                    const renderMoodCard = (title: string, data: Record<string, number>, emoji: string) => {
+                        const sorted = Object.entries(data).sort(([, a], [, b]) => b - a);
+                        const top = sorted[0];
+                        if (!top) return (
+                            <div className="rounded-2xl border bg-card p-4 text-center">
+                                <p className="text-xs text-muted-foreground">{emoji} {title}</p>
+                                <p className="mt-1 text-sm text-muted-foreground">No mood recorded</p>
+                            </div>
+                        );
+                        const info = EMOTION_INFO[top[0]];
+                        return (
+                            <div className="rounded-2xl border bg-card p-4">
+                                <p className="text-xs text-muted-foreground">{emoji} {title}</p>
+                                <div className="mt-2 flex items-center gap-2">
+                                    <span className="text-2xl">{info?.emoji ?? top[0]}</span>
+                                    <span className="text-sm font-semibold">{info?.label ?? top[0]}</span>
+                                </div>
+                                {sorted.length > 1 && (
+                                    <div className="mt-2 flex flex-wrap gap-1">
+                                        {sorted.slice(1).map(([key, count]) => (
+                                            <span key={key} className={`inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium ${EMOTION_INFO[key]?.color ?? 'bg-muted'}`}>
+                                                {EMOTION_INFO[key]?.emoji} {count}
+                                            </span>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    };
+
+                    return (
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                            {renderMoodCard('Today', emotionSummary.today, '🌤️')}
+                            {renderMoodCard('This Week', emotionSummary.week, '📅')}
+                            {renderMoodCard('This Month', emotionSummary.month, '🗓️')}
+                        </div>
+                    );
+                })()}
 
                 {/* ── Main content grid ──────────────────────── */}
                 <div className="grid gap-6 lg:grid-cols-3">
@@ -431,7 +560,7 @@ export default function FamilyDashboard({
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <Clock className="h-4 w-4 text-primary" />
+                                    <span>📅</span>
                                     Today's Schedule
                                 </CardTitle>
                                 <span className="text-sm text-muted-foreground">
@@ -447,39 +576,48 @@ export default function FamilyDashboard({
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center justify-center py-8 text-center">
-                                        <Calendar className="mb-2 h-8 w-8 text-muted-foreground/40" />
-                                        <p className="text-sm text-muted-foreground">No shifts scheduled for today</p>
+                                        <span className="mb-2 text-3xl">🌿</span>
+                                        <p className="text-sm text-muted-foreground">Nothing on the schedule today &mdash; time to relax!</p>
                                     </div>
                                 )}
                             </CardContent>
                         </Card>
 
-                        {/* Daily Summary */}
+                        {/* Today's Snapshot */}
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <ClipboardList className="h-4 w-4 text-primary" />
-                                    Daily Summary
+                                    <span>📋</span>
+                                    Today's Snapshot
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
                                 <div className="space-y-3">
-                                    <div className="flex items-center gap-3 rounded-lg bg-muted/50 p-3">
-                                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
-                                            <CheckCircle2 className="h-5 w-5 text-emerald-600" />
-                                        </div>
+                                    <div className="flex items-center gap-3 rounded-lg bg-amber-50/50 p-3 dark:bg-amber-950/10">
+                                        <span className="text-2xl">
+                                            {dailySummary.completedToday > 0 && dailySummary.scheduledToday === 0
+                                                ? '🌟'
+                                                : dailySummary.completedToday > 0
+                                                  ? '😊'
+                                                  : dailySummary.scheduledToday > 0
+                                                    ? '👍'
+                                                    : '🌿'}
+                                        </span>
                                         <div>
                                             <p className="text-sm font-medium">
-                                                {dailySummary.completedToday} shift{dailySummary.completedToday !== 1 ? 's' : ''} completed, {dailySummary.scheduledToday} scheduled
+                                                {dailySummary.completedToday > 0 && dailySummary.scheduledToday > 0
+                                                    ? `${name} has had ${dailySummary.completedToday} visit${dailySummary.completedToday !== 1 ? 's' : ''} so far, with ${dailySummary.scheduledToday} more to come!`
+                                                    : dailySummary.completedToday > 0
+                                                      ? `All done for today! ${name} had ${dailySummary.completedToday} visit${dailySummary.completedToday !== 1 ? 's' : ''}`
+                                                      : dailySummary.scheduledToday > 0
+                                                        ? `${dailySummary.scheduledToday} visit${dailySummary.scheduledToday !== 1 ? 's' : ''} coming up today \u2014 we'll keep you updated!`
+                                                        : `A peaceful day for ${name} \u2014 nothing on the schedule`}
                                             </p>
                                             {dailySummary.lastEvent && (
                                                 <p className="text-xs text-muted-foreground">
                                                     Last activity: {dailySummary.lastEvent.subject} at{' '}
                                                     {new Date(dailySummary.lastEvent.occurred_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                                                 </p>
-                                            )}
-                                            {!dailySummary.lastEvent && dailySummary.completedToday === 0 && dailySummary.scheduledToday === 0 && (
-                                                <p className="text-xs text-muted-foreground">No activity recorded today</p>
                                             )}
                                         </div>
                                     </div>
@@ -492,8 +630,8 @@ export default function FamilyDashboard({
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <Target className="h-4 w-4 text-primary" />
-                                        {carePlan.title || 'Care Plan'}
+                                        <span>🎯</span>
+                                        {carePlan.title || `${name}'s Care Plan`}
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-4">
@@ -511,12 +649,15 @@ export default function FamilyDashboard({
                                                     style={{ width: `${carePlan.goals_count > 0 ? (carePlan.goals_completed / carePlan.goals_count) * 100 : 0}%` }}
                                                 />
                                             </div>
+                                            {carePlan.goals_completed === carePlan.goals_count && carePlan.goals_count > 0 && (
+                                                <p className="mt-1.5 text-xs font-medium text-emerald-600">All goals achieved! 🎉</p>
+                                            )}
                                         </div>
                                     )}
                                     {carePlan.important_to_me && (
-                                        <div className="rounded-lg bg-primary/5 p-3">
-                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-primary">
-                                                What's Important to Me
+                                        <div className="rounded-lg bg-amber-50/70 p-3 dark:bg-amber-950/10">
+                                            <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-400">
+                                                ⭐ What's Important to Me
                                             </p>
                                             <p className="text-sm leading-relaxed">{carePlan.important_to_me}</p>
                                         </div>
@@ -524,7 +665,7 @@ export default function FamilyDashboard({
                                     {carePlan.ideal_day && (
                                         <div>
                                             <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                                My Ideal Day
+                                                🌅 My Ideal Day
                                             </p>
                                             <p className="text-sm leading-relaxed">{carePlan.ideal_day}</p>
                                         </div>
@@ -532,7 +673,7 @@ export default function FamilyDashboard({
                                     {carePlan.how_to_support && (
                                         <div>
                                             <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                                                How to Support Me
+                                                🤝 How to Support Me
                                             </p>
                                             <p className="text-sm leading-relaxed">{carePlan.how_to_support}</p>
                                         </div>
@@ -540,15 +681,15 @@ export default function FamilyDashboard({
                                     {(carePlan.likes || carePlan.dislikes) && (
                                         <div className="grid grid-cols-2 gap-3">
                                             {carePlan.likes && (
-                                                <div className="rounded-lg bg-emerald-50 p-3">
-                                                    <p className="mb-1 text-xs font-medium text-emerald-700">Likes</p>
-                                                    <p className="text-xs leading-relaxed text-emerald-800">{carePlan.likes}</p>
+                                                <div className="rounded-lg bg-emerald-50 p-3 dark:bg-emerald-950/20">
+                                                    <p className="mb-1 text-xs font-medium text-emerald-700 dark:text-emerald-400">💚 Things I Love</p>
+                                                    <p className="text-xs leading-relaxed text-emerald-800 dark:text-emerald-300">{carePlan.likes}</p>
                                                 </div>
                                             )}
                                             {carePlan.dislikes && (
-                                                <div className="rounded-lg bg-rose-50 p-3">
-                                                    <p className="mb-1 text-xs font-medium text-rose-700">Dislikes</p>
-                                                    <p className="text-xs leading-relaxed text-rose-800">{carePlan.dislikes}</p>
+                                                <div className="rounded-lg bg-rose-50 p-3 dark:bg-rose-950/20">
+                                                    <p className="mb-1 text-xs font-medium text-rose-700 dark:text-rose-400">Not a Fan Of</p>
+                                                    <p className="text-xs leading-relaxed text-rose-800 dark:text-rose-300">{carePlan.dislikes}</p>
                                                 </div>
                                             )}
                                         </div>
@@ -561,8 +702,8 @@ export default function FamilyDashboard({
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <CalendarDays className="h-4 w-4 text-primary" />
-                                    Schedule Overview
+                                    <span>🗓️</span>
+                                    Coming Up
                                 </CardTitle>
                                 <div className="flex gap-1 rounded-lg border p-0.5">
                                     <button
@@ -595,9 +736,10 @@ export default function FamilyDashboard({
                                                 <ShiftRow key={shift.id} shift={shift} showDate />
                                             ))
                                         ) : (
-                                            <p className="py-6 text-center text-sm text-muted-foreground">
-                                                No shifts scheduled this week
-                                            </p>
+                                            <div className="flex flex-col items-center justify-center py-6 text-center">
+                                                <span className="mb-2 text-3xl">🌈</span>
+                                                <p className="text-sm text-muted-foreground">A clear week ahead &mdash; enjoy the downtime!</p>
+                                            </div>
                                         )}
                                     </div>
                                 ) : (
@@ -659,6 +801,13 @@ export default function FamilyDashboard({
                                         ))}
                                     </div>
                                 )}
+                                <div className="mt-4 flex justify-center">
+                                    <Button variant="ghost" size="sm" asChild>
+                                        <Link href={`/portal/clients/${client.id}/schedule`}>
+                                            View full schedule →
+                                        </Link>
+                                    </Button>
+                                </div>
                             </CardContent>
                         </Card>
 
@@ -666,8 +815,8 @@ export default function FamilyDashboard({
                         <Card>
                             <CardHeader className="flex flex-row items-center justify-between pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <CalendarPlus className="h-4 w-4 text-primary" />
-                                    Your Visit Requests
+                                    <span>✈️</span>
+                                    Your Visits
                                 </CardTitle>
                                 <Button size="sm" variant="outline" className="gap-1.5" onClick={() => setBookingOpen(true)}>
                                     <CalendarPlus className="h-3.5 w-3.5" />
@@ -733,8 +882,8 @@ export default function FamilyDashboard({
                                     </div>
                                 ) : (
                                     <div className="flex flex-col items-center justify-center py-8 text-center">
-                                        <CalendarPlus className="mb-2 h-8 w-8 text-muted-foreground/40" />
-                                        <p className="text-sm text-muted-foreground">No upcoming visit requests</p>
+                                        <span className="mb-2 text-3xl">💛</span>
+                                        <p className="text-sm text-muted-foreground">No visits planned yet &mdash; ready when you are!</p>
                                         <Button
                                             size="sm"
                                             variant="outline"
@@ -742,7 +891,7 @@ export default function FamilyDashboard({
                                             onClick={() => setBookingOpen(true)}
                                         >
                                             <CalendarPlus className="h-3.5 w-3.5" />
-                                            Book a Visit
+                                            Plan a Visit
                                         </Button>
                                     </div>
                                 )}
@@ -753,8 +902,8 @@ export default function FamilyDashboard({
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <Star className="h-4 w-4 text-primary" />
-                                    Recent Activity
+                                    <span>📰</span>
+                                    What's Been Happening
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
@@ -787,12 +936,34 @@ export default function FamilyDashboard({
                                                             By {event.actor_name}
                                                         </p>
                                                     )}
+                                                    {event.reactions && event.reactions.length > 0 && (
+                                                        <div className="mt-1.5 flex flex-wrap gap-1">
+                                                            {event.reactions.map((r) => (
+                                                                <span
+                                                                    key={r.emoji}
+                                                                    className="inline-flex items-center gap-0.5 rounded-full border bg-muted/50 px-1.5 py-0.5 text-[10px]"
+                                                                >
+                                                                    {r.emoji} {r.count}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
                                                 </div>
                                             </div>
                                         ))}
+                                        <div className="mt-4 flex justify-center">
+                                            <Button variant="ghost" size="sm" asChild>
+                                                <Link href={`/portal/clients/${client.id}/timeline`}>
+                                                    View all activity →
+                                                </Link>
+                                            </Button>
+                                        </div>
                                     </div>
                                 ) : (
-                                    <p className="py-6 text-center text-sm text-muted-foreground">No recent activity</p>
+                                    <div className="flex flex-col items-center justify-center py-6 text-center">
+                                        <span className="mb-2 text-3xl">📬</span>
+                                        <p className="text-sm text-muted-foreground">All quiet for now &mdash; we'll keep you posted!</p>
+                                    </div>
                                 )}
                             </CardContent>
                         </Card>
@@ -804,7 +975,7 @@ export default function FamilyDashboard({
                         <Card>
                             <CardHeader className="pb-3">
                                 <CardTitle className="flex items-center gap-2 text-base">
-                                    <User className="h-4 w-4 text-primary" />
+                                    <span>💜</span>
                                     About {name}
                                 </CardTitle>
                             </CardHeader>
@@ -862,15 +1033,15 @@ export default function FamilyDashboard({
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <Star className="h-4 w-4 text-amber-500" />
+                                        <span>⭐</span>
                                         Key Worker
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex items-center gap-3">
-                                        <Avatar className="h-11 w-11 ring-2 ring-amber-100 ring-offset-1">
+                                        <Avatar className="h-11 w-11 ring-2 ring-amber-100 ring-offset-1 dark:ring-amber-800">
                                             <AvatarImage src={keyWorker.avatar ?? undefined} alt={keyWorker.name} />
-                                            <AvatarFallback className="bg-amber-50 text-amber-700">
+                                            <AvatarFallback className="bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
                                                 {getInitials(keyWorker.name)}
                                             </AvatarFallback>
                                         </Avatar>
@@ -881,6 +1052,12 @@ export default function FamilyDashboard({
                                             )}
                                         </div>
                                     </div>
+                                    <Button variant="outline" size="sm" className="mt-3 w-full gap-1.5" asChild>
+                                        <Link href={`/portal/clients/${client.id}/messages`}>
+                                            <MessageSquare className="h-3.5 w-3.5" />
+                                            Send a Message
+                                        </Link>
+                                    </Button>
                                 </CardContent>
                             </Card>
                         )}
@@ -890,8 +1067,8 @@ export default function FamilyDashboard({
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <Users className="h-4 w-4 text-primary" />
-                                        Support Team
+                                        <span>👥</span>
+                                        {name}'s Team
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent>
@@ -917,8 +1094,8 @@ export default function FamilyDashboard({
                             <Card>
                                 <CardHeader className="pb-3">
                                     <CardTitle className="flex items-center gap-2 text-base">
-                                        <Heart className="h-4 w-4 text-rose-500" />
-                                        Medical Summary
+                                        <span>🏥</span>
+                                        Health at a Glance
                                     </CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-3 text-sm">
@@ -1030,37 +1207,19 @@ export default function FamilyDashboard({
 
 /* ── Subcomponents ─────────────────────────────────────────────────── */
 
-function StatCard({
-    icon: Icon,
-    label,
-    value,
-    color,
+function GlanceCard({
+    emoji,
+    message,
+    bgClass,
 }: {
-    icon: typeof Clock;
-    label: string;
-    value: number;
-    color: string;
+    emoji: string;
+    message: string;
+    bgClass: string;
 }) {
-    const bgColors: Record<string, string> = {
-        blue: 'bg-blue-50',
-        indigo: 'bg-indigo-50',
-        violet: 'bg-violet-50',
-        amber: 'bg-amber-50',
-    };
-    const iconColors: Record<string, string> = {
-        blue: 'text-blue-600',
-        indigo: 'text-indigo-600',
-        violet: 'text-violet-600',
-        amber: 'text-amber-600',
-    };
-
     return (
-        <div className="relative overflow-hidden rounded-xl border bg-card p-4 shadow-sm">
-            <div className={`absolute right-3 top-3 rounded-lg ${bgColors[color] ?? ''} p-2`}>
-                <Icon className={`h-4 w-4 ${iconColors[color] ?? ''}`} />
-            </div>
-            <div className="text-2xl font-bold tracking-tight">{value}</div>
-            <div className="mt-0.5 text-xs text-muted-foreground">{label}</div>
+        <div className={`flex items-center gap-3 rounded-2xl border p-4 shadow-sm ${bgClass}`}>
+            <span className="text-2xl">{emoji}</span>
+            <p className="text-sm font-medium">{message}</p>
         </div>
     );
 }

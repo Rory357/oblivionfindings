@@ -22,6 +22,7 @@ class ProgressNote extends Model
         'note_type',
         'content',
         'mood_rating',
+        'emotions',
         'is_flagged',
         'flagged_reason',
         'ai_summary',
@@ -30,6 +31,7 @@ class ProgressNote extends Model
 
     protected $casts = [
         'is_flagged' => 'boolean',
+        'emotions' => 'array',
     ];
 
     public function client()

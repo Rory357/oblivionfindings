@@ -26,6 +26,7 @@ type Note = {
     note_type: string;
     content: string;
     mood_rating: number | null;
+    emotions: string[] | null;
     is_flagged: boolean;
     flagged_reason: string | null;
     visibility: string;
@@ -36,6 +37,18 @@ type Note = {
     goal: { id: number; title: string } | null;
 };
 
+const EMOTIONS: Array<{ key: string; emoji: string; label: string; color: string }> = [
+    { key: 'happy', emoji: '😊', label: 'Happy', color: 'bg-emerald-100 text-emerald-700' },
+    { key: 'calm', emoji: '😌', label: 'Calm', color: 'bg-sky-100 text-sky-700' },
+    { key: 'excited', emoji: '🤩', label: 'Excited', color: 'bg-amber-100 text-amber-700' },
+    { key: 'tired', emoji: '😴', label: 'Tired', color: 'bg-indigo-100 text-indigo-700' },
+    { key: 'anxious', emoji: '😰', label: 'Anxious', color: 'bg-orange-100 text-orange-700' },
+    { key: 'sad', emoji: '😢', label: 'Sad', color: 'bg-blue-100 text-blue-700' },
+    { key: 'frustrated', emoji: '😤', label: 'Frustrated', color: 'bg-red-100 text-red-700' },
+    { key: 'confused', emoji: '😕', label: 'Confused', color: 'bg-purple-100 text-purple-700' },
+];
+const EMOTION_MAP = Object.fromEntries(EMOTIONS.map(e => [e.key, e]));
+
 type Props = {
     notes: {
         data: Note[];
@@ -44,7 +57,7 @@ type Props = {
         last_page: number;
         total: number;
     };
-    filters: { q?: string; note_type?: string; flagged?: string; client_id?: string };
+    filters: { q?: string; note_type?: string; flagged?: string; client_id?: string; date_from?: string; date_to?: string; emotion?: string };
     stats: { total: number; flagged: number; this_week: number };
     clients: Array<{ id: number; first_name: string; last_name: string }>;
 };
@@ -170,34 +183,51 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                 )}
 
                 {/* Filters */}
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white/50 p-3 shadow-sm">
-                    <div className="relative flex-1">
-                        <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
-                        <Input placeholder="Search notes..." className="h-9 pl-8 text-sm" defaultValue={filters?.q ?? ''} onChange={(e) => updateFilters('q', e.target.value || null)} />
+                <div className="space-y-2 rounded-xl border bg-white/50 p-3 shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="relative flex-1">
+                            <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+                            <Input placeholder="Search notes..." className="h-9 pl-8 text-sm" defaultValue={filters?.q ?? ''} onChange={(e) => updateFilters('q', e.target.value || null)} />
+                        </div>
+                        <Select value={filters?.client_id ?? ANY} onValueChange={(v) => updateFilters('client_id', v === ANY ? null : v)}>
+                            <SelectTrigger className="h-9 w-[160px] text-xs"><SelectValue placeholder={`All ${clientPlural}`} /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ANY}>{`All ${clientPlural}`}</SelectItem>
+                                {(clients ?? []).map((c) => (
+                                    <SelectItem key={c.id} value={String(c.id)}>{c.first_name} {c.last_name}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={filters?.note_type ?? ANY} onValueChange={(v) => updateFilters('note_type', v === ANY ? null : v)}>
+                            <SelectTrigger className="h-9 w-[140px] text-xs"><SelectValue placeholder="All Types" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ANY}>All Types</SelectItem>
+                                {Object.entries(NOTE_TYPE_STYLES).map(([k, v]) => (
+                                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={filters?.emotion ?? ANY} onValueChange={(v) => updateFilters('emotion', v === ANY ? null : v)}>
+                            <SelectTrigger className="h-9 w-[150px] text-xs"><SelectValue placeholder="All Emotions" /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value={ANY}>All Emotions</SelectItem>
+                                {EMOTIONS.map(em => (
+                                    <SelectItem key={em.key} value={em.key}>{em.emoji} {em.label}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Button size="sm" variant={filters?.flagged === '1' ? 'default' : 'outline'}
+                            className={`h-9 gap-1 text-xs ${filters?.flagged !== '1' ? 'text-red-600 border-red-200 hover:bg-red-50' : ''}`}
+                            onClick={() => updateFilters('flagged', filters?.flagged === '1' ? null : '1')}>
+                            <Flag className="h-3.5 w-3.5" /> Flagged
+                        </Button>
                     </div>
-                    <Select value={filters?.client_id ?? ANY} onValueChange={(v) => updateFilters('client_id', v === ANY ? null : v)}>
-                        <SelectTrigger className="h-9 w-[160px] text-xs"><SelectValue placeholder={`All ${clientPlural}`} /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>{`All ${clientPlural}`}</SelectItem>
-                            {(clients ?? []).map((c) => (
-                                <SelectItem key={c.id} value={String(c.id)}>{c.first_name} {c.last_name}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select value={filters?.note_type ?? ANY} onValueChange={(v) => updateFilters('note_type', v === ANY ? null : v)}>
-                        <SelectTrigger className="h-9 w-[140px] text-xs"><SelectValue placeholder="All Types" /></SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value={ANY}>All Types</SelectItem>
-                            {Object.entries(NOTE_TYPE_STYLES).map(([k, v]) => (
-                                <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Button size="sm" variant={filters?.flagged === '1' ? 'default' : 'outline'}
-                        className={`h-9 gap-1 text-xs ${filters?.flagged !== '1' ? 'text-red-600 border-red-200 hover:bg-red-50' : ''}`}
-                        onClick={() => updateFilters('flagged', filters?.flagged === '1' ? null : '1')}>
-                        <Flag className="h-3.5 w-3.5" /> Flagged
-                    </Button>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Label className="text-xs text-muted-foreground">Date range:</Label>
+                        <Input type="date" className="h-8 w-[140px] text-xs" value={filters?.date_from ?? ''} onChange={(e) => updateFilters('date_from', e.target.value || null)} />
+                        <span className="text-xs text-muted-foreground">to</span>
+                        <Input type="date" className="h-8 w-[140px] text-xs" value={filters?.date_to ?? ''} onChange={(e) => updateFilters('date_to', e.target.value || null)} />
+                    </div>
                 </div>
 
                 {/* Notes list */}
@@ -231,11 +261,11 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="text-sm font-semibold">{note.author?.name ?? 'Unknown'}</span>
                                                 <Badge className={`border-0 text-[9px] ${style.bg} ${style.border.replace('border-l-', 'text-').replace('-400', '-700')}`}>{style.label}</Badge>
-                                                {note.mood_rating && (
-                                                    <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${
-                                                        note.mood_rating >= 7 ? 'bg-emerald-500' : note.mood_rating >= 4 ? 'bg-amber-500' : 'bg-red-500'
-                                                    }`}>{note.mood_rating}</span>
-                                                )}
+                                                {(note.emotions ?? []).map((em) => (
+                                                    <span key={em} className={`inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${EMOTION_MAP[em]?.color ?? 'bg-muted'}`}>
+                                                        {EMOTION_MAP[em]?.emoji ?? em} {EMOTION_MAP[em]?.label ?? em}
+                                                    </span>
+                                                ))}
                                                 {note.is_flagged && <Badge className="border-0 bg-red-100 text-red-700 text-[9px]">Flagged</Badge>}
                                                 {note.visibility === 'include_family' && <Badge className="border-0 bg-blue-100 text-blue-700 text-[9px]">Family</Badge>}
                                             </div>
@@ -258,7 +288,8 @@ export default function ProgressNotesIndex({ notes = { data: [], links: [], curr
                                             )}
                                         </div>
                                         <div className="flex shrink-0 flex-col items-end gap-1">
-                                            <span className="text-[10px] text-muted-foreground">{formatRelativeTime(note.created_at)}</span>
+                                            <span className="text-[10px] font-medium text-muted-foreground">{new Date(note.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                                            <span className="text-[10px] text-muted-foreground">{new Date(note.created_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })} · {formatRelativeTime(note.created_at)}</span>
                                             <Button variant="ghost" size="sm" className={`h-6 gap-1 px-1.5 text-[10px] ${note.is_flagged ? 'text-red-600' : 'text-muted-foreground hover:text-red-600'}`}
                                                 onClick={() => toggleFlag(note.id)} title={note.is_flagged ? 'Unflag' : 'Flag'}>
                                                 <Flag className="h-3 w-3" /> {note.is_flagged ? 'Unflag' : 'Flag'}

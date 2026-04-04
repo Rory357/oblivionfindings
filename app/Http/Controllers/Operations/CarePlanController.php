@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Operations;
 use App\Http\Controllers\Controller;
 use App\Models\CarePlan;
 use App\Models\Client;
+use App\Models\TimelineEvent;
 use Illuminate\Http\Request;
 
 class CarePlanController extends Controller
@@ -129,6 +130,26 @@ class CarePlanController extends Controller
             'status' => $data['status'] ?? 'draft',
             'created_by' => $auth->id,
             'version' => 1,
+        ]);
+
+        $client = Client::find($data['client_id']);
+        TimelineEvent::create([
+            'source_type' => CarePlan::class,
+            'source_id' => $carePlan->id,
+            'occurred_at' => now(),
+            'type' => 'care_plan_created',
+            'actor_user_id' => $auth->id,
+            'client_id' => $data['client_id'],
+            'site_id' => $client?->site_id,
+            'subject' => 'Care plan created: ' . $data['title'],
+            'body' => null,
+            'meta' => array_filter([
+                'plan_type' => $data['plan_type'],
+                'status' => $data['status'] ?? 'draft',
+            ]),
+            'visibility' => 'internal',
+            'is_pinned' => false,
+            'created_by' => $auth->id,
         ]);
 
         // Auto-complete onboarding step if from_onboarding

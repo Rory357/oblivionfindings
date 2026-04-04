@@ -201,7 +201,12 @@ class ClientController extends Controller
             ->where('client_id', $client->id)
             ->orderByDesc('occurred_at')
             ->limit(80)
-            ->with(['actor:id,name', 'site:id,name'])
+            ->with([
+                'actor:id,name',
+                'site:id,name',
+                'comments' => fn ($q) => $q->whereNull('parent_id')->with(['user:id,name,role', 'replies' => fn ($r) => $r->with('user:id,name,role')->orderBy('created_at'), 'replies.likes', 'likes'])->orderBy('created_at'),
+                'reactions',
+            ])
             ->get();
 
         $handover = TimelineEvent::query()
@@ -273,6 +278,35 @@ class ClientController extends Controller
                 'shift_id' => $e->shift_id,
                 'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
                 'site' => $e->site ? ['id' => $e->site->id, 'name' => $e->site->name] : null,
+                'comments' => $e->comments->map(fn ($c) => [
+                    'id' => $c->id,
+                    'body' => $c->body,
+                    'user_id' => $c->user_id,
+                    'user_name' => $c->user?->name,
+                    'is_staff' => !in_array($c->user?->role, ['client', 'next_of_kin'], true),
+                    'likes_count' => $c->likes->count(),
+                    'liked_by_user_ids' => $c->likes->pluck('user_id')->all(),
+                    'created_at' => $c->created_at?->toISOString(),
+                    'replies' => $c->replies->map(fn ($r) => [
+                        'id' => $r->id,
+                        'body' => $r->body,
+                        'user_id' => $r->user_id,
+                        'user_name' => $r->user?->name,
+                        'is_staff' => !in_array($r->user?->role, ['client', 'next_of_kin'], true),
+                        'likes_count' => $r->likes->count(),
+                        'liked_by_user_ids' => $r->likes->pluck('user_id')->all(),
+                        'created_at' => $r->created_at?->toISOString(),
+                    ]),
+                ]),
+                'reactions' => $e->reactions
+                    ->groupBy('emoji')
+                    ->map(fn ($group, $emoji) => [
+                        'emoji' => $emoji,
+                        'count' => $group->count(),
+                        'user_ids' => $group->pluck('user_id')->all(),
+                    ])
+                    ->values()
+                    ->all(),
             ])->values(),
             'handover' => $handover->map(fn($e) => [
                 'id' => $e->id,
@@ -430,6 +464,7 @@ class ClientController extends Controller
                 'create_shift' => $request->user()?->canDo('shifts.create') ?? false,
                 'manage_onboarding_workflow' => $request->user()?->canDo('onboarding.edit') ?? false,
             ],
+            'pending_visit_count' => \App\Models\FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
             'photos' => \App\Models\ClientPhoto::where('client_id', $client->id)
                 ->with('uploadedBy:id,name')
                 ->orderByDesc('created_at')

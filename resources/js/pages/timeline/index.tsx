@@ -3,6 +3,7 @@ import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { TimelineInteractions, type Comment, type ReactionGroup } from '@/components/timeline-interactions';
 import { type BreadcrumbItem } from '@/types';
 
 type EventDto = {
@@ -15,6 +16,8 @@ type EventDto = {
   client?: { id: number; first_name: string; last_name: string } | null;
   site?: { id: number; name: string } | null;
   meta?: any;
+  comments?: Comment[];
+  reactions?: ReactionGroup[];
 };
 
 type Props = {
@@ -124,6 +127,21 @@ export default function TimelineIndex(props: Props) {
                         {e.body}
                       </div>
                     ) : null}
+                    {props.scope.type === 'client' && (
+                      <TimelineInteractions
+                        eventId={e.id}
+                        comments={e.comments ?? []}
+                        reactions={e.reactions ?? []}
+                        currentUserId={auth?.user?.id}
+                        commentUrl={`/clients/${props.scope.id}/timeline/${e.id}/comments`}
+                        deleteCommentUrl={`/clients/${props.scope.id}/timeline/comments`}
+                        likeCommentUrl={`/clients/${props.scope.id}/timeline/comments`}
+                        reactUrl={`/clients/${props.scope.id}/timeline/${e.id}/react`}
+                        canComment={canCreate}
+                        canReact={true}
+                        showStaffBadge={true}
+                      />
+                    )}
                   </div>
                 ))}
               </div>

@@ -17,11 +17,17 @@ import { Separator } from '@/components/ui/separator';
 import { Tabs } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { useInitials } from '@/hooks/use-initials';
+import { TimelineInteractions } from '@/components/timeline-interactions';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Car, ChevronDown, ChevronRight, Clock, DollarSign, FileText, FolderOpen, Globe, GraduationCap, Heart, Pill, Search, ShieldAlert, Star } from 'lucide-react';
+import { Activity, BookOpen, Calendar, Camera, Car, CheckCircle2, ChevronDown, ChevronRight, Clock, ClipboardList, DollarSign, FileText, FolderOpen, Globe, GraduationCap, Heart, Home, Mail, MapPin, Pencil, Phone, Pill, Search, Shield, ShieldAlert, Star, Target, User, Users } from 'lucide-react';
+import FullCalendar from '@fullcalendar/react';
+import dayGridPlugin from '@fullcalendar/daygrid';
+import timeGridPlugin from '@fullcalendar/timegrid';
+import listPlugin from '@fullcalendar/list';
+import interactionPlugin from '@fullcalendar/interaction';
 import { useMemo, useState } from 'react';
 import { HalfMoonGauge, ProgressRing, HorizontalBarChart } from '@/components/fleet-charts';
 import { DonutChart } from '@/components/ops-stat-card';
@@ -149,6 +155,7 @@ type TabKey =
     | 'medical'
     | 'mar'
     | 'care_plans'
+    | 'calendar'
     | 'progress_notes'
     | 'service_agreements'
     | 'support_plan'
@@ -198,30 +205,26 @@ export default function ClientShow({
     const photoForm = useForm<{ photo: File | null }>({ photo: null });
     const removePhotoForm = useForm({});
 
-    const tabs: Array<{ key: TabKey; label: string; show: boolean }> = useMemo(
+    const tabs: Array<{ key: TabKey; label: string; icon: typeof User; show: boolean; count?: number }> = useMemo(
         () => [
-            { key: 'profile', label: 'Profile', show: true },
-            { key: 'onboarding', label: 'Onboarding', show: client.status === 'onboarding' || !!onboarding?.workflow },
-            { key: 'medical', label: 'Medical', show: true },
-            { key: 'mar', label: 'MAR', show: true },
-            { key: 'care_plans', label: 'Care Plans', show: true },
-            { key: 'progress_notes', label: 'Progress Notes', show: true },
-            { key: 'service_agreements', label: 'Agreements', show: true },
-            // Support plan merged into Care Plans tab
-            { key: 'assessments', label: 'Assessments', show: true },
-            { key: 'timeline', label: 'Timeline', show: true },
-            { key: 'documents', label: 'Documents', show: true },
-            { key: 'photos', label: 'Photo Gallery', show: true },
-            { key: 'consents', label: 'Consents', show: true },
-            { key: 'portal', label: 'Next of Kin / Portal', show: true },
-            { key: 'respite', label: 'Respite', show: !!respiteCan?.viewAny },
-            {
-                key: 'assignments',
-                label: 'Assign workers',
-                show: can.assign_workers || can.edit,
-            },
+            { key: 'profile', label: 'Overview', icon: User, show: true },
+            { key: 'onboarding', label: 'Onboarding', icon: CheckCircle2, show: client.status === 'onboarding' || !!onboarding?.workflow, count: onboarding?.total },
+            { key: 'medical', label: 'Medical', icon: Heart, show: true },
+            { key: 'mar', label: 'MAR', icon: Pill, show: true },
+            { key: 'care_plans', label: 'Care Plans', icon: Target, show: true },
+            { key: 'calendar', label: 'Calendar', icon: Calendar, show: true },
+            { key: 'progress_notes', label: 'Progress Notes', icon: ClipboardList, show: true },
+            { key: 'service_agreements', label: 'Agreements', icon: FileText, show: true },
+            { key: 'assessments', label: 'Assessments', icon: BookOpen, show: true },
+            { key: 'timeline', label: 'Timeline', icon: Activity, show: true },
+            { key: 'documents', label: 'Documents', icon: FolderOpen, show: true, count: documents?.length },
+            { key: 'photos', label: 'Photos', icon: Camera, show: true, count: photos?.length },
+            { key: 'consents', label: 'Consents', icon: Shield, show: true },
+            { key: 'portal', label: 'Family Portal', icon: Users, show: true },
+            { key: 'respite', label: 'Respite', icon: Calendar, show: !!respiteCan?.viewAny },
+            { key: 'assignments', label: 'Workers', icon: Users, show: can.assign_workers || can.edit },
         ],
-        [can.assign_workers, can.edit, respiteCan?.viewAny],
+        [can.assign_workers, can.edit, respiteCan?.viewAny, documents?.length, photos?.length, onboarding?.total],
     );
 
     // Support ?tab=onboarding deep linking from dashboard
@@ -266,6 +269,10 @@ export default function ClientShow({
     // Timeline filter state
     const [timelineSearch, setTimelineSearch] = useState('');
     const [timelineTypeFilter, setTimelineTypeFilter] = useState('all');
+    const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
+    const [showApptForm, setShowApptForm] = useState(false);
+    const [apptData, setApptData] = useState({ title: '', appointment_type: 'gp_visit', starts_at: '', ends_at: '', location: '', provider_name: '', description: '', share_with_family: true });
+    const [calendarEvent, setCalendarEvent] = useState<any>(null);
 
     const eventTypes = useMemo(() => {
         const types = new Set<string>();
@@ -295,168 +302,163 @@ export default function ClientShow({
             <Head title={name} />
 
             <PageShell>
-                <PageHeader
-                    title={
-                        <div className="flex items-center gap-3">
-                            <Avatar className="h-25 w-25">
-                                <AvatarImage
-                                    src={
-                                        client.avatar ??
-                                        client.profile_photo_url ??
-                                        undefined
-                                    }
-                                    alt={name}
-                                />
-                                <AvatarFallback>
-                                    {getInitials(name)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <span>{name}</span>
+                {/* ── Hero Header ──────────────────────────────── */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-white md:p-8">
+                    <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute right-1/3 top-1/4 h-24 w-24 rounded-full bg-white/5" />
+
+                    <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
+                        {/* Avatar */}
+                        <Avatar className="h-24 w-24 shrink-0 border-4 border-white/20 shadow-xl md:h-28 md:w-28">
+                            <AvatarImage src={client.avatar ?? client.profile_photo_url ?? undefined} alt={name} />
+                            <AvatarFallback className="bg-white/10 text-2xl font-bold text-white md:text-3xl">
+                                {getInitials(name)}
+                            </AvatarFallback>
+                        </Avatar>
+
+                        {/* Info */}
+                        <div className="flex-1 text-center md:text-left">
+                            <h1 className="text-2xl font-bold md:text-3xl">{name}</h1>
+                            {client.preferred_name && client.preferred_name !== name && (
+                                <p className="mt-0.5 text-sm text-white/60">Preferred: {client.preferred_name}</p>
+                            )}
+                            {client.nhi_number && (
+                                <p className="mt-0.5 text-sm text-white/60">NHI: {client.nhi_number}</p>
+                            )}
+
+                            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
+                                <Badge className={client.status === 'active' ? 'bg-emerald-400/20 text-emerald-100 border-emerald-300/30' : client.status === 'onboarding' ? 'bg-amber-400/20 text-amber-100 border-amber-300/30' : 'bg-white/10 text-white/90 border-white/20'}>
+                                    {client.status}
+                                </Badge>
+                                {client.funding_type && (
+                                    <Badge className="bg-white/10 text-white/90 border-white/20">{client.funding_type}</Badge>
+                                )}
+                                {client.service_context && (
+                                    <Badge className="bg-white/10 text-white/90 border-white/20">{client.service_context.name}</Badge>
+                                )}
+                                {client.site && (
+                                    <Badge className="bg-white/10 text-white/90 border-white/20">
+                                        <Home className="mr-1 h-3 w-3" />{client.site.name}
+                                    </Badge>
+                                )}
+                                {client.risk_level && client.risk_level !== 'low' && (
+                                    <Badge className={client.risk_level === 'critical' ? 'bg-red-400/20 text-red-100 border-red-300/30' : client.risk_level === 'high' ? 'bg-orange-400/20 text-orange-100 border-orange-300/30' : 'bg-yellow-400/20 text-yellow-100 border-yellow-300/30'}>
+                                        <ShieldAlert className="mr-1 h-3 w-3" />{client.risk_level} risk
+                                    </Badge>
+                                )}
+                                {client.safeguarding_flag && (
+                                    <Badge className="bg-red-400/20 text-red-100 border-red-300/30">
+                                        <Shield className="mr-1 h-3 w-3" />Safeguarding
+                                    </Badge>
+                                )}
+                            </div>
+
+                            {client.service_start_date && (
+                                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-white/60 md:justify-start">
+                                    <Clock className="h-3.5 w-3.5" />
+                                    Since {new Date(client.service_start_date).toLocaleDateString('en-NZ', { month: 'short', year: 'numeric' })}
+                                </p>
+                            )}
                         </div>
-                    }
-                    backHref="/clients"
-                    description={`${client.status}${client.service_context ? ` • ${client.service_context.name}` : ''}${client.site ? ` • ${client.site.name}` : ''}`}
-                    actions={
-                        <>
-                            {can.edit ? (
-                                <form
-                                    onSubmit={(e) => {
-                                        e.preventDefault();
-                                        if (!photoForm.data.photo) return;
-                                        photoForm.post(
-                                            `/operations/clients/${client.id}/photo`,
-                                            {
-                                                forceFormData: true,
-                                                preserveScroll: true,
-                                            },
-                                        );
-                                    }}
-                                    className="flex items-center gap-2"
-                                >
-                                    <Input
-                                        type="file"
-                                        accept="image/*"
-                                        className="hidden"
-                                        id="client-photo"
-                                        onChange={(e) =>
-                                            photoForm.setData(
-                                                'photo',
-                                                e.target.files?.[0] ?? null,
-                                            )
-                                        }
-                                    />
-                                    <Button
-                                        type="button"
-                                        variant="outline"
-                                        size="sm"
-                                        onClick={() =>
-                                            (
-                                                document.getElementById(
-                                                    'client-photo',
-                                                ) as HTMLInputElement | null
-                                            )?.click()
-                                        }
-                                    >
-                                        Change photo
-                                    </Button>
-                                    <Button
-                                        type="submit"
-                                        size="sm"
-                                        disabled={
-                                            photoForm.processing ||
-                                            !photoForm.data.photo
-                                        }
-                                    >
-                                        Upload
-                                    </Button>
 
-                                    {(client as any).profile_photo_path ? (
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            disabled={
-                                                removePhotoForm.processing
-                                            }
-                                            onClick={() =>
-                                                removePhotoForm.delete(
-                                                    `/operations/clients/${client.id}/photo`,
-                                                    { preserveScroll: true },
-                                                )
-                                            }
-                                        >
-                                            Remove
+                        {/* Right: Actions + KPIs */}
+                        <div className="flex flex-col items-center gap-3 md:items-end">
+                            <div className="flex flex-wrap gap-2">
+                                {client.phone && (
+                                    <a href={`tel:${client.phone}`}>
+                                        <Button size="sm" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20">
+                                            <Phone className="mr-1.5 h-3.5 w-3.5" />Call
                                         </Button>
-                                    ) : null}
-                                </form>
-                            ) : null}
+                                    </a>
+                                )}
+                                <Button size="sm" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" asChild>
+                                    <Link href={`/operations/clients/${client.id}/visit-requests`}>
+                                        <Users className="mr-1.5 h-3.5 w-3.5" />Visits
+                                        {(() => { const pc = (usePage().props as any).pending_visit_count; return pc > 0 ? <span className="ml-1 rounded-full bg-amber-400 px-1.5 py-0.5 text-[10px] font-bold text-amber-900">{pc}</span> : null; })()}
+                                    </Link>
+                                </Button>
+                                {can.edit && (
+                                    <Button size="sm" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" asChild>
+                                        <Link href={`/operations/clients/${client.id}/edit`}>
+                                            <Pencil className="mr-1.5 h-3.5 w-3.5" />Edit
+                                        </Link>
+                                    </Button>
+                                )}
+                            </div>
 
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href={`/operations/clients/${client.id}/incidents`}>
-                                    Incidents
-                                </Link>
-                            </Button>
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href={`/operations/clients/${client.id}/risks`}>
-                                    Risks
-                                </Link>
-                            </Button>
-                            {can.edit ? (
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link href={`/operations/clients/${client.id}/edit`}>
-                                        Edit
-                                    </Link>
-                                </Button>
-                            ) : null}
-                            {can.assign_workers || can.edit ? (
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link
-                                        href={`/operations/clients/${client.id}/assignments`}
-                                    >
-                                        Assign workers
-                                    </Link>
-                                </Button>
-                            ) : null}
-                            <Button variant="outline" size="sm" asChild>
-                                <Link href={`/assets?client_id=${client.id}`}>
-                                    Assets
-                                </Link>
-                            </Button>
-                            {can.edit ? (
-                                <Button variant="outline" size="sm" asChild>
-                                    <Link
-                                        href={`/assets/create?client_id=${client.id}`}
-                                    >
-                                        Add asset
-                                    </Link>
-                                </Button>
-                            ) : null}
-                        </>
-                    }
-                />
+                            {/* KPI Stats */}
+                            <div className="hidden gap-6 text-center md:flex">
+                                <div>
+                                    <p className="text-2xl font-bold">{(() => { const summary = (pageProps as any).care_plans_summary ?? {}; return summary.active_plan ? 'Active' : '—'; })()}</p>
+                                    <p className="text-xs text-white/50">Care Plan</p>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold">{(() => { const summary = (pageProps as any).care_plans_summary ?? {}; const goals = summary.active_plan?.goals ?? []; const done = goals.filter((g: any) => g.status === 'completed').length; return goals.length > 0 ? `${done}/${goals.length}` : '—'; })()}</p>
+                                    <p className="text-xs text-white/50">Goals</p>
+                                </div>
+                                <div>
+                                    <p className="text-2xl font-bold">{shifts_summary?.next ? 'Yes' : '—'}</p>
+                                    <p className="text-xs text-white/50">Next Shift</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
 
-                <div className="-mx-4 overflow-x-auto px-4">
-                    <div className="flex w-max items-center gap-2 pb-1">
+                    {/* Hidden photo upload form */}
+                    {can.edit && (
+                        <form
+                            onSubmit={(e) => {
+                                e.preventDefault();
+                                if (!photoForm.data.photo) return;
+                                photoForm.post(`/operations/clients/${client.id}/photo`, { forceFormData: true, preserveScroll: true });
+                            }}
+                            className="hidden"
+                        >
+                            <Input type="file" accept="image/*" id="client-photo" onChange={(e) => photoForm.setData('photo', e.target.files?.[0] ?? null)} />
+                        </form>
+                    )}
+                </div>
+
+                <div className="-mx-4 mt-4 overflow-x-auto border-b px-4">
+                    <div className="flex w-max items-center gap-1 pb-0">
                         {tabs
                             .filter((t) => t.show)
-                            .map((t) => (
-                                <Button
-                                    key={t.key}
-                                    variant={
-                                        tab === t.key ? 'default' : 'outline'
-                                    }
-                                    size="sm"
-                                    onClick={() => {
-                                        if (t.key === 'mar') {
-                                            window.location.href = `/operations/clients/${client.id}/mar`;
-                                            return;
-                                        }
-                                        setTab(t.key);
-                                    }}
-                                >
-                                    {t.label}
-                                </Button>
-                            ))}
+                            .map((t) => {
+                                const Icon = t.icon;
+                                const isActive = tab === t.key;
+                                return (
+                                    <button
+                                        key={t.key}
+                                        onClick={() => {
+                                            if (t.key === 'mar') {
+                                                window.location.href = `/operations/clients/${client.id}/mar`;
+                                                return;
+                                            }
+                                            if (t.key === 'calendar') {
+                                                window.location.href = `/operations/clients/${client.id}/calendar`;
+                                                return;
+                                            }
+                                            setTab(t.key);
+                                        }}
+                                        className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                                            isActive
+                                                ? 'border-primary text-primary'
+                                                : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                        }`}
+                                    >
+                                        <Icon className="h-3.5 w-3.5" />
+                                        {t.label}
+                                        {t.count != null && t.count > 0 && (
+                                            <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
+                                                isActive ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                                            }`}>
+                                                {t.count}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
                     </div>
                 </div>
 
@@ -702,29 +704,14 @@ export default function ClientShow({
 
                                 {/* RIGHT COLUMN */}
                                 <div className="space-y-4">
-                                    {/* Profile Summary */}
-                                    <Card className="overflow-hidden">
-                                        <div className="bg-gradient-to-b from-violet-100 to-white px-4 pb-2 pt-4 text-center">
-                                            <Avatar className="mx-auto h-16 w-16 border-2 border-white shadow">
-                                                <AvatarImage src={client.avatar ?? ''} />
-                                                <AvatarFallback className="bg-violet-200 text-violet-700 text-lg">{getInitials(`${client.first_name} ${client.last_name}`)}</AvatarFallback>
-                                            </Avatar>
-                                            <h3 className="mt-2 text-sm font-bold">{client.preferred_name || client.first_name} {client.last_name}</h3>
-                                            {client.preferred_pronouns && <p className="text-xs text-muted-foreground">{client.preferred_pronouns}</p>}
-                                        </div>
-                                        <CardContent className="space-y-1.5 px-4 pb-4 pt-2 text-xs">
-                                            {client.date_of_birth && <div className="flex justify-between"><span className="text-muted-foreground">DOB</span><span>{new Date(client.date_of_birth).toLocaleDateString('en-NZ')}</span></div>}
-                                            {client.phone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><span>{client.phone}</span></div>}
-                                            {client.email && <div className="flex justify-between"><span className="text-muted-foreground">Email</span><span className="truncate ml-2">{client.email}</span></div>}
+                                    {/* Quick Contact */}
+                                    <Card>
+                                        <CardContent className="space-y-2 p-4 text-xs">
+                                            {client.date_of_birth && <div className="flex justify-between"><span className="text-muted-foreground">DOB</span><span>{new Date(client.date_of_birth).toLocaleDateString('en-NZ')}{(() => { const b = new Date(client.date_of_birth!); const age = Math.floor((Date.now() - b.getTime()) / 31557600000); return ` (${age}y)`; })()}</span></div>}
+                                            {client.phone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><a href={`tel:${client.phone}`} className="text-primary hover:underline">{client.phone}</a></div>}
+                                            {client.email && <div className="flex justify-between"><span className="text-muted-foreground">Email</span><a href={`mailto:${client.email}`} className="truncate ml-2 text-primary hover:underline">{client.email}</a></div>}
                                             {client.city && <div className="flex justify-between"><span className="text-muted-foreground">Location</span><span>{client.suburb ? `${client.suburb}, ` : ''}{client.city}</span></div>}
-                                            {(client.ethnicity || client.religion || (client.languages ?? []).length > 0) && (
-                                                <>
-                                                    <Separator className="my-2" />
-                                                    {client.ethnicity && <div className="flex justify-between"><span className="text-muted-foreground">Ethnicity</span><span>{client.ethnicity}</span></div>}
-                                                    {(client.languages ?? []).length > 0 && <div className="flex justify-between"><span className="text-muted-foreground">Languages</span><span>{(client.languages ?? []).join(', ')}</span></div>}
-                                                    {client.religion && <div className="flex justify-between"><span className="text-muted-foreground">Religion</span><span>{client.religion}</span></div>}
-                                                </>
-                                            )}
+                                            {client.key_worker && <div className="flex justify-between"><span className="text-muted-foreground">Key Worker</span><span>{client.key_worker.name}</span></div>}
                                         </CardContent>
                                     </Card>
 
@@ -1508,14 +1495,217 @@ export default function ClientShow({
                     );
                 })()}
 
+                {/* Calendar tab navigates to dedicated page */}
+
+                {false && (() => {
+                    const apptTypes = [
+                        { value: 'gp_visit', label: 'GP Visit' },
+                        { value: 'specialist', label: 'Specialist' },
+                        { value: 'therapy', label: 'Therapy' },
+                        { value: 'activity', label: 'Activity' },
+                        { value: 'reminder', label: 'Reminder' },
+                        { value: 'other', label: 'Other' },
+                    ];
+
+                    const submitAppointment = () => {
+                        if (!apptData.title || !apptData.starts_at) return;
+                        fetch(`/clients/${client.id}/calendar/appointments`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as any)?.content ?? '' },
+                            body: JSON.stringify(apptData),
+                        }).then(r => r.json()).then(() => {
+                            setShowApptForm(false);
+                            setApptData({ title: '', appointment_type: 'gp_visit', starts_at: '', ends_at: '', location: '', provider_name: '', description: '', share_with_family: true });
+                            router.reload({ only: ['events'] });
+                        });
+                    };
+
+                    return (
+                        <div className="space-y-4">
+                            <div className="flex items-center justify-between">
+                                <div className="flex flex-wrap gap-3 text-xs">
+                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-blue-500" />Shifts</div>
+                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-green-500" />Family Visits</div>
+                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-amber-500" />GP Visits</div>
+                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-purple-500" />Specialist</div>
+                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-pink-500" />Therapy</div>
+                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-cyan-500" />Activities</div>
+                                </div>
+                                <Button size="sm" className="gap-1.5" onClick={() => setShowApptForm(!showApptForm)}>
+                                    <Calendar className="h-3.5 w-3.5" />{showApptForm ? 'Cancel' : 'Schedule Appointment'}
+                                </Button>
+                            </div>
+
+                            {/* Appointment Form */}
+                            {showApptForm && (
+                                <Card className="border-primary/20">
+                                    <CardContent className="p-4 space-y-3">
+                                        <div className="grid gap-3 sm:grid-cols-3">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">Title *</Label>
+                                                <Input className="h-8 text-xs" placeholder="GP Visit - Dr. Patel" value={apptData.title} onChange={e => setApptData({ ...apptData, title: e.target.value })} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">Type</Label>
+                                                <Select value={apptData.appointment_type} onValueChange={v => setApptData({ ...apptData, appointment_type: v })}>
+                                                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {apptTypes.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
+                                                    </SelectContent>
+                                                </Select>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">Provider</Label>
+                                                <Input className="h-8 text-xs" placeholder="Dr. Patel" value={apptData.provider_name} onChange={e => setApptData({ ...apptData, provider_name: e.target.value })} />
+                                            </div>
+                                        </div>
+                                        <div className="grid gap-3 sm:grid-cols-3">
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">Start *</Label>
+                                                <Input type="datetime-local" className="h-8 text-xs" value={apptData.starts_at} onChange={e => setApptData({ ...apptData, starts_at: e.target.value })} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">End</Label>
+                                                <Input type="datetime-local" className="h-8 text-xs" value={apptData.ends_at} onChange={e => setApptData({ ...apptData, ends_at: e.target.value })} />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-xs">Location</Label>
+                                                <Input className="h-8 text-xs" placeholder="Riverside Medical Centre" value={apptData.location} onChange={e => setApptData({ ...apptData, location: e.target.value })} />
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">Notes</Label>
+                                            <Textarea className="min-h-[60px] text-xs" value={apptData.description} onChange={e => setApptData({ ...apptData, description: e.target.value })} />
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <label className="flex items-center gap-2 text-xs">
+                                                <Checkbox checked={apptData.share_with_family} onCheckedChange={v => setApptData({ ...apptData, share_with_family: !!v })} />
+                                                Share with family
+                                            </label>
+                                            <Button size="sm" onClick={submitAppointment} disabled={!apptData.title || !apptData.starts_at}>
+                                                Save Appointment
+                                            </Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Calendar */}
+                            <Card>
+                                <CardContent className="p-2 md:p-4">
+                                    <FullCalendar
+                                        plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+                                        initialView="dayGridMonth"
+                                        headerToolbar={{
+                                            left: 'prev,next today',
+                                            center: 'title',
+                                            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
+                                        }}
+                                        events={(info, successCallback) => {
+                                            fetch(`/clients/${client.id}/calendar/events?start=${info.startStr}&end=${info.endStr}`)
+                                                .then(r => r.json())
+                                                .then(data => successCallback(data))
+                                                .catch(() => successCallback([]));
+                                        }}
+                                        selectable={true}
+                                        select={(info) => {
+                                            setApptData({
+                                                ...apptData,
+                                                starts_at: info.start.toISOString().slice(0, 16),
+                                                ends_at: info.end ? info.end.toISOString().slice(0, 16) : '',
+                                            });
+                                            setShowApptForm(true);
+                                        }}
+                                        eventClick={(info) => {
+                                            setCalendarEvent({
+                                                title: info.event.title,
+                                                start: info.event.start,
+                                                end: info.event.end,
+                                                ...info.event.extendedProps,
+                                            });
+                                        }}
+                                        height="auto"
+                                        nowIndicator={true}
+                                        eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
+                                    />
+                                </CardContent>
+                            </Card>
+
+                            {/* Event Detail Panel */}
+                            {calendarEvent && (
+                                <Card className="border-primary/20">
+                                    <CardContent className="p-4">
+                                        <div className="flex items-start justify-between">
+                                            <div>
+                                                <h3 className="text-sm font-semibold">{calendarEvent.title}</h3>
+                                                <p className="mt-1 text-xs text-muted-foreground capitalize">{calendarEvent.type?.replace('_', ' ')} {calendarEvent.appointment_type ? `— ${calendarEvent.appointment_type.replace('_', ' ')}` : ''}</p>
+                                                {calendarEvent.start && (
+                                                    <p className="mt-1 text-xs text-muted-foreground">
+                                                        {new Date(calendarEvent.start).toLocaleString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                                                        {calendarEvent.end && ` — ${new Date(calendarEvent.end).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}`}
+                                                    </p>
+                                                )}
+                                                {calendarEvent.location && <p className="mt-1 text-xs"><strong>Location:</strong> {calendarEvent.location}</p>}
+                                                {calendarEvent.provider_name && <p className="mt-0.5 text-xs"><strong>Provider:</strong> {calendarEvent.provider_name}</p>}
+                                                {calendarEvent.staff_name && <p className="mt-0.5 text-xs"><strong>Staff:</strong> {calendarEvent.staff_name}</p>}
+                                                {calendarEvent.status && <Badge variant="outline" className="mt-1 text-[9px] capitalize">{calendarEvent.status}</Badge>}
+                                                {calendarEvent.description && <p className="mt-2 text-sm text-muted-foreground">{calendarEvent.description}</p>}
+                                                {calendarEvent.notes && <p className="mt-2 text-sm text-muted-foreground">{calendarEvent.notes}</p>}
+                                            </div>
+                                            <Button size="sm" variant="ghost" onClick={() => setCalendarEvent(null)}>Close</Button>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+                        </div>
+                    );
+                })()}
+
                 {tab === 'progress_notes' && (() => {
                     const pageProps = usePage().props as any;
                     const notes = pageProps.client_progress_notes ?? [];
                     const flaggedCount = notes.filter((n: any) => n.is_flagged).length;
                     const familyCount = notes.filter((n: any) => n.visibility === 'include_family').length;
-                    const avgMood = notes.filter((n: any) => n.mood_rating).length > 0
-                        ? Math.round(notes.filter((n: any) => n.mood_rating).reduce((s: number, n: any) => s + n.mood_rating, 0) / notes.filter((n: any) => n.mood_rating).length)
-                        : null;
+
+                    const EMOTIONS: Array<{ key: string; emoji: string; label: string; color: string }> = [
+                        { key: 'happy', emoji: '😊', label: 'Happy', color: 'bg-emerald-100 border-emerald-300 text-emerald-700' },
+                        { key: 'calm', emoji: '😌', label: 'Calm', color: 'bg-sky-100 border-sky-300 text-sky-700' },
+                        { key: 'excited', emoji: '🤩', label: 'Excited', color: 'bg-amber-100 border-amber-300 text-amber-700' },
+                        { key: 'tired', emoji: '😴', label: 'Tired', color: 'bg-indigo-100 border-indigo-300 text-indigo-700' },
+                        { key: 'anxious', emoji: '😰', label: 'Anxious', color: 'bg-orange-100 border-orange-300 text-orange-700' },
+                        { key: 'sad', emoji: '😢', label: 'Sad', color: 'bg-blue-100 border-blue-300 text-blue-700' },
+                        { key: 'frustrated', emoji: '😤', label: 'Frustrated', color: 'bg-red-100 border-red-300 text-red-700' },
+                        { key: 'confused', emoji: '😕', label: 'Confused', color: 'bg-purple-100 border-purple-300 text-purple-700' },
+                    ];
+
+                    const EMOTION_MAP = Object.fromEntries(EMOTIONS.map(e => [e.key, e]));
+
+                    // Time-based emotion analysis
+                    const now = new Date();
+                    const weekAgo = new Date(now.getTime() - 7 * 86400000);
+                    const monthAgo = new Date(now.getTime() - 30 * 86400000);
+
+                    const getTopEmotion = (noteList: any[]) => {
+                        const counts: Record<string, number> = {};
+                        noteList.forEach((n: any) => {
+                            (n.emotions ?? []).forEach((e: string) => { counts[e] = (counts[e] || 0) + 1; });
+                        });
+                        const top = Object.entries(counts).sort(([, a], [, b]) => b - a)[0];
+                        return top ? { key: top[0], count: top[1] } : null;
+                    };
+
+                    const weekNotes = notes.filter((n: any) => new Date(n.created_at) >= weekAgo);
+                    const monthNotes = notes.filter((n: any) => new Date(n.created_at) >= monthAgo);
+                    const topWeek = getTopEmotion(weekNotes);
+                    const topMonth = getTopEmotion(monthNotes);
+
+                    // Full emotion counts for the chart (all time)
+                    const emotionCounts: Record<string, number> = {};
+                    notes.forEach((n: any) => {
+                        (n.emotions ?? []).forEach((e: string) => {
+                            emotionCounts[e] = (emotionCounts[e] || 0) + 1;
+                        });
+                    });
 
                     const NOTE_TYPE_STYLES: Record<string, { border: string; bg: string; label: string }> = {
                         general: { border: 'border-l-violet-400', bg: 'bg-violet-50', label: 'General' },
@@ -1525,19 +1715,29 @@ export default function ClientShow({
                         incident: { border: 'border-l-red-400', bg: 'bg-red-50', label: 'Incident' },
                     };
 
+                    const toggleEmotion = (key: string) => {
+                        setSelectedEmotions(prev => prev.includes(key) ? prev.filter(e => e !== key) : [...prev, key]);
+                    };
+
                     return (
                         <div className="space-y-4">
                             {/* Stats */}
-                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
                                 <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
                                     <div className="text-xl font-bold text-violet-700">{notes.length}</div>
                                     <div className="text-[10px] uppercase tracking-wider text-violet-500">Total Notes</div>
                                 </div>
-                                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
-                                    <div className={`text-xl font-bold ${avgMood !== null ? (avgMood >= 7 ? 'text-emerald-600' : avgMood >= 4 ? 'text-amber-600' : 'text-red-600') : 'text-slate-400'}`}>
-                                        {avgMood !== null ? `${avgMood}/10` : '—'}
+                                <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
+                                    <div className="text-lg font-bold text-emerald-700">
+                                        {topWeek ? `${EMOTION_MAP[topWeek.key]?.emoji ?? ''} ${EMOTION_MAP[topWeek.key]?.label ?? topWeek.key}` : '—'}
                                     </div>
-                                    <div className="text-[10px] uppercase tracking-wider text-violet-500">Avg Mood</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-emerald-500">This Week</div>
+                                </div>
+                                <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-3 text-center">
+                                    <div className="text-lg font-bold text-blue-700">
+                                        {topMonth ? `${EMOTION_MAP[topMonth.key]?.emoji ?? ''} ${EMOTION_MAP[topMonth.key]?.label ?? topMonth.key}` : '—'}
+                                    </div>
+                                    <div className="text-[10px] uppercase tracking-wider text-blue-500">This Month</div>
                                 </div>
                                 <div className="rounded-xl border p-3 text-center">
                                     <div className={`text-xl font-bold ${flaggedCount > 0 ? 'text-red-600' : 'text-slate-400'}`}>{flaggedCount}</div>
@@ -1549,13 +1749,46 @@ export default function ClientShow({
                                 </div>
                             </div>
 
+                            {/* Emotion Trends Chart */}
+                            {Object.keys(emotionCounts).length > 0 && (
+                                <Card>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm">Emotion Trends</CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        <div className="space-y-2">
+                                            {EMOTIONS.filter(e => emotionCounts[e.key]).sort((a, b) => (emotionCounts[b.key] || 0) - (emotionCounts[a.key] || 0)).map(emotion => {
+                                                const count = emotionCounts[emotion.key] || 0;
+                                                const maxCount = Math.max(...Object.values(emotionCounts));
+                                                const pct = maxCount > 0 ? (count / maxCount) * 100 : 0;
+                                                return (
+                                                    <div key={emotion.key} className="flex items-center gap-3">
+                                                        <span className="w-6 text-center text-lg">{emotion.emoji}</span>
+                                                        <span className="w-20 text-xs font-medium">{emotion.label}</span>
+                                                        <div className="flex-1">
+                                                            <div className="h-5 overflow-hidden rounded-full bg-muted">
+                                                                <div
+                                                                    className={`h-full rounded-full transition-all ${emotion.color.split(' ')[0]}`}
+                                                                    style={{ width: `${pct}%` }}
+                                                                />
+                                                            </div>
+                                                        </div>
+                                                        <span className="w-8 text-right text-xs font-semibold text-muted-foreground">{count}</span>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
                             {/* Add Note Form */}
                             <Card className="overflow-hidden border-violet-200">
                                 <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
                                     <h3 className="text-sm font-semibold text-white">Add Progress Note</h3>
                                 </div>
                                 <CardContent className="p-4">
-                                    <div className="grid gap-3 sm:grid-cols-3">
+                                    <div className="grid gap-3 sm:grid-cols-2">
                                         <div className="space-y-1">
                                             <Label className="text-xs">Note Type</Label>
                                             <Select defaultValue="general" onValueChange={(v) => {
@@ -1573,10 +1806,6 @@ export default function ClientShow({
                                             <input id="pn-type" type="hidden" defaultValue="general" />
                                         </div>
                                         <div className="space-y-1">
-                                            <Label className="text-xs">Mood (1-10)</Label>
-                                            <Input id="pn-mood" type="number" min={1} max={10} className="h-8 text-xs" placeholder="Optional" />
-                                        </div>
-                                        <div className="space-y-1">
                                             <Label className="text-xs">Visibility</Label>
                                             <Select defaultValue="staff_only" onValueChange={(v) => {
                                                 const el = document.getElementById('pn-vis') as HTMLInputElement;
@@ -1592,6 +1821,32 @@ export default function ClientShow({
                                             <input id="pn-vis" type="hidden" defaultValue="staff_only" />
                                         </div>
                                     </div>
+
+                                    {/* Emotion Picker */}
+                                    <div className="mt-3">
+                                        <Label className="text-xs">How is {client.preferred_name || client.first_name} feeling?</Label>
+                                        <div className="mt-2 flex flex-wrap gap-2">
+                                            {EMOTIONS.map(emotion => {
+                                                const isSelected = selectedEmotions.includes(emotion.key);
+                                                return (
+                                                    <button
+                                                        key={emotion.key}
+                                                        type="button"
+                                                        onClick={() => toggleEmotion(emotion.key)}
+                                                        className={`inline-flex items-center gap-1.5 rounded-full border-2 px-3 py-1.5 text-xs font-medium transition-all ${
+                                                            isSelected
+                                                                ? `${emotion.color} shadow-sm scale-105`
+                                                                : 'border-border bg-card text-muted-foreground hover:border-primary/30'
+                                                        }`}
+                                                    >
+                                                        <span className="text-base">{emotion.emoji}</span>
+                                                        {emotion.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
                                     <div className="mt-3">
                                         <Textarea id="pn-content" className="min-h-[80px] text-sm" placeholder="Write your progress note here..." />
                                     </div>
@@ -1600,20 +1855,19 @@ export default function ClientShow({
                                         <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => {
                                             const content = (document.getElementById('pn-content') as HTMLTextAreaElement)?.value;
                                             const noteType = (document.getElementById('pn-type') as HTMLInputElement)?.value || 'general';
-                                            const mood = (document.getElementById('pn-mood') as HTMLInputElement)?.value;
                                             const vis = (document.getElementById('pn-vis') as HTMLInputElement)?.value || 'staff_only';
                                             if (!content?.trim()) return;
                                             router.post('/operations/progress-notes', {
                                                 client_id: client.id,
                                                 content,
                                                 note_type: noteType,
-                                                mood_rating: mood ? Number(mood) : null,
+                                                emotions: selectedEmotions.length > 0 ? selectedEmotions : null,
                                                 visibility: vis,
-                                            }, {
+                                            } as any, {
                                                 preserveScroll: true,
                                                 onSuccess: () => {
                                                     (document.getElementById('pn-content') as HTMLTextAreaElement).value = '';
-                                                    (document.getElementById('pn-mood') as HTMLInputElement).value = '';
+                                                    setSelectedEmotions([]);
                                                 },
                                             });
                                         }}>
@@ -1644,7 +1898,7 @@ export default function ClientShow({
                                 </Card>
                             ) : (
                                 <div className="space-y-2">
-                                    {notes.map((note: any) => {
+                                    {notes.slice(0, 5).map((note: any) => {
                                         const typeStyle = NOTE_TYPE_STYLES[note.note_type] ?? NOTE_TYPE_STYLES.general;
                                         return (
                                             <Card key={note.id} className={`overflow-hidden border-l-4 ${note.is_flagged ? 'border-l-red-500 bg-red-50/30' : typeStyle.border}`}>
@@ -1659,11 +1913,9 @@ export default function ClientShow({
                                                                 <div className="flex items-center gap-2">
                                                                     <span className="text-sm font-semibold">{note.author?.name ?? 'Unknown'}</span>
                                                                     <Badge className={`border-0 text-[9px] ${typeStyle.bg} ${typeStyle.border.replace('border-l-', 'text-').replace('-400', '-700')}`}>{typeStyle.label}</Badge>
-                                                                    {note.mood_rating && (
-                                                                        <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-bold text-white ${
-                                                                            note.mood_rating >= 7 ? 'bg-emerald-500' : note.mood_rating >= 4 ? 'bg-amber-500' : 'bg-red-500'
-                                                                        }`}>{note.mood_rating}</span>
-                                                                    )}
+                                                                    {(note.emotions ?? []).length > 0 && (note.emotions ?? []).map((e: string) => (
+                                                                        <span key={e} className="text-sm" title={EMOTION_MAP[e]?.label ?? e}>{EMOTION_MAP[e]?.emoji ?? e}</span>
+                                                                    ))}
                                                                     {note.visibility === 'include_family' && (
                                                                         <Badge className="border-0 bg-blue-100 text-blue-700 text-[9px]">Family</Badge>
                                                                     )}
@@ -1683,6 +1935,15 @@ export default function ClientShow({
                                             </Card>
                                         );
                                     })}
+                                    {notes.length > 5 && (
+                                        <div className="flex justify-center pt-2">
+                                            <Button size="sm" variant="outline" className="gap-1.5 text-xs" asChild>
+                                                <Link href={`/operations/progress-notes?client_id=${client.id}`}>
+                                                    View all {notes.length} notes
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -2157,6 +2418,34 @@ export default function ClientShow({
                                                             </div>
                                                             {e.body && (
                                                                 <p className="mt-1.5 text-xs leading-relaxed text-slate-600 whitespace-pre-wrap">{e.body.length > 250 ? e.body.slice(0, 250) + '...' : e.body}</p>
+                                                            )}
+                                                            {e.meta?.emotions && (e.meta.emotions as string[]).length > 0 && (
+                                                                <div className="mt-1.5 flex flex-wrap gap-1">
+                                                                    {(e.meta.emotions as string[]).map((em: string) => {
+                                                                        const emojiMap: Record<string, string> = { happy: '😊', calm: '😌', excited: '🤩', tired: '😴', anxious: '😰', sad: '😢', frustrated: '😤', confused: '😕' };
+                                                                        const colorMap: Record<string, string> = { happy: 'bg-emerald-100 text-emerald-700', calm: 'bg-sky-100 text-sky-700', excited: 'bg-amber-100 text-amber-700', tired: 'bg-indigo-100 text-indigo-700', anxious: 'bg-orange-100 text-orange-700', sad: 'bg-blue-100 text-blue-700', frustrated: 'bg-red-100 text-red-700', confused: 'bg-purple-100 text-purple-700' };
+                                                                        return (
+                                                                            <span key={em} className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${colorMap[em] ?? 'bg-muted'}`}>
+                                                                                {emojiMap[em] ?? em} {em}
+                                                                            </span>
+                                                                        );
+                                                                    })}
+                                                                </div>
+                                                            )}
+                                                            {(e.comments?.length > 0 || e.reactions?.length > 0 || can.create_note) && (
+                                                                <TimelineInteractions
+                                                                    eventId={e.id}
+                                                                    comments={e.comments ?? []}
+                                                                    reactions={e.reactions ?? []}
+                                                                    currentUserId={(auth as any)?.user?.id}
+                                                                    commentUrl={`/clients/${client.id}/timeline/${e.id}/comments`}
+                                                                    deleteCommentUrl={`/clients/${client.id}/timeline/comments`}
+                                                                    likeCommentUrl={`/clients/${client.id}/timeline/comments`}
+                                                                    reactUrl={`/clients/${client.id}/timeline/${e.id}/react`}
+                                                                    canComment={can.create_note}
+                                                                    canReact={true}
+                                                                    showStaffBadge={true}
+                                                                />
                                                             )}
                                                         </div>
                                                     </div>

@@ -1,4 +1,5 @@
-import PageHeader from '@/components/page-header';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -21,15 +22,19 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
-import { Head, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
+    ArrowLeft,
     ClipboardList,
     FileHeart,
     Heart,
+    Home,
     Package,
+    Pencil,
     Phone,
     Pill,
     Plus,
@@ -82,7 +87,14 @@ export default function ClientMedical({
 }: Props) {
     const { labels } = usePage().props as any;
     const name = `${client.first_name} ${client.last_name}`.trim();
+    const getInitials = useInitials();
     const [confirmAdminOpen, setConfirmAdminOpen] = useState(false);
+    const [showAddMed, setShowAddMed] = useState(false);
+    const [showAddCondition, setShowAddCondition] = useState(false);
+    const [showAddContact, setShowAddContact] = useState(false);
+    const [showAdminForm, setShowAdminForm] = useState(false);
+    const [showStockForm, setShowStockForm] = useState(false);
+    const [editingProfile, setEditingProfile] = useState(false);
 
     // When navigating from the client profile "Manage" buttons, we pass a section.
     // This keeps the medical workflow focused instead of showing every create form at once.
@@ -203,17 +215,53 @@ export default function ClientMedical({
             <Head title={`Medical - ${name}`} />
 
             <div className="space-y-6">
-                <PageHeader
-                    title="Medical Profile"
-                    description={`Medical information and health records for ${name}.`}
-                    backHref={`/operations/clients/${client.id}`}
-                    actions={
-                        <Button variant="outline" onClick={() => (window.location.href = `/operations/clients/${client.id}/mar`)}>
-                            <ClipboardList className="mr-2 h-4 w-4" />
-                            Open Daily MAR
-                        </Button>
-                    }
-                />
+                {/* ── Hero Header ──────────────────────────────── */}
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-600/90 via-rose-500 to-pink-500/80 p-6 text-white md:p-8">
+                    <div className="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/5" />
+                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
+
+                    <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
+                        <Avatar className="h-20 w-20 shrink-0 border-4 border-white/20 shadow-xl md:h-24 md:w-24">
+                            <AvatarFallback className="bg-white/10 text-xl font-bold text-white md:text-2xl">
+                                {getInitials(name)}
+                            </AvatarFallback>
+                        </Avatar>
+
+                        <div className="flex-1 text-center md:text-left">
+                            <h1 className="text-2xl font-bold md:text-3xl">Medical Profile</h1>
+                            <p className="mt-1 text-sm text-white/70">Health records for {name}</p>
+
+                            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
+                                {profile?.allergies && (
+                                    <Badge className="bg-red-400/30 text-red-100 border-red-300/40">
+                                        <AlertTriangle className="mr-1 h-3 w-3" />Allergies: {profile.allergies}
+                                    </Badge>
+                                )}
+                                {medications.length > 0 && (
+                                    <Badge className="bg-white/10 text-white/90 border-white/20">
+                                        <Pill className="mr-1 h-3 w-3" />{medications.filter((m: any) => m.active !== false && m.state !== 'ceased').length} active medications
+                                    </Badge>
+                                )}
+                                {conditions.length > 0 && (
+                                    <Badge className="bg-white/10 text-white/90 border-white/20">
+                                        <Heart className="mr-1 h-3 w-3" />{conditions.length} condition{conditions.length !== 1 ? 's' : ''}
+                                    </Badge>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="flex flex-wrap gap-2">
+                            <Button size="sm" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" asChild>
+                                <Link href={`/operations/clients/${client.id}`}>
+                                    <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />Back
+                                </Link>
+                            </Button>
+                            <Button size="sm" variant="outline" className="border-white/20 bg-white/10 text-white hover:bg-white/20" onClick={() => (window.location.href = `/operations/clients/${client.id}/mar`)}>
+                                <ClipboardList className="mr-1.5 h-3.5 w-3.5" />Daily MAR
+                            </Button>
+                        </div>
+                    </div>
+                </div>
 
                 {has_open_controlled_discrepancy && (
                     <div className="flex items-center gap-3 rounded-xl border-2 border-amber-300 bg-amber-50 p-4">
@@ -223,17 +271,6 @@ export default function ClientMedical({
                             <p className="text-sm text-amber-700">
                                 There is an open controlled-drug discrepancy for this {(labels?.['client.singular'] ?? 'Client').toLowerCase()}. Review and resolve before further controlled stock edits (unless override is granted).
                             </p>
-                        </div>
-                    </div>
-                )}
-
-                {/* Allergy alert banner */}
-                {profile?.allergies && (
-                    <div className="flex items-center gap-3 rounded-xl border-2 border-red-300 bg-red-50 p-4">
-                        <AlertTriangle className="h-6 w-6 shrink-0 text-red-600" />
-                        <div>
-                            <p className="text-sm font-bold text-red-800">Allergies</p>
-                            <p className="text-sm text-red-700">{profile.allergies}</p>
                         </div>
                     </div>
                 )}
@@ -268,37 +305,333 @@ export default function ClientMedical({
                     </Card>
                 )}
 
-                {/* Section navigation pills */}
-                <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-white/50 p-2 shadow-sm">
-                    {[
-                        { key: 'all', label: 'Overview', icon: Activity },
-                        { key: 'profile', label: 'Medical Profile', icon: FileHeart },
-                        { key: 'medications', label: 'Medications', icon: Pill },
-                        { key: 'conditions', label: 'Conditions', icon: Thermometer },
-                        { key: 'emergency_contacts', label: 'Emergency Contacts', icon: Phone },
-                    ].map(s => (
-                        <Button key={s.key} size="sm"
-                            variant={focusSection === s.key ? 'default' : 'ghost'}
-                            className={`gap-1.5 text-xs ${focusSection === s.key ? 'bg-violet-600 hover:bg-violet-700' : ''}`}
-                            onClick={() => setFocusSection(s.key)}>
-                            <s.icon className="h-3.5 w-3.5" />
-                            {s.label}
-                        </Button>
-                    ))}
+                {/* Section tabs */}
+                <div className="overflow-x-auto border-b">
+                    <div className="flex w-max items-center gap-1">
+                        {[
+                            { key: 'all', label: 'Overview', icon: Activity },
+                            { key: 'profile', label: 'Medical Profile', icon: FileHeart },
+                            { key: 'medications', label: 'Medications', icon: Pill, count: medications.length },
+                            { key: 'administrations', label: 'Administrations', icon: Syringe, count: administrations.length },
+                            { key: 'stock', label: 'Stock', icon: Package },
+                            ...(can_controlled_view ? [{ key: 'controlled_drugs', label: 'Controlled Drugs', icon: Shield, count: controlled_entries.length }] : []),
+                            { key: 'conditions', label: 'Conditions', icon: Thermometer, count: conditions.length },
+                            { key: 'emergency_contacts', label: 'Emergency Contacts', icon: Phone, count: emergency_contacts.length },
+                        ].map(s => {
+                            const Icon = s.icon;
+                            const isActive = focusSection === s.key;
+                            return (
+                                <button key={s.key}
+                                    onClick={() => setFocusSection(s.key)}
+                                    className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
+                                        isActive
+                                            ? 'border-primary text-primary'
+                                            : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
+                                    }`}
+                                >
+                                    <Icon className="h-3.5 w-3.5" />
+                                    {s.label}
+                                    {'count' in s && (s as any).count > 0 && (
+                                        <span className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-semibold leading-none ${
+                                            isActive ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground'
+                                        }`}>
+                                            {(s as any).count}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </div>
                 </div>
 
-                <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2">
+                {/* ── Dashboard Overview (visible only in Overview tab) ── */}
+                {focusSection === 'all' && (
+                    <div className="space-y-4">
+                        {/* KPI Row */}
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+                            <div className="rounded-xl border bg-gradient-to-br from-rose-50 to-pink-50 p-4 dark:from-rose-950/20 dark:to-pink-950/20">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-rose-500">Allergies</p>
+                                <p className="mt-1 text-lg font-bold text-rose-900 dark:text-rose-300">{profile?.allergies || 'None recorded'}</p>
+                            </div>
+                            <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4 dark:from-violet-950/20 dark:to-purple-950/20">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-violet-500">Active Medications</p>
+                                <p className="mt-1 text-lg font-bold text-violet-900 dark:text-violet-300">{medications.filter((m: any) => m.active !== false && m.state !== 'ceased').length}</p>
+                                {medications.some((m: any) => m.controlled_drug || m.is_controlled_drug) && (
+                                    <p className="mt-0.5 text-[10px] text-amber-600">{medications.filter((m: any) => m.controlled_drug || m.is_controlled_drug).length} controlled</p>
+                                )}
+                            </div>
+                            <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-4 dark:from-blue-950/20 dark:to-sky-950/20">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-blue-500">Conditions</p>
+                                <p className="mt-1 text-lg font-bold text-blue-900 dark:text-blue-300">{conditions.length || 'None'}</p>
+                            </div>
+                            <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-4 dark:from-emerald-950/20 dark:to-green-950/20">
+                                <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-500">Emergency Contacts</p>
+                                <p className="mt-1 text-lg font-bold text-emerald-900 dark:text-emerald-300">{emergency_contacts.length || 'None'}</p>
+                            </div>
+                        </div>
+
+                        {/* GP + Blood Type + Hospital row */}
+                        {(profile?.gp_name || profile?.gp_practice || profile?.blood_type || profile?.hospital_preference) && (
+                            <Card>
+                                <CardContent className="p-4">
+                                    <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
+                                        {(profile?.gp_name || profile?.gp_practice) && (
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600">
+                                                    <Stethoscope className="h-4 w-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">GP / Doctor</p>
+                                                    <p className="text-sm font-medium">{profile.gp_name || '—'}</p>
+                                                    {profile.gp_practice && <p className="text-xs text-muted-foreground">{profile.gp_practice}</p>}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {profile?.gp_phone && (
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
+                                                    <Phone className="h-4 w-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">GP Phone</p>
+                                                    <p className="text-sm font-medium">{profile.gp_phone}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {profile?.hospital_preference && (
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                                    <Home className="h-4 w-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Hospital Preference</p>
+                                                    <p className="text-sm font-medium">{profile.hospital_preference}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                        {profile?.blood_type && (
+                                            <div className="flex items-start gap-3">
+                                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                                                    <Heart className="h-4 w-4" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-xs text-muted-foreground">Blood Type</p>
+                                                    <p className="text-sm font-medium">{profile.blood_type}</p>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        )}
+
+                        {/* Quick lists: Medications + Conditions side by side */}
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            {/* Active Medications List */}
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center justify-between text-sm">
+                                        <span className="flex items-center gap-2">
+                                            <Pill className="h-4 w-4 text-violet-500" />
+                                            Active Medications
+                                        </span>
+                                        <Button variant="ghost" size="sm" className="text-xs" onClick={() => setFocusSection('medications')}>View all</Button>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {medications.filter((m: any) => m.active !== false && m.state !== 'ceased').length > 0 ? (
+                                        <div className="space-y-2">
+                                            {medications.filter((m: any) => m.active !== false && m.state !== 'ceased').map((m: any) => (
+                                                <div key={m.id} className="flex items-center justify-between rounded-lg border p-2.5">
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-medium">{m.name}</span>
+                                                            {m.is_prn && <Badge variant="outline" className="text-[9px]">PRN</Badge>}
+                                                            {(m.controlled_drug || m.is_controlled_drug) && <Badge variant="outline" className="text-[9px] border-amber-200 bg-amber-50 text-amber-700">CD</Badge>}
+                                                            {(m.high_risk || m.is_high_risk) && <Badge variant="outline" className="text-[9px] border-red-200 bg-red-50 text-red-700">High Risk</Badge>}
+                                                        </div>
+                                                        <p className="text-xs text-muted-foreground">
+                                                            {[m.dosage, m.frequency, m.route].filter(Boolean).join(' · ')}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="py-4 text-center text-sm text-muted-foreground">No active medications</p>
+                                    )}
+                                </CardContent>
+                            </Card>
+
+                            {/* Conditions + Emergency Contacts */}
+                            <div className="space-y-4">
+                                <Card>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="flex items-center justify-between text-sm">
+                                            <span className="flex items-center gap-2">
+                                                <Thermometer className="h-4 w-4 text-blue-500" />
+                                                Conditions
+                                            </span>
+                                            <Button variant="ghost" size="sm" className="text-xs" onClick={() => setFocusSection('conditions')}>Manage</Button>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {conditions.length > 0 ? (
+                                            <div className="space-y-1.5">
+                                                {conditions.map((c: any) => (
+                                                    <div key={c.id} className="flex items-center justify-between rounded-lg border p-2.5">
+                                                        <span className="text-sm font-medium">{c.label}</span>
+                                                        {c.severity && (
+                                                            <Badge variant="outline" className={`text-[9px] ${c.severity === 'high' ? 'border-red-200 bg-red-50 text-red-700' : c.severity === 'medium' ? 'border-amber-200 bg-amber-50 text-amber-700' : ''}`}>
+                                                                {c.severity}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="py-4 text-center text-sm text-muted-foreground">No conditions recorded</p>
+                                        )}
+                                    </CardContent>
+                                </Card>
+
+                                <Card>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="flex items-center justify-between text-sm">
+                                            <span className="flex items-center gap-2">
+                                                <Phone className="h-4 w-4 text-emerald-500" />
+                                                Emergency Contacts
+                                            </span>
+                                            <Button variant="ghost" size="sm" className="text-xs" onClick={() => setFocusSection('emergency_contacts')}>Manage</Button>
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {emergency_contacts.length > 0 ? (
+                                            <div className="space-y-1.5">
+                                                {emergency_contacts.map((ec: any) => (
+                                                    <div key={ec.id} className="flex items-center justify-between rounded-lg border p-2.5">
+                                                        <div>
+                                                            <span className="text-sm font-medium">{ec.name}</span>
+                                                            {ec.relationship && <span className="ml-2 text-xs text-muted-foreground">{ec.relationship}</span>}
+                                                        </div>
+                                                        {ec.phone && <span className="text-xs text-muted-foreground">{ec.phone}</span>}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <p className="py-4 text-center text-sm text-muted-foreground">No emergency contacts</p>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        </div>
+
+                        {/* Medical History + Disabilities + Notes (read-only summary) */}
+                        {(profile?.medical_history || profile?.disabilities) && (
+                            <Card>
+                                <CardHeader className="pb-2">
+                                    <CardTitle className="flex items-center justify-between text-sm">
+                                        <span className="flex items-center gap-2">
+                                            <FileHeart className="h-4 w-4 text-rose-500" />
+                                            Medical History
+                                        </span>
+                                        <Button variant="ghost" size="sm" className="text-xs" onClick={() => setFocusSection('profile')}>Edit</Button>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {profile?.medical_history && (
+                                            <div>
+                                                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">History</p>
+                                                <p className="text-sm leading-relaxed">{profile.medical_history}</p>
+                                            </div>
+                                        )}
+                                        {profile?.disabilities && (
+                                            <div>
+                                                <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Disabilities</p>
+                                                <p className="text-sm leading-relaxed">{profile.disabilities}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {profile?.notes && (
+                                        <div className="mt-3 rounded-lg bg-muted/50 p-3">
+                                            <p className="text-xs text-muted-foreground">{profile.notes}</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+                    </div>
+                )}
+
+                <div className={cn('grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2', !['profile', 'medications', 'conditions', 'emergency_contacts'].includes(focusSection) && 'hidden')}>
                     {/* Medical Profile Card */}
-                    <Card className={cn(focusSection !== 'all' && focusSection !== 'profile' && 'hidden')}>
-                        <CardHeader>
+                    <Card className={cn(focusSection !== 'profile' && 'hidden')}>
+                        <CardHeader className="flex flex-row items-center justify-between">
                             <CardTitle className="flex items-center gap-2.5 text-base">
                                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-100 text-red-600">
                                     <FileHeart className="h-4 w-4" />
                                 </div>
                                 Medical Profile
                             </CardTitle>
+                            {can_edit && (
+                                <Button variant="outline" size="sm" onClick={() => setEditingProfile(!editingProfile)}>
+                                    <Pencil className="mr-1.5 h-3.5 w-3.5" />{editingProfile ? 'View' : 'Edit'}
+                                </Button>
+                            )}
                         </CardHeader>
                         <CardContent className="space-y-3">
+                            {/* Read-only view */}
+                            {!editingProfile && (
+                                <div className="space-y-4">
+                                    {/* GP Info */}
+                                    {(profile?.gp_name || profile?.gp_practice || profile?.gp_phone) && (
+                                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
+                                            <div className="flex items-center gap-2 mb-2">
+                                                <Stethoscope className="h-4 w-4 text-emerald-600" />
+                                                <span className="text-sm font-semibold text-emerald-800">GP / Primary Care</span>
+                                            </div>
+                                            <div className="grid gap-2 sm:grid-cols-3 text-sm">
+                                                {profile.gp_name && <div><span className="text-xs text-muted-foreground">Doctor</span><p className="font-medium">{profile.gp_name}</p></div>}
+                                                {profile.gp_practice && <div><span className="text-xs text-muted-foreground">Practice</span><p className="font-medium">{profile.gp_practice}</p></div>}
+                                                {profile.gp_phone && <div><span className="text-xs text-muted-foreground">Phone</span><p className="font-medium">{profile.gp_phone}</p></div>}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Read-only fields */}
+                                    <div className="grid gap-4 md:grid-cols-2">
+                                        {profile?.medical_history && (
+                                            <div><p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Medical History</p><p className="text-sm leading-relaxed">{profile.medical_history}</p></div>
+                                        )}
+                                        {profile?.disabilities && (
+                                            <div><p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Disabilities</p><p className="text-sm leading-relaxed">{profile.disabilities}</p></div>
+                                        )}
+                                        {profile?.allergies && (
+                                            <div><p className="mb-1 text-xs font-medium uppercase tracking-wider text-rose-600">Allergies</p><p className="text-sm font-medium text-rose-700">{profile.allergies}</p></div>
+                                        )}
+                                        {profile?.blood_type && (
+                                            <div><p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Blood Type</p><p className="text-sm font-medium">{profile.blood_type}</p></div>
+                                        )}
+                                        {profile?.hospital_preference && (
+                                            <div><p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Hospital Preference</p><p className="text-sm">{profile.hospital_preference}</p></div>
+                                        )}
+                                    </div>
+                                    {profile?.notes && (
+                                        <div className="rounded-lg bg-muted/50 p-3">
+                                            <p className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">Notes</p>
+                                            <p className="text-sm">{profile.notes}</p>
+                                        </div>
+                                    )}
+                                    {!profile?.medical_history && !profile?.disabilities && !profile?.allergies && (
+                                        <p className="py-6 text-center text-sm text-muted-foreground">No medical profile data recorded yet. Click Edit to add information.</p>
+                                    )}
+                                </div>
+                            )}
+
+                            {/* Edit form */}
+                            {editingProfile && (
+                                <div className="space-y-3">
                             {/* GP Information highlight card */}
                             {(profile?.gp_name || profile?.gp_practice || profile?.gp_phone) && (
                                 <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
@@ -439,11 +772,13 @@ export default function ClientMedical({
                                     Save profile
                                 </Button>
                             )}
+                                </div>
+                            )}
                         </CardContent>
                     </Card>
 
                     {/* Medications Card */}
-                    <Card className={cn(focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
+                    <Card className={cn(focusSection !== 'medications' && 'hidden')}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
                                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
@@ -453,11 +788,19 @@ export default function ClientMedical({
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {can_edit && (
+                            {can_edit && !showAddMed && (
+                                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowAddMed(true)}>
+                                    <Plus className="h-3.5 w-3.5" />Add Medication
+                                </Button>
+                            )}
+                            {can_edit && showAddMed && (
                                 <div className="rounded-xl border border-dashed border-violet-200 bg-violet-50/30 p-4">
-                                    <div className="flex items-center gap-2 text-sm font-medium text-violet-800">
-                                        <Plus className="h-4 w-4" />
-                                        Add medication
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-violet-800">
+                                            <Plus className="h-4 w-4" />
+                                            Add medication
+                                        </div>
+                                        <Button variant="ghost" size="sm" onClick={() => setShowAddMed(false)}>Cancel</Button>
                                     </div>
                                     <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                                         <div>
@@ -818,7 +1161,7 @@ export default function ClientMedical({
                     </Card>
 
                     {/* Conditions Card */}
-                    <Card className={cn(focusSection !== 'all' && focusSection !== 'conditions' && 'hidden')}>
+                    <Card className={cn(focusSection !== 'conditions' && 'hidden')}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
                                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
@@ -828,11 +1171,19 @@ export default function ClientMedical({
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {can_edit && (
+                            {can_edit && !showAddCondition && (
+                                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowAddCondition(true)}>
+                                    <Plus className="h-3.5 w-3.5" />Add Condition
+                                </Button>
+                            )}
+                            {can_edit && showAddCondition && (
                                 <div className="rounded-xl border border-dashed border-amber-200 bg-amber-50/30 p-4">
-                                    <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
-                                        <Plus className="h-4 w-4" />
-                                        Add condition
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-amber-800">
+                                            <Plus className="h-4 w-4" />
+                                            Add condition
+                                        </div>
+                                        <Button variant="ghost" size="sm" onClick={() => setShowAddCondition(false)}>Cancel</Button>
                                     </div>
                                     <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                                         <div>
@@ -956,7 +1307,7 @@ export default function ClientMedical({
                     </Card>
 
                     {/* Emergency Contacts Card */}
-                    <Card className={cn(focusSection !== 'all' && focusSection !== 'emergency_contacts' && 'hidden')}>
+                    <Card className={cn(focusSection !== 'emergency_contacts' && 'hidden')}>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
                                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-600">
@@ -966,11 +1317,19 @@ export default function ClientMedical({
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {can_edit && (
+                            {can_edit && !showAddContact && (
+                                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowAddContact(true)}>
+                                    <Plus className="h-3.5 w-3.5" />Add Contact
+                                </Button>
+                            )}
+                            {can_edit && showAddContact && (
                                 <div className="rounded-xl border border-dashed border-blue-200 bg-blue-50/30 p-4">
-                                    <div className="flex items-center gap-2 text-sm font-medium text-blue-800">
-                                        <Plus className="h-4 w-4" />
-                                        Add emergency contact
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-blue-800">
+                                            <Plus className="h-4 w-4" />
+                                            Add emergency contact
+                                        </div>
+                                        <Button variant="ghost" size="sm" onClick={() => setShowAddContact(false)}>Cancel</Button>
                                     </div>
                                     <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                                         <div>
@@ -1145,8 +1504,8 @@ export default function ClientMedical({
                     </Card>
                 </div>
 
-                {/* MAR + Stock */}
-                <div className={cn('grid gap-4 md:grid-cols-2', focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
+                {/* Administrations tab */}
+                <div className={cn('space-y-4', focusSection !== 'administrations' && 'hidden')}>
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
@@ -1157,11 +1516,24 @@ export default function ClientMedical({
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {can_record && medications.length > 0 && (
+                            {can_record && medications.length > 0 && !showAdminForm && (
+                                <div className="flex items-center gap-2">
+                                    <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowAdminForm(true)}>
+                                        <Plus className="h-3.5 w-3.5" />Record Administration
+                                    </Button>
+                                    <Button variant="outline" size="sm" onClick={() => (window.location.href = `/operations/clients/${client.id}/mar`)}>
+                                        <ClipboardList className="mr-1.5 h-3.5 w-3.5" />Open Daily MAR
+                                    </Button>
+                                </div>
+                            )}
+                            {can_record && medications.length > 0 && showAdminForm && (
                                 <div className="rounded-xl border border-dashed border-emerald-200 bg-emerald-50/30 p-4">
-                                    <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
-                                        <Plus className="h-4 w-4" />
-                                        Record administration
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-emerald-800">
+                                            <Plus className="h-4 w-4" />
+                                            Record administration
+                                        </div>
+                                        <Button variant="ghost" size="sm" onClick={() => setShowAdminForm(false)}>Cancel</Button>
                                     </div>
                                     <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                                         <div className="md:col-span-2">
@@ -1501,7 +1873,10 @@ export default function ClientMedical({
                             </div>
                         </CardContent>
                     </Card>
+                </div>
 
+                {/* Stock tab */}
+                <div className={cn('space-y-4', focusSection !== 'stock' && 'hidden')}>
                     <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
@@ -1512,11 +1887,19 @@ export default function ClientMedical({
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-3">
-                            {can_stock && medications.length > 0 && (
+                            {can_stock && medications.length > 0 && !showStockForm && (
+                                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setShowStockForm(true)}>
+                                    <Plus className="h-3.5 w-3.5" />Update Stock
+                                </Button>
+                            )}
+                            {can_stock && medications.length > 0 && showStockForm && (
                                 <div className="rounded-xl border border-dashed border-indigo-200 bg-indigo-50/30 p-4">
-                                    <div className="flex items-center gap-2 text-sm font-medium text-indigo-800">
-                                        <Plus className="h-4 w-4" />
-                                        Update stock
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2 text-sm font-medium text-indigo-800">
+                                            <Plus className="h-4 w-4" />
+                                            Update stock
+                                        </div>
+                                        <Button variant="ghost" size="sm" onClick={() => setShowStockForm(false)}>Cancel</Button>
                                     </div>
                                     <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
                                         <div className="md:col-span-2">
@@ -1734,9 +2117,10 @@ export default function ClientMedical({
                     </Card>
                 </div>
 
-                {/* Controlled Drug Register */}
-                {can_controlled_view && (
-                    <Card className={cn(focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
+                {/* Controlled Drugs tab */}
+                {can_controlled_view && focusSection === 'controlled_drugs' && (
+                    <div className="space-y-4">
+                    <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
                                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-rose-100 text-rose-600">
@@ -1789,11 +2173,9 @@ export default function ClientMedical({
                             )}
                         </CardContent>
                     </Card>
-                )}
 
-                {/* Controlled Drug Discrepancies */}
-                {can_controlled_view && (
-                    <Card className={cn(focusSection !== 'all' && focusSection !== 'medications' && 'hidden')}>
+                    {/* Controlled Drug Discrepancies */}
+                    <Card>
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2.5 text-base">
                                 <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
@@ -1870,6 +2252,7 @@ export default function ClientMedical({
                             )}
                         </CardContent>
                     </Card>
+                    </div>
                 )}
             </div>
 

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Portal;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientDocument;
+use App\Models\TimelineEvent;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 
@@ -84,7 +85,7 @@ class PortalDocumentController extends Controller
         $file = $request->file('file');
         $path = $file->store("client_documents/{$client->id}", 'local');
 
-        ClientDocument::create([
+        $doc = ClientDocument::create([
             'client_id' => $client->id,
             'uploaded_by_user_id' => $user->id,
             'title' => $request->input('title'),
@@ -98,6 +99,21 @@ class PortalDocumentController extends Controller
             'mime_type' => $file->getMimeType(),
             'size_bytes' => $file->getSize(),
             'portal_visible' => true,
+        ]);
+
+        TimelineEvent::create([
+            'source_type' => ClientDocument::class,
+            'source_id' => $doc->id,
+            'occurred_at' => now(),
+            'type' => 'document_uploaded',
+            'actor_user_id' => $user->id,
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'subject' => 'Family uploaded: ' . ($doc->title ?: $doc->original_name),
+            'body' => $request->input('notes'),
+            'visibility' => 'portal',
+            'is_pinned' => false,
+            'created_by' => $user->id,
         ]);
 
         AuditLogger::log('portal.document.upload', $client);

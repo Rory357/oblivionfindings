@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientDocument;
+use App\Models\TimelineEvent;
 use App\Services\Rag\OpenAiVectorStoreClient;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
@@ -105,6 +106,26 @@ class ClientDocumentController extends Controller
                 }
             }
         }
+
+        TimelineEvent::create([
+            'source_type' => ClientDocument::class,
+            'source_id' => $doc->id,
+            'occurred_at' => now(),
+            'type' => 'document_uploaded',
+            'actor_user_id' => $request->user()?->id,
+            'client_id' => $client->id,
+            'site_id' => $client->site_id,
+            'subject' => 'Document uploaded: ' . ($doc->title ?: $doc->original_name),
+            'body' => $data['notes'] ?? null,
+            'meta' => array_filter([
+                'title' => $doc->title,
+                'category' => $doc->category,
+                'original_name' => $doc->original_name,
+            ]),
+            'visibility' => 'internal',
+            'is_pinned' => false,
+            'created_by' => $request->user()?->id,
+        ]);
 
         app(NotificationService::class)->notifyCrud($request->user(), 'created', 'document', $doc, $client, [
             'title' => 'Document uploaded',

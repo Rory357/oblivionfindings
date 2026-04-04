@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Operations;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ProgressNote;
+use App\Models\TimelineEvent;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -21,6 +22,7 @@ class ProgressNoteController extends Controller
             'author_id' => ['nullable', 'integer', 'exists:users,id'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'emotion' => ['nullable', 'string', 'in:happy,calm,anxious,sad,frustrated,excited,tired,confused'],
             'flagged' => ['nullable', 'boolean'],
         ]);
 
@@ -37,6 +39,7 @@ class ProgressNoteController extends Controller
             ->when(!empty($data['author_id']), fn ($q) => $q->where('author_id', $data['author_id']))
             ->when(!empty($data['date_from']), fn ($q) => $q->whereDate('created_at', '>=', $data['date_from']))
             ->when(!empty($data['date_to']), fn ($q) => $q->whereDate('created_at', '<=', $data['date_to']))
+            ->when(!empty($data['emotion']), fn ($q) => $q->whereJsonContains('emotions', $data['emotion']))
             ->when(isset($data['flagged']) && $data['flagged'], fn ($q) => $q->flagged())
             ->orderByDesc('created_at')
             ->paginate(20)
@@ -66,7 +69,7 @@ class ProgressNoteController extends Controller
             'clients' => $clients,
             'authors' => $authors,
             'stats' => $stats,
-            'filters' => $request->only(['client_id', 'note_type', 'author_id', 'date_from', 'date_to', 'flagged']),
+            'filters' => $request->only(['client_id', 'note_type', 'author_id', 'date_from', 'date_to', 'emotion', 'flagged', 'q']),
         ]);
     }
 
@@ -82,12 +85,14 @@ class ProgressNoteController extends Controller
             'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
             'care_plan_goal_id' => ['nullable', 'integer', 'exists:care_plan_goals,id'],
             'mood_rating' => ['nullable', 'integer', 'min:1', 'max:10'],
+            'emotions' => ['nullable', 'array'],
+            'emotions.*' => ['string', 'in:happy,calm,anxious,sad,frustrated,excited,tired,confused'],
             'visibility' => ['nullable', 'string', 'in:staff_only,include_family,private'],
             'is_flagged' => ['nullable', 'boolean'],
             'flagged_reason' => ['nullable', 'string', 'max:500'],
         ]);
 
-        ProgressNote::create([
+        $note = ProgressNote::create([
             'organization_id' => $auth->organization_id,
             'client_id' => $data['client_id'],
             'content' => $data['content'],
@@ -95,10 +100,38 @@ class ProgressNoteController extends Controller
             'shift_id' => $data['shift_id'] ?? null,
             'care_plan_goal_id' => $data['care_plan_goal_id'] ?? null,
             'mood_rating' => $data['mood_rating'] ?? null,
+            'emotions' => $data['emotions'] ?? null,
             'visibility' => $data['visibility'] ?? 'staff_only',
             'is_flagged' => $data['is_flagged'] ?? false,
             'flagged_reason' => $data['flagged_reason'] ?? null,
             'author_id' => $auth->id,
+        ]);
+
+        $client = Client::find($data['client_id']);
+        $emotionEmojis = collect($data['emotions'] ?? [])->map(fn ($e) => match($e) {
+            'happy' => '😊', 'calm' => '😌', 'excited' => '🤩', 'tired' => '😴',
+            'anxious' => '😰', 'sad' => '😢', 'frustrated' => '😤', 'confused' => '😕',
+            default => $e,
+        })->join(' ');
+
+        TimelineEvent::create([
+            'source_type' => ProgressNote::class,
+            'source_id' => $note->id,
+            'occurred_at' => now(),
+            'type' => 'progress_note',
+            'actor_user_id' => $auth->id,
+            'client_id' => $data['client_id'],
+            'shift_id' => $data['shift_id'] ?? null,
+            'site_id' => $client?->site_id,
+            'subject' => 'Progress note: ' . ucfirst(str_replace('_', ' ', $data['note_type'])) . ($emotionEmojis ? ' ' . $emotionEmojis : ''),
+            'body' => \Illuminate\Support\Str::limit($data['content'], 200),
+            'meta' => array_filter([
+                'note_type' => $data['note_type'],
+                'emotions' => $data['emotions'] ?? null,
+            ]),
+            'visibility' => ($data['visibility'] ?? 'staff_only') === 'include_family' ? 'portal' : 'internal',
+            'is_pinned' => false,
+            'created_by' => $auth->id,
         ]);
 
         return redirect()->back()->with('success', 'Progress note created.');
