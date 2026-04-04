@@ -31,6 +31,7 @@ import interactionPlugin from '@fullcalendar/interaction';
 import { useMemo, useState } from 'react';
 import { HalfMoonGauge, ProgressRing, HorizontalBarChart } from '@/components/fleet-charts';
 import { DonutChart } from '@/components/ops-stat-card';
+import ClientLocationTab, { type ClientLocationData } from '@/components/client-location-tab';
 
 function Field({ label, value }: { label: string; value: string }) {
     return (
@@ -40,6 +41,39 @@ function Field({ label, value }: { label: string; value: string }) {
         </div>
     );
 }
+
+type PersonalAsset = {
+    id: number;
+    name: string;
+    category?: string | null;
+    description?: string | null;
+    serial_number?: string | null;
+    estimated_value?: string | null;
+    condition?: string | null;
+    location?: string | null;
+    photo_url?: string | null;
+    acquired_at?: string | null;
+    notes?: string | null;
+    status: string;
+    ownership?: string | null;
+    funding_source?: string | null;
+    return_required?: boolean;
+    return_by?: string | null;
+    last_serviced_at?: string | null;
+    next_service_due?: string | null;
+    service_provider?: string | null;
+    warranty_expires_at?: string | null;
+    insurance_reference?: string | null;
+    disposed_at?: string | null;
+    disposal_reason?: string | null;
+    portal_visible?: boolean;
+    is_service_overdue?: boolean;
+    is_warranty_expired?: boolean;
+    is_warranty_expiring_soon?: boolean;
+    is_return_overdue?: boolean;
+    recorded_by?: string | null;
+    created_at: string;
+};
 
 type Props = {
     client: {
@@ -103,21 +137,7 @@ type Props = {
     assessments: Array<any>;
     documents: Array<any>;
     photos: GalleryPhoto[];
-    personal_assets: Array<{
-        id: number;
-        name: string;
-        category?: string | null;
-        description?: string | null;
-        serial_number?: string | null;
-        estimated_value?: string | null;
-        condition?: string | null;
-        location?: string | null;
-        photo_url?: string | null;
-        acquired_at?: string | null;
-        notes?: string | null;
-        recorded_by?: string | null;
-        created_at: string;
-    }>;
+    personal_assets: PersonalAsset[];
     portal_users: Array<any>;
     events: Array<any>;
     handover: Array<any>;
@@ -162,6 +182,7 @@ type Props = {
         manage_onboarding?: boolean;
         create_shift?: boolean;
     };
+    location?: ClientLocationData;
 };
 
 type TabKey =
@@ -183,6 +204,7 @@ type TabKey =
     | 'family_notes'
     | 'respite'
     | 'personal_assets'
+    | 'location'
     | 'assignments';
 
 type GalleryPhoto = {
@@ -213,6 +235,7 @@ export default function ClientShow({
     shifts_summary,
     respite,
     can,
+    location,
 }: Props) {
     const pageProps = usePage().props as any;
     const { auth, labels } = pageProps;
@@ -239,6 +262,7 @@ export default function ClientShow({
             { key: 'photos', label: 'Photos', icon: Camera, show: true, count: photos?.length },
             { key: 'personal_assets', label: 'Personal Assets', icon: Package, show: true, count: personal_assets?.length },
             { key: 'consents', label: 'Consents', icon: Shield, show: true },
+            { key: 'location', label: 'Location', icon: MapPin, show: true },
             { key: 'portal', label: 'Family Portal', icon: Users, show: true },
             { key: 'family_notes', label: 'Family Notes', icon: ListTodo, show: true, count: (usePage().props as any).family_notes_open_count },
             { key: 'respite', label: 'Respite', icon: Calendar, show: !!respiteCan?.viewAny },
@@ -453,17 +477,7 @@ export default function ClientShow({
                                 return (
                                     <button
                                         key={t.key}
-                                        onClick={() => {
-                                            if (t.key === 'mar') {
-                                                window.location.href = `/operations/clients/${client.id}/mar`;
-                                                return;
-                                            }
-                                            if (t.key === 'calendar') {
-                                                window.location.href = `/operations/clients/${client.id}/calendar`;
-                                                return;
-                                            }
-                                            setTab(t.key);
-                                        }}
+                                        onClick={() => setTab(t.key)}
                                         className={`inline-flex items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
                                             isActive
                                                 ? 'border-primary text-primary'
@@ -733,7 +747,18 @@ export default function ClientShow({
                                             {client.date_of_birth && <div className="flex justify-between"><span className="text-muted-foreground">DOB</span><span>{new Date(client.date_of_birth).toLocaleDateString('en-NZ')}{(() => { const b = new Date(client.date_of_birth!); const age = Math.floor((Date.now() - b.getTime()) / 31557600000); return ` (${age}y)`; })()}</span></div>}
                                             {client.phone && <div className="flex justify-between"><span className="text-muted-foreground">Phone</span><a href={`tel:${client.phone}`} className="text-primary hover:underline">{client.phone}</a></div>}
                                             {client.email && <div className="flex justify-between"><span className="text-muted-foreground">Email</span><a href={`mailto:${client.email}`} className="truncate ml-2 text-primary hover:underline">{client.email}</a></div>}
-                                            {client.city && <div className="flex justify-between"><span className="text-muted-foreground">Location</span><span>{client.suburb ? `${client.suburb}, ` : ''}{client.city}</span></div>}
+                                            {(client.address_line_1 || client.city) && (
+                                                <div className="flex justify-between gap-2">
+                                                    <span className="text-muted-foreground shrink-0">Address</span>
+                                                    <span className="text-right">
+                                                        {client.address_line_1 && <>{client.address_line_1}<br /></>}
+                                                        {client.address_line_2 && <>{client.address_line_2}<br /></>}
+                                                        {[client.suburb, client.city, client.postcode].filter(Boolean).join(', ')}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {!client.address_line_1 && client.city && <div className="flex justify-between"><span className="text-muted-foreground">Location</span><span>{client.suburb ? `${client.suburb}, ` : ''}{client.city}</span></div>}
+                                            {client.gender && <div className="flex justify-between"><span className="text-muted-foreground">Gender</span><span className="capitalize">{client.gender}{client.preferred_pronouns ? ` (${client.preferred_pronouns})` : ''}</span></div>}
                                             {client.key_worker && <div className="flex justify-between"><span className="text-muted-foreground">Key Worker</span><span>{client.key_worker.name}</span></div>}
                                         </CardContent>
                                     </Card>
@@ -803,7 +828,7 @@ export default function ClientShow({
                                             <div className="flex justify-center">
                                                 <ProgressRing value={budgetPct} size={90} color="#7c3aed" label="Budget Used" />
                                             </div>
-                                            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                                            <div className="mt-3 grid grid-cols-4 gap-2 text-center">
                                                 <div className="rounded-lg bg-slate-50 p-2">
                                                     <div className="text-sm font-bold text-violet-600">{activeConsents}</div>
                                                     <div className="text-[9px] uppercase text-muted-foreground">Consents</div>
@@ -815,6 +840,10 @@ export default function ClientShow({
                                                 <div className="rounded-lg bg-slate-50 p-2">
                                                     <div className="text-sm font-bold text-violet-600">{(assessments ?? []).length}</div>
                                                     <div className="text-[9px] uppercase text-muted-foreground">Assessments</div>
+                                                </div>
+                                                <div className="cursor-pointer rounded-lg bg-slate-50 p-2 hover:bg-violet-50 transition-colors" onClick={() => setTab('personal_assets')}>
+                                                    <div className="text-sm font-bold text-violet-600">{(personal_assets ?? []).filter((a: PersonalAsset) => a.status === 'active').length}</div>
+                                                    <div className="text-[9px] uppercase text-muted-foreground">Assets</div>
                                                 </div>
                                             </div>
                                         </CardContent>
@@ -851,6 +880,117 @@ export default function ClientShow({
                                             </CardContent>
                                         </Card>
                                     )}
+                                </div>
+                            )}
+
+                            {/* Row 4: Identity & Culture */}
+                            {(client.ethnicity || client.preferred_pronouns || client.religion || (client.languages && client.languages.length > 0) || client.education_level || client.employment_status || client.gender) && (
+                                <div className="mt-4">
+                                    <Card className="border-violet-100">
+                                        <CardContent className="p-4">
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500 mb-3">Identity &amp; Culture</p>
+                                            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                                {client.gender && (
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground">Gender</p>
+                                                        <p className="text-xs font-medium capitalize">{client.gender}{client.preferred_pronouns ? ` (${client.preferred_pronouns})` : ''}</p>
+                                                    </div>
+                                                )}
+                                                {!client.gender && client.preferred_pronouns && (
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground">Pronouns</p>
+                                                        <p className="text-xs font-medium">{client.preferred_pronouns}</p>
+                                                    </div>
+                                                )}
+                                                {client.ethnicity && (
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground">Ethnicity</p>
+                                                        <p className="text-xs font-medium">{client.ethnicity}</p>
+                                                    </div>
+                                                )}
+                                                {client.religion && (
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground">Religion</p>
+                                                        <p className="text-xs font-medium">{client.religion}</p>
+                                                    </div>
+                                                )}
+                                                {client.languages && client.languages.length > 0 && (
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground">Languages</p>
+                                                        <div className="mt-0.5 flex flex-wrap gap-1">
+                                                            {client.languages.map((lang: string) => (
+                                                                <Badge key={lang} variant="secondary" className="text-[10px]">{lang}</Badge>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                                {client.education_level && (
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground">Education</p>
+                                                        <p className="text-xs font-medium capitalize">{client.education_level}</p>
+                                                    </div>
+                                                )}
+                                                {client.employment_status && (
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground">Employment</p>
+                                                        <p className="text-xs font-medium capitalize">{client.employment_status}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            )}
+
+                            {/* Row 5: Interests & Strengths */}
+                            {(client.interests_hobbies || client.strengths_abilities || client.life_story) && (
+                                <div className="mt-4">
+                                    <Card className="border-violet-100">
+                                        <CardContent className="p-4">
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500 mb-3">Interests &amp; Strengths</p>
+                                            <div className="space-y-3">
+                                                {client.interests_hobbies && (
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground font-medium">Interests &amp; Hobbies</p>
+                                                        <p className="mt-0.5 text-xs">{client.interests_hobbies}</p>
+                                                    </div>
+                                                )}
+                                                {client.strengths_abilities && (
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground font-medium">Strengths &amp; Abilities</p>
+                                                        <p className="mt-0.5 text-xs">{client.strengths_abilities}</p>
+                                                    </div>
+                                                )}
+                                                {client.life_story && (
+                                                    <div>
+                                                        <p className="text-[10px] text-muted-foreground font-medium">Life Story</p>
+                                                        <p className="mt-0.5 text-xs">{client.life_story}</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                </div>
+                            )}
+
+                            {/* Row 6: Transport */}
+                            {((client.transport_needs && client.transport_needs.length > 0) || client.transport_notes) && (
+                                <div className="mt-4">
+                                    <Card className="border-violet-100">
+                                        <CardContent className="p-4">
+                                            <p className="text-[10px] font-bold uppercase tracking-wider text-violet-500 mb-2">Transport</p>
+                                            {client.transport_needs && client.transport_needs.length > 0 && (
+                                                <div className="flex flex-wrap gap-1 mb-2">
+                                                    {client.transport_needs.map((need: string) => (
+                                                        <Badge key={need} variant="secondary" className="text-[10px] capitalize">{need}</Badge>
+                                                    ))}
+                                                </div>
+                                            )}
+                                            {client.transport_notes && (
+                                                <p className="text-xs text-muted-foreground">{client.transport_notes}</p>
+                                            )}
+                                        </CardContent>
+                                    </Card>
                                 </div>
                             )}
 
@@ -1293,15 +1433,58 @@ export default function ClientShow({
 
                 {tab === 'mar' && (() => {
                     const emarSummary = (usePage().props as any).emar_summary;
+                    const meds = medical?.medications ?? [];
+                    const activeMeds = meds.filter((m: any) => m.active !== false);
+                    const ceasedMeds = meds.filter((m: any) => m.active === false);
+                    const prnMeds = activeMeds.filter((m: any) => m.is_prn);
+                    const scheduledMeds = activeMeds.filter((m: any) => !m.is_prn);
+                    const controlledMeds = activeMeds.filter((m: any) => m.controlled_drug);
+                    const allergies = medical?.profile?.allergies ?? [];
+                    const hasAllergies = Array.isArray(allergies) && allergies.length > 0;
+
                     return (
                         <div className="space-y-4">
+                            {/* Allergy Banner */}
+                            {hasAllergies && (
+                                <div className="flex items-center gap-3 rounded-xl border-2 border-red-300 bg-gradient-to-r from-red-50 to-rose-50 p-4">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-600">
+                                        <AlertTriangle className="h-5 w-5" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-semibold text-red-800">Allergies</p>
+                                        <div className="mt-1 flex flex-wrap gap-1.5">
+                                            {allergies.map((a: string) => (
+                                                <Badge key={a} className="border-0 bg-red-200/60 text-red-800 text-xs font-semibold">{a}</Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Alerts Banner */}
+                            {emarSummary && emarSummary.pending_alerts_count > 0 && (
+                                <div className="flex items-center gap-3 rounded-xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4">
+                                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                                        <AlertTriangle className="h-5 w-5" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <p className="text-sm font-semibold text-amber-800">{emarSummary.pending_alerts_count} Active Medication Alert{emarSummary.pending_alerts_count !== 1 ? 's' : ''}</p>
+                                        <p className="text-xs text-amber-700">Review alerts in the full eMAR dashboard.</p>
+                                    </div>
+                                    <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white" asChild>
+                                        <Link href={`/operations/clients/${client.id}/mar`}>Review</Link>
+                                    </Button>
+                                </div>
+                            )}
+
+                            {/* Stats */}
                             {emarSummary && (
                                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                    <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-3 text-center">
-                                        <div className="text-2xl font-bold text-blue-700">{emarSummary.active_medications_count}</div>
+                                    <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-4 text-center">
+                                        <div className="text-3xl font-bold text-blue-700">{emarSummary.active_medications_count}</div>
                                         <div className="text-[10px] uppercase tracking-wider text-blue-500">Active Medications</div>
                                     </div>
-                                    <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
+                                    <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-4 text-center">
                                         <div className="text-sm font-bold text-emerald-700">
                                             {emarSummary.last_administration
                                                 ? new Date(emarSummary.last_administration).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
@@ -1309,11 +1492,11 @@ export default function ClientShow({
                                         </div>
                                         <div className="text-[10px] uppercase tracking-wider text-emerald-500">Last Administration</div>
                                     </div>
-                                    <div className={`rounded-xl border p-3 text-center ${emarSummary.pending_alerts_count > 0 ? 'bg-gradient-to-br from-amber-50 to-orange-50' : ''}`}>
-                                        <div className={`text-2xl font-bold ${emarSummary.pending_alerts_count > 0 ? 'text-amber-700' : 'text-slate-400'}`}>{emarSummary.pending_alerts_count}</div>
-                                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Active Alerts</div>
+                                    <div className={`rounded-xl border p-4 text-center ${controlledMeds.length > 0 ? 'bg-gradient-to-br from-rose-50 to-pink-50' : ''}`}>
+                                        <div className={`text-3xl font-bold ${controlledMeds.length > 0 ? 'text-rose-700' : 'text-slate-400'}`}>{controlledMeds.length}</div>
+                                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Controlled Drugs</div>
                                     </div>
-                                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-4 text-center">
                                         <div className="text-sm font-bold text-violet-700">
                                             {emarSummary.next_review_date
                                                 ? new Date(emarSummary.next_review_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })
@@ -1324,54 +1507,159 @@ export default function ClientShow({
                                 </div>
                             )}
 
-                            {/* Medications list */}
-                            <Card>
-                                <CardHeader>
-                                    <CardTitle className="flex items-center justify-between text-base">
-                                        <div className="flex items-center gap-2">
-                                            <Pill className="h-4 w-4" />
-                                            <span>Medication Administration Record</span>
+                            {/* Action Buttons */}
+                            <div className="flex flex-wrap gap-2">
+                                <Button className="gap-1.5 bg-blue-600 hover:bg-blue-700" asChild>
+                                    <Link href={`/operations/clients/${client.id}/mar`}>
+                                        <Pill className="h-3.5 w-3.5" />Daily MAR
+                                    </Link>
+                                </Button>
+                                <Button variant="outline" className="gap-1.5" asChild>
+                                    <Link href={`/emar/mar?client_id=${client.id}`}>
+                                        <ClipboardList className="h-3.5 w-3.5" />eMAR Dashboard
+                                    </Link>
+                                </Button>
+                                <Button variant="outline" className="gap-1.5" asChild>
+                                    <Link href={`/emar/controlled?client_id=${client.id}`}>
+                                        <Shield className="h-3.5 w-3.5" />Controlled Drugs
+                                    </Link>
+                                </Button>
+                                <Button variant="outline" className="gap-1.5" asChild>
+                                    <Link href={`/emar/reviews?client_id=${client.id}`}>
+                                        <BookOpen className="h-3.5 w-3.5" />Reviews
+                                    </Link>
+                                </Button>
+                            </div>
+
+                            {/* Scheduled Medications */}
+                            {scheduledMeds.length > 0 && (
+                                <Card className="overflow-hidden">
+                                    <div className="bg-gradient-to-r from-blue-500 to-indigo-600 px-5 py-3">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-white">Scheduled Medications</h3>
+                                                <p className="text-xs text-blue-200">{scheduledMeds.length} medication{scheduledMeds.length !== 1 ? 's' : ''} on regular schedule</p>
+                                            </div>
                                         </div>
-                                        <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700" asChild>
-                                            <Link href={`/emar/mar?client_id=${client.id}`}>Open eMAR</Link>
-                                        </Button>
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent>
-                                    {(medical?.medications ?? []).length > 0 ? (
-                                        <div className="space-y-2">
-                                            {(medical?.medications ?? []).map((m: any) => (
-                                                <div key={m.id} className={`flex items-center justify-between rounded-lg border p-3 ${m.active !== false ? '' : 'opacity-50'}`}>
-                                                    <div>
-                                                        <div className="flex items-center gap-2">
+                                    </div>
+                                    <CardContent className="p-0">
+                                        <div className="divide-y">
+                                            {scheduledMeds.map((m: any) => (
+                                                <div key={m.id} className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/30">
+                                                    <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${m.controlled_drug ? 'bg-rose-100 text-rose-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                        <Pill className="h-5 w-5" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2 flex-wrap">
                                                             <span className="text-sm font-semibold">{m.name}</span>
-                                                            {m.active !== false ? (
-                                                                <Badge className="border-0 bg-emerald-100 text-emerald-700 text-[9px]">Active</Badge>
-                                                            ) : (
-                                                                <Badge className="border-0 bg-slate-100 text-slate-600 text-[9px]">Ceased</Badge>
+                                                            {m.controlled_drug && (
+                                                                <Badge className="border-0 bg-rose-100 text-rose-700 text-[9px] gap-0.5">
+                                                                    <Shield className="h-2.5 w-2.5" />Controlled
+                                                                </Badge>
                                                             )}
                                                         </div>
-                                                        <div className="mt-0.5 flex gap-3 text-xs text-muted-foreground">
-                                                            {m.dosage && <span>Dosage: {m.dosage}</span>}
-                                                            {m.frequency && <span>Frequency: {m.frequency}</span>}
-                                                            {m.route && <span>Route: {m.route}</span>}
+                                                        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                                            {m.dosage && <span className="font-medium text-foreground/70">{m.dosage}</span>}
+                                                            {m.route && <span>{m.route}</span>}
+                                                            {m.form && <span>{m.form}</span>}
+                                                            {m.frequency && <span className="text-blue-600">{m.frequency}</span>}
                                                         </div>
-                                                        {m.instructions && <p className="mt-1 text-xs text-muted-foreground">{m.instructions}</p>}
+                                                        {m.instructions && <p className="mt-1 text-xs text-muted-foreground line-clamp-1">{m.instructions}</p>}
                                                     </div>
                                                 </div>
                                             ))}
                                         </div>
-                                    ) : (
-                                        <div className="flex flex-col items-center justify-center py-12">
-                                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
-                                                <Pill className="h-7 w-7 text-blue-400" />
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* PRN Medications */}
+                            {prnMeds.length > 0 && (
+                                <Card className="overflow-hidden">
+                                    <div className="bg-gradient-to-r from-indigo-500 to-purple-600 px-5 py-3">
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <h3 className="text-sm font-semibold text-white">PRN (As Needed)</h3>
+                                                <p className="text-xs text-indigo-200">{prnMeds.length} medication{prnMeds.length !== 1 ? 's' : ''} available as needed</p>
                                             </div>
-                                            <p className="font-medium">No Medications</p>
-                                            <p className="mt-1 text-sm text-muted-foreground">No medications recorded for {client.first_name}.</p>
                                         </div>
-                                    )}
-                                </CardContent>
-                            </Card>
+                                    </div>
+                                    <CardContent className="p-0">
+                                        <div className="divide-y">
+                                            {prnMeds.map((m: any) => (
+                                                <div key={m.id} className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/30">
+                                                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600">
+                                                        <Pill className="h-5 w-5" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <span className="text-sm font-semibold">{m.name}</span>
+                                                            <Badge className="border-0 bg-indigo-100 text-indigo-700 text-[9px]">PRN</Badge>
+                                                            {m.controlled_drug && (
+                                                                <Badge className="border-0 bg-rose-100 text-rose-700 text-[9px] gap-0.5">
+                                                                    <Shield className="h-2.5 w-2.5" />Controlled
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                                            {m.dosage && <span className="font-medium text-foreground/70">{m.dosage}</span>}
+                                                            {m.route && <span>{m.route}</span>}
+                                                            {m.form && <span>{m.form}</span>}
+                                                        </div>
+                                                        {m.prn_reason && <p className="mt-1 text-xs text-indigo-600">Indication: {m.prn_reason}</p>}
+                                                        {m.instructions && <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{m.instructions}</p>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Ceased Medications */}
+                            {ceasedMeds.length > 0 && (
+                                <Card>
+                                    <CardHeader className="pb-2">
+                                        <CardTitle className="text-sm text-muted-foreground">Ceased Medications ({ceasedMeds.length})</CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        <div className="divide-y">
+                                            {ceasedMeds.map((m: any) => (
+                                                <div key={m.id} className="flex items-center gap-4 px-5 py-2.5 opacity-50">
+                                                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-400">
+                                                        <Pill className="h-4 w-4" />
+                                                    </div>
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-medium line-through">{m.name}</span>
+                                                            <Badge className="border-0 bg-slate-100 text-slate-500 text-[9px]">Ceased</Badge>
+                                                        </div>
+                                                        <div className="mt-0.5 text-xs text-muted-foreground">
+                                                            {[m.dosage, m.route, m.form].filter(Boolean).join(' · ')}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            )}
+
+                            {/* Empty state */}
+                            {meds.length === 0 && (
+                                <Card className="border-dashed">
+                                    <CardContent className="flex flex-col items-center justify-center py-16">
+                                        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-blue-50">
+                                            <Pill className="h-8 w-8 text-blue-400" />
+                                        </div>
+                                        <p className="font-medium">No Medications</p>
+                                        <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground">No medications recorded for {client.first_name}. Add medications through the medical tab or eMAR system.</p>
+                                        <Button size="sm" className="mt-4" asChild>
+                                            <Link href={`/emar/medications?client_id=${client.id}`}>Add Medication</Link>
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            )}
                         </div>
                     );
                 })()}
@@ -2954,6 +3242,14 @@ export default function ClientShow({
                     </Card>
                 )}
 
+                {tab === 'location' && location && (
+                    <ClientLocationTab
+                        clientId={client.id}
+                        clientName={name}
+                        location={location}
+                    />
+                )}
+
                 {tab === 'consents' && (() => {
                     const activeCount = consents.filter((c: any) => c.status === 'given' && !c.is_expired).length;
                     const expiredCount = consents.filter((c: any) => c.is_expired).length;
@@ -3649,32 +3945,16 @@ function PhotoGalleryTab({ clientId, photos, canEdit }: { clientId: number; phot
     );
 }
 
-type PersonalAsset = {
-    id: number;
-    name: string;
-    category?: string | null;
-    description?: string | null;
-    serial_number?: string | null;
-    estimated_value?: string | null;
-    condition?: string | null;
-    location?: string | null;
-    photo_url?: string | null;
-    acquired_at?: string | null;
-    notes?: string | null;
-    recorded_by?: string | null;
-    created_at: string;
-};
-
-const ASSET_CATEGORIES: Record<string, { label: string; color: string }> = {
-    mobility_aid: { label: 'Mobility Aid', color: 'bg-blue-100 text-blue-700' },
-    electronics: { label: 'Electronics', color: 'bg-violet-100 text-violet-700' },
-    furniture: { label: 'Furniture', color: 'bg-amber-100 text-amber-700' },
-    clothing: { label: 'Clothing', color: 'bg-pink-100 text-pink-700' },
-    medical_equipment: { label: 'Medical Equipment', color: 'bg-red-100 text-red-700' },
-    personal_care: { label: 'Personal Care', color: 'bg-teal-100 text-teal-700' },
-    entertainment: { label: 'Entertainment', color: 'bg-indigo-100 text-indigo-700' },
-    transport: { label: 'Transport', color: 'bg-emerald-100 text-emerald-700' },
-    other: { label: 'Other', color: 'bg-slate-100 text-slate-600' },
+const ASSET_CATEGORIES: Record<string, { label: string; color: string; icon: string }> = {
+    mobility_aid: { label: 'Mobility Aid', color: 'bg-blue-100 text-blue-700', icon: '♿' },
+    electronics: { label: 'Electronics', color: 'bg-violet-100 text-violet-700', icon: '📱' },
+    furniture: { label: 'Furniture', color: 'bg-amber-100 text-amber-700', icon: '🪑' },
+    clothing: { label: 'Clothing', color: 'bg-pink-100 text-pink-700', icon: '👕' },
+    medical_equipment: { label: 'Medical Equipment', color: 'bg-red-100 text-red-700', icon: '🩺' },
+    personal_care: { label: 'Personal Care', color: 'bg-teal-100 text-teal-700', icon: '🧴' },
+    entertainment: { label: 'Entertainment', color: 'bg-indigo-100 text-indigo-700', icon: '🎮' },
+    transport: { label: 'Transport', color: 'bg-emerald-100 text-emerald-700', icon: '🚗' },
+    other: { label: 'Other', color: 'bg-slate-100 text-slate-600', icon: '📦' },
 };
 
 const CONDITION_COLORS: Record<string, string> = {
@@ -3684,9 +3964,30 @@ const CONDITION_COLORS: Record<string, string> = {
     poor: 'bg-red-100 text-red-700',
 };
 
+const STATUS_CONFIG: Record<string, { label: string; color: string; dot: string }> = {
+    active: { label: 'Active', color: 'bg-emerald-100 text-emerald-700', dot: 'bg-emerald-500' },
+    in_repair: { label: 'In Repair', color: 'bg-amber-100 text-amber-700', dot: 'bg-amber-500' },
+    lost: { label: 'Lost', color: 'bg-red-100 text-red-700', dot: 'bg-red-500' },
+    damaged: { label: 'Damaged', color: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500' },
+    disposed: { label: 'Disposed', color: 'bg-slate-100 text-slate-600', dot: 'bg-slate-400' },
+    returned: { label: 'Returned', color: 'bg-purple-100 text-purple-700', dot: 'bg-purple-500' },
+};
+
+const OWNERSHIP_CONFIG: Record<string, { label: string; color: string }> = {
+    client: { label: 'Client Owned', color: 'bg-sky-100 text-sky-700' },
+    provider: { label: 'Provider Owned', color: 'bg-violet-100 text-violet-700' },
+    funded: { label: 'Funded', color: 'bg-emerald-100 text-emerald-700' },
+    loaned: { label: 'On Loan', color: 'bg-amber-100 text-amber-700' },
+};
+
 function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId: number; assets: PersonalAsset[]; canEdit: boolean; firstName: string }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
+    const [search, setSearch] = useState('');
+    const [filterCategory, setFilterCategory] = useState('all');
+    const [filterStatus, setFilterStatus] = useState('all');
+    const [sortBy, setSortBy] = useState<'name' | 'value' | 'acquired' | 'added'>('added');
+    const [groupByCategory, setGroupByCategory] = useState(false);
 
     const form = useForm<{
         name: string;
@@ -3699,6 +4000,17 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
         photo: File | null;
         acquired_at: string;
         notes: string;
+        status: string;
+        ownership: string;
+        funding_source: string;
+        return_required: boolean;
+        return_by: string;
+        last_serviced_at: string;
+        next_service_due: string;
+        service_provider: string;
+        warranty_expires_at: string;
+        insurance_reference: string;
+        portal_visible: boolean;
     }>({
         name: '',
         category: '',
@@ -3710,6 +4022,17 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
         photo: null,
         acquired_at: '',
         notes: '',
+        status: 'active',
+        ownership: 'client',
+        funding_source: '',
+        return_required: false,
+        return_by: '',
+        last_serviced_at: '',
+        next_service_due: '',
+        service_provider: '',
+        warranty_expires_at: '',
+        insurance_reference: '',
+        portal_visible: false,
     });
 
     const resetForm = () => {
@@ -3730,6 +4053,17 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
             photo: null,
             acquired_at: a.acquired_at ?? '',
             notes: a.notes ?? '',
+            status: a.status ?? 'active',
+            ownership: a.ownership ?? 'client',
+            funding_source: a.funding_source ?? '',
+            return_required: a.return_required ?? false,
+            return_by: a.return_by ?? '',
+            last_serviced_at: a.last_serviced_at ?? '',
+            next_service_due: a.next_service_due ?? '',
+            service_provider: a.service_provider ?? '',
+            warranty_expires_at: a.warranty_expires_at ?? '',
+            insurance_reference: a.insurance_reference ?? '',
+            portal_visible: a.portal_visible ?? false,
         });
         setEditingId(a.id);
         setShowForm(true);
@@ -3755,96 +4089,442 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
         }
     };
 
-    const totalValue = assets.reduce((sum, a) => sum + (parseFloat(a.estimated_value ?? '0') || 0), 0);
+    const changeStatus = (assetId: number, newStatus: string) => {
+        router.patch(`/operations/clients/${clientId}/personal-assets/${assetId}/status`, { status: newStatus }, { preserveScroll: true });
+    };
+
+    // Computed stats
+    const activeAssets = assets.filter(a => a.status === 'active');
+    const totalValue = activeAssets.reduce((sum, a) => sum + (parseFloat(a.estimated_value ?? '0') || 0), 0);
+    const needsAttention = assets.filter(a => a.is_service_overdue || a.is_warranty_expired || a.is_warranty_expiring_soon || a.is_return_overdue || a.condition === 'poor').length;
+    const categories = new Set(assets.map(a => a.category).filter(Boolean));
+
+    // Filter & sort
+    const filtered = assets.filter(a => {
+        if (filterCategory !== 'all' && a.category !== filterCategory) return false;
+        if (filterStatus !== 'all' && a.status !== filterStatus) return false;
+        if (search) {
+            const q = search.toLowerCase();
+            return a.name.toLowerCase().includes(q) || (a.description ?? '').toLowerCase().includes(q) || (a.serial_number ?? '').toLowerCase().includes(q) || (a.location ?? '').toLowerCase().includes(q);
+        }
+        return true;
+    }).sort((a, b) => {
+        if (sortBy === 'name') return a.name.localeCompare(b.name);
+        if (sortBy === 'value') return (parseFloat(b.estimated_value ?? '0') || 0) - (parseFloat(a.estimated_value ?? '0') || 0);
+        if (sortBy === 'acquired') return (b.acquired_at ?? '').localeCompare(a.acquired_at ?? '');
+        return (b.created_at ?? '').localeCompare(a.created_at ?? '');
+    });
+
+    // Group by category
+    const grouped = groupByCategory
+        ? filtered.reduce((acc: Record<string, PersonalAsset[]>, a) => {
+            const key = a.category || 'other';
+            if (!acc[key]) acc[key] = [];
+            acc[key].push(a);
+            return acc;
+        }, {} as Record<string, PersonalAsset[]>)
+        : { all: filtered };
+
+    const renderAssetCard = (a: PersonalAsset) => {
+        const cat = ASSET_CATEGORIES[a.category ?? ''];
+        const stat = STATUS_CONFIG[a.status] ?? STATUS_CONFIG.active;
+        const own = OWNERSHIP_CONFIG[a.ownership ?? 'client'];
+        const hasAlerts = a.is_service_overdue || a.is_warranty_expired || a.is_warranty_expiring_soon || a.is_return_overdue;
+
+        return (
+            <Card key={a.id} className={`group relative overflow-hidden transition-all hover:shadow-md ${hasAlerts ? 'border-amber-300' : ''} ${a.status !== 'active' ? 'opacity-75' : ''}`}>
+                {/* Photo or category icon header */}
+                {a.photo_url ? (
+                    <div className="relative h-36 overflow-hidden bg-slate-100">
+                        <img src={a.photo_url} alt={a.name} className="h-full w-full object-cover" />
+                        <div className="absolute left-2 top-2 flex gap-1">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${stat.color} shadow-sm`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${stat.dot}`} />
+                                {stat.label}
+                            </span>
+                        </div>
+                        {a.portal_visible && (
+                            <div className="absolute right-2 top-2">
+                                <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-medium text-white shadow-sm">Portal</span>
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className={`relative flex h-20 items-center justify-center ${cat ? cat.color.replace('text-', 'bg-').split(' ')[0] : 'bg-slate-50'}`}>
+                        <span className="text-3xl">{cat?.icon ?? '📦'}</span>
+                        <div className="absolute left-2 top-2 flex gap-1">
+                            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${stat.color} shadow-sm`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${stat.dot}`} />
+                                {stat.label}
+                            </span>
+                        </div>
+                        {a.portal_visible && (
+                            <div className="absolute right-2 top-2">
+                                <span className="rounded-full bg-blue-600 px-1.5 py-0.5 text-[9px] font-medium text-white shadow-sm">Portal</span>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Alert banner */}
+                {hasAlerts && (
+                    <div className="flex flex-wrap gap-1.5 border-b border-amber-200 bg-amber-50 px-3 py-1.5">
+                        {a.is_service_overdue && <span className="text-[10px] font-medium text-amber-700">Service overdue</span>}
+                        {a.is_warranty_expired && <span className="text-[10px] font-medium text-red-700">Warranty expired</span>}
+                        {a.is_warranty_expiring_soon && !a.is_warranty_expired && <span className="text-[10px] font-medium text-amber-700">Warranty expiring soon</span>}
+                        {a.is_return_overdue && <span className="text-[10px] font-medium text-red-700">Return overdue</span>}
+                    </div>
+                )}
+
+                <CardContent className="space-y-2.5 pt-3">
+                    <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                            <h4 className="truncate text-sm font-semibold">{a.name}</h4>
+                            <div className="mt-1 flex flex-wrap gap-1">
+                                {cat && <Badge className={`border-0 text-[10px] ${cat.color}`}>{cat.icon} {cat.label}</Badge>}
+                                {a.condition && <Badge className={`border-0 text-[10px] ${CONDITION_COLORS[a.condition] ?? 'bg-slate-100 text-slate-600'}`}>{a.condition}</Badge>}
+                                {own && a.ownership !== 'client' && <Badge className={`border-0 text-[10px] ${own.color}`}>{own.label}</Badge>}
+                            </div>
+                        </div>
+                        {canEdit && (
+                            <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => startEdit(a)}>
+                                    <Pencil className="h-3.5 w-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                                    onClick={() => {
+                                        if (confirm(`Remove "${a.name}" from personal assets?`)) {
+                                            router.delete(`/operations/clients/${clientId}/personal-assets/${a.id}`, { preserveScroll: true });
+                                        }
+                                    }}>
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    {a.description && <p className="text-xs text-muted-foreground line-clamp-2">{a.description}</p>}
+
+                    <div className="space-y-1 text-xs text-muted-foreground">
+                        {a.estimated_value && parseFloat(a.estimated_value) > 0 && (
+                            <div className="flex items-center gap-1.5">
+                                <DollarSign className="h-3 w-3" />
+                                <span className="font-medium text-slate-700">${parseFloat(a.estimated_value).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}</span>
+                            </div>
+                        )}
+                        {a.location && (
+                            <div className="flex items-center gap-1.5">
+                                <MapPin className="h-3 w-3" />
+                                <span>{a.location}</span>
+                            </div>
+                        )}
+                        {a.serial_number && (
+                            <div className="flex items-center gap-1.5">
+                                <FileText className="h-3 w-3" />
+                                <span className="font-mono text-[10px]">{a.serial_number}</span>
+                            </div>
+                        )}
+                        {a.funding_source && (
+                            <div className="flex items-center gap-1.5">
+                                <DollarSign className="h-3 w-3" />
+                                <span>Funded by {a.funding_source}</span>
+                            </div>
+                        )}
+                        {a.next_service_due && (
+                            <div className={`flex items-center gap-1.5 ${a.is_service_overdue ? 'font-medium text-amber-700' : ''}`}>
+                                <Clock className="h-3 w-3" />
+                                <span>Service {a.is_service_overdue ? 'was' : ''} due {new Date(a.next_service_due).toLocaleDateString('en-NZ')}</span>
+                            </div>
+                        )}
+                        {a.warranty_expires_at && (
+                            <div className={`flex items-center gap-1.5 ${a.is_warranty_expired ? 'font-medium text-red-600' : a.is_warranty_expiring_soon ? 'font-medium text-amber-700' : ''}`}>
+                                <Shield className="h-3 w-3" />
+                                <span>Warranty {a.is_warranty_expired ? 'expired' : 'expires'} {new Date(a.warranty_expires_at).toLocaleDateString('en-NZ')}</span>
+                            </div>
+                        )}
+                        {a.return_required && a.return_by && (
+                            <div className={`flex items-center gap-1.5 ${a.is_return_overdue ? 'font-medium text-red-600' : ''}`}>
+                                <AlertTriangle className="h-3 w-3" />
+                                <span>Return by {new Date(a.return_by).toLocaleDateString('en-NZ')}</span>
+                            </div>
+                        )}
+                        {a.acquired_at && (
+                            <div className="flex items-center gap-1.5">
+                                <Calendar className="h-3 w-3" />
+                                <span>Acquired {new Date(a.acquired_at).toLocaleDateString('en-NZ')}</span>
+                            </div>
+                        )}
+                    </div>
+
+                    {a.notes && (
+                        <p className="rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600 line-clamp-2">{a.notes}</p>
+                    )}
+
+                    {/* Quick status actions */}
+                    {canEdit && a.status === 'active' && (
+                        <div className="flex flex-wrap gap-1 pt-1 opacity-0 transition-opacity group-hover:opacity-100">
+                            <button onClick={() => changeStatus(a.id, 'in_repair')} className="rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700 hover:bg-amber-100 transition-colors">In Repair</button>
+                            <button onClick={() => changeStatus(a.id, 'lost')} className="rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-700 hover:bg-red-100 transition-colors">Lost</button>
+                            <button onClick={() => changeStatus(a.id, 'damaged')} className="rounded-full bg-orange-50 px-2 py-0.5 text-[10px] font-medium text-orange-700 hover:bg-orange-100 transition-colors">Damaged</button>
+                        </div>
+                    )}
+                    {canEdit && a.status === 'in_repair' && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                            <button onClick={() => changeStatus(a.id, 'active')} className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-100 transition-colors">Repaired</button>
+                            <button onClick={() => changeStatus(a.id, 'disposed')} className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-100 transition-colors">Dispose</button>
+                        </div>
+                    )}
+                    {canEdit && (a.status === 'lost' || a.status === 'damaged') && (
+                        <div className="flex flex-wrap gap-1 pt-1">
+                            <button onClick={() => changeStatus(a.id, 'active')} className="rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-medium text-emerald-700 hover:bg-emerald-100 transition-colors">Found / Restored</button>
+                            <button onClick={() => changeStatus(a.id, 'disposed')} className="rounded-full bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-100 transition-colors">Dispose</button>
+                        </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-0.5 text-[10px] text-muted-foreground">
+                        {a.recorded_by && <span>By {a.recorded_by}</span>}
+                        {a.created_at && <span>{new Date(a.created_at).toLocaleDateString('en-NZ')}</span>}
+                    </div>
+                </CardContent>
+            </Card>
+        );
+    };
 
     return (
         <div className="space-y-4">
-            {/* Header stats */}
-            <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                    <span className="text-sm font-medium">{assets.length} {assets.length === 1 ? 'item' : 'items'} registered</span>
-                    {totalValue > 0 && (
-                        <Badge variant="secondary" className="text-xs">
-                            Est. total: ${totalValue.toLocaleString('en-NZ', { minimumFractionDigits: 2 })}
-                        </Badge>
+            {/* Gradient stat cards */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                    <div className="text-xl font-bold text-violet-700">{activeAssets.length}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-violet-500">Active Items</div>
+                </div>
+                <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-teal-50 p-3 text-center">
+                    <div className="text-xl font-bold text-emerald-700">${totalValue > 0 ? totalValue.toLocaleString('en-NZ', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '0'}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-emerald-500">Est. Value (NZD)</div>
+                </div>
+                <div className={`rounded-xl border p-3 text-center ${needsAttention > 0 ? 'bg-gradient-to-br from-amber-50 to-orange-50' : 'bg-gradient-to-br from-slate-50 to-gray-50'}`}>
+                    <div className={`text-xl font-bold ${needsAttention > 0 ? 'text-amber-700' : 'text-slate-400'}`}>{needsAttention}</div>
+                    <div className={`text-[10px] uppercase tracking-wider ${needsAttention > 0 ? 'text-amber-500' : 'text-slate-400'}`}>Needs Attention</div>
+                </div>
+                <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-3 text-center">
+                    <div className="text-xl font-bold text-blue-700">{categories.size}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-blue-500">Categories</div>
+                </div>
+            </div>
+
+            {/* Toolbar: search, filters, sort, add button */}
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex flex-1 flex-wrap items-center gap-2">
+                    <div className="relative flex-1 sm:max-w-xs">
+                        <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                            placeholder="Search assets..."
+                            value={search}
+                            onChange={e => setSearch(e.target.value)}
+                            className="pl-9 h-9"
+                        />
+                    </div>
+                    <Select value={filterCategory} onValueChange={setFilterCategory}>
+                        <SelectTrigger className="h-9 w-[140px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Categories</SelectItem>
+                            {Object.entries(ASSET_CATEGORIES).map(([k, v]) => (
+                                <SelectItem key={k} value={k}>{v.icon} {v.label}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                        <SelectTrigger className="h-9 w-[130px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">All Statuses</SelectItem>
+                            {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                                <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    <Select value={sortBy} onValueChange={v => setSortBy(v as any)}>
+                        <SelectTrigger className="h-9 w-[120px]"><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="added">Newest</SelectItem>
+                            <SelectItem value="name">Name</SelectItem>
+                            <SelectItem value="value">Value</SelectItem>
+                            <SelectItem value="acquired">Acquired</SelectItem>
+                        </SelectContent>
+                    </Select>
+                    <Button variant={groupByCategory ? 'default' : 'outline'} size="sm" className="h-9 gap-1.5 text-xs" onClick={() => setGroupByCategory(!groupByCategory)}>
+                        <Package className="h-3.5 w-3.5" />
+                        Group
+                    </Button>
+                </div>
+                <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs" onClick={() => window.print()}>
+                        <FileText className="h-3.5 w-3.5" />
+                        Print Register
+                    </Button>
+                    {canEdit && (
+                        <Button size="sm" className="h-9 gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => { resetForm(); setShowForm(true); }}>
+                            <Plus className="h-3.5 w-3.5" />
+                            Add Asset
+                        </Button>
                     )}
                 </div>
-                {canEdit && (
-                    <Button size="sm" className="gap-1.5" onClick={() => { resetForm(); setShowForm(true); }}>
-                        <Plus className="h-3.5 w-3.5" />
-                        Add Asset
-                    </Button>
-                )}
             </div>
 
             {/* Add/Edit form */}
             {showForm && canEdit && (
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="text-base">{editingId ? 'Edit Asset' : 'Add Personal Asset'}</CardTitle>
+                <Card className="border-violet-200">
+                    <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-violet-100 text-violet-600">
+                                <Package className="h-4 w-4" />
+                            </div>
+                            {editingId ? 'Edit Asset' : 'Add Personal Asset'}
+                        </CardTitle>
                     </CardHeader>
                     <CardContent>
                         <form onSubmit={submit} className="space-y-4">
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                <div>
-                                    <Label>Name *</Label>
-                                    <Input value={form.data.name} onChange={e => form.setData('name', e.target.value)} placeholder="e.g. Wheelchair, PlayStation, TV" />
-                                    {form.errors.name && <p className="mt-1 text-xs text-red-600">{form.errors.name}</p>}
-                                </div>
-                                <div>
-                                    <Label>Category</Label>
-                                    <Select value={form.data.category} onValueChange={v => form.setData('category', v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
-                                        <SelectContent>
-                                            {Object.entries(ASSET_CATEGORIES).map(([k, v]) => (
-                                                <SelectItem key={k} value={k}>{v.label}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div>
-                                    <Label>Condition</Label>
-                                    <Select value={form.data.condition} onValueChange={v => form.setData('condition', v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select condition" /></SelectTrigger>
-                                        <SelectContent>
-                                            <SelectItem value="new">New</SelectItem>
-                                            <SelectItem value="good">Good</SelectItem>
-                                            <SelectItem value="fair">Fair</SelectItem>
-                                            <SelectItem value="poor">Poor</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <div>
-                                    <Label>Serial / Model Number</Label>
-                                    <Input value={form.data.serial_number} onChange={e => form.setData('serial_number', e.target.value)} />
-                                </div>
-                                <div>
-                                    <Label>Estimated Value (NZD)</Label>
-                                    <Input type="number" step="0.01" min="0" value={form.data.estimated_value} onChange={e => form.setData('estimated_value', e.target.value)} placeholder="0.00" />
-                                </div>
-                                <div>
-                                    <Label>Location</Label>
-                                    <Input value={form.data.location} onChange={e => form.setData('location', e.target.value)} placeholder="e.g. Bedroom, Lounge" />
-                                </div>
-                                <div>
-                                    <Label>Acquired Date</Label>
-                                    <Input type="date" value={form.data.acquired_at} onChange={e => form.setData('acquired_at', e.target.value)} />
-                                </div>
-                                <div>
-                                    <Label>Photo</Label>
-                                    <Input type="file" accept="image/*" onChange={e => form.setData('photo', e.target.files?.[0] ?? null)} />
-                                </div>
-                            </div>
+                            {/* Basic Info */}
                             <div>
-                                <Label>Description</Label>
-                                <Textarea rows={2} value={form.data.description} onChange={e => form.setData('description', e.target.value)} placeholder="Brief description of the item" />
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Basic Information</p>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    <div>
+                                        <Label>Name *</Label>
+                                        <Input value={form.data.name} onChange={e => form.setData('name', e.target.value)} placeholder="e.g. Wheelchair, PlayStation, TV" />
+                                        {form.errors.name && <p className="mt-1 text-xs text-red-600">{form.errors.name}</p>}
+                                    </div>
+                                    <div>
+                                        <Label>Category</Label>
+                                        <Select value={form.data.category} onValueChange={v => form.setData('category', v)}>
+                                            <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                                            <SelectContent>
+                                                {Object.entries(ASSET_CATEGORIES).map(([k, v]) => (
+                                                    <SelectItem key={k} value={k}>{v.icon} {v.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>Condition</Label>
+                                        <Select value={form.data.condition} onValueChange={v => form.setData('condition', v)}>
+                                            <SelectTrigger><SelectValue placeholder="Select condition" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="new">New</SelectItem>
+                                                <SelectItem value="good">Good</SelectItem>
+                                                <SelectItem value="fair">Fair</SelectItem>
+                                                <SelectItem value="poor">Poor</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>Serial / Model Number</Label>
+                                        <Input value={form.data.serial_number} onChange={e => form.setData('serial_number', e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <Label>Estimated Value (NZD)</Label>
+                                        <Input type="number" step="0.01" min="0" value={form.data.estimated_value} onChange={e => form.setData('estimated_value', e.target.value)} placeholder="0.00" />
+                                    </div>
+                                    <div>
+                                        <Label>Location</Label>
+                                        <Input value={form.data.location} onChange={e => form.setData('location', e.target.value)} placeholder="e.g. Bedroom, Lounge" />
+                                    </div>
+                                    <div>
+                                        <Label>Acquired Date</Label>
+                                        <Input type="date" value={form.data.acquired_at} onChange={e => form.setData('acquired_at', e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <Label>Photo</Label>
+                                        <Input type="file" accept="image/*" onChange={e => form.setData('photo', e.target.files?.[0] ?? null)} />
+                                    </div>
+                                </div>
                             </div>
+
+                            <Separator />
+
+                            {/* Ownership & Funding */}
                             <div>
-                                <Label>Notes</Label>
-                                <Textarea rows={2} value={form.data.notes} onChange={e => form.setData('notes', e.target.value)} placeholder="Any additional notes" />
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ownership & Funding</p>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    <div>
+                                        <Label>Ownership</Label>
+                                        <Select value={form.data.ownership} onValueChange={v => form.setData('ownership', v)}>
+                                            <SelectTrigger><SelectValue /></SelectTrigger>
+                                            <SelectContent>
+                                                {Object.entries(OWNERSHIP_CONFIG).map(([k, v]) => (
+                                                    <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>Funding Source</Label>
+                                        <Input value={form.data.funding_source} onChange={e => form.setData('funding_source', e.target.value)} placeholder="e.g. NASC, MOH, Family" />
+                                    </div>
+                                    <div className="flex items-end gap-4">
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox checked={form.data.return_required} onCheckedChange={v => form.setData('return_required', !!v)} id="return_required" />
+                                            <Label htmlFor="return_required" className="text-sm">Return required</Label>
+                                        </div>
+                                    </div>
+                                    {form.data.return_required && (
+                                        <div>
+                                            <Label>Return By</Label>
+                                            <Input type="date" value={form.data.return_by} onChange={e => form.setData('return_by', e.target.value)} />
+                                        </div>
+                                    )}
+                                </div>
                             </div>
+
+                            <Separator />
+
+                            {/* Service & Warranty */}
+                            <div>
+                                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">Service & Warranty</p>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                    <div>
+                                        <Label>Last Serviced</Label>
+                                        <Input type="date" value={form.data.last_serviced_at} onChange={e => form.setData('last_serviced_at', e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <Label>Next Service Due</Label>
+                                        <Input type="date" value={form.data.next_service_due} onChange={e => form.setData('next_service_due', e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <Label>Service Provider</Label>
+                                        <Input value={form.data.service_provider} onChange={e => form.setData('service_provider', e.target.value)} placeholder="e.g. Enable NZ" />
+                                    </div>
+                                    <div>
+                                        <Label>Warranty Expires</Label>
+                                        <Input type="date" value={form.data.warranty_expires_at} onChange={e => form.setData('warranty_expires_at', e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <Label>Insurance Reference</Label>
+                                        <Input value={form.data.insurance_reference} onChange={e => form.setData('insurance_reference', e.target.value)} />
+                                    </div>
+                                    <div className="flex items-end">
+                                        <div className="flex items-center gap-2">
+                                            <Checkbox checked={form.data.portal_visible} onCheckedChange={v => form.setData('portal_visible', !!v)} id="portal_visible" />
+                                            <Label htmlFor="portal_visible" className="text-sm">Visible on family portal</Label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <Separator />
+
+                            {/* Description & Notes */}
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div>
+                                    <Label>Description</Label>
+                                    <Textarea rows={3} value={form.data.description} onChange={e => form.setData('description', e.target.value)} placeholder="Brief description of the item" />
+                                </div>
+                                <div>
+                                    <Label>Notes</Label>
+                                    <Textarea rows={3} value={form.data.notes} onChange={e => form.setData('notes', e.target.value)} placeholder="Any additional notes" />
+                                </div>
+                            </div>
+
                             <div className="flex gap-2">
-                                <Button type="submit" disabled={form.processing}>
+                                <Button type="submit" disabled={form.processing} className="bg-violet-600 hover:bg-violet-700">
                                     {editingId ? 'Update Asset' : 'Add Asset'}
                                 </Button>
                                 <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
@@ -3854,96 +4534,52 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
                 </Card>
             )}
 
-            {/* Asset list */}
+            {/* Asset grid */}
             {assets.length === 0 && !showForm ? (
                 <Card className="border-dashed">
                     <CardContent className="flex flex-col items-center justify-center py-12">
-                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50">
-                            <Package className="h-7 w-7 text-slate-400" />
+                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
+                            <Package className="h-7 w-7 text-violet-400" />
                         </div>
                         <p className="font-medium">No Personal Assets</p>
                         <p className="mt-1 text-sm text-muted-foreground">Track {firstName}'s belongings like wheelchairs, electronics, and other items.</p>
                         {canEdit && (
-                            <Button size="sm" className="mt-3 gap-1.5" onClick={() => setShowForm(true)}>
+                            <Button size="sm" className="mt-3 gap-1.5 bg-violet-600 hover:bg-violet-700" onClick={() => setShowForm(true)}>
                                 <Plus className="h-3.5 w-3.5" />
                                 Add First Asset
                             </Button>
                         )}
                     </CardContent>
                 </Card>
-            ) : (
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {assets.map(a => {
-                        const cat = ASSET_CATEGORIES[a.category ?? ''];
+            ) : filtered.length === 0 ? (
+                <Card className="border-dashed">
+                    <CardContent className="flex flex-col items-center justify-center py-8">
+                        <Search className="mb-2 h-8 w-8 text-slate-300" />
+                        <p className="text-sm text-muted-foreground">No assets match your filters</p>
+                        <Button variant="link" size="sm" onClick={() => { setSearch(''); setFilterCategory('all'); setFilterStatus('all'); }}>Clear filters</Button>
+                    </CardContent>
+                </Card>
+            ) : groupByCategory ? (
+                <div className="space-y-4">
+                    {Object.entries(grouped).map(([catKey, catAssets]) => {
+                        const catConfig = ASSET_CATEGORIES[catKey];
                         return (
-                            <Card key={a.id} className="group relative overflow-hidden transition-all hover:shadow-md">
-                                {a.photo_url && (
-                                    <div className="h-32 overflow-hidden bg-slate-100">
-                                        <img src={a.photo_url} alt={a.name} className="h-full w-full object-cover" />
-                                    </div>
-                                )}
-                                <CardContent className={`space-y-2 ${a.photo_url ? 'pt-3' : 'pt-5'}`}>
-                                    <div className="flex items-start justify-between gap-2">
-                                        <div className="min-w-0">
-                                            <h4 className="truncate text-sm font-semibold">{a.name}</h4>
-                                            <div className="mt-1 flex flex-wrap gap-1">
-                                                {cat && <Badge className={`border-0 text-[10px] ${cat.color}`}>{cat.label}</Badge>}
-                                                {a.condition && <Badge className={`border-0 text-[10px] ${CONDITION_COLORS[a.condition] ?? 'bg-slate-100 text-slate-600'}`}>{a.condition}</Badge>}
-                                            </div>
-                                        </div>
-                                        {canEdit && (
-                                            <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => startEdit(a)}>
-                                                    <Pencil className="h-3.5 w-3.5" />
-                                                </Button>
-                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
-                                                    onClick={() => {
-                                                        if (confirm(`Remove "${a.name}" from personal assets?`)) {
-                                                            router.delete(`/operations/clients/${clientId}/personal-assets/${a.id}`, { preserveScroll: true });
-                                                        }
-                                                    }}>
-                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {a.description && <p className="text-xs text-muted-foreground line-clamp-2">{a.description}</p>}
-                                    <div className="space-y-1 text-xs text-muted-foreground">
-                                        {a.estimated_value && parseFloat(a.estimated_value) > 0 && (
-                                            <div className="flex items-center gap-1.5">
-                                                <DollarSign className="h-3 w-3" />
-                                                <span>${parseFloat(a.estimated_value).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}</span>
-                                            </div>
-                                        )}
-                                        {a.location && (
-                                            <div className="flex items-center gap-1.5">
-                                                <MapPin className="h-3 w-3" />
-                                                <span>{a.location}</span>
-                                            </div>
-                                        )}
-                                        {a.serial_number && (
-                                            <div className="flex items-center gap-1.5">
-                                                <FileText className="h-3 w-3" />
-                                                <span className="font-mono text-[10px]">{a.serial_number}</span>
-                                            </div>
-                                        )}
-                                        {a.acquired_at && (
-                                            <div className="flex items-center gap-1.5">
-                                                <Calendar className="h-3 w-3" />
-                                                <span>Acquired {new Date(a.acquired_at).toLocaleDateString('en-NZ')}</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                    {a.notes && (
-                                        <p className="rounded bg-slate-50 p-2 text-[11px] text-slate-600 line-clamp-2">{a.notes}</p>
-                                    )}
-                                    {a.recorded_by && (
-                                        <p className="text-[10px] text-muted-foreground">Recorded by {a.recorded_by}</p>
-                                    )}
-                                </CardContent>
-                            </Card>
+                            <div key={catKey}>
+                                <div className="mb-2 flex items-center gap-2">
+                                    <span className="text-lg">{catConfig?.icon ?? '📦'}</span>
+                                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{catConfig?.label ?? 'Other'}</span>
+                                    <Badge variant="secondary" className="text-[10px]">{catAssets.length}</Badge>
+                                </div>
+                                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    {catAssets.map(renderAssetCard)}
+                                </div>
+                            </div>
                         );
                     })}
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {filtered.map(renderAssetCard)}
                 </div>
             )}
         </div>

@@ -20,7 +20,7 @@ type ReactionGroup = { emoji: string; count: number; user_ids: number[]; user_na
 type Attachment = { type: 'photo' | 'document'; name: string; url?: string; thumbnail_url?: string; size: number; mime_type: string };
 type Message = {
     id: number; content: string; sender_id: number; sender_type: string; message_type?: string;
-    attachments?: Attachment[] | null; is_pinned?: boolean; is_read?: boolean; read_at?: string | null;
+    attachments?: Attachment[] | null; is_pinned?: boolean; is_read?: boolean; read_at?: string | null; is_deleted?: boolean;
     shift_id?: number | null; reactions?: ReactionGroup[];
     sender?: { id: number; name: string } | null; created_at: string;
 };
@@ -382,6 +382,13 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                                         {msg.sender_type !== 'family' && <Badge variant="outline" className="ml-1 text-[8px] border-blue-200 bg-blue-50 text-blue-700">Staff</Badge>}
                                                     </p>
                                                 )}
+                                                {/* Deleted message */}
+                                                {msg.is_deleted ? (
+                                                    <div className={`inline-flex items-center gap-1.5 rounded-2xl px-3.5 py-2 text-sm italic ${isMe ? 'bg-primary/30 text-primary-foreground/60' : 'bg-muted/60 text-muted-foreground'}`}>
+                                                        <Trash2 className="h-3 w-3" />
+                                                        <span>This message was deleted</span>
+                                                    </div>
+                                                ) : (<>
                                                 {/* Attachments */}
                                                 {msg.attachments?.map((att, ai) => (
                                                     <div key={ai} className="mb-1">
@@ -447,6 +454,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                                         msg.is_read ? <span title={`Read ${msg.read_at ? formatTime(msg.read_at) : ''}`}><CheckCheck className="h-3 w-3 text-blue-500" /></span> : <span title="Sent"><Check className="h-3 w-3" /></span>
                                                     )}
                                                 </div>
+                                                </>)}
                                                 {/* Actions — always visible for pinned, hover for others */}
                                                 <div className={`mt-0.5 gap-1 ${msg.is_pinned ? 'flex' : 'hidden group-hover:flex'} ${isMe ? 'justify-end' : ''}`}>
                                                     <Popover>
@@ -533,7 +541,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
 
             {/* Context Menu — WhatsApp style */}
             {ctxMenu && (
-                <div data-ctx-menu className="fixed z-50 min-w-[200px] overflow-hidden rounded-2xl border bg-card shadow-2xl" style={{ top: Math.min(ctxMenu.y, window.innerHeight - 350), left: Math.min(ctxMenu.x, window.innerWidth - 220) }} onClick={e => e.stopPropagation()}>
+                <div data-ctx-menu className="fixed z-50 w-[280px] overflow-hidden rounded-2xl border bg-card shadow-2xl" style={{ top: Math.min(ctxMenu.y, window.innerHeight - 300), left: Math.min(ctxMenu.x, window.innerWidth - 300) }} onClick={e => e.stopPropagation()}>
                     {ctxMenu.messageId ? (
                         <>
                             {/* Reaction bar at top */}
@@ -570,12 +578,21 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                     <Pin className="h-4 w-4 text-muted-foreground" />
                                     <span>{activeMessages.find(m => m.id === ctxMenu.messageId)?.is_pinned ? 'Unpin' : 'Pin'}</span>
                                 </button>
-                                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground/50 cursor-not-allowed" disabled>
-                                    <Star className="h-4 w-4" /><span>Star</span><span className="ml-auto text-[9px]">Soon</span>
+                                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { if (ctxMenu.messageId) togglePin(ctxMenu.messageId); setCtxMenu(null); }}>
+                                    <Star className="h-4 w-4 text-amber-500" />
+                                    <span>{activeMessages.find(m => m.id === ctxMenu.messageId)?.is_pinned ? 'Unstar' : 'Star'}</span>
                                 </button>
-                                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground/50 cursor-not-allowed" disabled>
-                                    <Trash2 className="h-4 w-4" /><span>Delete</span><span className="ml-auto text-[9px]">Soon</span>
-                                </button>
+                                {ctxMenu.isOwn && (
+                                    <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20" onClick={() => {
+                                        if (ctxMenu.messageId && confirm('Delete this message? It will show as "deleted" but data is kept for auditing.')) {
+                                            router.delete(`/portal/clients/${client.id}/messages/archive/${ctxMenu.messageId}`, { preserveScroll: true });
+                                        }
+                                        setCtxMenu(null);
+                                    }}>
+                                        <Trash2 className="h-4 w-4" />
+                                        <span>Delete</span>
+                                    </button>
+                                )}
                             </div>
                         </>
                     ) : (

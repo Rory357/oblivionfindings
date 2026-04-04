@@ -97,7 +97,7 @@ class PortalMessageController extends Controller
         // Verify conversation belongs to the client
         abort_unless($conversation->client_id === $client->id, 403);
 
-        $messages = $conversation->messages()
+        $messages = $conversation->messages()->withTrashed()
             ->with(['sender:id,name,profile_photo_path', 'reactions.user:id,name'])
             ->orderBy('created_at')
             ->get()
@@ -112,6 +112,7 @@ class PortalMessageController extends Controller
                 'is_read' => (bool) $msg->is_read,
                 'read_at' => $msg->read_at?->toISOString(),
                 'shift_id' => $msg->shift_id,
+                'is_deleted' => $msg->trashed(),
                 'reactions' => $msg->reactions
                     ->groupBy('emoji')
                     ->map(fn ($group, $emoji) => [
@@ -259,6 +260,19 @@ class PortalMessageController extends Controller
         abort_unless($user->canAccessClientPortal($client), 403);
 
         $message->update(['is_pinned' => !$message->is_pinned]);
+
+        return redirect()->back();
+    }
+
+    public function archiveMessage(Request $request, Client $client, OpsMessage $message)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+        abort_unless($user->canAccessClientPortal($client), 403);
+        abort_unless($message->sender_id === $user->id, 403);
+
+        // Soft delete — data preserved for auditing
+        $message->delete();
 
         return redirect()->back();
     }

@@ -23,6 +23,7 @@ type Message = {
     is_pinned?: boolean;
     is_read?: boolean;
     read_at?: string | null;
+    is_deleted?: boolean;
     reactions?: ReactionGroup[];
 };
 type PinnedMessage = { id: number; content: string; sender_name?: string; created_at: string };
@@ -115,6 +116,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
     const [msgSearchResults, setMsgSearchResults] = useState<any[]>([]);
     const [isRecording, setIsRecording] = useState(false);
     const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; messageId?: number; isOwn?: boolean; content?: string; senderName?: string } | null>(null);
+    const [replyingTo, setReplyingTo] = useState<{ id: number; senderName: string; content: string } | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
     const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -151,14 +153,18 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
 
     const sendMessage = useCallback(() => {
         if (!messageText.trim() || !selectedId) return;
-        router.post(`/operations/messages/${selectedId}`, { content: messageText }, {
+        const content = replyingTo
+            ? `> ${replyingTo.senderName}: ${replyingTo.content}\n\n${messageText}`
+            : messageText;
+        router.post(`/operations/messages/${selectedId}`, { content }, {
             preserveScroll: true,
             onSuccess: () => {
                 setMessageText('');
+                setReplyingTo(null);
                 inputRef.current?.focus();
             },
         });
-    }, [messageText, selectedId]);
+    }, [messageText, selectedId, replyingTo]);
 
     const startNewChat = useCallback((userId: number) => {
         router.post('/operations/messages/create', { participant_ids: [userId] }, {
@@ -436,7 +442,11 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                                 {showAvatar && !isMe && (
                                                     <p className="mb-0.5 text-[10px] font-medium text-muted-foreground">{msg.sender?.name}</p>
                                                 )}
-                                                {(() => {
+                                                {msg.is_deleted ? (
+                                                    <div className={`inline-flex items-center gap-1.5 rounded-2xl px-3 py-2 text-sm italic ${isMe ? 'bg-indigo-600/30 text-white/60' : 'bg-muted/60 text-muted-foreground'}`}>
+                                                        <Trash2 className="h-3 w-3" /><span>This message was deleted</span>
+                                                    </div>
+                                                ) : (() => {
                                                     const hasQuote = msg.content.startsWith('> ');
                                                     const parts = hasQuote ? msg.content.split('\n\n') : null;
                                                     const quoteLine = parts ? parts[0].replace(/^> /, '') : null;
@@ -453,7 +463,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                                         </div>
                                                     );
                                                 })()}
-                                                {/* Reactions */}
+                                                {/* Reactions - only for non-deleted */}
                                                 {msg.reactions && msg.reactions.length > 0 && (
                                                     <div className="mt-0.5 flex flex-wrap gap-1">
                                                         {msg.reactions.map(r => (
@@ -481,7 +491,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                                         </PopoverContent>
                                                     </Popover>
                                                     <button onClick={() => togglePin(msg.id)} className={`h-6 w-6 rounded-full flex items-center justify-center transition-colors ${msg.is_pinned ? 'bg-amber-100 text-amber-600' : 'bg-muted hover:bg-accent'}`}><Pin className="h-3 w-3" /></button>
-                                                    <button onClick={() => { setMessageText(`> ${isMe ? 'You' : msg.sender?.name}: ${msg.content.slice(0, 60)}\n\n`); inputRef.current?.focus(); }}
+                                                    <button onClick={() => { setReplyingTo({ id: msg.id, senderName: isMe ? 'You' : (msg.sender?.name ?? '?'), content: msg.content.slice(0, 80) }); inputRef.current?.focus(); }}
                                                         className="h-6 w-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors" title="Reply"><Send className="h-3 w-3 rotate-180" /></button>
                                                 </div>
                                             </div>
@@ -490,6 +500,17 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                 })}
                                 <div ref={messagesEndRef} />
                             </div>
+
+                            {/* Reply preview */}
+                            {replyingTo && (
+                                <div className="flex items-center gap-2 border-t border-l-4 border-l-indigo-500 bg-indigo-50/50 dark:bg-indigo-950/10 px-4 py-2">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] font-semibold text-indigo-600">Replying to {replyingTo.senderName}</p>
+                                        <p className="truncate text-xs text-muted-foreground">{replyingTo.content}</p>
+                                    </div>
+                                    <button onClick={() => setReplyingTo(null)} className="shrink-0 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                                </div>
+                            )}
 
                             {/* Message Input */}
                             <div className="border-t bg-card px-4 py-3">
@@ -536,7 +557,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
 
             {/* Context Menu — WhatsApp style */}
             {ctxMenu && (
-                <div data-ctx-menu className="fixed z-50 min-w-[200px] overflow-hidden rounded-2xl border bg-card shadow-2xl" style={{ top: Math.min(ctxMenu.y, window.innerHeight - 350), left: Math.min(ctxMenu.x, window.innerWidth - 220) }} onClick={e => e.stopPropagation()}>
+                <div data-ctx-menu className="fixed z-50 w-[280px] overflow-hidden rounded-2xl border bg-card shadow-2xl" style={{ top: Math.min(ctxMenu.y, window.innerHeight - 300), left: Math.min(ctxMenu.x, window.innerWidth - 300) }} onClick={e => e.stopPropagation()}>
                     {ctxMenu.messageId ? (
                         <>
                             <div className="flex items-center justify-center gap-1 border-b px-3 py-2.5">
@@ -560,7 +581,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                             </div>
                             <div className="p-1">
                                 <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => {
-                                    setMessageText(`> ${ctxMenu.isOwn ? 'You' : ctxMenu.senderName}: ${(ctxMenu.content ?? '').slice(0, 60)}\n\n`);
+                                    if (ctxMenu.messageId) setReplyingTo({ id: ctxMenu.messageId, senderName: ctxMenu.isOwn ? 'You' : (ctxMenu.senderName ?? '?'), content: (ctxMenu.content ?? '').slice(0, 80) });
                                     inputRef.current?.focus(); setCtxMenu(null);
                                 }}>
                                     <Send className="h-4 w-4 text-muted-foreground rotate-180" /><span>Reply</span>
@@ -573,12 +594,19 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                 <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { if (ctxMenu.messageId) togglePin(ctxMenu.messageId); setCtxMenu(null); }}>
                                     <Pin className="h-4 w-4 text-muted-foreground" /><span>{activeMessages.find(m => m.id === ctxMenu.messageId)?.is_pinned ? 'Unpin' : 'Pin'}</span>
                                 </button>
-                                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground/50 cursor-not-allowed" disabled>
-                                    <Star className="h-4 w-4" /><span>Star</span><span className="ml-auto text-[9px]">Soon</span>
+                                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { if (ctxMenu.messageId) togglePin(ctxMenu.messageId); setCtxMenu(null); }}>
+                                    <Star className="h-4 w-4 text-amber-500" /><span>{activeMessages.find(m => m.id === ctxMenu.messageId)?.is_pinned ? 'Unstar' : 'Star'}</span>
                                 </button>
-                                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground/50 cursor-not-allowed" disabled>
-                                    <Trash2 className="h-4 w-4" /><span>Delete</span><span className="ml-auto text-[9px]">Soon</span>
-                                </button>
+                                {ctxMenu.isOwn && (
+                                    <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-50 dark:hover:bg-red-950/20" onClick={() => {
+                                        if (ctxMenu.messageId && confirm('Delete this message? It will show as "deleted" but data is kept for auditing.')) {
+                                            router.delete(`/operations/messages/archive/${ctxMenu.messageId}`, { preserveScroll: true });
+                                        }
+                                        setCtxMenu(null);
+                                    }}>
+                                        <Trash2 className="h-4 w-4" /><span>Delete</span>
+                                    </button>
+                                )}
                             </div>
                         </>
                     ) : (

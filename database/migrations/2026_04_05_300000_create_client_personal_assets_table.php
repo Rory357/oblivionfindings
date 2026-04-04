@@ -23,6 +23,7 @@ return new class extends Migration
             $table->text('notes')->nullable();             // any extra info
             $table->foreignId('recorded_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
+            $table->softDeletes();
 
             $table->index('client_id');
         });

@@ -126,7 +126,7 @@ class MessageController extends Controller
         $isParticipant = $conversation->participants->contains('user_id', $auth->id);
         abort_unless($isParticipant, 403);
 
-        $messages = OpsMessage::query()
+        $messages = OpsMessage::withTrashed()
             ->where('conversation_id', $conversation->id)
             ->with(['sender:id,name', 'reactions.user:id,name'])
             ->orderByDesc('created_at')
@@ -144,6 +144,7 @@ class MessageController extends Controller
                 'is_read' => (bool) $msg->is_read,
                 'read_at' => $msg->read_at?->toISOString(),
                 'shift_id' => $msg->shift_id,
+                'is_deleted' => $msg->trashed(),
                 'reactions' => $msg->reactions->groupBy('emoji')->map(fn ($g, $e) => [
                     'emoji' => $e, 'count' => $g->count(),
                     'user_ids' => $g->pluck('user_id')->all(),
@@ -228,6 +229,17 @@ class MessageController extends Controller
         $auth = $request->user();
         abort_unless($auth, 403);
         $message->update(['is_pinned' => !$message->is_pinned]);
+        return redirect()->back();
+    }
+
+    public function archiveMessage(Request $request, OpsMessage $message)
+    {
+        $auth = $request->user();
+        abort_unless($auth, 403);
+        abort_unless($message->sender_id === $auth->id, 403);
+
+        $message->delete();
+
         return redirect()->back();
     }
 

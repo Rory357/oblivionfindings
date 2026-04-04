@@ -95,6 +95,11 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->whereNumber('client')
             ->name('operations.clients.show');
 
+        // Client Location History (JSON)
+        Route::get('/clients/{client}/location/history', [ClientController::class, 'locationHistory'])
+            ->whereNumber('client')
+            ->name('operations.clients.location.history');
+
         // Documents
         Route::get('/clients/{client}/documents', [ClientDocumentController::class, 'index'])
             ->whereNumber('client')
@@ -154,6 +159,8 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.clients.personal-assets.store');
         Route::put('/clients/{client}/personal-assets/{asset}', [ClientPersonalAssetController::class, 'update'])
             ->name('operations.clients.personal-assets.update');
+        Route::patch('/clients/{client}/personal-assets/{asset}/status', [ClientPersonalAssetController::class, 'updateStatus'])
+            ->name('operations.clients.personal-assets.status');
         Route::delete('/clients/{client}/personal-assets/{asset}', [ClientPersonalAssetController::class, 'destroy'])
             ->name('operations.clients.personal-assets.destroy');
 
@@ -648,6 +655,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/messages/react/{message}', [MessageController::class, 'toggleReaction'])->name('operations.messages.react');
     Route::post('/messages/pin/{message}', [MessageController::class, 'togglePin'])->name('operations.messages.pin');
     Route::get('/messages-search', [MessageController::class, 'searchMessages'])->name('operations.messages.search');
+    Route::delete('/messages/archive/{message}', [MessageController::class, 'archiveMessage'])->name('operations.messages.archive');
 
     // -------------------------------------------------------------------------
     // Reports (NEW)

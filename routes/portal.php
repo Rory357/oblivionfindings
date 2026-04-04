@@ -130,6 +130,8 @@ Route::middleware(['auth'])->group(function () {
         ->name('portal.clients.messages.pin');
     Route::get('/portal/clients/{client}/messages-search', [PortalMessageController::class, 'searchMessages'])
         ->name('portal.clients.messages.search');
+    Route::delete('/portal/clients/{client}/messages/archive/{message}', [PortalMessageController::class, 'archiveMessage'])
+        ->name('portal.clients.messages.archive');
 
     // Portal Notifications & Preferences
     Route::get('/portal/notifications', [PortalNotificationController::class, 'index'])
