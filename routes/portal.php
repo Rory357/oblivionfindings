@@ -117,6 +117,12 @@ Route::middleware(['auth'])->group(function () {
         ->name('portal.clients.messages.show');
     Route::post('/portal/clients/{client}/messages/{conversation}', [PortalMessageController::class, 'storeMessage'])
         ->name('portal.clients.messages.send');
+    Route::post('/portal/clients/{client}/messages/react/{message}', [PortalMessageController::class, 'toggleReaction'])
+        ->name('portal.clients.messages.react');
+    Route::post('/portal/clients/{client}/messages/pin/{message}', [PortalMessageController::class, 'togglePin'])
+        ->name('portal.clients.messages.pin');
+    Route::get('/portal/clients/{client}/messages-search', [PortalMessageController::class, 'searchMessages'])
+        ->name('portal.clients.messages.search');
 
     // Portal Notifications & Preferences
     Route::get('/portal/notifications', [PortalNotificationController::class, 'index'])

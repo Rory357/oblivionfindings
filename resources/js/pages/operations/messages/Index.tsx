@@ -2,19 +2,30 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Hash, MessageSquareText, Plus, Search, Send, Users, X } from 'lucide-react';
+import { Check, CheckCheck, FileText, Hash, MessageSquareText, Mic, MicOff, Paperclip, Pin, Plus, Search, Send, Smile, Users, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
+type ReactionGroup = { emoji: string; count: number; user_ids: number[]; user_names?: string[] };
 type User = { id: number; name: string; email: string; presence_status: 'online' | 'offline' | 'busy' | 'away'; last_seen_at: string | null };
 type Message = {
     id: number;
     content: string;
     created_at: string;
     sender: { id: number; name: string } | null;
+    sender_id?: number;
+    sender_type?: string;
     message_type: string;
+    attachments?: any[] | null;
+    is_pinned?: boolean;
+    is_read?: boolean;
+    read_at?: string | null;
+    reactions?: ReactionGroup[];
 };
+type PinnedMessage = { id: number; content: string; sender_name?: string; created_at: string };
 type Conversation = {
     id: number;
     title: string | null;
@@ -29,9 +40,9 @@ type Props = {
     conversations: Conversation[];
     users: User[];
     currentUserId: number;
-    // When a conversation is selected via show route
     conversation?: Conversation;
     messages?: { data: Message[] };
+    pinnedMessages?: PinnedMessage[];
 };
 
 function getInitials(name: string): string {
@@ -85,7 +96,10 @@ function getConversationName(conv: Conversation, currentUserId: number): string 
     return conv.participants?.map(p => p.user?.name).filter(Boolean).join(', ') || 'Group Chat';
 }
 
-export default function MessagesChat({ conversations = [], users = [], currentUserId = 0, conversation, messages }: Props) {
+const CHAT_REACTIONS = ['👍', '❤️', '😊', '✅', '🙏', '😢'];
+const QUICK_REPLIES = ['Noted, will do! 👍', 'Thank you for letting us know.', "We'll discuss this at the next handover.", 'Everything is going well today! 😊', "I'll follow up on this shortly.", 'Great idea, we\'ll make it happen.'];
+
+export default function MessagesChat({ conversations = [], users = [], currentUserId = 0, conversation, messages, pinnedMessages: propPinned }: Props) {
     const { labels } = usePage().props as any;
     const [selectedId, setSelectedId] = useState<number | null>(conversation?.id ?? null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -94,8 +108,17 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
     const [messageText, setMessageText] = useState('');
     const [activeMessages, setActiveMessages] = useState<Message[]>(messages?.data ?? []);
     const [activeConversation, setActiveConversation] = useState<Conversation | null>(conversation ?? null);
+    const [showPinned, setShowPinned] = useState(false);
+    const [pinnedMsgs, setPinnedMsgs] = useState<PinnedMessage[]>(propPinned ?? []);
+    const [showMsgSearch, setShowMsgSearch] = useState(false);
+    const [msgSearchQuery, setMsgSearchQuery] = useState('');
+    const [msgSearchResults, setMsgSearchResults] = useState<any[]>([]);
+    const [isRecording, setIsRecording] = useState(false);
+    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; messageId?: number; isOwn?: boolean; content?: string; senderName?: string } | null>(null);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     const inputRef = useRef<HTMLInputElement>(null);
+    const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+    const audioChunksRef = useRef<Blob[]>([]);
 
     // Scroll to bottom when messages change
     useEffect(() => {
@@ -150,11 +173,53 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
     // Update messages when props change
     useEffect(() => {
         if (messages?.data) setActiveMessages(messages.data);
-        if (conversation) {
-            setActiveConversation(conversation);
-            setSelectedId(conversation.id);
-        }
-    }, [messages, conversation]);
+        if (conversation) { setActiveConversation(conversation); setSelectedId(conversation.id); }
+        if (propPinned) setPinnedMsgs(propPinned);
+    }, [messages, conversation, propPinned]);
+
+    // Close context menu on click
+    useEffect(() => { const close = () => setCtxMenu(null); document.addEventListener('click', close); return () => document.removeEventListener('click', close); }, []);
+
+    const toggleReaction = useCallback((msgId: number, emoji: string) => {
+        router.post(`/operations/messages/react/${msgId}`, { emoji }, { preserveScroll: true, preserveState: true });
+    }, []);
+
+    const togglePin = useCallback((msgId: number) => {
+        router.post(`/operations/messages/pin/${msgId}`, {}, { preserveScroll: true });
+    }, []);
+
+    const doMsgSearch = useCallback(async (q: string) => {
+        if (q.length < 2) { setMsgSearchResults([]); return; }
+        try {
+            const res = await fetch(`/operations/messages-search?q=${encodeURIComponent(q)}`, { credentials: 'same-origin', headers: { Accept: 'application/json' } });
+            if (res.ok) setMsgSearchResults(await res.json());
+        } catch { /* */ }
+    }, []);
+
+    const startRecording = useCallback(async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const recorder = new MediaRecorder(stream);
+            audioChunksRef.current = [];
+            recorder.ondataavailable = (e) => { if (e.data.size > 0) audioChunksRef.current.push(e.data); };
+            recorder.onstop = () => {
+                stream.getTracks().forEach(t => t.stop());
+                const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+                if (!selectedId) return;
+                router.post(`/operations/messages/${selectedId}`, { content: '🎙️ Voice note', message_type: 'text' }, { preserveScroll: true });
+            };
+            recorder.start(); mediaRecorderRef.current = recorder; setIsRecording(true);
+            setTimeout(() => { if (mediaRecorderRef.current?.state === 'recording') { mediaRecorderRef.current.stop(); setIsRecording(false); } }, 60000);
+        } catch { toast.error('Microphone access denied'); }
+    }, [selectedId]);
+
+    const stopRecording = useCallback(() => { if (mediaRecorderRef.current?.state === 'recording') { mediaRecorderRef.current.stop(); setIsRecording(false); } }, []);
+
+    const handleMsgRightClick = useCallback((e: React.MouseEvent, msg: Message) => {
+        e.preventDefault();
+        const senderId = msg.sender_id ?? msg.sender?.id;
+        setCtxMenu({ x: e.clientX, y: e.clientY, messageId: msg.id, isOwn: senderId === currentUserId, content: msg.content, senderName: msg.sender?.name });
+    }, [currentUserId]);
 
     return (
         <AppLayout>
@@ -313,7 +378,28 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                         })() : `${activeConversation.participants?.length ?? 0} members`}
                                     </p>
                                 </div>
+                                {pinnedMsgs.length > 0 && (
+                                    <button onClick={() => setShowPinned(!showPinned)} className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-[10px] font-medium text-muted-foreground hover:bg-muted transition-colors ml-auto">
+                                        <Pin className="h-3 w-3" />{pinnedMsgs.length} pinned
+                                    </button>
+                                )}
                             </div>
+
+                            {/* Pinned Messages */}
+                            {showPinned && pinnedMsgs.length > 0 && (
+                                <div className="border-b bg-amber-50/50 px-4 py-2 dark:bg-amber-950/10">
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-600"><Pin className="inline h-3 w-3 mr-1" />Pinned</span>
+                                        <button onClick={() => setShowPinned(false)} className="text-muted-foreground hover:text-foreground"><X className="h-3 w-3" /></button>
+                                    </div>
+                                    {pinnedMsgs.map(pm => (
+                                        <div key={pm.id} className="rounded-lg bg-white/60 dark:bg-card p-2 mb-1 text-xs">
+                                            <p className="font-medium">{pm.content.slice(0, 100)}</p>
+                                            <p className="text-[10px] text-muted-foreground mt-0.5">{pm.sender_name} · {formatTime(pm.created_at)}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
 
                             {/* Messages Area */}
                             <div className="flex-1 overflow-y-auto px-4 py-4">
@@ -324,24 +410,57 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                     </div>
                                 )}
                                 {[...activeMessages].reverse().map((msg, idx, arr) => {
-                                    const isMe = msg.sender?.id === currentUserId;
+                                    const senderId = msg.sender_id ?? msg.sender?.id;
+                                    const isMe = senderId === currentUserId;
                                     const prevMsg = idx > 0 ? arr[idx - 1] : null;
-                                    const showAvatar = !prevMsg || prevMsg.sender?.id !== msg.sender?.id;
+                                    const prevSenderId = prevMsg ? (prevMsg.sender_id ?? prevMsg.sender?.id) : null;
+                                    const showAvatar = !prevMsg || prevSenderId !== senderId;
+                                    const isLastByMe = isMe && (idx === arr.length - 1 || (arr[idx + 1]?.sender_id ?? arr[idx + 1]?.sender?.id) !== senderId);
                                     return (
-                                        <div key={msg.id} className={`flex gap-2 ${isMe ? 'flex-row-reverse' : ''} ${showAvatar ? 'mt-4' : 'mt-0.5'}`}>
+                                        <div key={msg.id} className={`group flex gap-2 ${isMe ? 'flex-row-reverse' : ''} ${showAvatar ? 'mt-4' : 'mt-0.5'}`}
+                                            onContextMenu={(e) => handleMsgRightClick(e, msg)}>
                                             {!isMe && showAvatar ? (
                                                 <Avatar className="mt-1 h-7 w-7 shrink-0">
                                                     <AvatarFallback className="bg-slate-100 text-[10px] text-slate-600">{getInitials(msg.sender?.name ?? '?')}</AvatarFallback>
                                                 </Avatar>
                                             ) : !isMe ? <div className="w-7 shrink-0" /> : null}
-                                            <div className={`max-w-[70%] ${isMe ? 'items-end' : 'items-start'}`}>
+                                            <div className={`max-w-[70%]`}>
                                                 {showAvatar && !isMe && (
                                                     <p className="mb-0.5 text-[10px] font-medium text-muted-foreground">{msg.sender?.name}</p>
                                                 )}
-                                                <div className={`inline-block rounded-2xl px-3 py-2 text-sm ${isMe ? 'bg-indigo-600 text-white' : 'bg-muted'}`}>
+                                                <div className={`inline-block rounded-2xl px-3 py-2 text-sm ${isMe ? 'bg-indigo-600 text-white' : 'bg-muted'} ${msg.is_pinned ? 'ring-2 ring-amber-300' : ''}`}>
+                                                    {msg.is_pinned && <Pin className="inline h-3 w-3 mr-1 opacity-60" />}
                                                     {msg.content}
                                                 </div>
-                                                <p className={`mt-0.5 text-[10px] text-muted-foreground ${isMe ? 'text-right' : ''}`}>{formatMessageTime(msg.created_at)}</p>
+                                                {/* Reactions */}
+                                                {msg.reactions && msg.reactions.length > 0 && (
+                                                    <div className="mt-0.5 flex flex-wrap gap-1">
+                                                        {msg.reactions.map(r => (
+                                                            <button key={r.emoji} onClick={() => toggleReaction(msg.id, r.emoji)}
+                                                                title={r.user_names?.length ? `Reacted by: ${r.user_names.join(', ')}` : undefined}
+                                                                className={`inline-flex items-center gap-0.5 rounded-full border px-1.5 py-0.5 text-[10px] transition-colors hover:bg-muted ${r.user_ids.includes(currentUserId) ? 'border-primary/50 bg-primary/5' : 'border-border'}`}>
+                                                                {r.emoji} <span className="font-medium">{r.count}</span>
+                                                            </button>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                                {/* Time + read receipt */}
+                                                <div className={`mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground/60 ${isMe ? 'justify-end' : ''}`}>
+                                                    <span>{formatMessageTime(msg.created_at)}</span>
+                                                    {isMe && isLastByMe && (
+                                                        msg.is_read ? <span title={`Read ${msg.read_at ? formatTime(msg.read_at) : ''}`}><CheckCheck className="h-3 w-3 text-blue-500" /></span> : <span title="Sent"><Check className="h-3 w-3" /></span>
+                                                    )}
+                                                </div>
+                                                {/* Hover actions */}
+                                                <div className={`mt-0.5 gap-1 ${msg.is_pinned ? 'flex' : 'hidden group-hover:flex'} ${isMe ? 'justify-end' : ''}`}>
+                                                    <Popover>
+                                                        <PopoverTrigger asChild><button className="h-6 w-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"><Smile className="h-3 w-3" /></button></PopoverTrigger>
+                                                        <PopoverContent className="w-auto p-1.5" align={isMe ? 'end' : 'start'}>
+                                                            <div className="flex gap-1">{CHAT_REACTIONS.map(e => <button key={e} onClick={() => toggleReaction(msg.id, e)} className="rounded-lg p-1.5 text-base hover:bg-muted">{e}</button>)}</div>
+                                                        </PopoverContent>
+                                                    </Popover>
+                                                    <button onClick={() => togglePin(msg.id)} className={`h-6 w-6 rounded-full flex items-center justify-center transition-colors ${msg.is_pinned ? 'bg-amber-100 text-amber-600' : 'bg-muted hover:bg-accent'}`}><Pin className="h-3 w-3" /></button>
+                                                </div>
                                             </div>
                                         </div>
                                     );
@@ -350,20 +469,26 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                             </div>
 
                             {/* Message Input */}
-                            <div className="border-t px-4 py-3">
+                            <div className="border-t bg-card px-4 py-3">
+                                <Popover>
+                                    <PopoverTrigger asChild><button className="mb-2 text-[10px] text-muted-foreground hover:text-foreground transition-colors">💬 Quick replies</button></PopoverTrigger>
+                                    <PopoverContent className="w-64 p-2" align="start">
+                                        <div className="space-y-1">{QUICK_REPLIES.map((r, i) => <button key={i} className="w-full rounded-lg p-2 text-left text-xs hover:bg-accent transition-colors" onClick={() => { setMessageText(r); inputRef.current?.focus(); }}>{r}</button>)}</div>
+                                    </PopoverContent>
+                                </Popover>
                                 <div className="flex items-center gap-2">
-                                    <Input
-                                        ref={inputRef}
-                                        placeholder="Type a message..."
-                                        className="flex-1"
-                                        value={messageText}
+                                    <button onClick={isRecording ? stopRecording : startRecording}
+                                        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full transition-colors ${isRecording ? 'bg-red-500 text-white animate-pulse' : 'text-muted-foreground hover:bg-muted hover:text-foreground'}`}>
+                                        {isRecording ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                                    </button>
+                                    <Input ref={inputRef} placeholder="Type a message..." className="flex-1 rounded-full" value={messageText}
                                         onChange={(e) => setMessageText(e.target.value)}
                                         onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
-                                        autoFocus
-                                    />
-                                    <Button size="sm" className="h-9 w-9 p-0" disabled={!messageText.trim()} onClick={sendMessage}>
+                                        autoFocus />
+                                    <button className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-white transition-colors hover:bg-indigo-700 disabled:opacity-50"
+                                        disabled={!messageText.trim()} onClick={sendMessage}>
                                         <Send className="h-4 w-4" />
-                                    </Button>
+                                    </button>
                                 </div>
                             </div>
                         </>
@@ -385,6 +510,46 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                     )}
                 </div>
             </div>
+
+            {/* Context Menu */}
+            {ctxMenu && (
+                <div className="fixed z-50 min-w-[180px] rounded-xl border bg-card p-1 shadow-xl" style={{ top: ctxMenu.y, left: ctxMenu.x }} onClick={e => e.stopPropagation()}>
+                    {ctxMenu.messageId ? (
+                        <>
+                            <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { if (ctxMenu.messageId) togglePin(ctxMenu.messageId); setCtxMenu(null); }}>
+                                <Pin className="h-4 w-4 text-amber-500" />
+                                {activeMessages.find(m => m.id === ctxMenu.messageId)?.is_pinned ? 'Unpin' : 'Pin message'}
+                            </button>
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent">
+                                        <Smile className="h-4 w-4 text-amber-500" />React
+                                    </button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-auto p-1.5" align="start">
+                                    <div className="flex gap-1">{CHAT_REACTIONS.map(e => <button key={e} onClick={() => { if (ctxMenu.messageId) toggleReaction(ctxMenu.messageId, e); setCtxMenu(null); }} className="rounded-lg p-1.5 text-base hover:bg-muted">{e}</button>)}</div>
+                                </PopoverContent>
+                            </Popover>
+                            {!ctxMenu.isOwn && ctxMenu.senderName && (
+                                <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { setMessageText(`@${ctxMenu.senderName} `); inputRef.current?.focus(); setCtxMenu(null); }}>
+                                    <Send className="h-4 w-4 text-blue-500 rotate-180" />Reply
+                                </button>
+                            )}
+                            {ctxMenu.content && (
+                                <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { navigator.clipboard.writeText(ctxMenu.content!).then(() => toast.success('Copied!')); setCtxMenu(null); }}>
+                                    <FileText className="h-4 w-4 text-muted-foreground" />Copy text
+                                </button>
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { startRecording(); setCtxMenu(null); }}>
+                                <Mic className="h-4 w-4 text-red-500" />Voice note
+                            </button>
+                        </>
+                    )}
+                </div>
+            )}
         </AppLayout>
     );
 }

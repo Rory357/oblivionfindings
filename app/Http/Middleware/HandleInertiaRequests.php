@@ -88,6 +88,9 @@ class HandleInertiaRequests extends Middleware
                         'relation' => $c->pivot->relation ?? null,
                     ])->values()->all()
                     : null,
+                'unreadMessageCount' => $user ? \App\Models\OpsMessage::whereIn('conversation_id',
+                    \App\Models\OpsConversationParticipant::where('user_id', $user->id)->pluck('conversation_id')
+                )->where('sender_id', '!=', $user->id)->where('is_read', false)->count() : 0,
             ],
 
             'labels' => $labels,

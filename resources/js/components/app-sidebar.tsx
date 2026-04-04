@@ -118,6 +118,7 @@ interface IconNavItem {
     href?: string;
     subPanel?: boolean;
     dividerAfter?: boolean;
+    badge?: number;
 }
 
 interface SubPanelGroup {
@@ -179,7 +180,7 @@ function isSubItemActive(currentUrl: string, href: NavItem['href']): boolean {
 
 // ── Build icon nav items ───────────────────────────────────────────────────
 
-function buildPortalNavItems(portalClients?: PortalClient[] | null): IconNavItem[] {
+function buildPortalNavItems(portalClients?: PortalClient[] | null, unreadMessageCount?: number): IconNavItem[] {
     const clients = portalClients ?? [];
     if (clients.length === 1) {
         const cid = clients[0].id;
@@ -188,7 +189,7 @@ function buildPortalNavItems(portalClients?: PortalClient[] | null): IconNavItem
             { id: 'timeline', icon: Clock, label: 'Timeline', href: `/portal/clients/${cid}/timeline` },
             { id: 'calendar', icon: CalendarDays, label: 'Calendar & Visits', href: `/portal/clients/${cid}/calendar` },
             { id: 'family-notes', icon: CalendarDays, label: 'Notes & To-Dos', href: `/portal/clients/${cid}/family-notes` },
-            { id: 'messages', icon: MessageSquareText, label: 'Messages', href: `/portal/clients/${cid}/messages`, dividerAfter: true },
+            { id: 'messages', icon: MessageSquareText, label: 'Messages', href: `/portal/clients/${cid}/messages`, dividerAfter: true, badge: unreadMessageCount || undefined },
             { id: 'health', icon: Heart, label: 'Health & Care', href: `/portal/clients/${cid}/health` },
             { id: 'documents', icon: FileText, label: 'Documents', href: `/portal/clients/${cid}/documents` },
             { id: 'photos', icon: Clipboard, label: 'Photo Gallery', href: `/portal/clients/${cid}/photos`, dividerAfter: true },
@@ -208,14 +209,16 @@ function buildIconNavItems({
     role,
     can,
     portalClients,
+    unreadMessageCount,
 }: {
     role?: string | null;
     can?: any;
     portalClients?: PortalClient[] | null;
+    unreadMessageCount?: number;
 }): IconNavItem[] {
     // Portal users (family members / clients) get a dedicated sidebar
     if (role === 'next_of_kin' || role === 'client') {
-        return buildPortalNavItems(portalClients);
+        return buildPortalNavItems(portalClients, unreadMessageCount);
     }
 
     const items: IconNavItem[] = [
@@ -1028,6 +1031,7 @@ export function AppSidebar() {
     const role = auth.user?.role ?? null;
     const can = auth?.can;
     const portalClients = auth?.portalClients ?? null;
+    const unreadMessageCount = (auth as any)?.unreadMessageCount ?? 0;
     const currentUrl = page.url;
     const getInitials = useInitials();
     const displayName: string = (branding as any)?.name ?? appName ?? 'Oblivion Findings';
@@ -1035,7 +1039,7 @@ export function AppSidebar() {
 
     const [openPanelId, setOpenPanelId] = useState<string | null>(null);
 
-    const iconNavItems = useMemo(() => buildIconNavItems({ role, can, portalClients }), [role, can, portalClients]);
+    const iconNavItems = useMemo(() => buildIconNavItems({ role, can, portalClients, unreadMessageCount }), [role, can, portalClients, unreadMessageCount]);
 
     const subPanelMap = useMemo(() => ({
         sites: buildSitesSubPanelGroups({ can }),
@@ -1125,13 +1129,16 @@ export function AppSidebar() {
                                                 href={item.href!}
                                                 prefetch
                                                 className={cn(
-                                                    'flex items-center justify-center w-10 h-10 rounded-xl transition-colors',
+                                                    'relative flex items-center justify-center w-10 h-10 rounded-xl transition-colors',
                                                     active
                                                         ? 'bg-sidebar-primary text-sidebar-primary-foreground'
                                                         : 'text-sidebar-foreground/60 hover:text-sidebar-foreground hover:bg-sidebar-accent',
                                                 )}
                                             >
                                                 <item.icon className="h-6 w-6" />
+                                                {item.badge != null && item.badge > 0 && (
+                                                    <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[9px] font-bold text-white">{item.badge > 9 ? '9+' : item.badge}</span>
+                                                )}
                                             </Link>
                                         </TooltipTrigger>
                                         <TooltipContent side="right">{item.label}</TooltipContent>
@@ -1220,9 +1227,10 @@ export function AppSidebarMobile({
     const role = auth.user?.role ?? null;
     const can = auth?.can;
     const portalClients = auth?.portalClients ?? null;
+    const unreadMessageCount = auth?.unreadMessageCount ?? 0;
     const currentUrl = page.url;
 
-    const iconNavItems = useMemo(() => buildIconNavItems({ role, can, portalClients }), [role, can, portalClients]);
+    const iconNavItems = useMemo(() => buildIconNavItems({ role, can, portalClients, unreadMessageCount }), [role, can, portalClients, unreadMessageCount]);
 
     const mobileSubPanelMap = useMemo(() => ({
         sites: buildSitesSubPanelGroups({ can }),

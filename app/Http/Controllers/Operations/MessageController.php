@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\OpsConversation;
 use App\Models\OpsConversationParticipant;
 use App\Models\OpsMessage;
+use App\Models\OpsMessageReaction;
 use Illuminate\Http\Request;
 
 class MessageController extends Controller
@@ -127,14 +128,46 @@ class MessageController extends Controller
 
         $messages = OpsMessage::query()
             ->where('conversation_id', $conversation->id)
-            ->with(['sender:id,name'])
+            ->with(['sender:id,name', 'reactions.user:id,name'])
             ->orderByDesc('created_at')
             ->paginate(50)
-            ->withQueryString();
+            ->withQueryString()
+            ->through(fn ($msg) => [
+                'id' => $msg->id,
+                'content' => $msg->content,
+                'sender' => $msg->sender ? ['id' => $msg->sender->id, 'name' => $msg->sender->name] : null,
+                'sender_id' => $msg->sender_id,
+                'sender_type' => $msg->sender_type,
+                'message_type' => $msg->message_type,
+                'attachments' => $msg->attachments,
+                'is_pinned' => (bool) $msg->is_pinned,
+                'is_read' => (bool) $msg->is_read,
+                'read_at' => $msg->read_at?->toISOString(),
+                'shift_id' => $msg->shift_id,
+                'reactions' => $msg->reactions->groupBy('emoji')->map(fn ($g, $e) => [
+                    'emoji' => $e, 'count' => $g->count(),
+                    'user_ids' => $g->pluck('user_id')->all(),
+                    'user_names' => $g->map(fn ($r) => $r->user?->name)->filter()->values()->all(),
+                ])->values()->all(),
+                'created_at' => $msg->created_at?->toISOString(),
+            ]);
 
-        return inertia('operations/messages/Show', [
+        $pinnedMessages = OpsMessage::where('conversation_id', $conversation->id)
+            ->where('is_pinned', true)->with('sender:id,name')->orderByDesc('created_at')->limit(5)->get()
+            ->map(fn ($m) => ['id' => $m->id, 'content' => $m->content, 'sender_name' => $m->sender?->name, 'created_at' => $m->created_at?->toISOString()]);
+
+        // Mark messages as read
+        OpsMessage::where('conversation_id', $conversation->id)
+            ->where('sender_id', '!=', $auth->id)->where('is_read', false)
+            ->update(['is_read' => true, 'read_at' => now()]);
+
+        return inertia('operations/messages/Index', [
+            'conversations' => $this->getConversations($auth),
+            'users' => $this->getUsers($auth),
+            'currentUserId' => $auth->id,
             'conversation' => $conversation,
             'messages' => $messages,
+            'pinnedMessages' => $pinnedMessages->values(),
         ]);
     }
 
@@ -171,6 +204,77 @@ class MessageController extends Controller
         $conversation->touch();
 
         return redirect()->back();
+    }
+
+    public function toggleReaction(Request $request, OpsMessage $message)
+    {
+        $auth = $request->user();
+        abort_unless($auth, 403);
+
+        $validated = $request->validate(['emoji' => 'required|string|max:10']);
+
+        $existing = OpsMessageReaction::where('message_id', $message->id)
+            ->where('user_id', $auth->id)->where('emoji', $validated['emoji'])->first();
+
+        if ($existing) { $existing->delete(); } else {
+            OpsMessageReaction::create(['message_id' => $message->id, 'user_id' => $auth->id, 'emoji' => $validated['emoji']]);
+        }
+
+        return redirect()->back();
+    }
+
+    public function togglePin(Request $request, OpsMessage $message)
+    {
+        $auth = $request->user();
+        abort_unless($auth, 403);
+        $message->update(['is_pinned' => !$message->is_pinned]);
+        return redirect()->back();
+    }
+
+    public function searchMessages(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($auth, 403);
+
+        $q = $request->query('q', '');
+        if (strlen($q) < 2) return response()->json([]);
+
+        $conversationIds = OpsConversationParticipant::where('user_id', $auth->id)->pluck('conversation_id');
+
+        return response()->json(
+            OpsMessage::whereIn('conversation_id', $conversationIds)
+                ->where('content', 'like', "%{$q}%")
+                ->with('sender:id,name')
+                ->orderByDesc('created_at')->limit(20)->get()
+                ->map(fn ($m) => ['id' => $m->id, 'content' => $m->content, 'sender_name' => $m->sender?->name, 'conversation_id' => $m->conversation_id, 'created_at' => $m->created_at?->toISOString()])
+        );
+    }
+
+    private function getConversations($auth)
+    {
+        return OpsConversation::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->whereHas('participants', fn ($q) => $q->where('user_id', $auth->id))
+            ->with(['latestMessage.sender:id,name', 'participants.user:id,name', 'client:id,first_name,last_name'])
+            ->orderByDesc('updated_at')
+            ->get();
+    }
+
+    private function getUsers($auth)
+    {
+        return \App\Models\User::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->where('id', '!=', $auth->id)
+            ->whereNotIn('role', ['client', 'next_of_kin'])
+            ->select(['id', 'name', 'email', 'presence_status', 'last_seen_at'])
+            ->orderBy('name')
+            ->get()
+            ->map(function ($u) {
+                $status = 'offline';
+                if ($u->presence_status === 'online' && $u->last_seen_at?->gt(now()->subMinutes(5))) $status = 'online';
+                elseif ($u->last_seen_at?->gt(now()->subMinutes(15))) $status = 'away';
+                return ['id' => $u->id, 'name' => $u->name, 'email' => $u->email, 'presence_status' => $status, 'last_seen_at' => $u->last_seen_at?->toISOString()];
+            });
     }
 
     public function markRead(Request $request, $conversation)

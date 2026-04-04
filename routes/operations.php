@@ -636,6 +636,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::get('/messages/{conversation}', [MessageController::class, 'show'])->name('operations.messages.show');
     Route::post('/messages/{conversation}', [MessageController::class, 'store'])->name('operations.messages.store');
     Route::patch('/messages/{conversation}/read', [MessageController::class, 'markRead'])->name('operations.messages.read');
+    Route::post('/messages/react/{message}', [MessageController::class, 'toggleReaction'])->name('operations.messages.react');
+    Route::post('/messages/pin/{message}', [MessageController::class, 'togglePin'])->name('operations.messages.pin');
+    Route::get('/messages-search', [MessageController::class, 'searchMessages'])->name('operations.messages.search');
 
     // -------------------------------------------------------------------------
     // Reports (NEW)
