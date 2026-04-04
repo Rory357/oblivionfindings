@@ -177,8 +177,15 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
         if (propPinned) setPinnedMsgs(propPinned);
     }, [messages, conversation, propPinned]);
 
-    // Close context menu on click
-    useEffect(() => { const close = () => setCtxMenu(null); document.addEventListener('click', close); return () => document.removeEventListener('click', close); }, []);
+    // Close context menu on mousedown outside
+    useEffect(() => {
+        const close = (e: MouseEvent) => {
+            if ((e.target as HTMLElement).closest('[data-ctx-menu]')) return;
+            setCtxMenu(null);
+        };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, []);
 
     const toggleReaction = useCallback((msgId: number, emoji: string) => {
         router.post(`/operations/messages/react/${msgId}`, { emoji }, { preserveScroll: true, preserveState: true });
@@ -428,10 +435,23 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                                 {showAvatar && !isMe && (
                                                     <p className="mb-0.5 text-[10px] font-medium text-muted-foreground">{msg.sender?.name}</p>
                                                 )}
-                                                <div className={`inline-block rounded-2xl px-3 py-2 text-sm ${isMe ? 'bg-indigo-600 text-white' : 'bg-muted'} ${msg.is_pinned ? 'ring-2 ring-amber-300' : ''}`}>
-                                                    {msg.is_pinned && <Pin className="inline h-3 w-3 mr-1 opacity-60" />}
-                                                    {msg.content}
-                                                </div>
+                                                {(() => {
+                                                    const hasQuote = msg.content.startsWith('> ');
+                                                    const parts = hasQuote ? msg.content.split('\n\n') : null;
+                                                    const quoteLine = parts ? parts[0].replace(/^> /, '') : null;
+                                                    const mainText = parts ? parts.slice(1).join('\n\n') : msg.content;
+                                                    return (
+                                                        <div className={`inline-block rounded-2xl px-3 py-2 text-sm ${isMe ? 'bg-indigo-600 text-white' : 'bg-muted'} ${msg.is_pinned ? 'ring-2 ring-amber-300' : ''}`}>
+                                                            {msg.is_pinned && <Pin className="inline h-3 w-3 mr-1 opacity-60" />}
+                                                            {quoteLine && (
+                                                                <div className={`mb-1.5 rounded-lg border-l-2 px-2 py-1 text-xs ${isMe ? 'border-l-white/40 bg-white/10' : 'border-l-indigo-400 bg-indigo-50'}`}>
+                                                                    <p className="opacity-70 truncate">{quoteLine}</p>
+                                                                </div>
+                                                            )}
+                                                            {mainText}
+                                                        </div>
+                                                    );
+                                                })()}
                                                 {/* Reactions */}
                                                 {msg.reactions && msg.reactions.length > 0 && (
                                                     <div className="mt-0.5 flex flex-wrap gap-1">
@@ -460,6 +480,10 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                                         </PopoverContent>
                                                     </Popover>
                                                     <button onClick={() => togglePin(msg.id)} className={`h-6 w-6 rounded-full flex items-center justify-center transition-colors ${msg.is_pinned ? 'bg-amber-100 text-amber-600' : 'bg-muted hover:bg-accent'}`}><Pin className="h-3 w-3" /></button>
+                                                    {!isMe && (
+                                                        <button onClick={() => { setMessageText(`> ${msg.sender?.name}: ${msg.content.slice(0, 60)}\n\n`); inputRef.current?.focus(); }}
+                                                            className="h-6 w-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"><Send className="h-3 w-3 rotate-180" /></button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -513,7 +537,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
 
             {/* Context Menu */}
             {ctxMenu && (
-                <div className="fixed z-50 min-w-[180px] rounded-xl border bg-card p-1 shadow-xl" style={{ top: ctxMenu.y, left: ctxMenu.x }} onClick={e => e.stopPropagation()}>
+                <div data-ctx-menu className="fixed z-50 min-w-[180px] rounded-xl border bg-card p-1 shadow-xl" style={{ top: ctxMenu.y, left: ctxMenu.x }} onClick={e => e.stopPropagation()}>
                     {ctxMenu.messageId ? (
                         <>
                             <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { if (ctxMenu.messageId) togglePin(ctxMenu.messageId); setCtxMenu(null); }}>

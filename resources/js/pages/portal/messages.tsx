@@ -76,6 +76,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
     const [isRecording, setIsRecording] = useState(false);
     const [showPinned, setShowPinned] = useState(false);
     const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; messageId?: number; isOwn?: boolean; content?: string; senderName?: string } | null>(null);
+    const [replyingTo, setReplyingTo] = useState<{ id: number; senderName: string; content: string } | null>(null);
     const dragCounter = useRef(0);
     const [activeMessages, setActiveMessages] = useState<Message[]>(propMsgs ?? []);
     const [activeConvo, setActiveConvo] = useState<typeof propConvo>(propConvo ?? null);
@@ -86,7 +87,15 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
     const audioChunksRef = useRef<Blob[]>([]);
 
     useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [activeMessages]);
-    useEffect(() => { const close = () => setCtxMenu(null); document.addEventListener('click', close); return () => document.removeEventListener('click', close); }, []);
+    useEffect(() => {
+        const close = (e: MouseEvent) => {
+            const target = e.target as HTMLElement;
+            if (target.closest('[data-ctx-menu]')) return;
+            setCtxMenu(null);
+        };
+        document.addEventListener('mousedown', close);
+        return () => document.removeEventListener('mousedown', close);
+    }, []);
     useEffect(() => {
         if (propMsgs) setActiveMessages(propMsgs);
         if (propConvo) { setActiveConvo(propConvo); setSelectedId(propConvo.id); }
@@ -106,10 +115,13 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
 
     const sendMessage = useCallback(() => {
         if (!messageText.trim() || !selectedId) return;
-        router.post(`/portal/clients/${client.id}/messages/${selectedId}`, { content: messageText }, {
-            preserveScroll: true, onSuccess: () => { setMessageText(''); inputRef.current?.focus(); },
+        const content = replyingTo
+            ? `> ${replyingTo.senderName}: ${replyingTo.content}\n\n${messageText}`
+            : messageText;
+        router.post(`/portal/clients/${client.id}/messages/${selectedId}`, { content }, {
+            preserveScroll: true, onSuccess: () => { setMessageText(''); setReplyingTo(null); inputRef.current?.focus(); },
         });
-    }, [messageText, selectedId, client.id]);
+    }, [messageText, selectedId, client.id, replyingTo]);
 
     const startNewChat = useCallback((workerId: number) => {
         router.post(`/portal/clients/${client.id}/messages/start`, { worker_id: workerId, content: 'Hello! 👋' }, {
@@ -201,8 +213,8 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
         setCtxMenu(null);
     }, []);
 
-    const replyTo = useCallback((name: string) => {
-        setMessageText(`@${name} `);
+    const replyTo = useCallback((msgId: number, senderName: string, content: string) => {
+        setReplyingTo({ id: msgId, senderName, content: content.slice(0, 80) });
         inputRef.current?.focus();
         setCtxMenu(null);
     }, []);
@@ -395,12 +407,23 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                                     </div>
                                                 )}
                                                 {/* Text */}
-                                                {msg.content && !(msg.message_type === 'attachment' && msg.attachments?.length) && (
-                                                    <div className={`inline-block rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${isMe ? 'bg-primary text-primary-foreground' : 'bg-muted'} ${msg.is_pinned ? 'ring-2 ring-amber-300' : ''}`}>
-                                                        {msg.is_pinned && <Pin className="inline h-3 w-3 mr-1 opacity-60" />}
-                                                        {msg.content}
-                                                    </div>
-                                                )}
+                                                {msg.content && !(msg.message_type === 'attachment' && msg.attachments?.length) && (() => {
+                                                    const hasQuote = msg.content.startsWith('> ');
+                                                    const parts = hasQuote ? msg.content.split('\n\n') : null;
+                                                    const quoteLine = parts ? parts[0].replace(/^> /, '') : null;
+                                                    const mainText = parts ? parts.slice(1).join('\n\n') : msg.content;
+                                                    return (
+                                                        <div className={`inline-block rounded-2xl px-3.5 py-2 text-sm leading-relaxed ${isMe ? 'bg-primary text-primary-foreground' : 'bg-muted'} ${msg.is_pinned ? 'ring-2 ring-amber-300' : ''}`}>
+                                                            {msg.is_pinned && <Pin className="inline h-3 w-3 mr-1 opacity-60" />}
+                                                            {quoteLine && (
+                                                                <div className={`mb-1.5 rounded-lg border-l-2 px-2 py-1 text-xs ${isMe ? 'border-l-white/40 bg-white/10' : 'border-l-primary/40 bg-primary/5'}`}>
+                                                                    <p className="opacity-70 truncate">{quoteLine}</p>
+                                                                </div>
+                                                            )}
+                                                            {mainText}
+                                                        </div>
+                                                    );
+                                                })()}
                                                 {msg.content && msg.message_type === 'attachment' && msg.attachments?.length && !msg.content.includes('🎙️') && (
                                                     <p className={`text-xs mt-0.5 ${isMe ? 'text-right' : ''} text-muted-foreground`}>{msg.content}</p>
                                                 )}
@@ -433,9 +456,14 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                                             <div className="flex gap-1">{CHAT_REACTIONS.map(e => <button key={e} onClick={() => toggleReaction(msg.id, e)} className="rounded-lg p-1.5 text-base hover:bg-muted">{e}</button>)}</div>
                                                         </PopoverContent>
                                                     </Popover>
-                                                    <button onClick={() => togglePin(msg.id)} className={`h-6 w-6 rounded-full flex items-center justify-center transition-colors ${msg.is_pinned ? 'bg-amber-100 text-amber-600' : 'bg-muted hover:bg-accent'}`} title={msg.is_pinned ? 'Unpin' : 'Pin'}>
+                                                    <button onClick={() => togglePin(msg.id)} className={`h-6 w-6 rounded-full flex items-center justify-center transition-colors ${msg.is_pinned ? 'bg-amber-100 text-amber-600' : 'bg-muted hover:bg-accent'}`}>
                                                         <Pin className="h-3 w-3" />
                                                     </button>
+                                                    {!isMe && (
+                                                        <button onClick={() => replyTo(msg.id, msg.sender?.name ?? '?', msg.content)} className="h-6 w-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors">
+                                                            <Send className="h-3 w-3 rotate-180" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         </div>
@@ -443,6 +471,17 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                 })}
                                 <div ref={messagesEndRef} />
                             </div>
+
+                            {/* Reply preview */}
+                            {replyingTo && (
+                                <div className="flex items-center gap-2 border-t border-l-4 border-l-primary bg-primary/5 px-4 py-2">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-[10px] font-semibold text-primary">Replying to {replyingTo.senderName}</p>
+                                        <p className="truncate text-xs text-muted-foreground">{replyingTo.content}</p>
+                                    </div>
+                                    <button onClick={() => setReplyingTo(null)} className="shrink-0 text-muted-foreground hover:text-foreground"><X className="h-4 w-4" /></button>
+                                </div>
+                            )}
 
                             {/* Input */}
                             <div className="border-t bg-card px-4 py-3">
@@ -495,7 +534,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
 
             {/* Context Menu */}
             {ctxMenu && (
-                <div className="fixed z-50 min-w-[180px] rounded-xl border bg-card p-1 shadow-xl" style={{ top: ctxMenu.y, left: ctxMenu.x }} onClick={e => e.stopPropagation()}>
+                <div data-ctx-menu className="fixed z-50 min-w-[180px] rounded-xl border bg-card p-1 shadow-xl" style={{ top: ctxMenu.y, left: ctxMenu.x }} onClick={e => e.stopPropagation()}>
                     {ctxMenu.messageId ? (
                         <>
                             <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { if (ctxMenu.messageId) togglePin(ctxMenu.messageId); setCtxMenu(null); }}>
@@ -513,7 +552,7 @@ export default function PortalMessages({ client, conversations, supportWorkers, 
                                 </PopoverContent>
                             </Popover>
                             {!ctxMenu.isOwn && ctxMenu.senderName && (
-                                <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { if (ctxMenu.senderName) replyTo(ctxMenu.senderName); }}>
+                                <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { if (ctxMenu.messageId && ctxMenu.senderName) replyTo(ctxMenu.messageId, ctxMenu.senderName, ctxMenu.content ?? ''); }}>
                                     <Send className="h-4 w-4 text-blue-500 rotate-180" />Reply
                                 </button>
                             )}
