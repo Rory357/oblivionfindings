@@ -191,6 +191,7 @@ function buildPortalNavItems(portalClients?: PortalClient[] | null, unreadMessag
             { id: 'family-notes', icon: CalendarDays, label: 'Notes & To-Dos', href: `/portal/clients/${cid}/family-notes` },
             { id: 'messages', icon: MessageSquareText, label: 'Messages', href: `/portal/clients/${cid}/messages`, dividerAfter: true, badge: unreadMessageCount || undefined },
             { id: 'health', icon: Heart, label: 'Health & Care', href: `/portal/clients/${cid}/health` },
+            { id: 'location', icon: MapPin, label: 'Location', href: `/portal/clients/${cid}/location` },
             { id: 'documents', icon: FileText, label: 'Documents', href: `/portal/clients/${cid}/documents` },
             { id: 'photos', icon: Clipboard, label: 'Photo Gallery', href: `/portal/clients/${cid}/photos`, dividerAfter: true },
             { id: 'notifications', icon: Bell, label: 'Notifications', href: '/portal/notifications' },

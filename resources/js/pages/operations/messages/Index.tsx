@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Check, CheckCheck, FileText, Hash, MessageSquareText, Mic, MicOff, Paperclip, Pin, Plus, Search, Send, Smile, Users, X } from 'lucide-react';
+import { Check, CheckCheck, FileText, Hash, MessageSquareText, Mic, MicOff, Paperclip, Pin, Plus, Search, Send, Smile, Star, Trash2, Users, X } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -224,6 +224,7 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
 
     const handleMsgRightClick = useCallback((e: React.MouseEvent, msg: Message) => {
         e.preventDefault();
+        e.stopPropagation();
         const senderId = msg.sender_id ?? msg.sender?.id;
         setCtxMenu({ x: e.clientX, y: e.clientY, messageId: msg.id, isOwn: senderId === currentUserId, content: msg.content, senderName: msg.sender?.name });
     }, [currentUserId]);
@@ -480,10 +481,8 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                                                         </PopoverContent>
                                                     </Popover>
                                                     <button onClick={() => togglePin(msg.id)} className={`h-6 w-6 rounded-full flex items-center justify-center transition-colors ${msg.is_pinned ? 'bg-amber-100 text-amber-600' : 'bg-muted hover:bg-accent'}`}><Pin className="h-3 w-3" /></button>
-                                                    {!isMe && (
-                                                        <button onClick={() => { setMessageText(`> ${msg.sender?.name}: ${msg.content.slice(0, 60)}\n\n`); inputRef.current?.focus(); }}
-                                                            className="h-6 w-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors"><Send className="h-3 w-3 rotate-180" /></button>
-                                                    )}
+                                                    <button onClick={() => { setMessageText(`> ${isMe ? 'You' : msg.sender?.name}: ${msg.content.slice(0, 60)}\n\n`); inputRef.current?.focus(); }}
+                                                        className="h-6 w-6 rounded-full bg-muted flex items-center justify-center hover:bg-accent transition-colors" title="Reply"><Send className="h-3 w-3 rotate-180" /></button>
                                                 </div>
                                             </div>
                                         </div>
@@ -535,42 +534,59 @@ export default function MessagesChat({ conversations = [], users = [], currentUs
                 </div>
             </div>
 
-            {/* Context Menu */}
+            {/* Context Menu — WhatsApp style */}
             {ctxMenu && (
-                <div data-ctx-menu className="fixed z-50 min-w-[180px] rounded-xl border bg-card p-1 shadow-xl" style={{ top: ctxMenu.y, left: ctxMenu.x }} onClick={e => e.stopPropagation()}>
+                <div data-ctx-menu className="fixed z-50 min-w-[200px] overflow-hidden rounded-2xl border bg-card shadow-2xl" style={{ top: Math.min(ctxMenu.y, window.innerHeight - 350), left: Math.min(ctxMenu.x, window.innerWidth - 220) }} onClick={e => e.stopPropagation()}>
                     {ctxMenu.messageId ? (
                         <>
-                            <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { if (ctxMenu.messageId) togglePin(ctxMenu.messageId); setCtxMenu(null); }}>
-                                <Pin className="h-4 w-4 text-amber-500" />
-                                {activeMessages.find(m => m.id === ctxMenu.messageId)?.is_pinned ? 'Unpin' : 'Pin message'}
-                            </button>
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent">
-                                        <Smile className="h-4 w-4 text-amber-500" />React
+                            <div className="flex items-center justify-center gap-1 border-b px-3 py-2.5">
+                                {CHAT_REACTIONS.map(e => (
+                                    <button key={e} onClick={() => { if (ctxMenu.messageId) toggleReaction(ctxMenu.messageId, e); setCtxMenu(null); }}
+                                        className="rounded-full p-1.5 text-xl transition-transform hover:scale-125 hover:bg-muted">{e}</button>
+                                ))}
+                                <Popover>
+                                    <PopoverTrigger asChild>
+                                        <button className="rounded-full p-1.5 text-lg text-muted-foreground transition-transform hover:scale-125 hover:bg-muted">+</button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-2" align="end">
+                                        <div className="grid grid-cols-6 gap-1">
+                                            {['😀','😂','🥺','😍','🤔','👏','🔥','💯','😱','🎉','💪','🙌'].map(e => (
+                                                <button key={e} onClick={() => { if (ctxMenu.messageId) toggleReaction(ctxMenu.messageId, e); setCtxMenu(null); }}
+                                                    className="rounded-lg p-1 text-xl hover:bg-muted">{e}</button>
+                                            ))}
+                                        </div>
+                                    </PopoverContent>
+                                </Popover>
+                            </div>
+                            <div className="p-1">
+                                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => {
+                                    setMessageText(`> ${ctxMenu.isOwn ? 'You' : ctxMenu.senderName}: ${(ctxMenu.content ?? '').slice(0, 60)}\n\n`);
+                                    inputRef.current?.focus(); setCtxMenu(null);
+                                }}>
+                                    <Send className="h-4 w-4 text-muted-foreground rotate-180" /><span>Reply</span>
+                                </button>
+                                {ctxMenu.content && (
+                                    <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { navigator.clipboard.writeText(ctxMenu.content!).then(() => toast.success('Copied!')); setCtxMenu(null); }}>
+                                        <FileText className="h-4 w-4 text-muted-foreground" /><span>Copy</span>
                                     </button>
-                                </PopoverTrigger>
-                                <PopoverContent className="w-auto p-1.5" align="start">
-                                    <div className="flex gap-1">{CHAT_REACTIONS.map(e => <button key={e} onClick={() => { if (ctxMenu.messageId) toggleReaction(ctxMenu.messageId, e); setCtxMenu(null); }} className="rounded-lg p-1.5 text-base hover:bg-muted">{e}</button>)}</div>
-                                </PopoverContent>
-                            </Popover>
-                            {!ctxMenu.isOwn && ctxMenu.senderName && (
-                                <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { setMessageText(`@${ctxMenu.senderName} `); inputRef.current?.focus(); setCtxMenu(null); }}>
-                                    <Send className="h-4 w-4 text-blue-500 rotate-180" />Reply
+                                )}
+                                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { if (ctxMenu.messageId) togglePin(ctxMenu.messageId); setCtxMenu(null); }}>
+                                    <Pin className="h-4 w-4 text-muted-foreground" /><span>{activeMessages.find(m => m.id === ctxMenu.messageId)?.is_pinned ? 'Unpin' : 'Pin'}</span>
                                 </button>
-                            )}
-                            {ctxMenu.content && (
-                                <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { navigator.clipboard.writeText(ctxMenu.content!).then(() => toast.success('Copied!')); setCtxMenu(null); }}>
-                                    <FileText className="h-4 w-4 text-muted-foreground" />Copy text
+                                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground/50 cursor-not-allowed" disabled>
+                                    <Star className="h-4 w-4" /><span>Star</span><span className="ml-auto text-[9px]">Soon</span>
                                 </button>
-                            )}
+                                <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground/50 cursor-not-allowed" disabled>
+                                    <Trash2 className="h-4 w-4" /><span>Delete</span><span className="ml-auto text-[9px]">Soon</span>
+                                </button>
+                            </div>
                         </>
                     ) : (
-                        <>
-                            <button className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { startRecording(); setCtxMenu(null); }}>
-                                <Mic className="h-4 w-4 text-red-500" />Voice note
+                        <div className="p-1">
+                            <button className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors hover:bg-accent" onClick={() => { startRecording(); setCtxMenu(null); }}>
+                                <Mic className="h-4 w-4 text-red-500" /><span>Voice note</span>
                             </button>
-                        </>
+                        </div>
                     )}
                 </div>
             )}

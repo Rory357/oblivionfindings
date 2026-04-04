@@ -58,6 +58,7 @@ use App\Http\Controllers\Operations\PayrollExportController;
 use App\Http\Controllers\Operations\CalendarSyncController;
 use App\Http\Controllers\Operations\GeofenceController;
 use App\Http\Controllers\Operations\ClientConsentController;
+use App\Http\Controllers\ClientPersonalAssetController;
 use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\SummaryController;
 
@@ -147,6 +148,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.clients.gallery-photos.store');
         Route::delete('/clients/{client}/gallery-photos/{photo}', [ClientController::class, 'destroyGalleryPhoto'])
             ->name('operations.clients.gallery-photos.destroy');
+
+        // Personal assets
+        Route::post('/clients/{client}/personal-assets', [ClientPersonalAssetController::class, 'store'])
+            ->name('operations.clients.personal-assets.store');
+        Route::put('/clients/{client}/personal-assets/{asset}', [ClientPersonalAssetController::class, 'update'])
+            ->name('operations.clients.personal-assets.update');
+        Route::delete('/clients/{client}/personal-assets/{asset}', [ClientPersonalAssetController::class, 'destroy'])
+            ->name('operations.clients.personal-assets.destroy');
 
         // Document management
         Route::post('/clients/{client}/documents', [ClientDocumentController::class, 'store'])

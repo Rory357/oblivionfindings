@@ -22,7 +22,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
-import { Activity, AlertTriangle, BookOpen, Calendar, Camera, Car, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, ClipboardList, DollarSign, FileText, FolderOpen, Globe, GraduationCap, Heart, Home, ListTodo, Mail, MapPin, MessageSquare as MsgIcon, Pencil, Phone, Pill, Search, Shield, ShieldAlert, Star, Target, User, Users } from 'lucide-react';
+import { Activity, AlertTriangle, BookOpen, Calendar, Camera, Car, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, ClipboardList, DollarSign, FileText, FolderOpen, Globe, GraduationCap, Heart, Home, ListTodo, Mail, MapPin, MessageSquare as MsgIcon, Package, Pencil, Phone, Pill, Plus, Search, Shield, ShieldAlert, Star, Target, Trash2, User, Users } from 'lucide-react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -103,6 +103,21 @@ type Props = {
     assessments: Array<any>;
     documents: Array<any>;
     photos: GalleryPhoto[];
+    personal_assets: Array<{
+        id: number;
+        name: string;
+        category?: string | null;
+        description?: string | null;
+        serial_number?: string | null;
+        estimated_value?: string | null;
+        condition?: string | null;
+        location?: string | null;
+        photo_url?: string | null;
+        acquired_at?: string | null;
+        notes?: string | null;
+        recorded_by?: string | null;
+        created_at: string;
+    }>;
     portal_users: Array<any>;
     events: Array<any>;
     handover: Array<any>;
@@ -167,6 +182,7 @@ type TabKey =
     | 'portal'
     | 'family_notes'
     | 'respite'
+    | 'personal_assets'
     | 'assignments';
 
 type GalleryPhoto = {
@@ -189,6 +205,7 @@ export default function ClientShow({
     assessments,
     documents,
     photos,
+    personal_assets,
     portal_users,
     events,
     handover,
@@ -220,13 +237,14 @@ export default function ClientShow({
             { key: 'timeline', label: 'Timeline', icon: Activity, show: true },
             { key: 'documents', label: 'Documents', icon: FolderOpen, show: true, count: documents?.length },
             { key: 'photos', label: 'Photos', icon: Camera, show: true, count: photos?.length },
+            { key: 'personal_assets', label: 'Personal Assets', icon: Package, show: true, count: personal_assets?.length },
             { key: 'consents', label: 'Consents', icon: Shield, show: true },
             { key: 'portal', label: 'Family Portal', icon: Users, show: true },
             { key: 'family_notes', label: 'Family Notes', icon: ListTodo, show: true, count: (usePage().props as any).family_notes_open_count },
             { key: 'respite', label: 'Respite', icon: Calendar, show: !!respiteCan?.viewAny },
             { key: 'assignments', label: 'Workers', icon: Users, show: can.assign_workers || can.edit },
         ],
-        [can.assign_workers, can.edit, respiteCan?.viewAny, documents?.length, photos?.length, onboarding?.total],
+        [can.assign_workers, can.edit, respiteCan?.viewAny, documents?.length, photos?.length, personal_assets?.length, onboarding?.total],
     );
 
     // Support ?tab=onboarding deep linking from dashboard
@@ -1273,6 +1291,91 @@ export default function ClientShow({
                     </div>
                 )}
 
+                {tab === 'mar' && (() => {
+                    const emarSummary = (usePage().props as any).emar_summary;
+                    return (
+                        <div className="space-y-4">
+                            {emarSummary && (
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                    <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-3 text-center">
+                                        <div className="text-2xl font-bold text-blue-700">{emarSummary.active_medications_count}</div>
+                                        <div className="text-[10px] uppercase tracking-wider text-blue-500">Active Medications</div>
+                                    </div>
+                                    <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
+                                        <div className="text-sm font-bold text-emerald-700">
+                                            {emarSummary.last_administration
+                                                ? new Date(emarSummary.last_administration).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
+                                                : '—'}
+                                        </div>
+                                        <div className="text-[10px] uppercase tracking-wider text-emerald-500">Last Administration</div>
+                                    </div>
+                                    <div className={`rounded-xl border p-3 text-center ${emarSummary.pending_alerts_count > 0 ? 'bg-gradient-to-br from-amber-50 to-orange-50' : ''}`}>
+                                        <div className={`text-2xl font-bold ${emarSummary.pending_alerts_count > 0 ? 'text-amber-700' : 'text-slate-400'}`}>{emarSummary.pending_alerts_count}</div>
+                                        <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Active Alerts</div>
+                                    </div>
+                                    <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                                        <div className="text-sm font-bold text-violet-700">
+                                            {emarSummary.next_review_date
+                                                ? new Date(emarSummary.next_review_date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' })
+                                                : 'Not scheduled'}
+                                        </div>
+                                        <div className="text-[10px] uppercase tracking-wider text-violet-500">Next Review</div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Medications list */}
+                            <Card>
+                                <CardHeader>
+                                    <CardTitle className="flex items-center justify-between text-base">
+                                        <div className="flex items-center gap-2">
+                                            <Pill className="h-4 w-4" />
+                                            <span>Medication Administration Record</span>
+                                        </div>
+                                        <Button size="sm" className="gap-1.5 bg-blue-600 hover:bg-blue-700" asChild>
+                                            <Link href={`/emar/mar?client_id=${client.id}`}>Open eMAR</Link>
+                                        </Button>
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent>
+                                    {(medical?.medications ?? []).length > 0 ? (
+                                        <div className="space-y-2">
+                                            {(medical?.medications ?? []).map((m: any) => (
+                                                <div key={m.id} className={`flex items-center justify-between rounded-lg border p-3 ${m.active !== false ? '' : 'opacity-50'}`}>
+                                                    <div>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-sm font-semibold">{m.name}</span>
+                                                            {m.active !== false ? (
+                                                                <Badge className="border-0 bg-emerald-100 text-emerald-700 text-[9px]">Active</Badge>
+                                                            ) : (
+                                                                <Badge className="border-0 bg-slate-100 text-slate-600 text-[9px]">Ceased</Badge>
+                                                            )}
+                                                        </div>
+                                                        <div className="mt-0.5 flex gap-3 text-xs text-muted-foreground">
+                                                            {m.dosage && <span>Dosage: {m.dosage}</span>}
+                                                            {m.frequency && <span>Frequency: {m.frequency}</span>}
+                                                            {m.route && <span>Route: {m.route}</span>}
+                                                        </div>
+                                                        {m.instructions && <p className="mt-1 text-xs text-muted-foreground">{m.instructions}</p>}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="flex flex-col items-center justify-center py-12">
+                                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50">
+                                                <Pill className="h-7 w-7 text-blue-400" />
+                                            </div>
+                                            <p className="font-medium">No Medications</p>
+                                            <p className="mt-1 text-sm text-muted-foreground">No medications recorded for {client.first_name}.</p>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        </div>
+                    );
+                })()}
+
                 {tab === 'care_plans' && (() => {
                     const pageProps = usePage().props as any;
                     const summary = pageProps.care_plans_summary ?? {};
@@ -1500,9 +1603,7 @@ export default function ClientShow({
                     );
                 })()}
 
-                {/* Calendar tab navigates to dedicated page */}
-
-                {false && (() => {
+                {tab === 'calendar' && (() => {
                     const apptTypes = [
                         { value: 'gp_visit', label: 'GP Visit' },
                         { value: 'specialist', label: 'Specialist' },
@@ -2997,6 +3098,10 @@ export default function ClientShow({
                     </Card>
                 )}
 
+                {tab === 'personal_assets' && (
+                    <PersonalAssetsTab clientId={client.id} assets={personal_assets} canEdit={can.edit} firstName={client.first_name} />
+                )}
+
                 {tab === 'assignments' && (
                     <Card>
                         <CardHeader>
@@ -3541,5 +3646,306 @@ function PhotoGalleryTab({ clientId, photos, canEdit }: { clientId: number; phot
                 )}
             </CardContent>
         </Card>
+    );
+}
+
+type PersonalAsset = {
+    id: number;
+    name: string;
+    category?: string | null;
+    description?: string | null;
+    serial_number?: string | null;
+    estimated_value?: string | null;
+    condition?: string | null;
+    location?: string | null;
+    photo_url?: string | null;
+    acquired_at?: string | null;
+    notes?: string | null;
+    recorded_by?: string | null;
+    created_at: string;
+};
+
+const ASSET_CATEGORIES: Record<string, { label: string; color: string }> = {
+    mobility_aid: { label: 'Mobility Aid', color: 'bg-blue-100 text-blue-700' },
+    electronics: { label: 'Electronics', color: 'bg-violet-100 text-violet-700' },
+    furniture: { label: 'Furniture', color: 'bg-amber-100 text-amber-700' },
+    clothing: { label: 'Clothing', color: 'bg-pink-100 text-pink-700' },
+    medical_equipment: { label: 'Medical Equipment', color: 'bg-red-100 text-red-700' },
+    personal_care: { label: 'Personal Care', color: 'bg-teal-100 text-teal-700' },
+    entertainment: { label: 'Entertainment', color: 'bg-indigo-100 text-indigo-700' },
+    transport: { label: 'Transport', color: 'bg-emerald-100 text-emerald-700' },
+    other: { label: 'Other', color: 'bg-slate-100 text-slate-600' },
+};
+
+const CONDITION_COLORS: Record<string, string> = {
+    new: 'bg-emerald-100 text-emerald-700',
+    good: 'bg-blue-100 text-blue-700',
+    fair: 'bg-amber-100 text-amber-700',
+    poor: 'bg-red-100 text-red-700',
+};
+
+function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId: number; assets: PersonalAsset[]; canEdit: boolean; firstName: string }) {
+    const [showForm, setShowForm] = useState(false);
+    const [editingId, setEditingId] = useState<number | null>(null);
+
+    const form = useForm<{
+        name: string;
+        category: string;
+        description: string;
+        serial_number: string;
+        estimated_value: string;
+        condition: string;
+        location: string;
+        photo: File | null;
+        acquired_at: string;
+        notes: string;
+    }>({
+        name: '',
+        category: '',
+        description: '',
+        serial_number: '',
+        estimated_value: '',
+        condition: '',
+        location: '',
+        photo: null,
+        acquired_at: '',
+        notes: '',
+    });
+
+    const resetForm = () => {
+        form.reset();
+        setShowForm(false);
+        setEditingId(null);
+    };
+
+    const startEdit = (a: PersonalAsset) => {
+        form.setData({
+            name: a.name,
+            category: a.category ?? '',
+            description: a.description ?? '',
+            serial_number: a.serial_number ?? '',
+            estimated_value: a.estimated_value ?? '',
+            condition: a.condition ?? '',
+            location: a.location ?? '',
+            photo: null,
+            acquired_at: a.acquired_at ?? '',
+            notes: a.notes ?? '',
+        });
+        setEditingId(a.id);
+        setShowForm(true);
+    };
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (editingId) {
+            router.post(`/operations/clients/${clientId}/personal-assets/${editingId}`, {
+                ...form.data,
+                _method: 'PUT',
+            }, {
+                preserveScroll: true,
+                onSuccess: () => resetForm(),
+                forceFormData: true,
+            });
+        } else {
+            form.post(`/operations/clients/${clientId}/personal-assets`, {
+                preserveScroll: true,
+                onSuccess: () => resetForm(),
+                forceFormData: true,
+            });
+        }
+    };
+
+    const totalValue = assets.reduce((sum, a) => sum + (parseFloat(a.estimated_value ?? '0') || 0), 0);
+
+    return (
+        <div className="space-y-4">
+            {/* Header stats */}
+            <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                    <span className="text-sm font-medium">{assets.length} {assets.length === 1 ? 'item' : 'items'} registered</span>
+                    {totalValue > 0 && (
+                        <Badge variant="secondary" className="text-xs">
+                            Est. total: ${totalValue.toLocaleString('en-NZ', { minimumFractionDigits: 2 })}
+                        </Badge>
+                    )}
+                </div>
+                {canEdit && (
+                    <Button size="sm" className="gap-1.5" onClick={() => { resetForm(); setShowForm(true); }}>
+                        <Plus className="h-3.5 w-3.5" />
+                        Add Asset
+                    </Button>
+                )}
+            </div>
+
+            {/* Add/Edit form */}
+            {showForm && canEdit && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="text-base">{editingId ? 'Edit Asset' : 'Add Personal Asset'}</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={submit} className="space-y-4">
+                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                <div>
+                                    <Label>Name *</Label>
+                                    <Input value={form.data.name} onChange={e => form.setData('name', e.target.value)} placeholder="e.g. Wheelchair, PlayStation, TV" />
+                                    {form.errors.name && <p className="mt-1 text-xs text-red-600">{form.errors.name}</p>}
+                                </div>
+                                <div>
+                                    <Label>Category</Label>
+                                    <Select value={form.data.category} onValueChange={v => form.setData('category', v)}>
+                                        <SelectTrigger><SelectValue placeholder="Select category" /></SelectTrigger>
+                                        <SelectContent>
+                                            {Object.entries(ASSET_CATEGORIES).map(([k, v]) => (
+                                                <SelectItem key={k} value={k}>{v.label}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label>Condition</Label>
+                                    <Select value={form.data.condition} onValueChange={v => form.setData('condition', v)}>
+                                        <SelectTrigger><SelectValue placeholder="Select condition" /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="new">New</SelectItem>
+                                            <SelectItem value="good">Good</SelectItem>
+                                            <SelectItem value="fair">Fair</SelectItem>
+                                            <SelectItem value="poor">Poor</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label>Serial / Model Number</Label>
+                                    <Input value={form.data.serial_number} onChange={e => form.setData('serial_number', e.target.value)} />
+                                </div>
+                                <div>
+                                    <Label>Estimated Value (NZD)</Label>
+                                    <Input type="number" step="0.01" min="0" value={form.data.estimated_value} onChange={e => form.setData('estimated_value', e.target.value)} placeholder="0.00" />
+                                </div>
+                                <div>
+                                    <Label>Location</Label>
+                                    <Input value={form.data.location} onChange={e => form.setData('location', e.target.value)} placeholder="e.g. Bedroom, Lounge" />
+                                </div>
+                                <div>
+                                    <Label>Acquired Date</Label>
+                                    <Input type="date" value={form.data.acquired_at} onChange={e => form.setData('acquired_at', e.target.value)} />
+                                </div>
+                                <div>
+                                    <Label>Photo</Label>
+                                    <Input type="file" accept="image/*" onChange={e => form.setData('photo', e.target.files?.[0] ?? null)} />
+                                </div>
+                            </div>
+                            <div>
+                                <Label>Description</Label>
+                                <Textarea rows={2} value={form.data.description} onChange={e => form.setData('description', e.target.value)} placeholder="Brief description of the item" />
+                            </div>
+                            <div>
+                                <Label>Notes</Label>
+                                <Textarea rows={2} value={form.data.notes} onChange={e => form.setData('notes', e.target.value)} placeholder="Any additional notes" />
+                            </div>
+                            <div className="flex gap-2">
+                                <Button type="submit" disabled={form.processing}>
+                                    {editingId ? 'Update Asset' : 'Add Asset'}
+                                </Button>
+                                <Button type="button" variant="outline" onClick={resetForm}>Cancel</Button>
+                            </div>
+                        </form>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Asset list */}
+            {assets.length === 0 && !showForm ? (
+                <Card className="border-dashed">
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-slate-50">
+                            <Package className="h-7 w-7 text-slate-400" />
+                        </div>
+                        <p className="font-medium">No Personal Assets</p>
+                        <p className="mt-1 text-sm text-muted-foreground">Track {firstName}'s belongings like wheelchairs, electronics, and other items.</p>
+                        {canEdit && (
+                            <Button size="sm" className="mt-3 gap-1.5" onClick={() => setShowForm(true)}>
+                                <Plus className="h-3.5 w-3.5" />
+                                Add First Asset
+                            </Button>
+                        )}
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {assets.map(a => {
+                        const cat = ASSET_CATEGORIES[a.category ?? ''];
+                        return (
+                            <Card key={a.id} className="group relative overflow-hidden transition-all hover:shadow-md">
+                                {a.photo_url && (
+                                    <div className="h-32 overflow-hidden bg-slate-100">
+                                        <img src={a.photo_url} alt={a.name} className="h-full w-full object-cover" />
+                                    </div>
+                                )}
+                                <CardContent className={`space-y-2 ${a.photo_url ? 'pt-3' : 'pt-5'}`}>
+                                    <div className="flex items-start justify-between gap-2">
+                                        <div className="min-w-0">
+                                            <h4 className="truncate text-sm font-semibold">{a.name}</h4>
+                                            <div className="mt-1 flex flex-wrap gap-1">
+                                                {cat && <Badge className={`border-0 text-[10px] ${cat.color}`}>{cat.label}</Badge>}
+                                                {a.condition && <Badge className={`border-0 text-[10px] ${CONDITION_COLORS[a.condition] ?? 'bg-slate-100 text-slate-600'}`}>{a.condition}</Badge>}
+                                            </div>
+                                        </div>
+                                        {canEdit && (
+                                            <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => startEdit(a)}>
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-500 hover:text-red-700"
+                                                    onClick={() => {
+                                                        if (confirm(`Remove "${a.name}" from personal assets?`)) {
+                                                            router.delete(`/operations/clients/${clientId}/personal-assets/${a.id}`, { preserveScroll: true });
+                                                        }
+                                                    }}>
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {a.description && <p className="text-xs text-muted-foreground line-clamp-2">{a.description}</p>}
+                                    <div className="space-y-1 text-xs text-muted-foreground">
+                                        {a.estimated_value && parseFloat(a.estimated_value) > 0 && (
+                                            <div className="flex items-center gap-1.5">
+                                                <DollarSign className="h-3 w-3" />
+                                                <span>${parseFloat(a.estimated_value).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}</span>
+                                            </div>
+                                        )}
+                                        {a.location && (
+                                            <div className="flex items-center gap-1.5">
+                                                <MapPin className="h-3 w-3" />
+                                                <span>{a.location}</span>
+                                            </div>
+                                        )}
+                                        {a.serial_number && (
+                                            <div className="flex items-center gap-1.5">
+                                                <FileText className="h-3 w-3" />
+                                                <span className="font-mono text-[10px]">{a.serial_number}</span>
+                                            </div>
+                                        )}
+                                        {a.acquired_at && (
+                                            <div className="flex items-center gap-1.5">
+                                                <Calendar className="h-3 w-3" />
+                                                <span>Acquired {new Date(a.acquired_at).toLocaleDateString('en-NZ')}</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    {a.notes && (
+                                        <p className="rounded bg-slate-50 p-2 text-[11px] text-slate-600 line-clamp-2">{a.notes}</p>
+                                    )}
+                                    {a.recorded_by && (
+                                        <p className="text-[10px] text-muted-foreground">Recorded by {a.recorded_by}</p>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        );
+                    })}
+                </div>
+            )}
+        </div>
     );
 }

@@ -270,4 +270,9 @@ class Client extends Model
     {
         return $this->hasMany(Invoice::class);
     }
+
+    public function personalAssets()
+    {
+        return $this->hasMany(\App\Models\ClientPersonalAsset::class);
+    }
 }

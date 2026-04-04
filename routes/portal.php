@@ -27,6 +27,7 @@ use App\Http\Controllers\TimelineInteractionController;
 use App\Http\Controllers\ClientCalendarController;
 use App\Http\Controllers\ClientVisitRequestController;
 use App\Http\Controllers\Portal\PortalPreferenceController;
+use App\Http\Controllers\Portal\PortalLocationController;
 use App\Http\Controllers\Portal\PortalTimelineInteractionController;
 
 /**
@@ -101,6 +102,12 @@ Route::middleware(['auth'])->group(function () {
         ->name('portal.clients.documents');
     Route::post('/portal/clients/{client}/documents', [PortalDocumentController::class, 'store'])
         ->name('portal.clients.documents.store');
+
+    // Location Tracking
+    Route::get('/portal/clients/{client}/location', [PortalLocationController::class, 'index'])
+        ->name('portal.clients.location');
+    Route::get('/portal/clients/{client}/location/history', [PortalLocationController::class, 'history'])
+        ->name('portal.clients.location.history');
 
     // Photo Gallery
     Route::get('/portal/clients/{client}/photos', [PortalPhotoController::class, 'index'])

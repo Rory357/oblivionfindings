@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientDocument;
+use App\Models\ClientPersonalAsset;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationDashboardAlert;
@@ -508,6 +509,25 @@ class ClientController extends Controller
                     'original_name' => $p->original_name,
                     'uploaded_by' => $p->uploadedBy?->name,
                     'created_at' => $p->created_at?->toISOString(),
+                ])->values(),
+            'personal_assets' => ClientPersonalAsset::where('client_id', $client->id)
+                ->with('recordedBy:id,name')
+                ->orderByDesc('created_at')
+                ->get()
+                ->map(fn($a) => [
+                    'id' => $a->id,
+                    'name' => $a->name,
+                    'category' => $a->category,
+                    'description' => $a->description,
+                    'serial_number' => $a->serial_number,
+                    'estimated_value' => $a->estimated_value,
+                    'condition' => $a->condition,
+                    'location' => $a->location,
+                    'photo_url' => $a->photo_url,
+                    'acquired_at' => $a->acquired_at?->toDateString(),
+                    'notes' => $a->notes,
+                    'recorded_by' => $a->recordedBy?->name,
+                    'created_at' => $a->created_at?->toISOString(),
                 ])->values(),
             'emar_summary' => [
                 'active_medications_count' => ClientMedication::where('client_id', $client->id)
