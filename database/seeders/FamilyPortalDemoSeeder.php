@@ -6,6 +6,7 @@ use App\Models\CarePlan;
 use App\Models\CarePlanGoal;
 use App\Models\Client;
 use App\Models\ClientAppointment;
+use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
@@ -496,6 +497,66 @@ class FamilyPortalDemoSeeder extends Seeder
                     'created_by' => $workers->first()?->id,
                 ]
             );
+        }
+
+        // ── Family Notes ──────────────────────────────
+        if ($portalUser) {
+            $familyNotes = [
+                [
+                    'title' => 'Please bring warm jacket for Wednesday outing',
+                    'description' => 'The weather forecast shows it will be cold on Wednesday. She gets cold easily.',
+                    'note_type' => 'request',
+                    'priority' => 'high',
+                    'due_date' => $today->copy()->addDays(3)->toDateString(),
+                    'status' => 'open',
+                ],
+                [
+                    'title' => 'GP appointment reminder - bring medication list',
+                    'description' => 'Dr. Patel asked to bring a printed list of all current medications to the next appointment.',
+                    'note_type' => 'reminder',
+                    'priority' => 'normal',
+                    'due_date' => $today->copy()->addDays(5)->toDateString(),
+                    'due_time' => '09:30',
+                    'status' => 'open',
+                ],
+                [
+                    'title' => 'Buy new watercolour brushes',
+                    'description' => 'Her brushes are getting old. Size 6 and 10 round brushes from the art shop.',
+                    'note_type' => 'todo',
+                    'priority' => 'low',
+                    'status' => 'open',
+                ],
+                [
+                    'title' => 'Update emergency contact phone number',
+                    'description' => 'My new number is 021 987 6543. Please update in the system.',
+                    'note_type' => 'request',
+                    'priority' => 'urgent',
+                    'status' => 'open',
+                    'staff_response' => 'Updated! Thank you for letting us know.',
+                    'staff_responded_by' => $workers->first()?->id,
+                    'staff_responded_at' => now()->subHours(2),
+                ],
+                [
+                    'title' => 'Favourite TV shows list',
+                    'description' => "She loves watching: The Chase, Shortland Street, and nature documentaries. Please tune in if she seems bored in the evenings.",
+                    'note_type' => 'note',
+                    'priority' => 'normal',
+                    'status' => 'completed',
+                    'completed_at' => now()->subDays(2),
+                    'completed_by' => $workers->first()?->id,
+                ],
+            ];
+
+            foreach ($familyNotes as $fn) {
+                FamilyNote::updateOrCreate(
+                    ['client_id' => $client->id, 'title' => $fn['title']],
+                    [
+                        'created_by' => $portalUser->id,
+                        'visibility' => 'portal',
+                        ...$fn,
+                    ]
+                );
+            }
         }
 
         $this->command->info('Family portal demo data seeded successfully!');

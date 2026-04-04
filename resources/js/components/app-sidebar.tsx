@@ -187,6 +187,7 @@ function buildPortalNavItems(portalClients?: PortalClient[] | null): IconNavItem
             { id: 'dashboard', icon: LayoutGrid, label: 'Dashboard', href: `/portal/clients/${cid}/dashboard` },
             { id: 'timeline', icon: Clock, label: 'Timeline', href: `/portal/clients/${cid}/timeline` },
             { id: 'calendar', icon: CalendarDays, label: 'Calendar & Visits', href: `/portal/clients/${cid}/calendar` },
+            { id: 'family-notes', icon: CalendarDays, label: 'Notes & To-Dos', href: `/portal/clients/${cid}/family-notes` },
             { id: 'messages', icon: MessageSquareText, label: 'Messages', href: `/portal/clients/${cid}/messages`, dividerAfter: true },
             { id: 'health', icon: Heart, label: 'Health & Care', href: `/portal/clients/${cid}/health` },
             { id: 'documents', icon: FileText, label: 'Documents', href: `/portal/clients/${cid}/documents` },

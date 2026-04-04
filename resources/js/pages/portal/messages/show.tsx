@@ -3,6 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
+import { PresenceBadge } from '@/components/presence-dot';
 import { ArrowLeft, Send } from 'lucide-react';
 import { FormEvent, useEffect, useRef } from 'react';
 
@@ -20,7 +21,7 @@ type Props = {
     conversation: {
         id: number;
         title?: string | null;
-        participants: Array<{ id: number; name: string }>;
+        participants: Array<{ id: number; name: string; presence?: string }>;
     };
     messages: Message[];
 };
@@ -94,9 +95,12 @@ export default function ShowConversation({ client, conversation, messages }: Pro
                     </Button>
                     <div>
                         <h1 className="text-lg font-semibold">{conversationTitle}</h1>
-                        <p className="text-xs text-muted-foreground">
-                            {conversation.participants.map((p) => p.name).join(', ')}
-                        </p>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span>{conversation.participants.map((p) => p.name).join(', ')}</span>
+                            {conversation.participants.length > 0 && conversation.participants[0]?.presence && (
+                                <PresenceBadge status={conversation.participants[0].presence} />
+                            )}
+                        </div>
                     </div>
                 </div>
 

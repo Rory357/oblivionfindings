@@ -28,7 +28,15 @@ class FamilyDashboardController extends Controller
         $monthEnd = (clone $today)->addDays(30);
 
         // Load client with key relationships
-        $client->load(['keyWorker:id,name,email,profile_photo_path', 'supportWorkers:id,name,email,profile_photo_path', 'site:id,name,address_line_1,city', 'medicalProfile']);
+        $client->load(['keyWorker:id,name,email,profile_photo_path,last_seen_at,presence_status', 'supportWorkers:id,name,email,profile_photo_path,last_seen_at,presence_status', 'site:id,name,address_line_1,city', 'medicalProfile']);
+
+        // Helper to derive presence
+        $derivePresence = function ($user) {
+            if (!$user || !$user->last_seen_at) return 'offline';
+            if ($user->presence_status === 'online' && $user->last_seen_at->gt(now()->subMinutes(5))) return 'online';
+            if ($user->last_seen_at->gt(now()->subMinutes(15))) return 'away';
+            return 'offline';
+        };
 
         // Today's shifts
         $todayShifts = Shift::where('client_id', $client->id)
@@ -244,12 +252,44 @@ class FamilyDashboardController extends Controller
                 'name' => $client->keyWorker->name,
                 'email' => $client->keyWorker->email,
                 'avatar' => $client->keyWorker->avatar,
+                'presence' => $derivePresence($client->keyWorker),
             ] : null,
             'supportWorkers' => $client->supportWorkers->map(fn ($w) => [
                 'id' => $w->id,
                 'name' => $w->name,
                 'avatar' => $w->avatar,
+                'presence' => $derivePresence($w),
             ])->values(),
+            'currentShiftWorker' => (function () use ($client, $derivePresence) {
+                $current = Shift::where('client_id', $client->id)
+                    ->where('status', 'in_progress')
+                    ->with('staff:id,name,profile_photo_path,last_seen_at,presence_status')
+                    ->first();
+                if (!$current?->staff) return null;
+                return [
+                    'id' => $current->staff->id,
+                    'name' => $current->staff->name,
+                    'avatar' => $current->staff->avatar,
+                    'presence' => $derivePresence($current->staff),
+                    'shift_ends_at' => $current->ends_at?->toISOString(),
+                ];
+            })(),
+            'nextShiftWorker' => (function () use ($client, $derivePresence) {
+                $next = Shift::where('client_id', $client->id)
+                    ->where('status', 'scheduled')
+                    ->where('starts_at', '>', now())
+                    ->orderBy('starts_at')
+                    ->with('staff:id,name,profile_photo_path,last_seen_at,presence_status')
+                    ->first();
+                if (!$next?->staff) return null;
+                return [
+                    'id' => $next->staff->id,
+                    'name' => $next->staff->name,
+                    'avatar' => $next->staff->avatar,
+                    'presence' => $derivePresence($next->staff),
+                    'shift_starts_at' => $next->starts_at?->toISOString(),
+                ];
+            })(),
             'todayShifts' => $todayShifts->values(),
             'weekShifts' => $weekShifts->values(),
             'monthShifts' => $monthShifts->values(),
@@ -283,6 +323,23 @@ class FamilyDashboardController extends Controller
                 'dislikes' => $carePlan->content['about_me']['dislikes'] ?? null,
             ] : null,
             'emotionSummary' => $emotionSummary,
+            'familyNotesSummary' => [
+                'open' => \App\Models\FamilyNote::where('client_id', $client->id)->open()->count(),
+                'overdue' => \App\Models\FamilyNote::where('client_id', $client->id)->overdue()->count(),
+                'recent' => \App\Models\FamilyNote::where('client_id', $client->id)
+                    ->open()
+                    ->orderByDesc('created_at')
+                    ->limit(3)
+                    ->get(['id', 'title', 'note_type', 'priority', 'due_date', 'status'])
+                    ->map(fn ($n) => [
+                        'id' => $n->id,
+                        'title' => $n->title,
+                        'note_type' => $n->note_type,
+                        'priority' => $n->priority,
+                        'due_date' => $n->due_date?->toDateString(),
+                        'is_overdue' => $n->due_date && $n->due_date->isPast(),
+                    ]),
+            ],
         ]);
     }
 

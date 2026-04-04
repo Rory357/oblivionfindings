@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { useInitials } from '@/hooks/use-initials';
+import { PresenceDot, PresenceBadge } from '@/components/presence-dot';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import {
@@ -41,7 +42,8 @@ function getGreeting(): { text: string; emoji: string } {
     return { text: 'Good night', emoji: '✨' };
 }
 
-type Staff = { id: number; name: string; avatar?: string | null; email?: string };
+type Staff = { id: number; name: string; avatar?: string | null; email?: string; presence?: string };
+type ShiftWorker = { id: number; name: string; avatar?: string | null; presence?: string; shift_starts_at?: string; shift_ends_at?: string };
 type ShiftItem = {
     id: number;
     starts_at: string;
@@ -111,6 +113,8 @@ type Props = {
     site?: { id: number; name: string; address?: string | null; city?: string | null } | null;
     keyWorker?: Staff | null;
     supportWorkers: Staff[];
+    currentShiftWorker?: ShiftWorker | null;
+    nextShiftWorker?: ShiftWorker | null;
     todayShifts: ShiftItem[];
     weekShifts: ShiftItem[];
     monthShifts: MonthShift[];
@@ -150,6 +154,11 @@ type Props = {
         today: Record<string, number>;
         week: Record<string, number>;
         month: Record<string, number>;
+    };
+    familyNotesSummary?: {
+        open: number;
+        overdue: number;
+        recent: Array<{ id: number; title: string; note_type: string; priority: string; due_date?: string | null; is_overdue: boolean }>;
     };
 };
 
@@ -223,6 +232,8 @@ export default function FamilyDashboard({
     site,
     keyWorker,
     supportWorkers,
+    currentShiftWorker,
+    nextShiftWorker,
     todayShifts,
     weekShifts,
     monthShifts,
@@ -236,6 +247,7 @@ export default function FamilyDashboard({
     dailySummary,
     carePlan,
     emotionSummary,
+    familyNotesSummary,
 }: Props) {
     const getInitials = useInitials();
     const name = client.preferred_name || `${client.first_name} ${client.last_name}`.trim();
@@ -551,6 +563,41 @@ export default function FamilyDashboard({
                         </div>
                     );
                 })()}
+
+                {/* ── Family Notes Summary ────────────────────── */}
+                {familyNotesSummary && (familyNotesSummary.open > 0 || (familyNotesSummary.recent ?? []).length > 0) && (
+                    <Card>
+                        <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <span>📝</span> Your Notes & To-Dos
+                            </CardTitle>
+                            <Button variant="ghost" size="sm" asChild>
+                                <Link href={`/portal/clients/${client.id}/family-notes`}>View all →</Link>
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center gap-4 mb-3">
+                                <span className="text-sm"><span className="font-bold text-blue-700">{familyNotesSummary.open}</span> open</span>
+                                {familyNotesSummary.overdue > 0 && (
+                                    <span className="text-sm text-red-600 font-medium">{familyNotesSummary.overdue} overdue</span>
+                                )}
+                            </div>
+                            {(familyNotesSummary.recent ?? []).length > 0 && (
+                                <div className="space-y-1.5">
+                                    {familyNotesSummary.recent.map((n) => (
+                                        <div key={n.id} className={`flex items-center justify-between rounded-lg border p-2 ${n.is_overdue ? 'border-red-200 bg-red-50/30' : ''}`}>
+                                            <div className="flex items-center gap-2">
+                                                <span className="text-sm">{n.note_type === 'todo' ? '✅' : n.note_type === 'request' ? '🙏' : n.note_type === 'reminder' ? '⏰' : '📝'}</span>
+                                                <span className="text-sm font-medium">{n.title}</span>
+                                            </div>
+                                            {n.due_date && <span className="text-[10px] text-muted-foreground">{new Date(n.due_date + 'T00:00:00').toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}</span>}
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                )}
 
                 {/* ── Main content grid ──────────────────────── */}
                 <div className="grid gap-6 lg:grid-cols-3">
@@ -1028,6 +1075,68 @@ export default function FamilyDashboard({
                             </CardContent>
                         </Card>
 
+                        {/* On Shift Now */}
+                        {(currentShiftWorker || nextShiftWorker) && (
+                            <Card className="border-emerald-200 bg-emerald-50/30 dark:bg-emerald-950/10">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="flex items-center gap-2 text-base">
+                                        <span>🟢</span>
+                                        On Shift
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                    {currentShiftWorker ? (
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative">
+                                                    <Avatar className="h-10 w-10">
+                                                        <AvatarImage src={currentShiftWorker.avatar ?? undefined} />
+                                                        <AvatarFallback className="text-xs">{getInitials(currentShiftWorker.name)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={currentShiftWorker.presence ?? 'offline'} /></span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-semibold">{currentShiftWorker.name}</p>
+                                                    <p className="text-[10px] text-emerald-600">Currently on shift</p>
+                                                </div>
+                                            </div>
+                                            <Button size="sm" variant="outline" className="h-7 gap-1 text-xs" asChild>
+                                                <Link href={`/portal/clients/${client.id}/messages`}>
+                                                    <MessageSquare className="h-3 w-3" />Chat
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-muted-foreground">No one currently on shift</p>
+                                    )}
+                                    {nextShiftWorker && (
+                                        <div className="flex items-center justify-between border-t pt-2">
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative">
+                                                    <Avatar className="h-9 w-9">
+                                                        <AvatarImage src={nextShiftWorker.avatar ?? undefined} />
+                                                        <AvatarFallback className="text-xs">{getInitials(nextShiftWorker.name)}</AvatarFallback>
+                                                    </Avatar>
+                                                    <span className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={nextShiftWorker.presence ?? 'offline'} /></span>
+                                                </div>
+                                                <div>
+                                                    <p className="text-sm font-medium">{nextShiftWorker.name}</p>
+                                                    <p className="text-[10px] text-muted-foreground">
+                                                        Next: {nextShiftWorker.shift_starts_at ? new Date(nextShiftWorker.shift_starts_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' }) : '—'}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" asChild>
+                                                <Link href={`/portal/clients/${client.id}/messages`}>
+                                                    <MessageSquare className="h-3 w-3" />
+                                                </Link>
+                                            </Button>
+                                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
+                        )}
+
                         {/* Key Worker */}
                         {keyWorker && (
                             <Card>
@@ -1039,17 +1148,18 @@ export default function FamilyDashboard({
                                 </CardHeader>
                                 <CardContent>
                                     <div className="flex items-center gap-3">
-                                        <Avatar className="h-11 w-11 ring-2 ring-amber-100 ring-offset-1 dark:ring-amber-800">
-                                            <AvatarImage src={keyWorker.avatar ?? undefined} alt={keyWorker.name} />
-                                            <AvatarFallback className="bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
-                                                {getInitials(keyWorker.name)}
-                                            </AvatarFallback>
-                                        </Avatar>
+                                        <div className="relative">
+                                            <Avatar className="h-11 w-11 ring-2 ring-amber-100 ring-offset-1 dark:ring-amber-800">
+                                                <AvatarImage src={keyWorker.avatar ?? undefined} alt={keyWorker.name} />
+                                                <AvatarFallback className="bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
+                                                    {getInitials(keyWorker.name)}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <span className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={keyWorker.presence ?? 'offline'} /></span>
+                                        </div>
                                         <div>
                                             <p className="font-medium">{keyWorker.name}</p>
-                                            {keyWorker.email && (
-                                                <p className="text-xs text-muted-foreground">{keyWorker.email}</p>
-                                            )}
+                                            <PresenceBadge status={keyWorker.presence ?? 'offline'} />
                                         </div>
                                     </div>
                                     <Button variant="outline" size="sm" className="mt-3 w-full gap-1.5" asChild>
@@ -1074,14 +1184,25 @@ export default function FamilyDashboard({
                                 <CardContent>
                                     <div className="space-y-3">
                                         {supportWorkers.map((worker) => (
-                                            <div key={worker.id} className="flex items-center gap-3">
-                                                <Avatar className="h-9 w-9">
-                                                    <AvatarImage src={worker.avatar ?? undefined} alt={worker.name} />
-                                                    <AvatarFallback className="text-xs">
-                                                        {getInitials(worker.name)}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <p className="text-sm font-medium">{worker.name}</p>
+                                            <div key={worker.id} className="flex items-center justify-between">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="relative">
+                                                        <Avatar className="h-9 w-9">
+                                                            <AvatarImage src={worker.avatar ?? undefined} alt={worker.name} />
+                                                            <AvatarFallback className="text-xs">{getInitials(worker.name)}</AvatarFallback>
+                                                        </Avatar>
+                                                        <span className="absolute -bottom-0.5 -right-0.5"><PresenceDot status={worker.presence ?? 'offline'} size="sm" /></span>
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-sm font-medium">{worker.name}</p>
+                                                        <PresenceBadge status={worker.presence ?? 'offline'} />
+                                                    </div>
+                                                </div>
+                                                <Button size="sm" variant="ghost" className="h-7 gap-1 text-xs" asChild>
+                                                    <Link href={`/portal/clients/${client.id}/messages`}>
+                                                        <MessageSquare className="h-3 w-3" />
+                                                    </Link>
+                                                </Button>
                                             </div>
                                         ))}
                                     </div>

@@ -465,6 +465,34 @@ class ClientController extends Controller
                 'manage_onboarding_workflow' => $request->user()?->canDo('onboarding.edit') ?? false,
             ],
             'pending_visit_count' => \App\Models\FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
+            'family_notes_open_count' => \App\Models\FamilyNote::where('client_id', $client->id)->whereIn('status', ['open', 'in_progress'])->count(),
+            'family_notes' => \App\Models\FamilyNote::where('client_id', $client->id)
+                ->with(['creator:id,name', 'completer:id,name', 'staffResponder:id,name', 'shift:id,starts_at'])
+                ->orderByRaw("FIELD(status, 'open', 'in_progress', 'completed', 'cancelled')")
+                ->orderByDesc('created_at')
+                ->limit(50)
+                ->get()
+                ->map(fn ($n) => [
+                    'id' => $n->id,
+                    'title' => $n->title,
+                    'description' => $n->description,
+                    'note_type' => $n->note_type,
+                    'priority' => $n->priority,
+                    'status' => $n->status,
+                    'due_date' => $n->due_date?->toDateString(),
+                    'due_time' => $n->due_time,
+                    'completed_at' => $n->completed_at?->toISOString(),
+                    'completed_by_name' => $n->completer?->name,
+                    'staff_response' => $n->staff_response,
+                    'staff_responded_by_name' => $n->staffResponder?->name,
+                    'staff_responded_at' => $n->staff_responded_at?->toISOString(),
+                    'assigned_shift_date' => $n->shift?->starts_at?->format('j M'),
+                    'assigned_to_shift_id' => $n->assigned_to_shift_id,
+                    'creator_name' => $n->creator?->name,
+                    'created_by' => $n->created_by,
+                    'created_at' => $n->created_at?->toISOString(),
+                    'is_overdue' => $n->due_date && $n->due_date->isPast() && in_array($n->status, ['open', 'in_progress']),
+                ]),
             'photos' => \App\Models\ClientPhoto::where('client_id', $client->id)
                 ->with('uploadedBy:id,name')
                 ->orderByDesc('created_at')

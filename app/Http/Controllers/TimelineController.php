@@ -61,27 +61,50 @@ class TimelineController extends Controller
 
         $range = $this->parseRange($request);
 
-        $events = TimelineEvent::query()
+        $query = TimelineEvent::query()
             ->where('client_id', $client->id)
             ->whereBetween('occurred_at', [$range['from'], $range['to']])
-            ->orderBy('occurred_at')
             ->with([
                 'client:id,first_name,last_name,site_id',
                 'site:id,name',
                 'actor:id,name,email',
                 'comments' => fn ($q) => $q->whereNull('parent_id')->with(['user:id,name,role', 'replies' => fn ($r) => $r->with('user:id,name,role')->orderBy('created_at'), 'replies.likes', 'likes'])->orderBy('created_at'),
                 'reactions',
-            ])
-            ->limit(400)
-            ->get();
+            ]);
+
+        if ($request->filled('type') && $request->type !== 'all') {
+            $query->where('type', $request->type);
+        }
+
+        $events = $query->orderByDesc('occurred_at')->limit(400)->get();
+
+        $client->load(['site:id,name', 'serviceContext:id,name,type']);
 
         return inertia('timeline/index', [
             'scope' => ['type' => 'client', 'id' => $client->id, 'name' => trim($client->first_name . ' ' . $client->last_name)],
+            'client' => [
+                'id' => $client->id,
+                'first_name' => $client->first_name,
+                'last_name' => $client->last_name,
+                'preferred_name' => $client->preferred_name,
+                'nhi_number' => $client->nhi_number,
+                'status' => $client->status,
+                'avatar' => $client->avatar,
+                'profile_photo_url' => $client->profile_photo_url,
+                'funding_type' => $client->funding_type,
+                'site' => $client->site ? ['name' => $client->site->name] : null,
+                'service_context' => $client->serviceContext ? ['name' => $client->serviceContext->name] : null,
+            ],
             'range' => [
                 'from' => $range['from']->toISOString(),
                 'to' => $range['to']->toISOString(),
             ],
             'events' => $events->map(fn($e) => $this->toEventDto($e))->values(),
+            'filters' => [
+                'type' => $request->type ?? 'all',
+                'from' => $request->query('from'),
+                'to' => $request->query('to'),
+            ],
         ]);
     }
 

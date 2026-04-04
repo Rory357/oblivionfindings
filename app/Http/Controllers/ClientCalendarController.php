@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientAppointment;
+use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
@@ -118,6 +119,37 @@ class ClientCalendarController extends Controller
                     'description' => $a->description,
                     'share_with_family' => $a->share_with_family,
                     'appointment_id' => $a->id,
+                ],
+            ]);
+        }
+
+        // 4. Family notes with due dates
+        $familyNotes = FamilyNote::forClient($client->id)
+            ->withDueDate()
+            ->open()
+            ->whereBetween('due_date', [$start->toDateString(), $end->toDateString()])
+            ->get();
+
+        foreach ($familyNotes as $fn) {
+            $noteStart = $fn->due_date->copy();
+            if ($fn->due_time) {
+                [$h, $m] = explode(':', $fn->due_time);
+                $noteStart->setTime((int) $h, (int) $m);
+            }
+            $events->push([
+                'id' => 'fnote-' . $fn->id,
+                'title' => '📝 ' . $fn->title,
+                'start' => $fn->due_time ? $noteStart->toIso8601String() : $fn->due_date->toDateString(),
+                'end' => $fn->due_time ? $noteStart->copy()->addHour()->toIso8601String() : null,
+                'allDay' => !$fn->due_time,
+                'backgroundColor' => '#a78bfa',
+                'borderColor' => 'transparent',
+                'extendedProps' => [
+                    'type' => 'family_note',
+                    'note_type' => $fn->note_type,
+                    'priority' => $fn->priority,
+                    'description' => $fn->description,
+                    'status' => $fn->status,
                 ],
             ]);
         }

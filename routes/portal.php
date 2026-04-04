@@ -20,6 +20,8 @@ use App\Http\Controllers\Portal\PortalDocumentController;
 use App\Http\Controllers\Portal\PortalPhotoController;
 use App\Http\Controllers\Portal\PortalMessageController;
 use App\Http\Controllers\Portal\PortalCalendarController;
+use App\Http\Controllers\Portal\PortalFamilyNoteController;
+use App\Http\Controllers\FamilyNoteController;
 use App\Http\Controllers\Portal\PortalNotificationController;
 use App\Http\Controllers\TimelineInteractionController;
 use App\Http\Controllers\ClientCalendarController;
@@ -67,6 +69,16 @@ Route::middleware(['auth'])->group(function () {
         ->name('portal.clients.calendar');
     Route::get('/portal/clients/{client}/calendar/events', [PortalCalendarController::class, 'events'])
         ->name('portal.clients.calendar.events');
+
+    // Family Notes (Portal)
+    Route::get('/portal/clients/{client}/family-notes', [PortalFamilyNoteController::class, 'index'])
+        ->name('portal.clients.family-notes');
+    Route::post('/portal/clients/{client}/family-notes', [PortalFamilyNoteController::class, 'store'])
+        ->name('portal.clients.family-notes.store');
+    Route::put('/portal/clients/{client}/family-notes/{familyNote}', [PortalFamilyNoteController::class, 'update'])
+        ->name('portal.clients.family-notes.update');
+    Route::delete('/portal/clients/{client}/family-notes/{familyNote}', [PortalFamilyNoteController::class, 'destroy'])
+        ->name('portal.clients.family-notes.destroy');
 
     // Portal Tab Pages
     Route::get('/portal/clients/{client}/timeline', [PortalTimelineController::class, 'index'])
@@ -192,6 +204,14 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/clients/{client}/calendar/appointments', [ClientCalendarController::class, 'storeAppointment'])->name('client.calendar.appointments.store');
     Route::put('/clients/{client}/calendar/appointments/{appointment}', [ClientCalendarController::class, 'updateAppointment'])->name('client.calendar.appointments.update');
     Route::delete('/clients/{client}/calendar/appointments/{appointment}', [ClientCalendarController::class, 'destroyAppointment'])->name('client.calendar.appointments.destroy');
+
+    // Family Notes (Staff)
+    Route::post('/clients/{client}/family-notes/{familyNote}/respond', [FamilyNoteController::class, 'respond'])
+        ->name('client.family-notes.respond');
+    Route::post('/clients/{client}/family-notes/{familyNote}/status', [FamilyNoteController::class, 'updateStatus'])
+        ->name('client.family-notes.status');
+    Route::post('/clients/{client}/family-notes/{familyNote}/assign-shift', [FamilyNoteController::class, 'assignToShift'])
+        ->name('client.family-notes.assign-shift');
 
     // Visit Request Approval
     Route::get('/operations/clients/{client}/visit-requests', [ClientVisitRequestController::class, 'index'])->name('client.visit-requests.index');

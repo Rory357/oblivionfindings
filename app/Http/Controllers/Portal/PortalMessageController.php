@@ -20,7 +20,7 @@ class PortalMessageController extends Controller
         $conversations = OpsConversation::where('client_id', $client->id)
             ->where('conversation_type', 'family')
             ->whereHas('participants', fn ($q) => $q->where('user_id', $user->id))
-            ->with(['latestMessage', 'participants.user:id,name'])
+            ->with(['latestMessage', 'participants.user:id,name,last_seen_at,presence_status'])
             ->orderByDesc('updated_at')
             ->get()
             ->map(fn ($convo) => [
@@ -34,11 +34,29 @@ class PortalMessageController extends Controller
                     'sender_type' => $convo->latestMessage->sender_type,
                     'created_at' => $convo->latestMessage->created_at?->toISOString(),
                 ] : null,
-                'participants' => $convo->participants->map(fn ($p) => [
-                    'id' => $p->user?->id,
-                    'name' => $p->user?->name,
-                ])->filter(fn ($p) => $p['id'] !== null)->values(),
+                'participants' => $convo->participants->map(function ($p) {
+                    $u = $p->user;
+                    if (!$u) return null;
+                    $presence = 'offline';
+                    if ($u->presence_status === 'online' && $u->last_seen_at?->gt(now()->subMinutes(5))) $presence = 'online';
+                    elseif ($u->last_seen_at?->gt(now()->subMinutes(15))) $presence = 'away';
+                    return ['id' => $u->id, 'name' => $u->name, 'presence' => $presence];
+                })->filter()->values(),
             ]);
+
+        // Support workers for "new chat" picker
+        $client->load(['supportWorkers:id,name,profile_photo_path,last_seen_at,presence_status', 'keyWorker:id,name,profile_photo_path,last_seen_at,presence_status']);
+        $workers = collect();
+        if ($client->keyWorker) $workers->push($client->keyWorker);
+        foreach ($client->supportWorkers as $w) {
+            if (!$workers->contains('id', $w->id)) $workers->push($w);
+        }
+        $derivePresence = function ($u) {
+            if (!$u->last_seen_at) return 'offline';
+            if ($u->presence_status === 'online' && $u->last_seen_at->gt(now()->subMinutes(5))) return 'online';
+            if ($u->last_seen_at->gt(now()->subMinutes(15))) return 'away';
+            return 'offline';
+        };
 
         return inertia('portal/messages', [
             'client' => [
@@ -49,6 +67,12 @@ class PortalMessageController extends Controller
                 'profile_photo_url' => $client->profile_photo_url,
             ],
             'conversations' => $conversations->values(),
+            'supportWorkers' => $workers->map(fn ($w) => [
+                'id' => $w->id,
+                'name' => $w->name,
+                'presence' => $derivePresence($w),
+            ])->values(),
+            'currentUserId' => $user->id,
         ]);
     }
 
@@ -91,30 +115,75 @@ class PortalMessageController extends Controller
             ->update(['read_at' => now(), 'is_read' => true]);
 
         $participants = $conversation->participants()
-            ->with('user:id,name')
+            ->with('user:id,name,last_seen_at,presence_status')
             ->get()
-            ->map(fn ($p) => [
-                'id' => $p->user?->id,
-                'name' => $p->user?->name,
-            ])
-            ->filter(fn ($p) => $p['id'] !== null)
+            ->map(function ($p) {
+                $u = $p->user;
+                if (!$u) return null;
+                $presence = 'offline';
+                if ($u->presence_status === 'online' && $u->last_seen_at?->gt(now()->subMinutes(5))) $presence = 'online';
+                elseif ($u->last_seen_at?->gt(now()->subMinutes(15))) $presence = 'away';
+                return ['id' => $u->id, 'name' => $u->name, 'presence' => $presence];
+            })
+            ->filter()
             ->values();
 
-        return inertia('portal/messages/show', [
+        // Re-fetch conversations for sidebar (same as index)
+        $allConversations = OpsConversation::where('client_id', $client->id)
+            ->where('conversation_type', 'family')
+            ->whereHas('participants', fn ($q) => $q->where('user_id', $user->id))
+            ->with(['latestMessage', 'participants.user:id,name,last_seen_at,presence_status'])
+            ->orderByDesc('updated_at')
+            ->get()
+            ->map(function ($convo) {
+                return [
+                    'id' => $convo->id,
+                    'title' => $convo->title,
+                    'updated_at' => $convo->updated_at?->toISOString(),
+                    'latest_message' => $convo->latestMessage ? [
+                        'content' => $convo->latestMessage->content,
+                        'created_at' => $convo->latestMessage->created_at?->toISOString(),
+                        'sender_name' => $convo->latestMessage->sender?->name,
+                    ] : null,
+                    'participants' => $convo->participants->map(function ($p) {
+                        $u = $p->user;
+                        if (!$u) return null;
+                        $presence = 'offline';
+                        if ($u->presence_status === 'online' && $u->last_seen_at?->gt(now()->subMinutes(5))) $presence = 'online';
+                        elseif ($u->last_seen_at?->gt(now()->subMinutes(15))) $presence = 'away';
+                        return ['id' => $u->id, 'name' => $u->name, 'presence' => $presence];
+                    })->filter()->values(),
+                ];
+            });
+
+        $client->load(['supportWorkers:id,name,profile_photo_path,last_seen_at,presence_status', 'keyWorker:id,name,profile_photo_path,last_seen_at,presence_status']);
+        $workers = collect();
+        if ($client->keyWorker) $workers->push($client->keyWorker);
+        foreach ($client->supportWorkers as $w) {
+            if (!$workers->contains('id', $w->id)) $workers->push($w);
+        }
+        $derivePresence = function ($u) {
+            if (!$u->last_seen_at) return 'offline';
+            if ($u->presence_status === 'online' && $u->last_seen_at->gt(now()->subMinutes(5))) return 'online';
+            if ($u->last_seen_at->gt(now()->subMinutes(15))) return 'away';
+            return 'offline';
+        };
+
+        return inertia('portal/messages', [
             'client' => [
                 'id' => $client->id,
                 'first_name' => $client->first_name,
                 'last_name' => $client->last_name,
-                'avatar' => $client->avatar,
-                'profile_photo_url' => $client->profile_photo_url,
             ],
-            'conversation' => [
+            'conversations' => $allConversations->values(),
+            'supportWorkers' => $workers->map(fn ($w) => ['id' => $w->id, 'name' => $w->name, 'presence' => $derivePresence($w)])->values(),
+            'currentUserId' => $user->id,
+            'activeConversation' => [
                 'id' => $conversation->id,
                 'title' => $conversation->title,
-                'is_archived' => $conversation->is_archived,
+                'participants' => $participants,
             ],
-            'messages' => $messages->values(),
-            'participants' => $participants,
+            'activeMessages' => $messages->values(),
         ]);
     }
 
@@ -157,30 +226,55 @@ class PortalMessageController extends Controller
         $validated = $request->validate([
             'title' => 'nullable|string|max:200',
             'content' => 'required|string|max:5000',
+            'worker_id' => 'nullable|integer|exists:users,id',
         ]);
 
+        $workerId = $validated['worker_id'] ?? $client->key_worker_id;
+
+        // Check if a family conversation already exists between this user and worker for this client
+        if ($workerId) {
+            $existing = OpsConversation::where('client_id', $client->id)
+                ->where('conversation_type', 'family')
+                ->whereHas('participants', fn ($q) => $q->where('user_id', $user->id))
+                ->whereHas('participants', fn ($q) => $q->where('user_id', $workerId))
+                ->first();
+
+            if ($existing) {
+                // Add message to existing conversation
+                OpsMessage::create([
+                    'conversation_id' => $existing->id,
+                    'sender_id' => $user->id,
+                    'sender_type' => 'family',
+                    'content' => $validated['content'],
+                    'message_type' => 'text',
+                    'client_id' => $client->id,
+                ]);
+                $existing->touch();
+
+                return redirect("/portal/clients/{$client->id}/messages/{$existing->id}");
+            }
+        }
+
+        // Create new conversation
+        $workerName = $workerId ? \App\Models\User::find($workerId)?->name : null;
         $conversation = OpsConversation::create([
-            'title' => $validated['title'] ?? 'Family Message',
+            'title' => $workerName ? "Chat with {$workerName}" : ($validated['title'] ?? 'Family Message'),
             'conversation_type' => 'family',
             'client_id' => $client->id,
         ]);
 
-        // Add the family member as a participant
         OpsConversationParticipant::create([
             'conversation_id' => $conversation->id,
             'user_id' => $user->id,
         ]);
 
-        // Add the client's key worker as a participant if one exists
-        $client->load('keyWorker');
-        if ($client->key_worker_id) {
+        if ($workerId) {
             OpsConversationParticipant::create([
                 'conversation_id' => $conversation->id,
-                'user_id' => $client->key_worker_id,
+                'user_id' => $workerId,
             ]);
         }
 
-        // Create the first message
         OpsMessage::create([
             'conversation_id' => $conversation->id,
             'sender_id' => $user->id,
@@ -190,6 +284,6 @@ class PortalMessageController extends Controller
             'client_id' => $client->id,
         ]);
 
-        return redirect()->route('portal.messages.show', [$client, $conversation]);
+        return redirect("/portal/clients/{$client->id}/messages/{$conversation->id}");
     }
 }

@@ -22,7 +22,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
-import { Activity, BookOpen, Calendar, Camera, Car, CheckCircle2, ChevronDown, ChevronRight, Clock, ClipboardList, DollarSign, FileText, FolderOpen, Globe, GraduationCap, Heart, Home, Mail, MapPin, Pencil, Phone, Pill, Search, Shield, ShieldAlert, Star, Target, User, Users } from 'lucide-react';
+import { Activity, AlertTriangle, BookOpen, Calendar, Camera, Car, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, ClipboardList, DollarSign, FileText, FolderOpen, Globe, GraduationCap, Heart, Home, ListTodo, Mail, MapPin, MessageSquare as MsgIcon, Pencil, Phone, Pill, Search, Shield, ShieldAlert, Star, Target, User, Users } from 'lucide-react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
@@ -165,6 +165,7 @@ type TabKey =
     | 'photos'
     | 'consents'
     | 'portal'
+    | 'family_notes'
     | 'respite'
     | 'assignments';
 
@@ -221,6 +222,7 @@ export default function ClientShow({
             { key: 'photos', label: 'Photos', icon: Camera, show: true, count: photos?.length },
             { key: 'consents', label: 'Consents', icon: Shield, show: true },
             { key: 'portal', label: 'Family Portal', icon: Users, show: true },
+            { key: 'family_notes', label: 'Family Notes', icon: ListTodo, show: true, count: (usePage().props as any).family_notes_open_count },
             { key: 'respite', label: 'Respite', icon: Calendar, show: !!respiteCan?.viewAny },
             { key: 'assignments', label: 'Workers', icon: Users, show: can.assign_workers || can.edit },
         ],
@@ -271,6 +273,9 @@ export default function ClientShow({
     const [timelineTypeFilter, setTimelineTypeFilter] = useState('all');
     const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
     const [showApptForm, setShowApptForm] = useState(false);
+    const [respondingId, setRespondingId] = useState<number | null>(null);
+    const [responseText, setResponseText] = useState('');
+    const [assigningId, setAssigningId] = useState<number | null>(null);
     const [apptData, setApptData] = useState({ title: '', appointment_type: 'gp_visit', starts_at: '', ends_at: '', location: '', provider_name: '', description: '', share_with_family: true });
     const [calendarEvent, setCalendarEvent] = useState<any>(null);
 
@@ -2458,7 +2463,7 @@ export default function ClientShow({
 
                             <div className="flex justify-center pt-2">
                                 <Button variant="outline" size="sm" className="gap-1.5 text-xs" asChild>
-                                    <Link href={`/operations/clients/${client.id}/timeline`}>View Full Timeline</Link>
+                                    <Link href={`/clients/${client.id}/timeline`}>View Full Timeline</Link>
                                 </Button>
                             </div>
                         </CardContent>
@@ -2559,6 +2564,159 @@ export default function ClientShow({
                 {tab === 'photos' && (
                     <PhotoGalleryTab clientId={client.id} photos={photos} canEdit={can.edit} />
                 )}
+
+                {tab === 'family_notes' && (() => {
+                    const familyNotes = (usePage().props as any).family_notes ?? [];
+                    const openNotes = familyNotes.filter((n: any) => ['open', 'in_progress'].includes(n.status));
+                    const urgentCount = openNotes.filter((n: any) => n.priority === 'urgent').length;
+                    const overdueCount = openNotes.filter((n: any) => n.is_overdue).length;
+                    const completedThisWeek = familyNotes.filter((n: any) => n.status === 'completed' && n.completed_at && new Date(n.completed_at) >= new Date(Date.now() - 7 * 86400000)).length;
+                    const upcomingShifts = (shifts_summary?.next ? [shifts_summary.next] : []);
+
+                    const NOTE_TYPES: Record<string, { emoji: string; label: string; color: string }> = {
+                        note: { emoji: '📝', label: 'Note', color: 'bg-blue-100 text-blue-700' },
+                        todo: { emoji: '✅', label: 'To-Do', color: 'bg-emerald-100 text-emerald-700' },
+                        request: { emoji: '🙏', label: 'Request', color: 'bg-amber-100 text-amber-700' },
+                        reminder: { emoji: '⏰', label: 'Reminder', color: 'bg-purple-100 text-purple-700' },
+                    };
+                    const PRIORITY_COLORS: Record<string, string> = {
+                        low: 'bg-slate-100 text-slate-600', normal: 'bg-blue-100 text-blue-700',
+                        high: 'bg-orange-100 text-orange-700', urgent: 'bg-red-100 text-red-700',
+                    };
+                    const STATUS_COLORS: Record<string, string> = {
+                        open: 'bg-blue-100 text-blue-700', in_progress: 'bg-amber-100 text-amber-700',
+                        completed: 'bg-emerald-100 text-emerald-700', cancelled: 'bg-gray-100 text-gray-600',
+                    };
+
+                    return (
+                        <div className="space-y-4">
+                            {/* Stats */}
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                                <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-3 text-center">
+                                    <div className="text-xl font-bold text-blue-700">{openNotes.length}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-blue-500">Open</div>
+                                </div>
+                                <div className={`rounded-xl border p-3 text-center ${urgentCount > 0 ? 'bg-gradient-to-br from-red-50 to-rose-50' : ''}`}>
+                                    <div className={`text-xl font-bold ${urgentCount > 0 ? 'text-red-700' : 'text-slate-400'}`}>{urgentCount}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Urgent</div>
+                                </div>
+                                <div className={`rounded-xl border p-3 text-center ${overdueCount > 0 ? 'bg-gradient-to-br from-orange-50 to-amber-50' : ''}`}>
+                                    <div className={`text-xl font-bold ${overdueCount > 0 ? 'text-orange-700' : 'text-slate-400'}`}>{overdueCount}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Overdue</div>
+                                </div>
+                                <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
+                                    <div className="text-xl font-bold text-emerald-700">{completedThisWeek}</div>
+                                    <div className="text-[10px] uppercase tracking-wider text-emerald-500">Done This Week</div>
+                                </div>
+                            </div>
+
+                            {/* Notes list */}
+                            {familyNotes.length === 0 ? (
+                                <Card className="border-dashed">
+                                    <CardContent className="flex flex-col items-center justify-center py-12">
+                                        <span className="mb-3 text-4xl">📝</span>
+                                        <p className="font-medium">No family notes yet</p>
+                                        <p className="mt-1 text-sm text-muted-foreground">Notes and to-dos from family members will appear here.</p>
+                                    </CardContent>
+                                </Card>
+                            ) : (
+                                <div className="space-y-2">
+                                    {familyNotes.map((note: any) => {
+                                        const typeInfo = NOTE_TYPES[note.note_type] ?? NOTE_TYPES.note;
+                                        return (
+                                            <Card key={note.id} className={`overflow-hidden transition-all hover:shadow-sm ${note.is_overdue ? 'border-red-300 bg-red-50/20' : note.status === 'completed' ? 'opacity-60' : ''}`}>
+                                                <CardContent className="p-4">
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="text-sm font-semibold">{note.title}</span>
+                                                                <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium ${typeInfo.color}`}>{typeInfo.emoji} {typeInfo.label}</span>
+                                                                {note.priority !== 'normal' && <Badge className={`border-0 text-[9px] ${PRIORITY_COLORS[note.priority]}`}>{note.priority}</Badge>}
+                                                                <Badge className={`border-0 text-[9px] capitalize ${STATUS_COLORS[note.status]}`}>{note.status.replace('_', ' ')}</Badge>
+                                                                {note.is_overdue && <Badge className="border-0 bg-red-100 text-red-700 text-[9px] gap-0.5"><AlertTriangle className="h-2.5 w-2.5" />Overdue</Badge>}
+                                                                <Badge variant="outline" className="text-[9px] border-amber-200 bg-amber-50 text-amber-700">Family</Badge>
+                                                            </div>
+                                                            {note.due_date && <p className="mt-1 text-xs text-muted-foreground"><Calendar className="inline h-3 w-3 mr-1" />Due: {new Date(note.due_date + 'T00:00:00').toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}{note.due_time ? ` at ${note.due_time}` : ''}</p>}
+                                                            {note.description && <p className="mt-1.5 text-sm text-muted-foreground">{note.description.length > 200 ? note.description.slice(0, 200) + '...' : note.description}</p>}
+                                                            {note.assigned_shift_date && <p className="mt-1 text-xs text-violet-600">📋 Assigned to shift on {note.assigned_shift_date}</p>}
+                                                            {note.staff_response && (
+                                                                <div className="mt-2 rounded-lg border-l-2 border-l-blue-400 bg-blue-50/50 p-2">
+                                                                    <p className="text-xs"><span className="font-medium">{note.staff_responded_by_name}</span> <Badge variant="outline" className="ml-1 text-[9px] border-blue-200 bg-blue-50 text-blue-700">Staff</Badge></p>
+                                                                    <p className="mt-0.5 text-sm">{note.staff_response}</p>
+                                                                </div>
+                                                            )}
+                                                            {note.status === 'completed' && note.completed_by_name && (
+                                                                <p className="mt-1 text-xs text-emerald-600"><CheckCircle2 className="inline h-3 w-3 mr-1" />Completed by {note.completed_by_name}</p>
+                                                            )}
+                                                            <p className="mt-1 text-[10px] text-muted-foreground">By {note.creator_name} · {new Date(note.created_at).toLocaleDateString('en-NZ')}</p>
+                                                        </div>
+
+                                                        {/* Staff actions */}
+                                                        {['open', 'in_progress'].includes(note.status) && (
+                                                            <div className="flex shrink-0 flex-col gap-1">
+                                                                <Button size="sm" variant="outline" className="h-7 gap-1 text-[10px] text-emerald-600"
+                                                                    onClick={() => router.post(`/clients/${client.id}/family-notes/${note.id}/status`, { status: 'completed' }, { preserveScroll: true })}>
+                                                                    <Check className="h-3 w-3" />Done
+                                                                </Button>
+                                                                {note.status === 'open' && (
+                                                                    <Button size="sm" variant="outline" className="h-7 gap-1 text-[10px] text-amber-600"
+                                                                        onClick={() => router.post(`/clients/${client.id}/family-notes/${note.id}/status`, { status: 'in_progress' }, { preserveScroll: true })}>
+                                                                        <Clock className="h-3 w-3" />Start
+                                                                    </Button>
+                                                                )}
+                                                                <Button size="sm" variant="outline" className="h-7 gap-1 text-[10px]"
+                                                                    onClick={() => { setRespondingId(respondingId === note.id ? null : note.id); setResponseText(''); }}>
+                                                                    <MsgIcon className="h-3 w-3" />Reply
+                                                                </Button>
+                                                                {!note.assigned_to_shift_id && (
+                                                                    <Button size="sm" variant="outline" className="h-7 gap-1 text-[10px] text-violet-600"
+                                                                        onClick={() => setAssigningId(assigningId === note.id ? null : note.id)}>
+                                                                        <ListTodo className="h-3 w-3" />Shift
+                                                                    </Button>
+                                                                )}
+                                                            </div>
+                                                        )}
+                                                    </div>
+
+                                                    {/* Response form */}
+                                                    {respondingId === note.id && (
+                                                        <div className="mt-3 flex gap-2">
+                                                            <Input className="h-8 text-xs" placeholder="Write a response..." value={responseText} onChange={e => setResponseText(e.target.value)} />
+                                                            <Button size="sm" className="h-8" disabled={!responseText.trim()}
+                                                                onClick={() => { router.post(`/clients/${client.id}/family-notes/${note.id}/respond`, { staff_response: responseText }, { preserveScroll: true }); setRespondingId(null); }}>
+                                                                Send
+                                                            </Button>
+                                                        </div>
+                                                    )}
+
+                                                    {/* Assign to shift */}
+                                                    {assigningId === note.id && (
+                                                        <div className="mt-3 text-xs text-muted-foreground">
+                                                            <p className="mb-1 font-medium">Assign to upcoming shift:</p>
+                                                            {(() => {
+                                                                const clientShifts = (events ?? []).filter((e: any) => e.type === 'shift' && new Date(e.occurred_at) > new Date()).slice(0, 5);
+                                                                return clientShifts.length > 0 ? (
+                                                                    <div className="flex flex-wrap gap-1">
+                                                                        {clientShifts.map((s: any) => (
+                                                                            <Button key={s.id} size="sm" variant="outline" className="h-7 text-[10px]"
+                                                                                onClick={() => { router.post(`/clients/${client.id}/family-notes/${note.id}/assign-shift`, { shift_id: s.shift_id || s.id }, { preserveScroll: true }); setAssigningId(null); }}>
+                                                                                {new Date(s.occurred_at).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                                                            </Button>
+                                                                        ))}
+                                                                    </div>
+                                                                ) : <p>No upcoming shifts found.</p>;
+                                                            })()}
+                                                        </div>
+                                                    )}
+                                                </CardContent>
+                                            </Card>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })()}
 
                 {tab === 'respite' && (
                     <Card>
