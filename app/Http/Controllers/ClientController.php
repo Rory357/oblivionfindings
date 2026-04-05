@@ -529,7 +529,7 @@ class ClientController extends Controller
                     'created_at' => $p->created_at?->toISOString(),
                 ])->values(),
             'personal_assets' => ClientPersonalAsset::where('client_id', $client->id)
-                ->with('recordedBy:id,name')
+                ->with(['recordedBy:id,name', 'site:id,name', 'room:id,site_id,name', 'tracker'])
                 ->orderByDesc('created_at')
                 ->get()
                 ->map(fn($a) => [
@@ -541,6 +541,21 @@ class ClientController extends Controller
                     'estimated_value' => $a->estimated_value,
                     'condition' => $a->condition,
                     'location' => $a->location,
+                    'site_id' => $a->site_id,
+                    'site_name' => $a->site?->name,
+                    'room_id' => $a->room_id,
+                    'room_name' => $a->room?->name,
+                    'tracker_hardware_id' => $a->tracker_hardware_id,
+                    'tracker' => $a->tracker ? [
+                        'id' => $a->tracker->id,
+                        'name' => $a->tracker->name,
+                        'status' => $a->tracker->status,
+                        'last_seen_at' => $a->tracker->last_seen_at?->toISOString(),
+                        'battery' => $a->tracker->meta['battery'] ?? null,
+                        'lat' => $a->tracker->meta['lat'] ?? null,
+                        'lng' => $a->tracker->meta['lng'] ?? null,
+                        'speed' => $a->tracker->meta['speed'] ?? null,
+                    ] : null,
                     'photo_url' => $a->photo_url,
                     'acquired_at' => $a->acquired_at?->toDateString(),
                     'notes' => $a->notes,
@@ -564,6 +579,31 @@ class ClientController extends Controller
                     'recorded_by' => $a->recordedBy?->name,
                     'created_at' => $a->created_at?->toISOString(),
                 ])->values(),
+            'asset_locations' => \App\Models\Site::where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name', 'type'])
+                ->map(fn($s) => [
+                    'id' => $s->id,
+                    'name' => $s->name,
+                    'type' => $s->type,
+                    'rooms' => $s->houseRooms()->where('is_active', true)->orderBy('sort_order')->get(['id', 'name'])->map(fn($r) => [
+                        'id' => $r->id,
+                        'name' => $r->name,
+                    ]),
+                ]),
+            'available_trackers' => \App\Models\LocationHardware::where('category', \App\Models\LocationHardware::CATEGORY_TRACKER)
+                ->whereNotIn('status', ['retired'])
+                ->orderBy('name')
+                ->get(['id', 'name', 'status', 'last_seen_at', 'serial', 'site_id', 'meta'])
+                ->map(fn($t) => [
+                    'id' => $t->id,
+                    'name' => $t->name,
+                    'status' => $t->status,
+                    'serial' => $t->serial,
+                    'site_id' => $t->site_id,
+                    'last_seen_at' => $t->last_seen_at?->toISOString(),
+                    'battery' => $t->meta['battery'] ?? null,
+                ]),
             'emar_summary' => [
                 'active_medications_count' => ClientMedication::where('client_id', $client->id)
                     ->where('active', true)
@@ -583,7 +623,141 @@ class ClientController extends Controller
                     ->value('scheduled_date'),
             ],
             'location' => $this->buildLocationData($client),
+            'calendar_events' => $this->buildCalendarEvents($client),
         ]);
+    }
+
+    private function buildCalendarEvents(Client $client): array
+    {
+        $start = now()->startOfMonth();
+        $end = now()->endOfMonth()->addDays(7);
+        $events = collect();
+
+        // Shifts
+        $shifts = Shift::where('client_id', $client->id)
+            ->whereBetween('starts_at', [$start, $end])
+            ->with('staff:id,name')
+            ->get();
+        foreach ($shifts as $s) {
+            $events->push([
+                'id' => 'shift-' . $s->id,
+                'title' => ($s->staff?->name ?? 'Staff TBC') . ' — Shift',
+                'start' => $s->starts_at?->toIso8601String(),
+                'end' => $s->ends_at?->toIso8601String(),
+                'backgroundColor' => $s->status === 'completed' ? '#10b981' : ($s->status === 'cancelled' ? '#94a3b8' : '#3b82f6'),
+                'borderColor' => 'transparent',
+                'extendedProps' => ['type' => 'shift', 'status' => $s->status, 'staff_name' => $s->staff?->name, 'notes' => $s->notes, 'location' => $s->location],
+            ]);
+        }
+
+        // Family visits
+        $visits = \App\Models\FamilyVisitRequest::where('client_id', $client->id)
+            ->where('status', 'approved')
+            ->whereBetween('requested_date', [$start->toDateString(), $end->toDateString()])
+            ->with('user:id,name')
+            ->get();
+        foreach ($visits as $v) {
+            $vStart = $v->requested_date->copy();
+            if ($v->preferred_time_start) { [$h, $m] = explode(':', $v->preferred_time_start); $vStart->setTime((int)$h, (int)$m); }
+            $vEnd = $v->requested_date->copy();
+            if ($v->preferred_time_end) { [$h, $m] = explode(':', $v->preferred_time_end); $vEnd->setTime((int)$h, (int)$m); } else { $vEnd = $vStart->copy()->addHour(); }
+            $events->push([
+                'id' => 'visit-' . $v->id,
+                'title' => 'Family Visit — ' . ($v->user?->name ?? 'Family'),
+                'start' => $vStart->toIso8601String(),
+                'end' => $vEnd->toIso8601String(),
+                'backgroundColor' => '#22c55e',
+                'borderColor' => 'transparent',
+                'extendedProps' => ['type' => 'family_visit', 'requester' => $v->user?->name, 'notes' => $v->notes],
+            ]);
+        }
+
+        // Appointments
+        $appointments = \App\Models\ClientAppointment::where('client_id', $client->id)
+            ->where('starts_at', '>=', $start)
+            ->where('starts_at', '<=', $end)
+            ->where('status', '!=', 'cancelled')
+            ->get();
+        $typeColors = ['gp_visit' => '#f59e0b', 'specialist' => '#8b5cf6', 'therapy' => '#ec4899', 'activity' => '#06b6d4', 'reminder' => '#6366f1', 'other' => '#64748b'];
+        foreach ($appointments as $a) {
+            $events->push([
+                'id' => 'appt-' . $a->id,
+                'title' => $a->title,
+                'start' => $a->starts_at->toIso8601String(),
+                'end' => $a->ends_at?->toIso8601String(),
+                'backgroundColor' => $typeColors[$a->appointment_type] ?? '#64748b',
+                'borderColor' => 'transparent',
+                'extendedProps' => ['type' => 'appointment', 'appointment_type' => $a->appointment_type, 'status' => $a->status, 'location' => $a->location, 'provider_name' => $a->provider_name, 'description' => $a->description],
+            ]);
+        }
+
+        // Medication administrations
+        $medAdmins = ClientMedicationAdministration::where('client_id', $client->id)
+            ->whereBetween('scheduled_for', [$start, $end])
+            ->with('medication:id,name,dosage,route')
+            ->get();
+        foreach ($medAdmins as $ma) {
+            $medName = $ma->medication?->name ?? 'Medication';
+            $statusColor = match ($ma->status) { 'given' => '#10b981', 'refused' => '#f97316', 'withheld' => '#eab308', 'missed' => '#ef4444', default => '#ec4899' };
+            $statusLabel = match ($ma->status) { 'given' => 'Given', 'refused' => 'Refused', 'withheld' => 'Withheld', 'missed' => 'Missed', default => 'Scheduled' };
+            $events->push([
+                'id' => 'med-' . $ma->id,
+                'title' => $medName . ' — ' . $statusLabel,
+                'start' => $ma->scheduled_for?->toIso8601String() ?? $ma->administered_at?->toIso8601String(),
+                'backgroundColor' => $statusColor,
+                'borderColor' => 'transparent',
+                'extendedProps' => ['type' => 'medication', 'status' => $ma->status, 'medication_name' => $medName, 'dosage' => $ma->medication?->dosage],
+            ]);
+        }
+
+        // Scheduled medication doses — only show for today ± 3 days to avoid clutter
+        $medStart = now()->subDays(3)->startOfDay();
+        $medEnd = now()->addDays(3)->endOfDay();
+        $activeMeds = ClientMedication::where('client_id', $client->id)->where('active', true)->whereNull('ceased_at')->where('is_prn', false)->get();
+        foreach ($activeMeds as $med) {
+            $times = $this->parseFrequencyTimes($med->frequency);
+            if (empty($times)) continue;
+            $current = $medStart->copy();
+            while ($current->lte($medEnd)) {
+                foreach ($times as $time) {
+                    $scheduledAt = $current->copy()->setTimeFromTimeString($time);
+                    $alreadyRecorded = $medAdmins->contains(fn ($ma) => $ma->client_medication_id === $med->id && $ma->scheduled_for && $ma->scheduled_for->format('Y-m-d H:i') === $scheduledAt->format('Y-m-d H:i'));
+                    if (!$alreadyRecorded && $scheduledAt->gte($start) && $scheduledAt->lte($end)) {
+                        $isPast = $scheduledAt->lt(now());
+                        $events->push([
+                            'id' => 'medsched-' . $med->id . '-' . $scheduledAt->format('YmdHi'),
+                            'title' => $med->name . ($isPast ? ' — Overdue' : ' — Due'),
+                            'start' => $scheduledAt->toIso8601String(),
+                            'backgroundColor' => $isPast ? '#ef4444' : '#ec4899',
+                            'borderColor' => 'transparent',
+                            'extendedProps' => ['type' => 'medication', 'status' => $isPast ? 'overdue' : 'scheduled', 'medication_name' => $med->name, 'dosage' => $med->dosage],
+                        ]);
+                    }
+                }
+                $current->addDay();
+            }
+        }
+
+        return $events->values()->toArray();
+    }
+
+    private function parseFrequencyTimes(?string $frequency): array
+    {
+        if (!$frequency) return [];
+        $freq = strtolower(trim($frequency));
+        if (preg_match_all('/(\d{1,2}):(\d{2})/', $freq, $matches, PREG_SET_ORDER)) {
+            return array_map(fn ($m) => sprintf('%02d:%02d', $m[1], $m[2]), $matches);
+        }
+        return match (true) {
+            str_contains($freq, 'twice daily'), str_contains($freq, 'bd'), str_contains($freq, 'bid') => ['08:00', '20:00'],
+            str_contains($freq, 'three times'), str_contains($freq, 'tds'), str_contains($freq, 'tid') => ['08:00', '14:00', '20:00'],
+            str_contains($freq, 'four times'), str_contains($freq, 'qds'), str_contains($freq, 'qid') => ['08:00', '12:00', '16:00', '20:00'],
+            str_contains($freq, 'lunch') => ['12:00'],
+            str_contains($freq, 'evening'), str_contains($freq, 'night'), str_contains($freq, 'nocte') => ['20:00'],
+            str_contains($freq, 'morning'), str_contains($freq, 'mane') => ['08:00'],
+            str_contains($freq, 'once daily'), str_contains($freq, 'daily'), str_contains($freq, 'od') => ['08:00'],
+            default => [],
+        };
     }
 
     private function buildOnboardingChecklist(Client $client): array

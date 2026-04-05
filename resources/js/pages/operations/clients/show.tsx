@@ -22,13 +22,14 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
-import { Activity, AlertTriangle, BookOpen, Calendar, Camera, Car, Check, CheckCircle2, ChevronDown, ChevronRight, Clock, ClipboardList, DollarSign, FileText, FolderOpen, Globe, GraduationCap, Heart, Home, ListTodo, Mail, MapPin, MessageSquare as MsgIcon, Package, Pencil, Phone, Pill, Plus, Search, Shield, ShieldAlert, Star, Target, Trash2, User, Users } from 'lucide-react';
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Activity, AlertTriangle, BookOpen, Calendar, CalendarDays, Camera, Car, Check, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Clock, ClipboardList, DollarSign, FileText, FolderOpen, Globe, GraduationCap, Heart, Home, ListTodo, Mail, MapPin, MessageSquare as MsgIcon, Package, Pencil, Phone, Pill, Plus, Search, Shield, ShieldAlert, Star, Stethoscope, Target, Trash2, User, Users } from 'lucide-react';
 import FullCalendar from '@fullcalendar/react';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import timeGridPlugin from '@fullcalendar/timegrid';
 import listPlugin from '@fullcalendar/list';
 import interactionPlugin from '@fullcalendar/interaction';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { HalfMoonGauge, ProgressRing, HorizontalBarChart } from '@/components/fleet-charts';
 import { DonutChart } from '@/components/ops-stat-card';
 import ClientLocationTab, { type ClientLocationData } from '@/components/client-location-tab';
@@ -42,6 +43,34 @@ function Field({ label, value }: { label: string; value: string }) {
     );
 }
 
+type AssetLocation = {
+    id: number;
+    name: string;
+    type: string;
+    rooms: Array<{ id: number; name: string }>;
+};
+
+type AvailableTracker = {
+    id: number;
+    name: string;
+    status: string;
+    serial?: string | null;
+    site_id?: number | null;
+    last_seen_at?: string | null;
+    battery?: number | null;
+};
+
+type AssetTracker = {
+    id: number;
+    name: string;
+    status: string;
+    last_seen_at?: string | null;
+    battery?: number | null;
+    lat?: number | null;
+    lng?: number | null;
+    speed?: number | null;
+};
+
 type PersonalAsset = {
     id: number;
     name: string;
@@ -51,6 +80,12 @@ type PersonalAsset = {
     estimated_value?: string | null;
     condition?: string | null;
     location?: string | null;
+    site_id?: number | null;
+    site_name?: string | null;
+    room_id?: number | null;
+    room_name?: string | null;
+    tracker_hardware_id?: number | null;
+    tracker?: AssetTracker | null;
     photo_url?: string | null;
     acquired_at?: string | null;
     notes?: string | null;
@@ -1891,169 +1926,9 @@ export default function ClientShow({
                     );
                 })()}
 
-                {tab === 'calendar' && (() => {
-                    const apptTypes = [
-                        { value: 'gp_visit', label: 'GP Visit' },
-                        { value: 'specialist', label: 'Specialist' },
-                        { value: 'therapy', label: 'Therapy' },
-                        { value: 'activity', label: 'Activity' },
-                        { value: 'reminder', label: 'Reminder' },
-                        { value: 'other', label: 'Other' },
-                    ];
-
-                    const submitAppointment = () => {
-                        if (!apptData.title || !apptData.starts_at) return;
-                        fetch(`/clients/${client.id}/calendar/appointments`, {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json', 'X-CSRF-TOKEN': (document.querySelector('meta[name="csrf-token"]') as any)?.content ?? '' },
-                            body: JSON.stringify(apptData),
-                        }).then(r => r.json()).then(() => {
-                            setShowApptForm(false);
-                            setApptData({ title: '', appointment_type: 'gp_visit', starts_at: '', ends_at: '', location: '', provider_name: '', description: '', share_with_family: true });
-                            router.reload({ only: ['events'] });
-                        });
-                    };
-
-                    return (
-                        <div className="space-y-4">
-                            <div className="flex items-center justify-between">
-                                <div className="flex flex-wrap gap-3 text-xs">
-                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-blue-500" />Shifts</div>
-                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-green-500" />Family Visits</div>
-                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-amber-500" />GP Visits</div>
-                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-purple-500" />Specialist</div>
-                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-pink-500" />Therapy</div>
-                                    <div className="flex items-center gap-1.5"><div className="h-3 w-3 rounded-full bg-cyan-500" />Activities</div>
-                                </div>
-                                <Button size="sm" className="gap-1.5" onClick={() => setShowApptForm(!showApptForm)}>
-                                    <Calendar className="h-3.5 w-3.5" />{showApptForm ? 'Cancel' : 'Schedule Appointment'}
-                                </Button>
-                            </div>
-
-                            {/* Appointment Form */}
-                            {showApptForm && (
-                                <Card className="border-primary/20">
-                                    <CardContent className="p-4 space-y-3">
-                                        <div className="grid gap-3 sm:grid-cols-3">
-                                            <div className="space-y-1">
-                                                <Label className="text-xs">Title *</Label>
-                                                <Input className="h-8 text-xs" placeholder="GP Visit - Dr. Patel" value={apptData.title} onChange={e => setApptData({ ...apptData, title: e.target.value })} />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs">Type</Label>
-                                                <Select value={apptData.appointment_type} onValueChange={v => setApptData({ ...apptData, appointment_type: v })}>
-                                                    <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                                                    <SelectContent>
-                                                        {apptTypes.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
-                                                    </SelectContent>
-                                                </Select>
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs">Provider</Label>
-                                                <Input className="h-8 text-xs" placeholder="Dr. Patel" value={apptData.provider_name} onChange={e => setApptData({ ...apptData, provider_name: e.target.value })} />
-                                            </div>
-                                        </div>
-                                        <div className="grid gap-3 sm:grid-cols-3">
-                                            <div className="space-y-1">
-                                                <Label className="text-xs">Start *</Label>
-                                                <Input type="datetime-local" className="h-8 text-xs" value={apptData.starts_at} onChange={e => setApptData({ ...apptData, starts_at: e.target.value })} />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs">End</Label>
-                                                <Input type="datetime-local" className="h-8 text-xs" value={apptData.ends_at} onChange={e => setApptData({ ...apptData, ends_at: e.target.value })} />
-                                            </div>
-                                            <div className="space-y-1">
-                                                <Label className="text-xs">Location</Label>
-                                                <Input className="h-8 text-xs" placeholder="Riverside Medical Centre" value={apptData.location} onChange={e => setApptData({ ...apptData, location: e.target.value })} />
-                                            </div>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Notes</Label>
-                                            <Textarea className="min-h-[60px] text-xs" value={apptData.description} onChange={e => setApptData({ ...apptData, description: e.target.value })} />
-                                        </div>
-                                        <div className="flex items-center justify-between">
-                                            <label className="flex items-center gap-2 text-xs">
-                                                <Checkbox checked={apptData.share_with_family} onCheckedChange={v => setApptData({ ...apptData, share_with_family: !!v })} />
-                                                Share with family
-                                            </label>
-                                            <Button size="sm" onClick={submitAppointment} disabled={!apptData.title || !apptData.starts_at}>
-                                                Save Appointment
-                                            </Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-
-                            {/* Calendar */}
-                            <Card>
-                                <CardContent className="p-2 md:p-4">
-                                    <FullCalendar
-                                        plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
-                                        initialView="dayGridMonth"
-                                        headerToolbar={{
-                                            left: 'prev,next today',
-                                            center: 'title',
-                                            right: 'dayGridMonth,timeGridWeek,timeGridDay,listWeek',
-                                        }}
-                                        events={(info, successCallback) => {
-                                            fetch(`/clients/${client.id}/calendar/events?start=${info.startStr}&end=${info.endStr}`)
-                                                .then(r => r.json())
-                                                .then(data => successCallback(data))
-                                                .catch(() => successCallback([]));
-                                        }}
-                                        selectable={true}
-                                        select={(info) => {
-                                            setApptData({
-                                                ...apptData,
-                                                starts_at: info.start.toISOString().slice(0, 16),
-                                                ends_at: info.end ? info.end.toISOString().slice(0, 16) : '',
-                                            });
-                                            setShowApptForm(true);
-                                        }}
-                                        eventClick={(info) => {
-                                            setCalendarEvent({
-                                                title: info.event.title,
-                                                start: info.event.start,
-                                                end: info.event.end,
-                                                ...info.event.extendedProps,
-                                            });
-                                        }}
-                                        height="auto"
-                                        nowIndicator={true}
-                                        eventTimeFormat={{ hour: '2-digit', minute: '2-digit', hour12: false }}
-                                    />
-                                </CardContent>
-                            </Card>
-
-                            {/* Event Detail Panel */}
-                            {calendarEvent && (
-                                <Card className="border-primary/20">
-                                    <CardContent className="p-4">
-                                        <div className="flex items-start justify-between">
-                                            <div>
-                                                <h3 className="text-sm font-semibold">{calendarEvent.title}</h3>
-                                                <p className="mt-1 text-xs text-muted-foreground capitalize">{calendarEvent.type?.replace('_', ' ')} {calendarEvent.appointment_type ? `— ${calendarEvent.appointment_type.replace('_', ' ')}` : ''}</p>
-                                                {calendarEvent.start && (
-                                                    <p className="mt-1 text-xs text-muted-foreground">
-                                                        {new Date(calendarEvent.start).toLocaleString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                                                        {calendarEvent.end && ` — ${new Date(calendarEvent.end).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}`}
-                                                    </p>
-                                                )}
-                                                {calendarEvent.location && <p className="mt-1 text-xs"><strong>Location:</strong> {calendarEvent.location}</p>}
-                                                {calendarEvent.provider_name && <p className="mt-0.5 text-xs"><strong>Provider:</strong> {calendarEvent.provider_name}</p>}
-                                                {calendarEvent.staff_name && <p className="mt-0.5 text-xs"><strong>Staff:</strong> {calendarEvent.staff_name}</p>}
-                                                {calendarEvent.status && <Badge variant="outline" className="mt-1 text-[9px] capitalize">{calendarEvent.status}</Badge>}
-                                                {calendarEvent.description && <p className="mt-2 text-sm text-muted-foreground">{calendarEvent.description}</p>}
-                                                {calendarEvent.notes && <p className="mt-2 text-sm text-muted-foreground">{calendarEvent.notes}</p>}
-                                            </div>
-                                            <Button size="sm" variant="ghost" onClick={() => setCalendarEvent(null)}>Close</Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            )}
-                        </div>
-                    );
-                })()}
+                {tab === 'calendar' && (
+                    <ClientCalendarTab clientId={client.id} clientFirstName={client.first_name} initialEvents={(pageProps as any).calendar_events ?? []} />
+                )}
 
                 {tab === 'progress_notes' && (() => {
                     const pageProps = usePage().props as any;
@@ -3395,7 +3270,7 @@ export default function ClientShow({
                 )}
 
                 {tab === 'personal_assets' && (
-                    <PersonalAssetsTab clientId={client.id} assets={personal_assets} canEdit={can.edit} firstName={client.first_name} />
+                    <PersonalAssetsTab clientId={client.id} assets={personal_assets} canEdit={can.edit} firstName={client.first_name} locations={(pageProps as any).asset_locations ?? []} clientSiteId={client.site?.id ?? null} availableTrackers={(pageProps as any).available_trackers ?? []} />
                 )}
 
                 {tab === 'assignments' && (
@@ -3603,6 +3478,32 @@ function SupportPlanTab({
     );
 }
 
+const ASSESSMENT_TYPES: Record<string, { label: string; icon: string; border: string; bg: string; gradient: string }> = {
+    interrai:          { label: 'InterRAI',                icon: '\u{1F3E5}', border: 'border-l-blue-400',    bg: 'bg-blue-100',    gradient: 'from-blue-50 to-sky-50' },
+    whodas:            { label: 'WHODAS 2.0',              icon: '\u{1F4CA}', border: 'border-l-violet-400',  bg: 'bg-violet-100',  gradient: 'from-violet-50 to-purple-50' },
+    risk:              { label: 'Risk Assessment',         icon: '\u26A0\uFE0F', border: 'border-l-red-400',     bg: 'bg-red-100',     gradient: 'from-red-50 to-rose-50' },
+    medication_review: { label: 'Medication Review',       icon: '\u{1F48A}', border: 'border-l-emerald-400', bg: 'bg-emerald-100', gradient: 'from-emerald-50 to-green-50' },
+    honos:             { label: 'HoNOS',                   icon: '\u{1F9E0}', border: 'border-l-amber-400',   bg: 'bg-amber-100',   gradient: 'from-amber-50 to-yellow-50' },
+    functional:        { label: 'Functional Assessment',   icon: '\u{1F3C3}', border: 'border-l-cyan-400',    bg: 'bg-cyan-100',    gradient: 'from-cyan-50 to-teal-50' },
+    nasc:              { label: 'Needs Assessment (NASC)', icon: '\u{1F4CB}', border: 'border-l-indigo-400',  bg: 'bg-indigo-100',  gradient: 'from-indigo-50 to-blue-50' },
+    behaviour_support: { label: 'Behaviour Support',       icon: '\u{1F91D}', border: 'border-l-pink-400',    bg: 'bg-pink-100',    gradient: 'from-pink-50 to-rose-50' },
+    other:             { label: 'Other',                   icon: '\u{1F4DD}', border: 'border-l-slate-400',   bg: 'bg-slate-100',   gradient: 'from-slate-50 to-gray-50' },
+};
+
+function getTypeStyle(type: string) {
+    if (ASSESSMENT_TYPES[type]) return ASSESSMENT_TYPES[type];
+    const lower = (type ?? '').toLowerCase();
+    if (lower.includes('interrai')) return ASSESSMENT_TYPES.interrai;
+    if (lower.includes('whodas')) return ASSESSMENT_TYPES.whodas;
+    if (lower.includes('risk')) return ASSESSMENT_TYPES.risk;
+    if (lower.includes('medication') || lower.includes('med review')) return ASSESSMENT_TYPES.medication_review;
+    if (lower.includes('honos')) return ASSESSMENT_TYPES.honos;
+    if (lower.includes('functional')) return ASSESSMENT_TYPES.functional;
+    if (lower.includes('nasc') || lower.includes('needs')) return ASSESSMENT_TYPES.nasc;
+    if (lower.includes('behaviour') || lower.includes('behavior')) return ASSESSMENT_TYPES.behaviour_support;
+    return { ...ASSESSMENT_TYPES.other, label: type || 'Assessment' };
+}
+
 function AssessmentsTab({
     clientId,
     assessments,
@@ -3615,6 +3516,8 @@ function AssessmentsTab({
     const [editingId, setEditingId] = useState<number | null>(null);
     const [expandedId, setExpandedId] = useState<number | null>(null);
     const [showForm, setShowForm] = useState(false);
+    const [deletingId, setDeletingId] = useState<number | null>(null);
+    const [customType, setCustomType] = useState('');
 
     const form = useForm<{
         type: string;
@@ -3633,205 +3536,267 @@ function AssessmentsTab({
     function startEdit(a: any) {
         setEditingId(a.id);
         setShowForm(true);
-        form.setData({
-            type: a.type ?? '',
-            score: a.score ?? '',
-            assessed_at: a.assessed_at ?? '',
-            next_review_at: a.next_review_at ?? '',
-            notes: a.notes ?? '',
-        });
+        const knownKey = Object.keys(ASSESSMENT_TYPES).find((k) => k === a.type);
+        if (knownKey) {
+            form.setData({ type: knownKey, score: a.score ?? '', assessed_at: a.assessed_at ?? '', next_review_at: a.next_review_at ?? '', notes: a.notes ?? '' });
+            setCustomType('');
+        } else {
+            form.setData({ type: 'other', score: a.score ?? '', assessed_at: a.assessed_at ?? '', next_review_at: a.next_review_at ?? '', notes: a.notes ?? '' });
+            setCustomType(a.type ?? '');
+        }
     }
 
     function resetForm() {
         setEditingId(null);
         setShowForm(false);
+        setCustomType('');
         form.reset();
     }
 
-    const overdueCount = assessments.filter((a) => a.next_review_at && new Date(a.next_review_at) < new Date()).length;
+    function submitForm() {
+        const submitType = form.data.type === 'other' && customType.trim() ? customType.trim() : form.data.type;
+        const url = editingId
+            ? `/operations/clients/${clientId}/assessments/${editingId}`
+            : `/operations/clients/${clientId}/assessments`;
+        const method = editingId ? 'put' : 'post';
+        const data = { ...form.data, type: submitType };
+        // @ts-ignore
+        router[method](url, data, { preserveScroll: true, onSuccess: () => resetForm() });
+    }
+
+    const now = new Date();
+    const overdueCount = assessments.filter((a) => a.next_review_at && new Date(a.next_review_at) < now).length;
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const completedThisMonth = assessments.filter((a) => a.assessed_at && new Date(a.assessed_at) >= startOfMonth).length;
+    const nextDue = assessments
+        .filter((a) => a.next_review_at && new Date(a.next_review_at) >= now)
+        .sort((a, b) => new Date(a.next_review_at).getTime() - new Date(b.next_review_at).getTime())[0];
+    const nextDueDays = nextDue ? Math.ceil((new Date(nextDue.next_review_at).getTime() - now.getTime()) / 86400000) : null;
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle className="flex items-center justify-between text-base">
-                    <div className="flex items-center gap-2">
-                        <span>Assessments</span>
-                        {overdueCount > 0 && (
-                            <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">{overdueCount} overdue</span>
-                        )}
+        <div className="space-y-4">
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <div className="rounded-xl border bg-gradient-to-br from-violet-50 to-purple-50 p-3 text-center">
+                    <div className="text-2xl font-bold text-violet-700">{assessments.length}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-violet-500">Total Assessments</div>
+                </div>
+                <div className="rounded-xl border bg-gradient-to-br from-red-50 to-rose-50 p-3 text-center">
+                    <div className={`text-2xl font-bold ${overdueCount > 0 ? 'text-red-600' : 'text-slate-400'}`}>{overdueCount}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-red-500">Overdue Reviews</div>
+                </div>
+                <div className="rounded-xl border bg-gradient-to-br from-emerald-50 to-green-50 p-3 text-center">
+                    <div className="text-2xl font-bold text-emerald-700">{completedThisMonth}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-emerald-500">This Month</div>
+                </div>
+                <div className="rounded-xl border bg-gradient-to-br from-blue-50 to-sky-50 p-3 text-center">
+                    <div className="text-2xl font-bold text-blue-700">{nextDueDays !== null ? `${nextDueDays}d` : '\u2014'}</div>
+                    <div className="text-[10px] uppercase tracking-wider text-blue-500">Next Due</div>
+                </div>
+            </div>
+
+            {/* Overdue Alert Banner */}
+            {overdueCount > 0 && (
+                <div className="flex items-center gap-3 rounded-xl border-2 border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-4">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
+                        <ShieldAlert className="h-5 w-5" />
                     </div>
-                    {canEdit && !showForm && (
-                        <Button size="sm" onClick={() => { resetForm(); setShowForm(true); }}>
-                            New Assessment
-                        </Button>
-                    )}
-                </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-                {canEdit && showForm && (
-                    <div className="rounded-md border p-3">
-                        <div className="flex items-center justify-between gap-3">
-                            <div className="text-sm font-medium">
-                                {editingId
-                                    ? 'Edit assessment'
-                                    : 'Add assessment'}
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={resetForm}>
+                    <div className="flex-1">
+                        <p className="text-sm font-semibold text-amber-800">{overdueCount} Assessment Review{overdueCount !== 1 ? 's' : ''} Overdue</p>
+                        <p className="text-xs text-amber-700">These assessments are past their scheduled review date.</p>
+                    </div>
+                </div>
+            )}
+
+            {/* Form with Gradient Header */}
+            {canEdit && showForm && (
+                <Card className="overflow-hidden border-violet-200">
+                    <div className="bg-gradient-to-r from-violet-500 to-purple-600 px-4 py-2.5">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-semibold text-white">
+                                {editingId ? 'Edit Assessment' : 'Record Assessment'}
+                            </h3>
+                            <Button variant="ghost" size="sm" className="text-white hover:bg-white/20 hover:text-white" onClick={resetForm}>
                                 Cancel
                             </Button>
                         </div>
-                        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                    </div>
+                    <CardContent className="p-4">
+                        <div className="grid gap-3 sm:grid-cols-2">
                             <div>
                                 <Label>Type</Label>
-                                <Input
-                                    value={form.data.type}
-                                    onChange={(e) =>
-                                        form.setData('type', e.target.value)
-                                    }
-                                    placeholder="e.g. WHODAS, risk, medication review"
-                                />
+                                <Select value={form.data.type} onValueChange={(v) => { form.setData('type', v); if (v !== 'other') setCustomType(''); }}>
+                                    <SelectTrigger><SelectValue placeholder="Select type..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {Object.entries(ASSESSMENT_TYPES).map(([key, t]) => (
+                                            <SelectItem key={key} value={key}>
+                                                <span className="flex items-center gap-2">
+                                                    <span>{t.icon}</span> {t.label}
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
                             </div>
+                            {form.data.type === 'other' && (
+                                <div>
+                                    <Label>Custom Type</Label>
+                                    <Input value={customType} onChange={(e) => setCustomType(e.target.value)} placeholder="e.g. Sensory Profile" />
+                                </div>
+                            )}
                             <div>
                                 <Label>Score (optional)</Label>
-                                <Input
-                                    value={form.data.score}
-                                    onChange={(e) =>
-                                        form.setData('score', e.target.value)
-                                    }
-                                />
+                                <Input value={form.data.score} onChange={(e) => form.setData('score', e.target.value)} />
                             </div>
                             <div>
                                 <Label>Assessed at</Label>
-                                <Input
-                                    type="date"
-                                    value={form.data.assessed_at}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'assessed_at',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
+                                <Input type="date" value={form.data.assessed_at} onChange={(e) => form.setData('assessed_at', e.target.value)} />
                             </div>
                             <div>
                                 <Label>Next review</Label>
-                                <Input
-                                    type="date"
-                                    value={form.data.next_review_at}
-                                    onChange={(e) =>
-                                        form.setData(
-                                            'next_review_at',
-                                            e.target.value,
-                                        )
-                                    }
-                                />
+                                <Input type="date" value={form.data.next_review_at} onChange={(e) => form.setData('next_review_at', e.target.value)} />
                             </div>
-                            <div className="md:col-span-2">
+                            <div className="sm:col-span-2">
                                 <Label>Notes</Label>
-                                <Textarea
-                                    rows={3}
-                                    value={form.data.notes}
-                                    onChange={(e) =>
-                                        form.setData('notes', e.target.value)
-                                    }
-                                />
+                                <Textarea rows={3} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} />
                             </div>
                         </div>
                         <div className="mt-3 flex items-center gap-2">
                             <Button
-                                onClick={() => {
-                                    const url = editingId
-                                        ? `/operations/clients/${clientId}/assessments/${editingId}`
-                                        : `/operations/clients/${clientId}/assessments`;
-                                    const method = editingId ? 'put' : 'post';
-                                    // @ts-ignore
-                                    form[method](url, {
-                                        preserveScroll: true,
-                                        onSuccess: () => resetForm(),
-                                    });
-                                }}
-                                disabled={form.processing || !form.data.type}
+                                className="bg-violet-600 hover:bg-violet-700 text-white"
+                                onClick={submitForm}
+                                disabled={form.processing || !form.data.type || (form.data.type === 'other' && !customType.trim())}
                             >
                                 Save
                             </Button>
                         </div>
-                    </div>
-                )}
+                    </CardContent>
+                </Card>
+            )}
 
-                <div className="space-y-2">
+            {/* Header Row */}
+            <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">All Assessments ({assessments.length})</span>
+                {canEdit && !showForm && (
+                    <Button size="sm" className="gap-1.5 bg-violet-600 hover:bg-violet-700 text-white" onClick={() => { resetForm(); setShowForm(true); }}>
+                        <Plus className="h-3.5 w-3.5" /> New Assessment
+                    </Button>
+                )}
+            </div>
+
+            {/* List Items or Empty State */}
+            {assessments.length === 0 ? (
+                <Card className="border-dashed">
+                    <CardContent className="flex flex-col items-center justify-center py-12">
+                        <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-violet-50">
+                            <ClipboardList className="h-7 w-7 text-violet-400" />
+                        </div>
+                        <p className="font-medium">No Assessments Recorded</p>
+                        <p className="mt-1 text-sm text-muted-foreground">Clinical assessments and reviews will appear here.</p>
+                        {canEdit && (
+                            <Button size="sm" className="mt-4 gap-1.5" onClick={() => { resetForm(); setShowForm(true); }}>
+                                <Plus className="h-3.5 w-3.5" /> Record First Assessment
+                            </Button>
+                        )}
+                    </CardContent>
+                </Card>
+            ) : (
+                <div className="space-y-3">
                     {assessments.map((a) => {
-                        const isOverdue = a.next_review_at && new Date(a.next_review_at) < new Date();
+                        const isOverdue = a.next_review_at && new Date(a.next_review_at) < now;
                         const isExpanded = expandedId === a.id;
+                        const typeStyle = getTypeStyle(a.type);
                         return (
-                        <div key={a.id} className={`rounded-md border p-3 ${isOverdue ? 'border-red-200 bg-red-50/50 dark:border-red-900/30 dark:bg-red-950/20' : ''}`}>
-                            <div
-                                className="flex items-start justify-between gap-3 cursor-pointer"
-                                onClick={() => setExpandedId(isExpanded ? null : a.id)}
-                            >
-                                <div className="flex items-start gap-2">
-                                    <div className="mt-0.5 text-muted-foreground">
-                                        {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                            <Card key={a.id} className={`overflow-hidden border-l-4 ${typeStyle.border} ${isOverdue ? 'bg-red-50/30 dark:bg-red-950/20' : ''}`}>
+                                <CardContent className="p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div className="flex items-start gap-3">
+                                            <div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${typeStyle.bg} text-lg`}>
+                                                {typeStyle.icon}
+                                            </div>
+                                            <div>
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                    <span className="text-sm font-semibold">{typeStyle.label}</span>
+                                                    {a.score && (
+                                                        <Badge className="border-0 bg-violet-100 text-violet-700 text-xs font-bold">
+                                                            Score: {a.score}
+                                                        </Badge>
+                                                    )}
+                                                    {isOverdue && (
+                                                        <Badge className="border-0 bg-red-100 text-red-700 text-[9px] font-medium">
+                                                            Review Overdue
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-slate-500">
+                                                    {a.assessed_at && (
+                                                        <span className="flex items-center gap-1">
+                                                            <Calendar className="h-3 w-3" />
+                                                            {new Date(a.assessed_at).toLocaleDateString('en-NZ')}
+                                                        </span>
+                                                    )}
+                                                    {a.next_review_at && (
+                                                        <span className={`flex items-center gap-1 ${isOverdue ? 'font-medium text-red-600' : ''}`}>
+                                                            <Clock className="h-3 w-3" />
+                                                            Review: {new Date(a.next_review_at).toLocaleDateString('en-NZ')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                        {canEdit && (
+                                            <div className="flex shrink-0 items-center gap-1">
+                                                <Button size="sm" variant="ghost" onClick={() => startEdit(a)}>
+                                                    <Pencil className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button size="sm" variant="ghost" className="text-red-500 hover:text-red-700" onClick={() => setDeletingId(a.id)}>
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div>
-                                        <div className="flex items-center gap-2 text-sm font-medium">
-                                            {a.type}
-                                            {a.score && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] text-slate-600">Score: {a.score}</span>}
-                                            {isOverdue && (
-                                                <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-medium text-red-700">Review overdue</span>
+                                    {a.notes && (
+                                        <div className="mt-2 ml-12">
+                                            <button className="text-xs text-violet-600 hover:underline" onClick={() => setExpandedId(isExpanded ? null : a.id)}>
+                                                {isExpanded ? 'Hide notes' : 'Show notes'}
+                                            </button>
+                                            {isExpanded && (
+                                                <div className="mt-1.5 text-xs whitespace-pre-wrap text-slate-600 border-l-2 border-violet-200 pl-3">
+                                                    {a.notes}
+                                                </div>
                                             )}
                                         </div>
-                                        <div className="mt-0.5 text-xs text-slate-500">
-                                            {[
-                                                a.assessed_at && `Assessed: ${new Date(a.assessed_at).toLocaleDateString('en-NZ')}`,
-                                                a.next_review_at && `Next review: ${new Date(a.next_review_at).toLocaleDateString('en-NZ')}`,
-                                            ].filter(Boolean).join(' · ') || '-'}
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {canEdit && (
-                                    <div className="flex shrink-0 items-center gap-2" onClick={(ev) => ev.stopPropagation()}>
-                                        <Button
-                                            size="sm"
-                                            variant="secondary"
-                                            onClick={() => startEdit(a)}
-                                        >
-                                            Edit
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="destructive"
-                                            onClick={() =>
-                                                form.delete(
-                                                    `/operations/clients/${clientId}/assessments/${a.id}`,
-                                                    {
-                                                        preserveScroll: true,
-                                                    },
-                                                )
-                                            }
-                                        >
-                                            Delete
-                                        </Button>
-                                    </div>
-                                )}
-                            </div>
-                            {isExpanded && a.notes && (
-                                <div className="mt-2 ml-6 text-xs whitespace-pre-wrap text-slate-600 border-l-2 border-slate-200 pl-3">
-                                    {a.notes}
-                                </div>
-                            )}
-                        </div>
+                                    )}
+                                </CardContent>
+                            </Card>
                         );
                     })}
-
-                    {!assessments.length && (
-                        <div className="text-sm text-slate-500 text-center py-8">
-                            No assessments recorded.
-                        </div>
-                    )}
                 </div>
-            </CardContent>
-        </Card>
+            )}
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={deletingId !== null} onOpenChange={(open) => { if (!open) setDeletingId(null); }}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Delete Assessment</DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-muted-foreground">Are you sure you want to delete this assessment? This action cannot be undone.</p>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setDeletingId(null)}>Cancel</Button>
+                        <Button variant="destructive" onClick={() => {
+                            if (deletingId) {
+                                router.delete(`/operations/clients/${clientId}/assessments/${deletingId}`, {
+                                    preserveScroll: true,
+                                    onSuccess: () => setDeletingId(null),
+                                });
+                            }
+                        }}>
+                            Delete
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+        </div>
     );
 }
 
@@ -3980,7 +3945,7 @@ const OWNERSHIP_CONFIG: Record<string, { label: string; color: string }> = {
     loaned: { label: 'On Loan', color: 'bg-amber-100 text-amber-700' },
 };
 
-function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId: number; assets: PersonalAsset[]; canEdit: boolean; firstName: string }) {
+function PersonalAssetsTab({ clientId, assets, canEdit, firstName, locations, clientSiteId, availableTrackers }: { clientId: number; assets: PersonalAsset[]; canEdit: boolean; firstName: string; locations: AssetLocation[]; clientSiteId: number | null; availableTrackers: AvailableTracker[] }) {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<number | null>(null);
     const [search, setSearch] = useState('');
@@ -3997,6 +3962,9 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
         estimated_value: string;
         condition: string;
         location: string;
+        site_id: string;
+        room_id: string;
+        tracker_hardware_id: string;
         photo: File | null;
         acquired_at: string;
         notes: string;
@@ -4019,6 +3987,9 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
         estimated_value: '',
         condition: '',
         location: '',
+        site_id: clientSiteId ? String(clientSiteId) : '',
+        room_id: '',
+        tracker_hardware_id: '',
         photo: null,
         acquired_at: '',
         notes: '',
@@ -4050,6 +4021,9 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
             estimated_value: a.estimated_value ?? '',
             condition: a.condition ?? '',
             location: a.location ?? '',
+            site_id: a.site_id ? String(a.site_id) : (clientSiteId ? String(clientSiteId) : ''),
+            room_id: a.room_id ? String(a.room_id) : '',
+            tracker_hardware_id: a.tracker_hardware_id ? String(a.tracker_hardware_id) : '',
             photo: null,
             acquired_at: a.acquired_at ?? '',
             notes: a.notes ?? '',
@@ -4105,7 +4079,7 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
         if (filterStatus !== 'all' && a.status !== filterStatus) return false;
         if (search) {
             const q = search.toLowerCase();
-            return a.name.toLowerCase().includes(q) || (a.description ?? '').toLowerCase().includes(q) || (a.serial_number ?? '').toLowerCase().includes(q) || (a.location ?? '').toLowerCase().includes(q);
+            return a.name.toLowerCase().includes(q) || (a.description ?? '').toLowerCase().includes(q) || (a.serial_number ?? '').toLowerCase().includes(q) || (a.location ?? '').toLowerCase().includes(q) || (a.site_name ?? '').toLowerCase().includes(q) || (a.room_name ?? '').toLowerCase().includes(q);
         }
         return true;
     }).sort((a, b) => {
@@ -4212,10 +4186,10 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
                                 <span className="font-medium text-slate-700">${parseFloat(a.estimated_value).toLocaleString('en-NZ', { minimumFractionDigits: 2 })}</span>
                             </div>
                         )}
-                        {a.location && (
+                        {(a.site_name || a.room_name || a.location) && (
                             <div className="flex items-center gap-1.5">
                                 <MapPin className="h-3 w-3" />
-                                <span>{a.location}</span>
+                                <span>{[a.site_name, a.room_name].filter(Boolean).join(' · ') || a.location}</span>
                             </div>
                         )}
                         {a.serial_number && (
@@ -4255,6 +4229,27 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
                             </div>
                         )}
                     </div>
+
+                    {/* Tracker info */}
+                    {a.tracker && (
+                        <div className="rounded-lg border border-sky-200 bg-gradient-to-r from-sky-50 to-blue-50 p-2 space-y-1">
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-1.5">
+                                    <span className="text-xs">📡</span>
+                                    <span className="text-[11px] font-medium text-sky-800">{a.tracker.name}</span>
+                                </div>
+                                <span className={`inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium ${a.tracker.status === 'online' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'}`}>
+                                    <span className={`h-1.5 w-1.5 rounded-full ${a.tracker.status === 'online' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                                    {a.tracker.status}
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2 text-[10px] text-sky-700">
+                                {a.tracker.battery != null && <span>Battery: {a.tracker.battery}%</span>}
+                                {a.tracker.speed != null && <span>Speed: {a.tracker.speed} km/h</span>}
+                                {a.tracker.last_seen_at && <span>Seen: {new Date(a.tracker.last_seen_at).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>}
+                            </div>
+                        </div>
+                    )}
 
                     {a.notes && (
                         <p className="rounded-lg bg-slate-50 p-2 text-[11px] text-slate-600 line-clamp-2">{a.notes}</p>
@@ -4424,8 +4419,34 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
                                         <Input type="number" step="0.01" min="0" value={form.data.estimated_value} onChange={e => form.setData('estimated_value', e.target.value)} placeholder="0.00" />
                                     </div>
                                     <div>
-                                        <Label>Location</Label>
-                                        <Input value={form.data.location} onChange={e => form.setData('location', e.target.value)} placeholder="e.g. Bedroom, Lounge" />
+                                        <Label>Site / Location</Label>
+                                        <Select value={form.data.site_id} onValueChange={v => { form.setData('site_id', v); form.setData('room_id', ''); }}>
+                                            <SelectTrigger><SelectValue placeholder="Select site" /></SelectTrigger>
+                                            <SelectContent>
+                                                {locations.map(s => (
+                                                    <SelectItem key={s.id} value={String(s.id)}>{s.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div>
+                                        <Label>Room</Label>
+                                        {(() => {
+                                            const selectedSite = locations.find(s => String(s.id) === form.data.site_id);
+                                            const rooms = selectedSite?.rooms ?? [];
+                                            return rooms.length > 0 ? (
+                                                <Select value={form.data.room_id} onValueChange={v => form.setData('room_id', v)}>
+                                                    <SelectTrigger><SelectValue placeholder="Select room" /></SelectTrigger>
+                                                    <SelectContent>
+                                                        {rooms.map(r => (
+                                                            <SelectItem key={r.id} value={String(r.id)}>{r.name}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            ) : (
+                                                <Input disabled placeholder={form.data.site_id ? 'No rooms at this site' : 'Select a site first'} />
+                                            );
+                                        })()}
                                     </div>
                                     <div>
                                         <Label>Acquired Date</Label>
@@ -4499,6 +4520,21 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
                                     <div>
                                         <Label>Insurance Reference</Label>
                                         <Input value={form.data.insurance_reference} onChange={e => form.setData('insurance_reference', e.target.value)} />
+                                    </div>
+                                    <div>
+                                        <Label>GPS Tracker</Label>
+                                        <Select value={form.data.tracker_hardware_id || 'none'} onValueChange={v => form.setData('tracker_hardware_id', v === 'none' ? '' : v)}>
+                                            <SelectTrigger><SelectValue placeholder="No tracker assigned" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="none">None</SelectItem>
+                                                {availableTrackers.map(t => (
+                                                    <SelectItem key={t.id} value={String(t.id)}>
+                                                        {t.name}{t.serial ? ` (${t.serial})` : ''} — {t.status}
+                                                        {t.battery != null ? ` ${t.battery}%` : ''}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
                                     </div>
                                     <div className="flex items-end">
                                         <div className="flex items-center gap-2">
@@ -4582,6 +4618,341 @@ function PersonalAssetsTab({ clientId, assets, canEdit, firstName }: { clientId:
                     {filtered.map(renderAssetCard)}
                 </div>
             )}
+        </div>
+    );
+}
+
+// ─── Calendar Tab ────────────────────────────────────
+const CAL_STYLES = `
+.fc { --fc-border-color: transparent; --fc-today-bg-color: transparent; --fc-neutral-bg-color: transparent; --fc-page-bg-color: transparent; --fc-non-business-color: transparent; font-family: inherit; }
+.fc .fc-scrollgrid, .fc .fc-scrollgrid-section > td, .fc .fc-scrollgrid-section > th { border: none !important; }
+.fc table, .fc th, .fc td { border: none !important; }
+.fc .fc-col-header { margin-bottom: 0.25rem; }
+.fc .fc-col-header-cell { padding: 0.5rem 0; vertical-align: middle; }
+.fc .fc-col-header-cell-cushion { display: flex; flex-direction: column; align-items: center; gap: 4px; text-decoration: none !important; padding: 0.375rem 0.75rem; border-radius: 1rem; }
+.fc .fc-col-header-cell-cushion .fc-col-header-cell-content, .fc .fc-col-header-cell-cushion { font-weight: 500; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.1em; color: hsl(var(--muted-foreground) / 0.6); }
+.fc .fc-day-today .fc-col-header-cell-cushion { background: hsl(var(--primary)); color: white !important; border-radius: 1rem; font-weight: 700; }
+.fc .fc-timegrid-axis-cushion, .fc .fc-timegrid-slot-label-cushion { font-size: 0.7rem; font-weight: 500; color: hsl(var(--muted-foreground) / 0.45); padding-right: 0.75rem; }
+.fc .fc-timegrid-slot { height: 2.5em; }
+.fc .fc-timegrid-slot-lane { border-top: 1px dotted rgba(139, 92, 246, 0.12) !important; }
+.fc .fc-timegrid-slot-minor { border-top: 1px dotted rgba(139, 92, 246, 0.06) !important; }
+.fc .fc-timegrid-col { border-right: 1px dotted rgba(139, 92, 246, 0.1) !important; }
+.fc .fc-timegrid-col:last-child { border-right: none !important; }
+.fc .fc-timegrid-divider, .fc .fc-timegrid-axis, .fc .fc-timegrid-body, .fc .fc-timegrid-slots td, .fc .fc-timegrid-slot-label { border: none !important; }
+.fc .fc-timegrid-slots tr:not(:first-child) .fc-timegrid-slot-lane { border-top: 1px solid hsl(var(--border) / 0.1) !important; }
+.fc .fc-event, .fc .fc-event-mirror { border: none !important; border-radius: 0.5rem !important; cursor: pointer; transition: all 0.15s ease; overflow: hidden; }
+.fc .fc-event:hover { transform: scale(1.01); z-index: 10 !important; box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.fc .fc-timegrid-event { border-radius: 0.5rem !important; margin: 1px 3px; min-height: 1.25em; border-left: 3px solid rgba(0,0,0,0.15) !important; }
+.fc .fc-timegrid-event .fc-event-main { padding: 0.2rem 0.4rem; font-size: 0.7rem; line-height: 1.3; }
+.fc .fc-daygrid-event { border-radius: 0.375rem !important; padding: 1px 6px; margin: 1px 2px; font-size: 0.7rem; line-height: 1.4; }
+.fc .fc-daygrid-body { border: none !important; }
+.fc .fc-scrollgrid-section-header td { border-bottom: 1px solid hsl(var(--border) / 0.15) !important; }
+.fc .fc-highlight { background: hsl(var(--primary) / 0.06) !important; border: 2px dashed hsl(var(--primary) / 0.25) !important; border-radius: 0.625rem; }
+.fc .fc-now-indicator-line { border-color: #ef4444 !important; border-width: 2px !important; z-index: 4; }
+.fc .fc-now-indicator-arrow { border-color: #ef4444 !important; border-width: 5px !important; }
+.fc .fc-day-today { background: hsl(var(--primary) / 0.02) !important; }
+.fc .fc-daygrid-day-number { font-weight: 700; font-size: 0.85rem; padding: 0.375rem; color: hsl(var(--foreground)); }
+.fc .fc-day-today .fc-daygrid-day-number { background: hsl(var(--primary)); color: white; border-radius: 9999px; width: 1.75rem; height: 1.75rem; display: inline-flex; align-items: center; justify-content: center; margin: 0.25rem; }
+.fc .fc-daygrid-day { border-right: 1px dotted rgba(139, 92, 246, 0.1) !important; border-bottom: 1px dotted rgba(139, 92, 246, 0.1) !important; min-height: 5rem; }
+.fc .fc-more-link { font-size: 0.7rem; font-weight: 600; color: hsl(var(--primary)); padding: 2px 4px; }
+.fc .fc-popover { background: white !important; border: 1px solid #e2e8f0 !important; border-radius: 0.75rem !important; box-shadow: 0 10px 40px rgba(0,0,0,0.2) !important; z-index: 9999 !important; overflow: hidden; }
+.fc .fc-popover-header { background: #f1f5f9 !important; padding: 0.625rem 0.75rem !important; font-weight: 600 !important; font-size: 0.875rem !important; color: #1e293b !important; border-bottom: 1px solid #e2e8f0 !important; }
+.fc .fc-popover-body { padding: 0.5rem !important; max-height: 300px; overflow-y: auto; background: white !important; }
+.fc .fc-popover-body .fc-daygrid-event { margin: 2px 0 !important; }
+.fc .fc-popover-close { color: #64748b !important; font-size: 1.25rem !important; }
+.dark .fc .fc-popover { background: #1e293b !important; border-color: #334155 !important; }
+.dark .fc .fc-popover-header { background: #0f172a !important; color: #e2e8f0 !important; border-bottom-color: #334155 !important; }
+.dark .fc .fc-popover-body { background: #1e293b !important; }
+.fc .fc-list { border: 1px solid hsl(var(--border) / 0.2) !important; border-radius: 1rem; overflow: hidden; }
+.fc .fc-list-event:hover td { background-color: hsl(var(--accent)); }
+.fc .fc-list-day-cushion { background: hsl(var(--muted) / 0.15); font-weight: 600; }
+.fc .fc-daygrid-day-events { max-height: 6rem; overflow: hidden; }
+.calendar-context-menu { position: fixed; z-index: 99999; min-width: 200px; background: white; border: 1px solid #e2e8f0; border-radius: 0.75rem; box-shadow: 0 10px 40px rgba(0,0,0,0.2); padding: 0.375rem; }
+.calendar-context-menu button { display: flex; align-items: center; gap: 0.5rem; width: 100%; padding: 0.5rem 0.75rem; border-radius: 0.5rem; font-size: 0.875rem; transition: background 0.1s; text-align: left; border: none; background: none; cursor: pointer; color: #1e293b; }
+.calendar-context-menu button:hover { background: #f1f5f9; }
+.calendar-context-menu hr { margin: 0.25rem 0; border-color: #e2e8f0; }
+.dark .calendar-context-menu { background: #1e293b; border-color: #334155; }
+.dark .calendar-context-menu button { color: #e2e8f0; }
+.dark .calendar-context-menu button:hover { background: #334155; }
+`;
+
+const CAL_CATEGORIES = [
+    { dot: 'bg-blue-500', label: 'Shifts', icon: CalendarDays, bg: 'bg-blue-50 dark:bg-blue-950/40' },
+    { dot: 'bg-green-500', label: 'Family Visits', icon: Users, bg: 'bg-green-50 dark:bg-green-950/40' },
+    { dot: 'bg-pink-500', label: 'Medications', icon: Pill, bg: 'bg-pink-50 dark:bg-pink-950/40' },
+    { dot: 'bg-amber-500', label: 'GP Visits', icon: Stethoscope, bg: 'bg-amber-50 dark:bg-amber-950/40' },
+    { dot: 'bg-purple-500', label: 'Specialist', icon: Heart, bg: 'bg-purple-50 dark:bg-purple-950/40' },
+    { dot: 'bg-cyan-500', label: 'Activities', icon: Calendar, bg: 'bg-cyan-50 dark:bg-cyan-950/40' },
+    { dot: 'bg-violet-400', label: 'Family Notes', icon: ListTodo, bg: 'bg-violet-50 dark:bg-violet-950/40' },
+];
+
+const CAL_APPT_TYPES = [
+    { value: 'gp_visit', label: 'GP Visit' },
+    { value: 'specialist', label: 'Specialist' },
+    { value: 'therapy', label: 'Therapy' },
+    { value: 'activity', label: 'Activity' },
+    { value: 'reminder', label: 'Reminder' },
+    { value: 'other', label: 'Other' },
+];
+
+type CalViewKey = 'dayGridMonth' | 'timeGridWeek' | 'timeGridDay' | 'listWeek';
+const CAL_VIEWS: { key: CalViewKey; label: string }[] = [
+    { key: 'dayGridMonth', label: 'Month' },
+    { key: 'timeGridWeek', label: 'Week' },
+    { key: 'timeGridDay', label: 'Day' },
+    { key: 'listWeek', label: 'List' },
+];
+
+function pad2(n: number) { return String(n).padStart(2, '0'); }
+function toLocalISO(d: Date) {
+    return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+function renderCalEventContent(eventInfo: { event: any; view: any; timeText: string }) {
+    const props = eventInfo.event.extendedProps;
+    const isTime = eventInfo.view.type.includes('timeGrid');
+    const isDay = eventInfo.view.type === 'timeGridDay';
+    return (
+        <div className="flex h-full flex-col overflow-hidden">
+            <span className={`truncate font-bold leading-tight ${isDay ? 'text-sm' : 'text-xs'}`}>{eventInfo.event.title}</span>
+            {isTime && <span className={`truncate opacity-70 ${isDay ? 'text-xs' : 'text-[10px]'}`}>{eventInfo.timeText}</span>}
+            {isTime && props.location && (
+                <span className="mt-auto flex items-center gap-0.5 truncate text-[10px] opacity-50">
+                    <MapPin className="h-2.5 w-2.5 shrink-0" />{props.location}
+                </span>
+            )}
+        </div>
+    );
+}
+
+function ClientCalendarTab({ clientId, clientFirstName, initialEvents = [] }: { clientId: number; clientFirstName: string; initialEvents?: any[] }) {
+    const calRef = useRef<FullCalendar>(null);
+    const [currentView, setCurrentView] = useState<CalViewKey>('timeGridWeek');
+    const [calTitle, setCalTitle] = useState('');
+    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; date: Date } | null>(null);
+    const [createOpen, setCreateOpen] = useState(false);
+    const [calForm, setCalForm] = useState({ title: '', appointment_type: 'gp_visit', starts_at: '', ends_at: '', location: '', provider_name: '', description: '', share_with_family: true });
+    const [detail, setDetail] = useState<any>(null);
+    const [calEvents, setCalEvents] = useState<any[]>(initialEvents);
+
+    useEffect(() => {
+        const close = () => setCtxMenu(null);
+        document.addEventListener('click', close);
+        return () => document.removeEventListener('click', close);
+    }, []);
+
+    const goToday = useCallback(() => calRef.current?.getApi().today(), []);
+    const goPrev = useCallback(() => calRef.current?.getApi().prev(), []);
+    const goNext = useCallback(() => calRef.current?.getApi().next(), []);
+    const changeView = useCallback((view: CalViewKey) => { calRef.current?.getApi().changeView(view); setCurrentView(view); }, []);
+
+    // Fetch new events when navigating to different date ranges
+    const fetchEvents = useCallback(async (info: any, successCallback: any, failureCallback: any) => {
+        // First try AJAX fetch, fall back to initial events
+        try {
+            const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content;
+            const res = await fetch(`/clients/${clientId}/calendar/events?start=${info.startStr}&end=${info.endStr}`, {
+                credentials: 'same-origin',
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                    ...(token ? { 'X-CSRF-TOKEN': token } : {}),
+                },
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const data = await res.json();
+            successCallback(Array.isArray(data) ? data : []);
+        } catch (e) {
+            console.error('Calendar fetch error (using server data):', e);
+            // Fall back to server-provided initial events
+            successCallback(calEvents);
+        }
+    }, [clientId, calEvents]);
+
+    const submitAppointment = async () => {
+        if (!calForm.title.trim() || !calForm.starts_at) return;
+        const token = (document.querySelector('meta[name="csrf-token"]') as HTMLMetaElement | null)?.content;
+        await fetch(`/clients/${clientId}/calendar/appointments`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json', ...(token ? { 'X-CSRF-TOKEN': token } : {}) },
+            credentials: 'same-origin',
+            body: JSON.stringify(calForm),
+        });
+        setCreateOpen(false);
+        calRef.current?.getApi().refetchEvents();
+    };
+
+    const openCreateFromCtx = () => {
+        if (ctxMenu) {
+            const end = new Date(ctxMenu.date); end.setHours(end.getHours() + 1);
+            setCalForm({ ...calForm, starts_at: toLocalISO(ctxMenu.date), ends_at: toLocalISO(end), title: '', description: '', location: '', provider_name: '', appointment_type: 'gp_visit', share_with_family: true });
+        }
+        setCtxMenu(null);
+        setCreateOpen(true);
+    };
+
+    return (
+        <div className="space-y-4">
+            <style dangerouslySetInnerHTML={{ __html: CAL_STYLES }} />
+
+            <div className="flex gap-5">
+                {/* Sidebar */}
+                <div className="hidden w-52 shrink-0 space-y-3 lg:block">
+                    <Card className="overflow-hidden">
+                        <CardHeader className="pb-2">
+                            <CardTitle className="text-sm font-semibold">{clientFirstName}'s Calendar</CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-0.5 pb-4">
+                            {CAL_CATEGORIES.map((cat) => {
+                                const Icon = cat.icon;
+                                return (
+                                    <div key={cat.label} className={`flex items-center gap-3 rounded-lg px-3 py-2 ${cat.bg}`}>
+                                        <span className={`h-2.5 w-2.5 rounded-full ${cat.dot}`} />
+                                        <Icon className="h-3.5 w-3.5 opacity-50" />
+                                        <span className="text-sm font-medium">{cat.label}</span>
+                                    </div>
+                                );
+                            })}
+                        </CardContent>
+                    </Card>
+                </div>
+
+                {/* Main */}
+                <div className="min-w-0 flex-1">
+                    <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-center gap-3">
+                            <h2 className="text-xl font-bold tracking-tight">{calTitle}</h2>
+                            <div className="flex items-center">
+                                <button onClick={goPrev} className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted transition-colors"><ChevronLeft className="h-4 w-4" /></button>
+                                <button onClick={goNext} className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted transition-colors"><ChevronRight className="h-4 w-4" /></button>
+                            </div>
+                            <button onClick={goToday} className="rounded-full border px-4 py-1 text-sm font-semibold shadow-sm hover:bg-accent transition-colors">Today</button>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button size="sm" className="gap-1.5" onClick={() => { setCalForm({ ...calForm, starts_at: toLocalISO(new Date()), ends_at: '', title: '' }); setCreateOpen(true); }}>
+                                <Plus className="h-3.5 w-3.5" />Schedule
+                            </Button>
+                            <div className="inline-flex items-center gap-1 rounded-full border p-1 bg-muted/20">
+                                {CAL_VIEWS.map((v) => (
+                                    <button key={v.key} onClick={() => changeView(v.key)}
+                                        className={`rounded-full px-3 py-1 text-xs font-semibold transition-all ${currentView === v.key ? 'bg-foreground text-background shadow' : 'text-muted-foreground hover:text-foreground'}`}>
+                                        {v.label}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border bg-card shadow-sm overflow-hidden" onContextMenu={(e) => {
+                        const target = e.target as HTMLElement;
+                        if (!target.closest('.fc-timegrid-slot-lane, .fc-daygrid-day, .fc-timegrid-col')) return;
+                        e.preventDefault();
+                        setCtxMenu({ x: e.clientX, y: e.clientY, date: new Date() });
+                    }}>
+                        <FullCalendar
+                            ref={calRef}
+                            plugins={[dayGridPlugin, timeGridPlugin, listPlugin, interactionPlugin]}
+                            initialView="timeGridWeek"
+                            headerToolbar={false}
+                            events={fetchEvents}
+                            eventClick={(info) => setDetail({ title: info.event.title, start: info.event.start, end: info.event.end, ...info.event.extendedProps })}
+                            datesSet={(arg) => { setCalTitle(arg.view.title); setCurrentView(arg.view.type as CalViewKey); }}
+                            select={(arg) => {
+                                setCalForm({ ...calForm, starts_at: toLocalISO(arg.start), ends_at: toLocalISO(arg.end), title: '', description: '', location: '', provider_name: '', appointment_type: 'gp_visit', share_with_family: true });
+                                setCreateOpen(true);
+                                calRef.current?.getApi().unselect();
+                            }}
+                            height="auto"
+                            timeZone="local"
+                            slotMinTime="00:00:00"
+                            slotMaxTime="24:00:00"
+                            scrollTime="07:00:00"
+                            allDaySlot={true}
+                            nowIndicator={true}
+                            eventContent={renderCalEventContent}
+                            selectable={true}
+                            selectMirror={true}
+                            businessHours={{ daysOfWeek: [1, 2, 3, 4, 5], startTime: '06:00', endTime: '22:00' }}
+                            slotDuration="00:30:00"
+                            dayMaxEvents={4}
+                            moreLinkClick="popover"
+                            eventMaxStack={3}
+                            slotEventOverlap={false}
+                            eventOverlap={false}
+                            stickyHeaderDates={true}
+                            firstDay={1}
+                            eventTimeFormat={{ hour: '2-digit', minute: '2-digit', meridiem: false }}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* Context Menu */}
+            {ctxMenu && (
+                <div className="calendar-context-menu" style={{ top: ctxMenu.y, left: ctxMenu.x }} onClick={(e) => e.stopPropagation()}>
+                    <button onClick={openCreateFromCtx}><Plus className="h-4 w-4 text-primary" /><span>Schedule Appointment</span></button>
+                    <hr />
+                    <button onClick={() => { setCtxMenu(null); changeView('timeGridDay'); }}><Calendar className="h-4 w-4 text-muted-foreground" /><span>View Day</span></button>
+                </div>
+            )}
+
+            {/* Event Detail */}
+            {detail && (
+                <Card className="border-primary/20">
+                    <CardContent className="p-4">
+                        <div className="flex items-start justify-between">
+                            <div>
+                                <h3 className="text-sm font-semibold">{detail.title}</h3>
+                                <p className="mt-1 text-xs text-muted-foreground capitalize">{detail.type?.replace(/_/g, ' ')}{detail.appointment_type ? ` — ${detail.appointment_type.replace(/_/g, ' ')}` : ''}</p>
+                                {detail.start && <p className="mt-1 text-xs text-muted-foreground">{new Date(detail.start).toLocaleString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}{detail.end ? ` — ${new Date(detail.end).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}` : ''}</p>}
+                                {detail.location && <p className="mt-1 text-xs"><MapPin className="inline h-3 w-3 mr-1" />{detail.location}</p>}
+                                {detail.provider_name && <p className="mt-0.5 text-xs"><Stethoscope className="inline h-3 w-3 mr-1" />{detail.provider_name}</p>}
+                                {detail.staff_name && <p className="mt-0.5 text-xs"><Users className="inline h-3 w-3 mr-1" />{detail.staff_name}</p>}
+                                {detail.medication_name && <p className="mt-0.5 text-xs"><Pill className="inline h-3 w-3 mr-1" />{detail.medication_name}{detail.dosage ? ` — ${detail.dosage}` : ''}</p>}
+                                {detail.description && <p className="mt-2 text-sm text-muted-foreground">{detail.description}</p>}
+                                {detail.notes && <p className="mt-2 text-sm text-muted-foreground">{detail.notes}</p>}
+                            </div>
+                            <Button size="sm" variant="ghost" onClick={() => setDetail(null)}>Close</Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            )}
+
+            {/* Create Appointment Dialog */}
+            <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader><DialogTitle>Schedule Appointment</DialogTitle></DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div><Label>Title *</Label><Input value={calForm.title} onChange={(e) => setCalForm({ ...calForm, title: e.target.value })} placeholder="GP Visit - Dr. Patel" autoFocus /></div>
+                            <div>
+                                <Label>Type</Label>
+                                <Select value={calForm.appointment_type} onValueChange={(v) => setCalForm({ ...calForm, appointment_type: v })}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>{CAL_APPT_TYPES.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}</SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div><Label>Start *</Label><Input type="datetime-local" value={calForm.starts_at} onChange={(e) => setCalForm({ ...calForm, starts_at: e.target.value })} /></div>
+                            <div><Label>End</Label><Input type="datetime-local" value={calForm.ends_at} onChange={(e) => setCalForm({ ...calForm, ends_at: e.target.value })} /></div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div><Label>Location</Label><Input value={calForm.location} onChange={(e) => setCalForm({ ...calForm, location: e.target.value })} placeholder="Riverside Medical Centre" /></div>
+                            <div><Label>Provider</Label><Input value={calForm.provider_name} onChange={(e) => setCalForm({ ...calForm, provider_name: e.target.value })} placeholder="Dr. Patel" /></div>
+                        </div>
+                        <div><Label>Notes</Label><Textarea value={calForm.description} onChange={(e) => setCalForm({ ...calForm, description: e.target.value })} rows={2} /></div>
+                        <label className="flex items-center gap-2 text-sm">
+                            <Checkbox checked={calForm.share_with_family} onCheckedChange={(v) => setCalForm({ ...calForm, share_with_family: !!v })} />
+                            Share with family portal
+                        </label>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="ghost" onClick={() => setCreateOpen(false)}>Cancel</Button>
+                        <Button disabled={!calForm.title.trim() || !calForm.starts_at} onClick={submitAppointment}><Plus className="mr-2 h-4 w-4" />Create</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

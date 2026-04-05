@@ -20,6 +20,9 @@ class ClientPersonalAsset extends Model
         'estimated_value',
         'condition',
         'location',
+        'site_id',
+        'room_id',
+        'tracker_hardware_id',
         'photo_path',
         'acquired_at',
         'notes',
@@ -66,6 +69,21 @@ class ClientPersonalAsset extends Model
     public function recordedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by_user_id');
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
+    }
+
+    public function room(): BelongsTo
+    {
+        return $this->belongsTo(SiteHouseRoom::class, 'room_id');
+    }
+
+    public function tracker(): BelongsTo
+    {
+        return $this->belongsTo(LocationHardware::class, 'tracker_hardware_id');
     }
 
     public function getPhotoUrlAttribute(): ?string

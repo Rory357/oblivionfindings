@@ -4,6 +4,8 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ClientAppointment;
+use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\Shift;
@@ -154,6 +156,95 @@ class ClientCalendarController extends Controller
             ]);
         }
 
+        // 5. Medication administrations (scheduled doses)
+        $medAdmins = ClientMedicationAdministration::where('client_id', $client->id)
+            ->whereBetween('scheduled_for', [$start, $end])
+            ->with('medication:id,name,dosage,route,form')
+            ->get();
+
+        foreach ($medAdmins as $ma) {
+            $medName = $ma->medication?->name ?? 'Medication';
+            $statusLabel = match ($ma->status) {
+                'given' => 'Given',
+                'refused' => 'Refused',
+                'withheld' => 'Withheld',
+                'missed' => 'Missed',
+                default => 'Scheduled',
+            };
+            $statusColor = match ($ma->status) {
+                'given' => '#10b981',
+                'refused' => '#f97316',
+                'withheld' => '#eab308',
+                'missed' => '#ef4444',
+                default => '#ec4899',
+            };
+            $events->push([
+                'id' => 'med-' . $ma->id,
+                'title' => $medName . ' — ' . $statusLabel,
+                'start' => $ma->scheduled_for?->toIso8601String() ?? $ma->administered_at?->toIso8601String(),
+                'end' => null,
+                'allDay' => false,
+                'backgroundColor' => $statusColor,
+                'borderColor' => 'transparent',
+                'extendedProps' => [
+                    'type' => 'medication',
+                    'status' => $ma->status ?? 'scheduled',
+                    'medication_name' => $medName,
+                    'dosage' => $ma->medication?->dosage,
+                    'route' => $ma->medication?->route,
+                    'notes' => $ma->notes,
+                    'administered_at' => $ma->administered_at?->toIso8601String(),
+                ],
+            ]);
+        }
+
+        // 6. Scheduled medication doses — only show ± 3 days from today to avoid clutter
+        $medStart = max($start, now()->subDays(3)->startOfDay());
+        $medEnd = min($end, now()->addDays(3)->endOfDay());
+        $activeMeds = ClientMedication::where('client_id', $client->id)
+            ->where('active', true)
+            ->whereNull('ceased_at')
+            ->where('is_prn', false)
+            ->get();
+
+        foreach ($activeMeds as $med) {
+            $times = $this->parseFrequencyTimes($med->frequency);
+            if (empty($times)) continue;
+
+            $current = $medStart->copy();
+            while ($current->lte($medEnd)) {
+                foreach ($times as $time) {
+                    $scheduledAt = $current->copy()->setTimeFromTimeString($time);
+                    // Check if there's already an administration record for this slot
+                    $alreadyRecorded = $medAdmins->contains(function ($ma) use ($med, $scheduledAt) {
+                        return $ma->client_medication_id === $med->id
+                            && $ma->scheduled_for
+                            && $ma->scheduled_for->format('Y-m-d H:i') === $scheduledAt->format('Y-m-d H:i');
+                    });
+                    if (!$alreadyRecorded && $scheduledAt->gte($start) && $scheduledAt->lte($end)) {
+                        $isPast = $scheduledAt->lt(now());
+                        $events->push([
+                            'id' => 'medsched-' . $med->id . '-' . $scheduledAt->format('YmdHi'),
+                            'title' => $med->name . ($isPast ? ' — Overdue' : ' — Due'),
+                            'start' => $scheduledAt->toIso8601String(),
+                            'end' => null,
+                            'allDay' => false,
+                            'backgroundColor' => $isPast ? '#ef4444' : '#ec4899',
+                            'borderColor' => 'transparent',
+                            'extendedProps' => [
+                                'type' => 'medication',
+                                'status' => $isPast ? 'overdue' : 'scheduled',
+                                'medication_name' => $med->name,
+                                'dosage' => $med->dosage,
+                                'route' => $med->route,
+                            ],
+                        ]);
+                    }
+                }
+                $current->addDay();
+            }
+        }
+
         return response()->json($events->values());
     }
 
@@ -233,5 +324,31 @@ class ClientCalendarController extends Controller
         $appointment->delete();
 
         return response()->json(['success' => true]);
+    }
+
+    /**
+     * Parse common medication frequency strings into scheduled times.
+     */
+    private function parseFrequencyTimes(?string $frequency): array
+    {
+        if (!$frequency) return [];
+
+        $freq = strtolower(trim($frequency));
+
+        // Check for explicit times like "08:00, 20:00" or "8am, 8pm"
+        if (preg_match_all('/(\d{1,2}):(\d{2})/', $freq, $matches, PREG_SET_ORDER)) {
+            return array_map(fn ($m) => sprintf('%02d:%02d', $m[1], $m[2]), $matches);
+        }
+
+        // Common frequency keywords
+        return match (true) {
+            str_contains($freq, 'once daily'), str_contains($freq, 'od'), str_contains($freq, 'daily'), str_contains($freq, 'nocte'), str_contains($freq, 'mane') => ['08:00'],
+            str_contains($freq, 'twice daily'), str_contains($freq, 'bd'), str_contains($freq, 'bid') => ['08:00', '20:00'],
+            str_contains($freq, 'three times'), str_contains($freq, 'tds'), str_contains($freq, 'tid') => ['08:00', '14:00', '20:00'],
+            str_contains($freq, 'four times'), str_contains($freq, 'qds'), str_contains($freq, 'qid') => ['08:00', '12:00', '16:00', '20:00'],
+            str_contains($freq, 'morning') => ['08:00'],
+            str_contains($freq, 'evening'), str_contains($freq, 'night') => ['20:00'],
+            default => [],
+        };
     }
 }
