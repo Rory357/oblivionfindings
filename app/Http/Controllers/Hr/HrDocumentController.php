@@ -156,7 +156,7 @@ class HrDocumentController extends Controller
             'employee_profile_id' => ['required', 'integer', $employeeRule],
             'title' => ['required', 'string', 'max:255'],
             'category' => ['required', 'string', 'max:100'],
-            'file' => ['required', 'file', 'max:20480'], // 20MB max
+            'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,csv,jpg,jpeg,png,gif,txt,rtf'], // 20MB max
             'is_restricted' => ['boolean'],
         ]);
 
@@ -514,7 +514,7 @@ class HrDocumentController extends Controller
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $validated = $request->validate([
-            'file' => ['required', 'file', 'max:51200'],
+            'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,csv,jpg,jpeg,png,gif,txt,rtf'],
             'title' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:50'],
             'folder' => ['nullable', 'string', 'max:255'],

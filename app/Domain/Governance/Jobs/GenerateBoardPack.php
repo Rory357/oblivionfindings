@@ -10,6 +10,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Log;
 
 class GenerateBoardPack implements ShouldQueue
 {
@@ -26,20 +27,29 @@ class GenerateBoardPack implements ShouldQueue
         BoardPackBuilderService $builder,
         DashboardAggregatorService $aggregator
     ): void {
-        $meeting = GovernanceMeeting::findOrFail($this->meetingId);
-        
-        // Capture dashboard snapshot
-        $snapshot = $aggregator->captureSnapshot('month');
-        
-        // Build the pack
-        $pack = $builder->build($meeting, $snapshot);
-        
-        // Log success
-        \Log::info('Board pack generated', [
-            'pack_id' => $pack->id,
-            'meeting_id' => $meeting->id,
-            'file_size' => $pack->file_size,
-        ]);
+        try {
+            $meeting = GovernanceMeeting::findOrFail($this->meetingId);
+
+            // Capture dashboard snapshot
+            $snapshot = $aggregator->captureSnapshot('month');
+
+            // Build the pack
+            $pack = $builder->build($meeting, $snapshot);
+
+            // Log success
+            Log::info('Board pack generated', [
+                'pack_id' => $pack->id,
+                'meeting_id' => $meeting->id,
+                'file_size' => $pack->file_size,
+            ]);
+        } catch (\Throwable $e) {
+            Log::error('Failed to generate board pack', [
+                'meeting_id' => $this->meetingId,
+                'error' => $e->getMessage(),
+                'exception' => $e,
+            ]);
+            throw $e;
+        }
     }
 
     public function failed(\Throwable $exception): void

@@ -112,7 +112,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('sites.credentials.destroy')
             ->middleware('permission:credentials.manage');
         Route::get('/credentials/{credential}/audit', [SiteCredentialController::class, 'auditLog'])
-            ->name('sites.credentials.audit');
+            ->name('sites.credentials.audit')
+            ->middleware('permission:credentials.view');
 
         // Inspections
         Route::get('/inspections', [SiteInspectionController::class, 'index'])
@@ -194,7 +195,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Hazard routes (not site-scoped)
     Route::get('/hazards/{hazard}', [SiteHazardController::class, 'show'])
-        ->name('sites.hazards.show');
+        ->name('sites.hazards.show')
+        ->middleware('permission:hazards.view');
     Route::put('/hazards/{hazard}', [SiteHazardController::class, 'update'])
         ->name('sites.hazards.update')
         ->middleware('permission:hazards.create');
@@ -207,7 +209,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Checklist run routes
     Route::get('/checklists/runs/{run}', [SiteChecklistController::class, 'showRun'])
-        ->name('sites.checklists.showRun');
+        ->name('sites.checklists.showRun')
+        ->middleware('permission:checklists.view');
     Route::post('/checklists/runs/{run}/start', [SiteChecklistController::class, 'startRun'])
         ->name('sites.checklists.startRun')
         ->middleware('permission:checklists.run');
@@ -262,7 +265,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Type-specific management
     Route::get('/sites/{site}/rooms', [SiteRoomController::class, 'index'])
-        ->name('sites.rooms.index');
+        ->name('sites.rooms.index')
+        ->middleware('permission:sites.viewAny');
     Route::post('/sites/{site}/rooms', [SiteRoomController::class, 'store'])
         ->name('sites.rooms.store')
         ->middleware('permission:sites.update');
@@ -274,7 +278,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:sites.update');
 
     Route::get('/sites/{site}/resources', [SiteResourceController::class, 'index'])
-        ->name('sites.resources.index');
+        ->name('sites.resources.index')
+        ->middleware('permission:sites.viewAny');
     Route::post('/sites/{site}/resources', [SiteResourceController::class, 'store'])
         ->name('sites.resources.store')
         ->middleware('permission:sites.update');
@@ -286,7 +291,8 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:sites.update');
 
     Route::get('/sites/{site}/zones', [SiteZoneController::class, 'index'])
-        ->name('sites.zones.index');
+        ->name('sites.zones.index')
+        ->middleware('permission:sites.viewAny');
     Route::post('/sites/{site}/zones', [SiteZoneController::class, 'store'])
         ->name('sites.zones.store')
         ->middleware('permission:sites.update');
@@ -298,24 +304,52 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:sites.update');
 
     // Staff Requirements
-    Route::post('/sites/{site}/staff-requirements', [SiteComplianceController::class, 'storeStaffRequirement'])->name('sites.staff_requirements.store');
-    Route::put('/sites/{site}/staff-requirements/{requirement}', [SiteComplianceController::class, 'updateStaffRequirement'])->name('sites.staff_requirements.update');
-    Route::delete('/sites/{site}/staff-requirements/{requirement}', [SiteComplianceController::class, 'destroyStaffRequirement'])->name('sites.staff_requirements.destroy');
+    Route::post('/sites/{site}/staff-requirements', [SiteComplianceController::class, 'storeStaffRequirement'])
+        ->name('sites.staff_requirements.store')
+        ->middleware('permission:sites.update');
+    Route::put('/sites/{site}/staff-requirements/{requirement}', [SiteComplianceController::class, 'updateStaffRequirement'])
+        ->name('sites.staff_requirements.update')
+        ->middleware('permission:sites.update');
+    Route::delete('/sites/{site}/staff-requirements/{requirement}', [SiteComplianceController::class, 'destroyStaffRequirement'])
+        ->name('sites.staff_requirements.destroy')
+        ->middleware('permission:sites.update');
 
     // Feedback
-    Route::get('/sites/{site}/feedback', [SiteComplianceController::class, 'feedback'])->name('sites.feedback');
-    Route::post('/sites/{site}/feedback', [SiteComplianceController::class, 'storeFeedback'])->name('sites.feedback.store');
-    Route::post('/sites/{site}/feedback/{feedback}/respond', [SiteComplianceController::class, 'respondFeedback'])->name('sites.feedback.respond');
-    Route::put('/sites/{site}/feedback/{feedback}/status', [SiteComplianceController::class, 'updateFeedbackStatus'])->name('sites.feedback.update_status');
+    Route::get('/sites/{site}/feedback', [SiteComplianceController::class, 'feedback'])
+        ->name('sites.feedback')
+        ->middleware('permission:sites.viewAny');
+    Route::post('/sites/{site}/feedback', [SiteComplianceController::class, 'storeFeedback'])
+        ->name('sites.feedback.store')
+        ->middleware('permission:sites.update');
+    Route::post('/sites/{site}/feedback/{feedback}/respond', [SiteComplianceController::class, 'respondFeedback'])
+        ->name('sites.feedback.respond')
+        ->middleware('permission:sites.update');
+    Route::put('/sites/{site}/feedback/{feedback}/status', [SiteComplianceController::class, 'updateFeedbackStatus'])
+        ->name('sites.feedback.update_status')
+        ->middleware('permission:sites.update');
 
     // Compliance
-    Route::get('/sites/{site}/compliance', [SiteComplianceController::class, 'dashboard'])->name('sites.compliance.dashboard');
-    Route::post('/sites/{site}/certifications', [SiteComplianceController::class, 'storeCertification'])->name('sites.certifications.store');
-    Route::put('/sites/{site}/certifications/{certification}', [SiteComplianceController::class, 'updateCertification'])->name('sites.certifications.update');
-    Route::delete('/sites/{site}/certifications/{certification}', [SiteComplianceController::class, 'destroyCertification'])->name('sites.certifications.destroy');
-    Route::post('/sites/{site}/compliance-checks', [SiteComplianceController::class, 'storeCheck'])->name('sites.compliance_checks.store');
-    Route::patch('/sites/{site}/compliance-checks/{check}/complete', [SiteComplianceController::class, 'completeCheck'])->name('sites.compliance_checks.complete');
-    Route::put('/sites/{site}/compliance-checks/{check}', [SiteComplianceController::class, 'updateCheck'])->name('sites.compliance_checks.update');
+    Route::get('/sites/{site}/compliance', [SiteComplianceController::class, 'dashboard'])
+        ->name('sites.compliance.dashboard')
+        ->middleware('permission:sites.viewAny');
+    Route::post('/sites/{site}/certifications', [SiteComplianceController::class, 'storeCertification'])
+        ->name('sites.certifications.store')
+        ->middleware('permission:sites.update');
+    Route::put('/sites/{site}/certifications/{certification}', [SiteComplianceController::class, 'updateCertification'])
+        ->name('sites.certifications.update')
+        ->middleware('permission:sites.update');
+    Route::delete('/sites/{site}/certifications/{certification}', [SiteComplianceController::class, 'destroyCertification'])
+        ->name('sites.certifications.destroy')
+        ->middleware('permission:sites.update');
+    Route::post('/sites/{site}/compliance-checks', [SiteComplianceController::class, 'storeCheck'])
+        ->name('sites.compliance_checks.store')
+        ->middleware('permission:sites.update');
+    Route::patch('/sites/{site}/compliance-checks/{check}/complete', [SiteComplianceController::class, 'completeCheck'])
+        ->name('sites.compliance_checks.complete')
+        ->middleware('permission:sites.update');
+    Route::put('/sites/{site}/compliance-checks/{check}', [SiteComplianceController::class, 'updateCheck'])
+        ->name('sites.compliance_checks.update')
+        ->middleware('permission:sites.update');
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {

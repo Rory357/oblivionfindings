@@ -41,6 +41,10 @@ class CarePlanService
 
     public function completeReview(CarePlan $carePlan, User $reviewer): void
     {
+        if ($carePlan->goals()->count() === 0) {
+            throw new \DomainException('Cannot activate a care plan without at least one goal.');
+        }
+
         $carePlan->update([
             'status' => 'active',
             'reviewed_at' => now(),

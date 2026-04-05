@@ -16,6 +16,8 @@ class LegalHoldController extends Controller
      */
     public function index(Request $request): Response
     {
+        abort_unless($request->user()?->canDo('privacy.manageLegalHolds'), 403);
+
         $query = LegalHold::query()
             ->with(['imposedBy', 'releasedBy']);
 
@@ -51,8 +53,10 @@ class LegalHoldController extends Controller
     /**
      * Show the form for creating a new legal hold.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        abort_unless($request->user()?->canDo('privacy.manageLegalHolds'), 403);
+
         return Inertia::render('privacy/legal-holds/create');
     }
 
@@ -61,6 +65,8 @@ class LegalHoldController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()?->canDo('privacy.manageLegalHolds'), 403);
+
         $validated = $request->validate([
             'hold_type' => 'required|in:litigation,investigation,regulatory,audit,other',
             'reason' => 'required|string',
@@ -91,8 +97,10 @@ class LegalHoldController extends Controller
     /**
      * Show the form for editing the legal hold.
      */
-    public function edit(LegalHold $hold): Response
+    public function edit(Request $request, LegalHold $hold): Response
     {
+        abort_unless($request->user()?->canDo('privacy.manageLegalHolds'), 403);
+
         return Inertia::render('privacy/legal-holds/edit', [
             'hold' => $hold,
         ]);
@@ -103,6 +111,8 @@ class LegalHoldController extends Controller
      */
     public function update(Request $request, LegalHold $hold): RedirectResponse
     {
+        abort_unless($request->user()?->canDo('privacy.manageLegalHolds'), 403);
+
         $validated = $request->validate([
             'reason' => 'sometimes|string',
             'related_records' => 'nullable|array',
@@ -120,6 +130,8 @@ class LegalHoldController extends Controller
      */
     public function release(Request $request, LegalHold $hold): RedirectResponse
     {
+        abort_unless($request->user()?->canDo('privacy.manageLegalHolds'), 403);
+
         $request->validate([
             'release_reason' => 'required|string',
         ]);

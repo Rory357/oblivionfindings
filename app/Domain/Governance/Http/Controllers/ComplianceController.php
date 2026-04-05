@@ -18,6 +18,8 @@ class ComplianceController extends Controller
 
     public function create()
     {
+        abort_unless(request()->user()?->canDo('governance.compliance.manage'), 403);
+
         return Inertia::render('Governance/Compliance/Create', [
             'frameworks' => $this->getFrameworks(),
         ]);
@@ -25,6 +27,8 @@ class ComplianceController extends Controller
 
     public function index(Request $request)
     {
+        abort_unless($request->user()?->canDo('governance.compliance.view'), 403);
+
         $query = ComplianceObligation::with(['owner', 'evidence']);
 
         if ($request->has('framework')) {
@@ -51,6 +55,8 @@ class ComplianceController extends Controller
 
     public function show(ComplianceObligation $obligation)
     {
+        abort_unless(request()->user()?->canDo('governance.compliance.view'), 403);
+
         $obligation->load(['owner', 'evidence.uploadedBy', 'reminders']);
 
         return Inertia::render('Governance/Compliance/Show', [
@@ -60,6 +66,8 @@ class ComplianceController extends Controller
 
     public function store(StoreComplianceObligationRequest $request)
     {
+        abort_unless($request->user()?->canDo('governance.compliance.manage'), 403);
+
         $validated = $request->validated();
 
         $owner = $validated['owner_id'] ? \App\Models\User::find($validated['owner_id']) : null;
@@ -85,6 +93,8 @@ class ComplianceController extends Controller
 
     public function update(Request $request, ComplianceObligation $obligation)
     {
+        abort_unless($request->user()?->canDo('governance.compliance.manage'), 403);
+
         $validated = $request->validate([
             'title' => 'sometimes|string|max:255',
             'description' => 'sometimes|string',
@@ -100,6 +110,8 @@ class ComplianceController extends Controller
 
     public function complete(Request $request, ComplianceObligation $obligation)
     {
+        abort_unless($request->user()?->canDo('governance.compliance.manage'), 403);
+
         $validated = $request->validate([
             'evidence_ids' => 'nullable|array',
             'evidence_ids.*' => 'exists:compliance_evidence,id',
@@ -116,6 +128,8 @@ class ComplianceController extends Controller
 
     public function uploadEvidence(Request $request, ComplianceObligation $obligation)
     {
+        abort_unless($request->user()?->canDo('governance.compliance.manage'), 403);
+
         $validated = $request->validate([
             'evidence_type' => 'required|in:document,audit_report,certification,system_export,attestation',
             'title' => 'required|string|max:255',
@@ -138,6 +152,8 @@ class ComplianceController extends Controller
 
     public function calendar()
     {
+        abort_unless(request()->user()?->canDo('governance.compliance.view'), 403);
+
         $obligations = ComplianceObligation::where('due_date', '<=', now()->addDays(90))
             ->where('status', '!=', 'complete')
             ->with('owner')
@@ -158,6 +174,8 @@ class ComplianceController extends Controller
 
     public function edit(ComplianceObligation $obligation)
     {
+        abort_unless(request()->user()?->canDo('governance.compliance.manage'), 403);
+
         return Inertia::render('Governance/Compliance/Edit', [
             'obligation' => $obligation,
         ]);
@@ -165,6 +183,8 @@ class ComplianceController extends Controller
 
     public function storeNotifiableIncident(Request $request)
     {
+        abort_unless($request->user()?->canDo('governance.compliance.manage'), 403);
+
         $validated = $request->validate([
             'incident_type' => 'required|in:death,serious_harm,serious_injury,health_safety,privacy_breach',
             'notification_authority' => 'required|in:worksafe,health_nz,privacy_commissioner,charities_services',

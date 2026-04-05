@@ -168,6 +168,8 @@ class PaymentRunController extends Controller
 
     public function approve(Request $request, FinPaymentRun $paymentRun)
     {
+        $this->authorize('approve', $paymentRun);
+
         try {
             $this->service->approvePaymentRun($paymentRun, $request->user()->id);
         } catch (\InvalidArgumentException $e) {
@@ -179,6 +181,8 @@ class PaymentRunController extends Controller
 
     public function process(Request $request, FinPaymentRun $paymentRun)
     {
+        $this->authorize('process', $paymentRun);
+
         try {
             $this->service->processPaymentRun($paymentRun, $request->user()->id);
         } catch (\InvalidArgumentException $e) {

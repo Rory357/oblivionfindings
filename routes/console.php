@@ -13,6 +13,7 @@ use App\Domain\Roadmap\Jobs\ProcessRoadmapSuggestionsJob;
 use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
 use App\Domain\Roadmap\Jobs\SendRoadmapDigestJob;
 use App\Jobs\AutoEscalateControlRoomQueues;
+use App\Jobs\EnforceDataRetentionJob;
 use App\Jobs\CheckControlRoomSlaBreaches;
 use App\Jobs\ChecklistDueJob;
 use App\Jobs\DetectFleetOfflineDevices;
@@ -211,3 +212,11 @@ app(Schedule::class)
     ->job(new SendRoadmapDigestJob)
     ->timezone('Pacific/Auckland')
     ->weeklyOn(1, '07:30');
+
+// Privacy & Compliance Scheduled Jobs
+
+// Enforce data retention policies: daily at 03:00
+app(Schedule::class)
+    ->job(new EnforceDataRetentionJob)
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('03:00');

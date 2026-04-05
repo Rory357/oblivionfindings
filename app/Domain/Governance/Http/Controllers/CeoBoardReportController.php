@@ -12,6 +12,8 @@ class CeoBoardReportController extends Controller
 {
     public function index(Request $request)
     {
+        abort_unless($request->user()?->canDo('governance.ceo-reports.view'), 403);
+
         $reports = CeoBoardReport::with(['meeting', 'submittedBy'])
             ->orderByDesc('created_at')
             ->paginate(15);
@@ -23,6 +25,8 @@ class CeoBoardReportController extends Controller
 
     public function create(Request $request)
     {
+        abort_unless($request->user()?->canDo('governance.ceo-reports.manage'), 403);
+
         $meetings = GovernanceMeeting::query()
             ->where('scheduled_at', '>=', now())
             ->select('id', 'title', 'scheduled_at')
@@ -36,6 +40,8 @@ class CeoBoardReportController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($request->user()?->canDo('governance.ceo-reports.manage'), 403);
+
         $validated = $request->validate([
             'governance_meeting_id' => 'required|exists:governance_meetings,id',
             'operational_summary' => 'nullable|string',
@@ -59,6 +65,8 @@ class CeoBoardReportController extends Controller
 
     public function show(CeoBoardReport $report)
     {
+        abort_unless(request()->user()?->canDo('governance.ceo-reports.view'), 403);
+
         $report->load(['meeting', 'submittedBy']);
 
         return Inertia::render('Governance/CeoReports/Show', [
@@ -68,6 +76,8 @@ class CeoBoardReportController extends Controller
 
     public function update(Request $request, CeoBoardReport $report)
     {
+        abort_unless($request->user()?->canDo('governance.ceo-reports.manage'), 403);
+
         $validated = $request->validate([
             'operational_summary' => 'nullable|string',
             'key_achievements' => 'nullable|string',
@@ -85,6 +95,8 @@ class CeoBoardReportController extends Controller
 
     public function submit(CeoBoardReport $report)
     {
+        abort_unless(request()->user()?->canDo('governance.ceo-reports.manage'), 403);
+
         $report->submit();
 
         return redirect()->back()->with('success', 'CEO report submitted to board.');

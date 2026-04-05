@@ -35,7 +35,10 @@ class AuditLogger
                 'user_agent' => substr((string) $request?->userAgent(), 0, 5000),
             ]);
         } catch (\Throwable $e) {
-            // Never break primary workflows due to audit logging.
+            \Illuminate\Support\Facades\Log::error('AuditLogger failed: ' . $e->getMessage(), [
+                'action' => $action,
+                'exception' => $e,
+            ]);
         }
     }
 }

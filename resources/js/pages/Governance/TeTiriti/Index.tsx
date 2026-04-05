@@ -82,13 +82,13 @@ export default function TeTiritiIndex({ auth, obligationsByPrinciple, principles
             <p className="text-gray-500 mt-1">Obligations and implementation tracking across Te Tiriti principles</p>
           </div>
           <Button onClick={() => setShowForm(!showForm)}>
-            <Plus className="w-4 h-4 mr-2" /> Add Obligation
+            <Plus className="w-4 h-4 mr-2" /> New Obligation
           </Button>
         </div>
 
         {showForm && (
           <Card className="mb-6">
-            <CardHeader><CardTitle>Add Te Tiriti Obligation</CardTitle></CardHeader>
+            <CardHeader><CardTitle>New Te Tiriti Obligation</CardTitle></CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
@@ -124,7 +124,7 @@ export default function TeTiritiIndex({ auth, obligationsByPrinciple, principles
                 </div>
                 <div className="flex justify-end gap-3">
                   <Button type="button" variant="outline" onClick={() => setShowForm(false)}>Cancel</Button>
-                  <Button type="submit" disabled={processing}>Add Obligation</Button>
+                  <Button type="submit" disabled={processing}>Save Obligation</Button>
                 </div>
               </form>
             </CardContent>

@@ -35,6 +35,7 @@ class SyncBudgetActualsJob implements ShouldQueue
                 Log::error("Budget actuals sync failed for organisation #{$orgId}: {$e->getMessage()}", [
                     'exception' => $e,
                 ]);
+                throw $e;
             }
         }
     }

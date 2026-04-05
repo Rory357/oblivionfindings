@@ -254,18 +254,20 @@ class EmployeeProfileController extends Controller
                 ])->values(),
             ]);
 
-        // Performance reviews
-        $performanceReviews = HrPerformanceReview::where('employee_user_id', $userId)
-            ->with('reviewer:id,name')->orderByDesc('review_period_end')->limit(10)->get()
-            ->map(fn ($r) => [
-                'id' => $r->id, 'review_type' => $r->review_type, 'status' => $r->status,
-                'overall_rating' => $r->overall_rating,
-                'period_start' => $r->review_period_start?->toDateString(),
-                'period_end' => $r->review_period_end?->toDateString(),
-                'reviewer_name' => $r->reviewer?->name, 'next_review_date' => $r->next_review_date?->toDateString(),
-                'employee_signed_off' => (bool) $r->employee_signed_off,
-                'manager_signed_off' => (bool) $r->manager_signed_off,
-            ]);
+        // Performance reviews (restricted)
+        $performanceReviews = $user->canDo('hr.employees.viewRestricted')
+            ? HrPerformanceReview::where('employee_user_id', $userId)
+                ->with('reviewer:id,name')->orderByDesc('review_period_end')->limit(10)->get()
+                ->map(fn ($r) => [
+                    'id' => $r->id, 'review_type' => $r->review_type, 'status' => $r->status,
+                    'overall_rating' => $r->overall_rating,
+                    'period_start' => $r->review_period_start?->toDateString(),
+                    'period_end' => $r->review_period_end?->toDateString(),
+                    'reviewer_name' => $r->reviewer?->name, 'next_review_date' => $r->next_review_date?->toDateString(),
+                    'employee_signed_off' => (bool) $r->employee_signed_off,
+                    'manager_signed_off' => (bool) $r->manager_signed_off,
+                ])
+            : collect();
 
         // Probation reviews
         $probationReviews = HrProbationReview::where('employee_user_id', $userId)
@@ -366,25 +368,29 @@ class EmployeeProfileController extends Controller
                 'risk_decision' => $c->risk_decision,
             ]);
 
-        // Supervision notes
-        $supervisionNotes = HrSupervisionNote::where('employee_user_id', $userId)
-            ->with('supervisor:id,name')->orderByDesc('session_date')->limit(10)->get()
-            ->map(fn ($n) => [
-                'id' => $n->id, 'session_date' => $n->session_date?->toDateString(), 'session_type' => $n->session_type,
-                'duration_minutes' => $n->duration_minutes, 'supervisor_name' => $n->supervisor?->name,
-                'topics_discussed' => $n->topics_discussed, 'actions_agreed' => $n->actions_agreed,
-                'next_session_date' => $n->next_session_date?->toDateString(),
-            ]);
+        // Supervision notes (restricted)
+        $supervisionNotes = $user->canDo('hr.employees.viewRestricted')
+            ? HrSupervisionNote::where('employee_user_id', $userId)
+                ->with('supervisor:id,name')->orderByDesc('session_date')->limit(10)->get()
+                ->map(fn ($n) => [
+                    'id' => $n->id, 'session_date' => $n->session_date?->toDateString(), 'session_type' => $n->session_type,
+                    'duration_minutes' => $n->duration_minutes, 'supervisor_name' => $n->supervisor?->name,
+                    'topics_discussed' => $n->topics_discussed, 'actions_agreed' => $n->actions_agreed,
+                    'next_session_date' => $n->next_session_date?->toDateString(),
+                ])
+            : collect();
 
-        // Cases
-        $cases = HrCase::where('user_id', $userId)
-            ->with('assignedTo:id,name')->orderByDesc('opened_at')->limit(10)->get()
-            ->map(fn ($c) => [
-                'id' => $c->id, 'case_number' => $c->case_number, 'case_type' => $c->case_type,
-                'severity' => $c->severity, 'status' => $c->status, 'title' => $c->title,
-                'opened_at' => $c->opened_at?->toDateString(), 'closed_at' => $c->closed_at?->toDateString(),
-                'assigned_to_name' => $c->assignedTo?->name,
-            ]);
+        // Cases (restricted — disciplinary / HR cases)
+        $cases = $user->canDo('hr.employees.viewRestricted')
+            ? HrCase::where('user_id', $userId)
+                ->with('assignedTo:id,name')->orderByDesc('opened_at')->limit(10)->get()
+                ->map(fn ($c) => [
+                    'id' => $c->id, 'case_number' => $c->case_number, 'case_type' => $c->case_type,
+                    'severity' => $c->severity, 'status' => $c->status, 'title' => $c->title,
+                    'opened_at' => $c->opened_at?->toDateString(), 'closed_at' => $c->closed_at?->toDateString(),
+                    'assigned_to_name' => $c->assignedTo?->name,
+                ])
+            : collect();
 
         // Asset assignments
         $assetAssignments = HrAssetAssignment::where('employee_profile_id', $profile->id)
@@ -418,8 +424,8 @@ class EmployeeProfileController extends Controller
                 'end_date' => $profile->end_date?->toDateString(),
                 'probation_end_date' => $profile->probation_end_date?->toDateString(),
                 'hours_per_week' => $profile->hours_per_week,
-                'pay_rate' => $profile->hourly_rate,
-                'pay_frequency' => $profile->pay_frequency,
+                'pay_rate' => $user->canDo('hr.employees.viewFinancial') ? $profile->hourly_rate : null,
+                'pay_frequency' => $user->canDo('hr.employees.viewFinancial') ? $profile->pay_frequency : null,
                 'bio' => $profile->bio,
                 'preferred_name' => $profile->preferred_name,
                 'profile_photo_path' => $profile->profile_photo_path,

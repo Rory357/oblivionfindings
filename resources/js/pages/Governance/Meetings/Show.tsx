@@ -915,7 +915,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                   <Button size="sm" asChild>
                     <Link href={createResolution.url({ query: { meeting_id: meeting.id } })}>
                       <Plus className="w-4 h-4 mr-1" />
-                      Add Resolution
+                      New Resolution
                     </Link>
                   </Button>
                 </CardHeader>

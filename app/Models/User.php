@@ -289,21 +289,6 @@ class User extends Authenticatable
             return true;
         }
 
-        // 2.5) Backwards-compatibility: if the user hasn't been migrated into role_user yet,
-        // fall back to the legacy users.role column.
-        // This prevents "I'm an admin but I can't ..." issues when the pivot table is empty.
-        if (!$this->roles()->exists() && !empty($this->role)) {
-            // Legacy admin was effectively "allow all"
-            if ($this->role === 'admin') {
-                return true;
-            }
-
-            $legacyRole = \App\Models\Role::query()->where('name', $this->role)->first();
-            if ($legacyRole) {
-                return $legacyRole->permissions()->where('key', $permissionKey)->exists();
-            }
-        }
-
         // 3) role permissions
         return $this->roles()
             ->whereHas('permissions', fn($q) => $q->where('key', $permissionKey))

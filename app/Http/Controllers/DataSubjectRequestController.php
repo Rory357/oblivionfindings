@@ -6,6 +6,7 @@ use App\Models\DataSubjectRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Storage;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -218,7 +219,132 @@ class DataSubjectRequestController extends Controller
      */
     public function export(DataSubjectRequest $request)
     {
-        // TODO: Implement data export
-        return back()->with('info', 'Data export functionality coming soon.');
+        $dsr = $request;
+        $dsr->load(['client', 'user']);
+
+        $data = [
+            'export_metadata' => [
+                'reference_number' => $dsr->reference_number,
+                'request_type' => $dsr->request_type,
+                'generated_at' => now()->toIso8601String(),
+                'generated_by' => auth()->user()->name ?? 'System',
+            ],
+        ];
+
+        // Collect data based on whether this is a client or user request
+        if ($dsr->client_id && $dsr->client) {
+            $client = $dsr->client;
+
+            $data['personal_information'] = [
+                'name' => $client->first_name . ' ' . $client->last_name,
+                'preferred_name' => $client->preferred_name,
+                'date_of_birth' => $client->date_of_birth?->format('Y-m-d'),
+                'gender' => $client->gender,
+                'nhi_number' => $client->nhi_number,
+                'email' => $client->email,
+                'phone' => $client->phone,
+                'address' => implode(', ', array_filter([
+                    $client->address_line_1,
+                    $client->address_line_2,
+                    $client->suburb,
+                    $client->city,
+                    $client->postcode,
+                ])),
+                'ethnicity' => $client->ethnicity,
+                'languages' => $client->languages,
+                'preferred_pronouns' => $client->preferred_pronouns,
+                'religion' => $client->religion,
+                'status' => $client->status,
+                'service_start_date' => $client->service_start_date?->format('Y-m-d'),
+            ];
+
+            // Care/support plans
+            $client->loadMissing(['supportPlan', 'notes', 'assessments', 'incidents', 'medications']);
+
+            if ($client->supportPlan) {
+                $data['support_plan'] = [
+                    'id' => $client->supportPlan->id,
+                    'created_at' => $client->supportPlan->created_at?->format('Y-m-d'),
+                    'updated_at' => $client->supportPlan->updated_at?->format('Y-m-d'),
+                ];
+            }
+
+            // Notes (titles/dates only)
+            $data['notes'] = $client->notes->map(fn ($note) => [
+                'id' => $note->id,
+                'title' => $note->title ?? $note->subject ?? null,
+                'type' => $note->type ?? $note->note_type ?? null,
+                'created_at' => $note->created_at?->format('Y-m-d'),
+            ])->toArray();
+
+            // Assessments (titles/dates only)
+            $data['assessments'] = $client->assessments->map(fn ($assessment) => [
+                'id' => $assessment->id,
+                'title' => $assessment->title ?? $assessment->assessment_type ?? null,
+                'created_at' => $assessment->created_at?->format('Y-m-d'),
+            ])->toArray();
+
+            // Incidents (titles/dates only)
+            $data['incidents'] = $client->incidents->map(fn ($incident) => [
+                'id' => $incident->id,
+                'title' => $incident->title ?? $incident->incident_type ?? null,
+                'date' => $incident->incident_date?->format('Y-m-d') ?? $incident->created_at?->format('Y-m-d'),
+            ])->toArray();
+
+            // Medications (titles/dates only)
+            $data['medications'] = $client->medications->map(fn ($med) => [
+                'id' => $med->id,
+                'name' => $med->medication_name ?? $med->name ?? null,
+                'created_at' => $med->created_at?->format('Y-m-d'),
+            ])->toArray();
+
+            // Consent records
+            $consents = \App\Models\ClientConsent::where('client_id', $client->id)
+                ->with('consentType')
+                ->get();
+
+            $data['consent_records'] = $consents->map(fn ($consent) => [
+                'id' => $consent->id,
+                'type' => $consent->consentType?->name ?? null,
+                'status' => $consent->status,
+                'given_at' => $consent->given_at?->format('Y-m-d'),
+                'withdrawn_at' => $consent->withdrawn_at?->format('Y-m-d'),
+                'expires_at' => $consent->expires_at?->format('Y-m-d'),
+            ])->toArray();
+
+        } elseif ($dsr->user_id && $dsr->user) {
+            $user = $dsr->user;
+
+            $data['personal_information'] = [
+                'name' => $user->name,
+                'email' => $user->email,
+            ];
+        } else {
+            $data['personal_information'] = [
+                'subject_name' => $dsr->subject_name,
+                'subject_email' => $dsr->subject_email,
+                'note' => 'No linked client or user record found. Only request metadata is available.',
+            ];
+        }
+
+        $data['request_details'] = [
+            'request_type' => $dsr->request_type,
+            'request_details' => $dsr->request_details,
+            'specific_data_requested' => $dsr->specific_data_requested,
+            'status' => $dsr->status,
+            'received_at' => $dsr->received_at?->format('Y-m-d'),
+            'due_date' => $dsr->due_date?->format('Y-m-d'),
+        ];
+
+        $filename = 'dsr-' . $dsr->reference_number . '-' . now()->format('Y-m-d') . '.json';
+        $path = 'private/dsr-exports/' . $filename;
+        Storage::disk('local')->put($path, json_encode($data, JSON_PRETTY_PRINT));
+
+        $dsr->update([
+            'export_path' => $path,
+            'export_generated_at' => now(),
+        ]);
+
+        return back()->with('success', 'Data export generated successfully.');
     }
 }

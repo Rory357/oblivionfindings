@@ -7,6 +7,7 @@ use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\Shift;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\DB;
 
 class EnhancedMarService
 {
@@ -389,9 +390,14 @@ class EnhancedMarService
         int $userId,
         ?int $shiftId = null
     ): array {
-        // Validate safety check
-        $safetyCheck = $this->safetyService->performSafetyCheck($client, $medication);
-        
+        // Validate safety check (including dose validation)
+        $safetyCheck = $this->safetyService->performSafetyCheck(
+            $client,
+            $medication,
+            null,
+            $data['dose_given'] ?? null
+        );
+
         if ($safetyCheck['blocked'] && !($data['override_safety'] ?? false)) {
             return [
                 'success' => false,
@@ -403,6 +409,7 @@ class EnhancedMarService
         // Validate time window for scheduled doses
         $scheduledFor = isset($data['scheduled_for']) ? Carbon::parse($data['scheduled_for']) : null;
         $adminAt = isset($data['administered_at']) ? Carbon::parse($data['administered_at']) : now();
+        $windowCheck = null;
 
         if ($scheduledFor && !$medication->is_prn) {
             $windowCheck = $this->safetyService->validateTimeWindow(
@@ -421,41 +428,53 @@ class EnhancedMarService
             }
         }
 
-        // Create administration record
-        $admin = new ClientMedicationAdministration();
-        $admin->client_id = $client->id;
-        $admin->client_medication_id = $medication->id;
-        $admin->shift_id = $shiftId;
-        $admin->administered_by = $userId;
-        $admin->witnessed_by = $data['witnessed_by'] ?? null;
-        $admin->scheduled_for = $scheduledFor;
-        $admin->administered_at = $adminAt;
-        $admin->status = $data['status'];
-        $admin->reason = $data['reason'] ?? null;
-        $admin->dose_given = $data['dose_given'] ?? null;
-        $admin->notes = $data['notes'] ?? null;
-        $admin->late_minutes = $windowCheck['late_minutes'] ?? null;
-        $admin->early_minutes = $windowCheck['early_minutes'] ?? null;
-        $admin->outcome = $data['outcome'] ?? null;
-        $admin->site = $data['site'] ?? null;
+        return DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $safetyCheck, $scheduledFor, $adminAt, $windowCheck) {
+            // Re-fetch medication with lock to prevent race conditions
+            $medication = ClientMedication::lockForUpdate()->findOrFail($medication->id);
 
-        if ($shiftId) {
-            $shift = Shift::find($shiftId);
-            $admin->service_context_id = $shift?->service_context_id;
-        }
+            // Lock stock record if it exists
+            if ($medication->controlled_drug) {
+                $medication->load(['stock' => function ($q) {
+                    $q->lockForUpdate();
+                }]);
+            }
 
-        $admin->save();
+            // Create administration record
+            $admin = new ClientMedicationAdministration();
+            $admin->client_id = $client->id;
+            $admin->client_medication_id = $medication->id;
+            $admin->shift_id = $shiftId;
+            $admin->administered_by = $userId;
+            $admin->witnessed_by = $data['witnessed_by'] ?? null;
+            $admin->scheduled_for = $scheduledFor;
+            $admin->administered_at = $adminAt;
+            $admin->status = $data['status'];
+            $admin->reason = $data['reason'] ?? null;
+            $admin->dose_given = $data['dose_given'] ?? null;
+            $admin->notes = $data['notes'] ?? null;
+            $admin->late_minutes = $windowCheck['late_minutes'] ?? null;
+            $admin->early_minutes = $windowCheck['early_minutes'] ?? null;
+            $admin->outcome = $data['outcome'] ?? null;
+            $admin->site = $data['site'] ?? null;
 
-        // Handle controlled drug register entry
-        if ($medication->controlled_drug && $admin->status === 'given') {
-            $this->recordControlledDrugEntry($medication, $admin, $userId, $data['witnessed_by'] ?? null);
-        }
+            if ($shiftId) {
+                $shift = Shift::find($shiftId);
+                $admin->service_context_id = $shift?->service_context_id;
+            }
 
-        return [
-            'success' => true,
-            'administration' => $admin,
-            'safety_check' => $safetyCheck,
-        ];
+            $admin->save();
+
+            // Handle controlled drug register entry
+            if ($medication->controlled_drug && $admin->status === 'given') {
+                $this->recordControlledDrugEntry($medication, $admin, $userId, $data['witnessed_by'] ?? null);
+            }
+
+            return [
+                'success' => true,
+                'administration' => $admin,
+                'safety_check' => $safetyCheck,
+            ];
+        });
     }
 
     /**

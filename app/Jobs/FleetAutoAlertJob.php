@@ -19,11 +19,16 @@ class FleetAutoAlertJob implements ShouldQueue
 
     public function handle(FleetSignalService $signalService): void
     {
-        $this->checkOfflineVehicles($signalService);
-        $this->checkWofExpiring($signalService);
-        $this->checkRegistrationExpiring($signalService);
-        $this->checkMaintenanceOverdue($signalService);
-        $this->checkLowBattery($signalService);
+        try {
+            $this->checkOfflineVehicles($signalService);
+            $this->checkWofExpiring($signalService);
+            $this->checkRegistrationExpiring($signalService);
+            $this->checkMaintenanceOverdue($signalService);
+            $this->checkLowBattery($signalService);
+        } catch (\Throwable $e) {
+            \Log::error('FleetAutoAlertJob failed: ' . $e->getMessage(), ['exception' => $e]);
+            throw $e;
+        }
     }
 
     private function checkOfflineVehicles(FleetSignalService $signalService): void

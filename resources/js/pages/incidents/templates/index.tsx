@@ -4,10 +4,11 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Head, Link } from '@inertiajs/react';
 
 type Props = {
+    auth: any;
     templates: Array<any>;
 };
 
-export default function IncidentTemplateIndex({ templates }: Props) {
+export default function IncidentTemplateIndex({ auth, templates }: Props) {
     return (
         <AppLayout breadcrumbs={[{ title: 'Incidents', href: '/incidents' }, { title: 'Templates', href: '/incidents/templates' }]}>
             <Head title="Incident templates" />
@@ -19,9 +20,11 @@ export default function IncidentTemplateIndex({ templates }: Props) {
                         <div className="mt-1 text-sm text-slate-500">Prefill incident reporting fields</div>
                     </div>
 
-                    <Link href="/incidents/templates/create">
-                        <Button size="sm">New template</Button>
-                    </Link>
+                    {(auth.can as any)?.incidents?.templatesManage && (
+                        <Link href="/incidents/templates/create">
+                            <Button size="sm">New template</Button>
+                        </Link>
+                    )}
                 </div>
 
                 <div className="space-y-2">

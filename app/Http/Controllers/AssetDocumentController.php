@@ -15,7 +15,7 @@ class AssetDocumentController extends Controller
         $this->authorize('manageDocuments', $asset);
 
         $data = $request->validate([
-            'file' => ['required', 'file', 'max:20480'], // 20MB
+            'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,csv,jpg,jpeg,png,gif,txt,rtf'], // 20MB
             'title' => ['required', 'string', 'max:255'],
             'category' => ['nullable', 'string', 'max:120'],
             'version' => ['nullable', 'string', 'max:80'],

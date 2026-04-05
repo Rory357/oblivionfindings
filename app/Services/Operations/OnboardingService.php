@@ -25,6 +25,16 @@ class OnboardingService
         $totalSteps = $workflow->steps()->count();
         $completedSteps = $workflow->steps()->where('status', 'completed')->count();
 
+        // Ensure all required steps are completed before marking workflow as done
+        $incompleteRequiredSteps = $workflow->steps()
+            ->where('is_required', true)
+            ->where('status', '!=', 'completed')
+            ->count();
+
+        if ($incompleteRequiredSteps > 0) {
+            return false;
+        }
+
         if ($totalSteps > 0 && $totalSteps === $completedSteps) {
             $workflow->update([
                 'status' => 'completed',

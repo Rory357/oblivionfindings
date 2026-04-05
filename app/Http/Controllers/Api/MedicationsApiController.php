@@ -399,13 +399,9 @@ class MedicationsApiController extends Controller
 
         $alert = MedicationDashboardAlert::findOrFail($alertId);
 
-        // Check if user can acknowledge for this client
-        if (!$user->canDo('clients.viewAny')) {
-            $clientIds = $user->assignedClients()->pluck('clients.id')->toArray();
-            if (!in_array($alert->client_id, $clientIds)) {
-                abort(403, 'You can only acknowledge alerts for your assigned clients.');
-            }
-        }
+        // Verify user can access this client's medication data
+        $client = Client::findOrFail($alert->client_id);
+        $this->authorize('viewMedications', $client);
 
         $success = $this->alertService->acknowledgeAlert($alertId, $user->id);
 
@@ -427,6 +423,10 @@ class MedicationsApiController extends Controller
         );
 
         $alert = MedicationDashboardAlert::findOrFail($alertId);
+
+        // Verify user can access this client's medication data
+        $client = Client::findOrFail($alert->client_id);
+        $this->authorize('viewMedications', $client);
 
         $data = $request->validate([
             'resolution_notes' => ['nullable', 'string', 'max:500'],

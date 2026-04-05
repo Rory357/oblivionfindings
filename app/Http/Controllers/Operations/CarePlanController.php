@@ -115,7 +115,7 @@ class CarePlanController extends Controller
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'next_review_at' => ['nullable', 'date'],
-            'status' => ['nullable', 'string', 'in:draft,active,review,archived'],
+            'status' => ['nullable', 'string', 'in:draft,review,archived'],
         ]);
 
         $carePlan = CarePlan::create([
@@ -287,6 +287,12 @@ class CarePlanController extends Controller
             'status' => ['nullable', 'string', 'in:draft,active,review,archived'],
         ]);
 
+        // Prevent activating a plan with no goals
+        $becomingActive = ($data['status'] ?? null) === 'active' && $carePlan->status !== 'active';
+        if ($becomingActive && $carePlan->goals()->count() === 0) {
+            return back()->withErrors(['goals' => 'Cannot activate a care plan without at least one goal.']);
+        }
+
         $carePlan->update($data);
 
         return redirect()->route('operations.care_plans.show', $carePlan)
@@ -326,6 +332,11 @@ class CarePlanController extends Controller
         $data = $request->validate([
             'review_notes' => ['nullable', 'string', 'max:2000'],
         ]);
+
+        // A care plan must have at least one goal before it can be activated
+        if ($carePlan->goals()->count() === 0) {
+            return back()->withErrors(['goals' => 'Cannot activate a care plan without at least one goal. Please add goals before completing the review.']);
+        }
 
         // Archive the parent version
         if ($carePlan->parent_id) {

@@ -74,9 +74,11 @@ export default function BudgetsIndex({ auth, budgets }: Props) {
             <h1 className="text-3xl font-bold text-gray-900">Budgets</h1>
             <p className="text-gray-500 mt-1">Financial planning and oversight</p>
           </div>
-          <Button asChild>
-            <Link href="/governance/budgets/create">New Budget</Link>
-          </Button>
+          {(auth.can as any)?.governance?.budgets?.create && (
+            <Button asChild>
+              <Link href="/governance/budgets/create">New Budget</Link>
+            </Button>
+          )}
         </div>
 
         {/* Summary Stats */}

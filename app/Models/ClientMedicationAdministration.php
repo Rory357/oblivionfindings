@@ -5,11 +5,13 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientMedicationAdministration extends Model
 {
     use HasFactory;
     use AuditableChanges;
+    use SoftDeletes;
 
     protected $fillable = [
         'corrected_of_id',
@@ -37,6 +39,10 @@ class ClientMedicationAdministration extends Model
         'peak_flow_after',
         'topical_area',
         'topical_skin_condition',
+        'correction_status',
+        'correction_approved_by',
+        'correction_approved_at',
+        'correction_rejection_reason',
     ];
 
     protected $casts = [
@@ -49,6 +55,7 @@ class ClientMedicationAdministration extends Model
         'spacer_used' => 'boolean',
         'peak_flow_before' => 'integer',
         'peak_flow_after' => 'integer',
+        'correction_approved_at' => 'datetime',
     ];
 
     public function client()

@@ -102,44 +102,44 @@ class InvoiceController extends Controller
             // Auto-generate invoice number if not provided
             $invoiceNumber = $validated['invoice_number'] ?? $this->generateInvoiceNumber($orgId);
 
-            // Calculate line totals
+            // Calculate line totals using bcmath to avoid float rounding errors
             $lines = [];
-            $subtotal = 0;
-            $taxTotal = 0;
+            $subtotal = '0';
+            $taxTotal = '0';
 
             foreach ($validated['lines'] as $index => $lineData) {
-                $qty = (float) $lineData['quantity'];
-                $price = (float) $lineData['unit_price'];
-                $lineSubtotal = $qty * $price;
+                $qty = (string) $lineData['quantity'];
+                $price = (string) $lineData['unit_price'];
+                $lineSubtotal = bcmul($qty, $price, 2);
 
                 $taxRateId = $lineData['tax_rate_id'] ?? null;
-                $taxAmount = 0;
+                $taxAmount = '0';
 
                 if ($taxRateId) {
                     $taxRate = FinTaxRate::find($taxRateId);
                     if ($taxRate) {
-                        $taxAmount = $lineSubtotal * ((float) $taxRate->rate / 100);
+                        $taxAmount = bcmul($lineSubtotal, bcdiv((string) $taxRate->rate, '100', 6), 2);
                     }
                 } else {
                     // Default 15% GST for NZ
-                    $taxAmount = $lineSubtotal * 0.15;
+                    $taxAmount = bcmul($lineSubtotal, '0.15', 2);
                 }
 
-                $lineTotal = $lineSubtotal + $taxAmount;
+                $lineTotal = bcadd($lineSubtotal, $taxAmount, 2);
 
                 $lines[] = [
                     'description' => $lineData['description'],
                     'quantity' => $qty,
                     'unit_price' => $price,
                     'tax_rate_id' => $taxRateId,
-                    'tax_amount' => round($taxAmount, 2),
-                    'line_total' => round($lineTotal, 2),
+                    'tax_amount' => $taxAmount,
+                    'line_total' => $lineTotal,
                     'sort_order' => $index,
                     'account_id' => $lineData['account_id'] ?? null,
                 ];
 
-                $subtotal += $lineSubtotal;
-                $taxTotal += $taxAmount;
+                $subtotal = bcadd($subtotal, $lineSubtotal, 2);
+                $taxTotal = bcadd($taxTotal, $taxAmount, 2);
             }
 
             $invoice = FinInvoice::create([
@@ -151,9 +151,9 @@ class InvoiceController extends Controller
                 'client_email' => $validated['client_email'] ?? null,
                 'client_address' => $validated['client_address'] ?? null,
                 'bill_id' => $validated['bill_id'] ?? null,
-                'subtotal' => round($subtotal, 2),
-                'tax_amount' => round($taxTotal, 2),
-                'total_amount' => round($subtotal + $taxTotal, 2),
+                'subtotal' => $subtotal,
+                'tax_amount' => $taxTotal,
+                'total_amount' => bcadd($subtotal, $taxTotal, 2),
                 'currency_code' => $validated['currency_code'] ?? 'NZD',
                 'status' => 'draft',
                 'notes' => $validated['notes'] ?? null,
@@ -235,41 +235,41 @@ class InvoiceController extends Controller
 
         DB::transaction(function () use ($invoice, $validated) {
             $lines = [];
-            $subtotal = 0;
-            $taxTotal = 0;
+            $subtotal = '0';
+            $taxTotal = '0';
 
             foreach ($validated['lines'] as $index => $lineData) {
-                $qty = (float) $lineData['quantity'];
-                $price = (float) $lineData['unit_price'];
-                $lineSubtotal = $qty * $price;
+                $qty = (string) $lineData['quantity'];
+                $price = (string) $lineData['unit_price'];
+                $lineSubtotal = bcmul($qty, $price, 2);
 
                 $taxRateId = $lineData['tax_rate_id'] ?? null;
-                $taxAmount = 0;
+                $taxAmount = '0';
 
                 if ($taxRateId) {
                     $taxRate = FinTaxRate::find($taxRateId);
                     if ($taxRate) {
-                        $taxAmount = $lineSubtotal * ((float) $taxRate->rate / 100);
+                        $taxAmount = bcmul($lineSubtotal, bcdiv((string) $taxRate->rate, '100', 6), 2);
                     }
                 } else {
-                    $taxAmount = $lineSubtotal * 0.15;
+                    $taxAmount = bcmul($lineSubtotal, '0.15', 2);
                 }
 
-                $lineTotal = $lineSubtotal + $taxAmount;
+                $lineTotal = bcadd($lineSubtotal, $taxAmount, 2);
 
                 $lines[] = [
                     'description' => $lineData['description'],
                     'quantity' => $qty,
                     'unit_price' => $price,
                     'tax_rate_id' => $taxRateId,
-                    'tax_amount' => round($taxAmount, 2),
-                    'line_total' => round($lineTotal, 2),
+                    'tax_amount' => $taxAmount,
+                    'line_total' => $lineTotal,
                     'sort_order' => $index,
                     'account_id' => $lineData['account_id'] ?? null,
                 ];
 
-                $subtotal += $lineSubtotal;
-                $taxTotal += $taxAmount;
+                $subtotal = bcadd($subtotal, $lineSubtotal, 2);
+                $taxTotal = bcadd($taxTotal, $taxAmount, 2);
             }
 
             $invoice->update([
@@ -280,9 +280,9 @@ class InvoiceController extends Controller
                 'client_address' => $validated['client_address'] ?? null,
                 'bill_id' => $validated['bill_id'] ?? null,
                 'currency_code' => $validated['currency_code'] ?? 'NZD',
-                'subtotal' => round($subtotal, 2),
-                'tax_amount' => round($taxTotal, 2),
-                'total_amount' => round($subtotal + $taxTotal, 2),
+                'subtotal' => $subtotal,
+                'tax_amount' => $taxTotal,
+                'total_amount' => bcadd($subtotal, $taxTotal, 2),
                 'notes' => $validated['notes'] ?? null,
                 'terms' => $validated['terms'] ?? null,
                 'email_subject' => $validated['email_subject'] ?? null,
@@ -303,6 +303,8 @@ class InvoiceController extends Controller
 
     public function send(Request $request, FinInvoice $invoice)
     {
+        $this->authorize('update', $invoice);
+
         if (!$invoice->client_email) {
             return back()->withErrors(['invoice' => 'Invoice has no client email address.']);
         }
@@ -319,6 +321,8 @@ class InvoiceController extends Controller
 
     public function downloadPdf(Request $request, FinInvoice $invoice, InvoicePdfService $pdfService)
     {
+        $this->authorize('view', $invoice);
+
         // Generate PDF if not exists
         if (!$invoice->pdf_path || !Storage::disk('local')->exists($invoice->pdf_path)) {
             $pdfService->generate($invoice);
@@ -334,6 +338,8 @@ class InvoiceController extends Controller
 
     public function markPaid(Request $request, FinInvoice $invoice)
     {
+        $this->authorize('update', $invoice);
+
         if ($invoice->status === 'cancelled') {
             return back()->withErrors(['invoice' => 'Cannot mark a cancelled invoice as paid.']);
         }
@@ -341,6 +347,7 @@ class InvoiceController extends Controller
         $invoice->update([
             'status' => 'paid',
             'paid_at' => now(),
+            'paid_by' => $request->user()->id,
         ]);
 
         return redirect()->route('finance.invoices.show', $invoice)

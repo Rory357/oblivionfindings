@@ -29,7 +29,8 @@ class MedicationSafetyService
     public function performSafetyCheck(
         Client $client,
         ClientMedication $medication,
-        ?Carbon $adminTime = null
+        ?Carbon $adminTime = null,
+        ?string $doseGiven = null
     ): array {
         $adminTime = $adminTime ?? now();
         $warnings = [];
@@ -126,7 +127,7 @@ class MedicationSafetyService
         // 5. Check PRN limits
         if ($medication->is_prn) {
             $prnCheck = $this->checkPrnLimits($medication);
-            
+
             if ($prnCheck['blocked']) {
                 $blocked = true;
                 $blockReason = $prnCheck['message'];
@@ -143,6 +144,29 @@ class MedicationSafetyService
                     'message' => $prnCheck['message'],
                     'details' => $prnCheck['details'],
                 ];
+            }
+
+            // 5b. Check PRN minimum interval between doses
+            if ($medication->min_hours_between_doses && $medication->min_hours_between_doses > 0) {
+                $intervalCheck = $this->checkPrnInterval($medication);
+                if ($intervalCheck['blocked']) {
+                    $blocked = true;
+                    $blockReason = $intervalCheck['message'];
+                    $warnings[] = [
+                        'type' => 'prn_interval',
+                        'severity' => 'danger',
+                        'message' => $intervalCheck['message'],
+                        'details' => $intervalCheck['details'],
+                    ];
+                }
+            }
+        }
+
+        // 5c. Validate dose against prescribed amount
+        if ($doseGiven !== null) {
+            $doseWarning = $this->validateDoseAgainstPrescribed($medication, $doseGiven);
+            if ($doseWarning) {
+                $warnings[] = $doseWarning;
             }
         }
 
@@ -431,6 +455,100 @@ class MedicationSafetyService
             'warning_count' => count($warnings),
             'can_proceed' => !$blocked,
             'requires_acknowledgment' => $blocked || $safetyLevel === 'danger' || $safetyLevel === 'warning',
+        ];
+    }
+
+    /**
+     * Validate dose against prescribed amount
+     * Returns a warning if dose_given exceeds prescribed dose_amount by >20%
+     */
+    public function validateDoseAgainstPrescribed(ClientMedication $medication, string $doseGiven): ?array
+    {
+        // Extract numeric value from dose_given string
+        if (!preg_match('/(\d+(?:\.\d+)?)/', $doseGiven, $matches)) {
+            return null; // Cannot parse numeric value
+        }
+
+        $givenNumeric = (float) $matches[1];
+        $prescribedAmount = (float) $medication->dose_amount;
+
+        if ($prescribedAmount <= 0) {
+            return null; // No prescribed dose to compare against
+        }
+
+        $threshold = $prescribedAmount * 1.20;
+
+        if ($givenNumeric > $threshold) {
+            $percentOver = round((($givenNumeric - $prescribedAmount) / $prescribedAmount) * 100, 1);
+            return [
+                'type' => 'dose_exceeds_prescribed',
+                'severity' => 'warning',
+                'message' => "⚠️ DOSE WARNING: {$givenNumeric} exceeds prescribed dose of {$prescribedAmount} by {$percentOver}%",
+                'details' => [
+                    'dose_given' => $givenNumeric,
+                    'dose_prescribed' => $prescribedAmount,
+                    'percent_over' => $percentOver,
+                    'threshold_percent' => 20,
+                ],
+            ];
+        }
+
+        return null;
+    }
+
+    /**
+     * Check PRN minimum interval between doses
+     * Blocks administration if min_hours_between_doses hasn't elapsed since last dose
+     */
+    public function checkPrnInterval(ClientMedication $medication): array
+    {
+        $minHours = (float) $medication->min_hours_between_doses;
+
+        if ($minHours <= 0) {
+            return [
+                'blocked' => false,
+                'message' => null,
+                'details' => [],
+            ];
+        }
+
+        // Find the most recent administration
+        $lastAdmin = $medication->administrations()
+            ->where('status', 'given')
+            ->orderByDesc('administered_at')
+            ->first();
+
+        if (!$lastAdmin || !$lastAdmin->administered_at) {
+            return [
+                'blocked' => false,
+                'message' => null,
+                'details' => [],
+            ];
+        }
+
+        $hoursSinceLast = $lastAdmin->administered_at->diffInMinutes(now()) / 60;
+
+        if ($hoursSinceLast < $minHours) {
+            $remainingMinutes = (int) ceil(($minHours - $hoursSinceLast) * 60);
+            $hoursRemaining = round($minHours - $hoursSinceLast, 1);
+
+            return [
+                'blocked' => true,
+                'message' => "⛔ INTERVAL NOT ELAPSED: Minimum {$minHours} hours between doses required. Last dose was {$lastAdmin->administered_at->format('H:i')}. Please wait {$remainingMinutes} more minutes.",
+                'details' => [
+                    'min_hours_between_doses' => $minHours,
+                    'hours_since_last' => round($hoursSinceLast, 2),
+                    'hours_remaining' => $hoursRemaining,
+                    'minutes_remaining' => $remainingMinutes,
+                    'last_administered_at' => $lastAdmin->administered_at->toIso8601String(),
+                ],
+            ];
+        }
+
+        return [
+            'blocked' => false,
+            'message' => null,
+            'details' => [],
         ];
     }
 

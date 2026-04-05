@@ -92,7 +92,9 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->middleware('permission:medications.view')
         ->name('emar.handovers');
 
-    // ─── CRUD Routes ──────────────────────────────────────
+    // ─── CRUD Routes (permission-gated) ─────────────────────
+
+    Route::middleware('permission:medications.orders.manage')->group(function () {
 
     // Prescriber Orders
     Route::post('/prescriptions', [EmarController::class, 'storePrescription'])->name('emar.prescriptions.store');
@@ -161,6 +163,8 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     // PRN Effectiveness
     Route::post('/prn/effectiveness', [EmarController::class, 'storePrnEffectiveness'])->name('emar.prn_effectiveness.store');
+
+    }); // end medications.orders.manage middleware group
 
     // ─── End CRUD Routes ────────────────────────────────────
 

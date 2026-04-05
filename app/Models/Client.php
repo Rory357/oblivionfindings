@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 
@@ -12,6 +13,7 @@ class Client extends Model
 {
     use HasFactory;
     use AuditableChanges;
+    use SoftDeletes;
 
     protected $fillable = [
         'user_id',
@@ -63,6 +65,9 @@ class Client extends Model
         'languages' => 'array',
         'service_start_date' => 'date',
         'safeguarding_flag' => 'boolean',
+        'phone' => 'encrypted',
+        'email' => 'encrypted',
+        'nhi_number' => 'encrypted',
     ];
 
     protected $appends = ['profile_photo_url', 'avatar', 'full_name'];

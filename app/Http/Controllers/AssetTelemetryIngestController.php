@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Services\Fleet\FleetTelemetryIngestService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 
 class AssetTelemetryIngestController extends Controller
 {
@@ -21,7 +22,10 @@ class AssetTelemetryIngestController extends Controller
             $authorized = true;
         }
 
-        abort_unless($authorized, 403);
+        if (!$authorized) {
+            Log::warning('Telemetry ingest unauthorized attempt', ['ip' => $request->ip(), 'vendor' => $vendor]);
+            abort(403);
+        }
 
         $result = $ingestService->ingest($vendor, $request->all());
 

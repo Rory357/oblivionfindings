@@ -39,6 +39,15 @@ class WebhookReceiverController extends Controller
                 return response()->json(['error' => 'Invalid integration key'], 401);
             }
 
+            // Verify webhook signature if X-Webhook-Signature header present
+            $signature = $request->header('X-Webhook-Signature');
+            if ($signature && $apiKey) {
+                $expectedSignature = hash_hmac('sha256', $request->getContent(), $apiKey);
+                if (!hash_equals($expectedSignature, $signature)) {
+                    return response()->json(['error' => 'Invalid signature'], 401);
+                }
+            }
+
             $tenantId = $tenantSecret->tenant_id;
             $payload = $request->all();
 

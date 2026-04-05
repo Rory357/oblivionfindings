@@ -34,8 +34,8 @@ export default [
             '@typescript-eslint/ban-ts-comment': 'off',
             '@typescript-eslint/no-empty-object-type': 'off',
 
-            'react-hooks/rules-of-hooks': 'off',
-            'react-hooks/exhaustive-deps': 'off',
+            'react-hooks/rules-of-hooks': 'warn',
+            'react-hooks/exhaustive-deps': 'warn',
             'react-hooks/set-state-in-effect': 'off',
             'react-hooks/purity': 'off',
             'react-hooks/immutability': 'off',

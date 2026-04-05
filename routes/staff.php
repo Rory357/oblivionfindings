@@ -22,7 +22,9 @@ Route::middleware(['auth'])->group(function () {
         ->name('staff.index');
 
     // Staff profile (own profile always accessible, managers can view any)
-    Route::get('/staff/{user}', [StaffController::class, 'show'])->name('staff.show');
+    Route::get('/staff/{user}', [StaffController::class, 'show'])
+        ->middleware('permission:staff.viewAny')
+        ->name('staff.show');
 
     // Staff updates
     Route::get('/staff/{user}/edit', [StaffController::class, 'edit'])
@@ -40,23 +42,35 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:staff.assignments.update')
         ->name('staff.assignments.update');
 
-    // Staff credentials (compliance)
-    Route::get('/staff/{user}/credentials', [StaffCredentialController::class, 'index'])
-        ->name('staff.credentials.index');
-    Route::post('/staff/{user}/credentials', [StaffCredentialController::class, 'store'])
-        ->name('staff.credentials.store');
-    Route::put('/staff/{user}/credentials/{credential}', [StaffCredentialController::class, 'update'])
-        ->name('staff.credentials.update');
-    Route::delete('/staff/{user}/credentials/{credential}', [StaffCredentialController::class, 'destroy'])
-        ->name('staff.credentials.destroy');
+    // Staff credentials (compliance) - read
+    Route::middleware('permission:staff.credentials.viewAny')->group(function () {
+        Route::get('/staff/{user}/credentials', [StaffCredentialController::class, 'index'])
+            ->name('staff.credentials.index');
+    });
 
-    // Staff availability
-    Route::get('/staff/{user}/availability', [StaffAvailabilityController::class, 'index'])
-        ->name('staff.availability.index');
-    Route::post('/staff/{user}/availability', [StaffAvailabilityController::class, 'store'])
-        ->name('staff.availability.store');
-    Route::delete('/staff/{user}/availability/{availability}', [StaffAvailabilityController::class, 'destroy'])
-        ->name('staff.availability.destroy');
+    // Staff credentials (compliance) - write
+    Route::middleware('permission:staff.credentials.updateAny')->group(function () {
+        Route::post('/staff/{user}/credentials', [StaffCredentialController::class, 'store'])
+            ->name('staff.credentials.store');
+        Route::put('/staff/{user}/credentials/{credential}', [StaffCredentialController::class, 'update'])
+            ->name('staff.credentials.update');
+        Route::delete('/staff/{user}/credentials/{credential}', [StaffCredentialController::class, 'destroy'])
+            ->name('staff.credentials.destroy');
+    });
+
+    // Staff availability - read
+    Route::middleware('permission:staff.viewAny')->group(function () {
+        Route::get('/staff/{user}/availability', [StaffAvailabilityController::class, 'index'])
+            ->name('staff.availability.index');
+    });
+
+    // Staff availability - write
+    Route::middleware('permission:staff.availability.updateAny')->group(function () {
+        Route::post('/staff/{user}/availability', [StaffAvailabilityController::class, 'store'])
+            ->name('staff.availability.store');
+        Route::delete('/staff/{user}/availability/{availability}', [StaffAvailabilityController::class, 'destroy'])
+            ->name('staff.availability.destroy');
+    });
 
     // Rostering
     Route::middleware('permission:rostering.viewAny')->group(function () {

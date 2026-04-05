@@ -12,6 +12,8 @@ class GovernancePolicyController extends Controller
 {
     public function index(Request $request)
     {
+        abort_unless($request->user()?->canDo('governance.policies.view'), 403);
+
         $policies = GovernancePolicy::query()
             ->withCount('attestations')
             ->when($request->category, fn($q, $cat) => $q->where('category', $cat))
@@ -36,11 +38,15 @@ class GovernancePolicyController extends Controller
 
     public function create()
     {
+        abort_unless(request()->user()?->canDo('governance.policies.manage'), 403);
+
         return Inertia::render('Governance/Policies/Create');
     }
 
     public function store(Request $request)
     {
+        abort_unless($request->user()?->canDo('governance.policies.manage'), 403);
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'category' => 'required|string',
@@ -65,6 +71,8 @@ class GovernancePolicyController extends Controller
 
     public function show(GovernancePolicy $policy)
     {
+        abort_unless(request()->user()?->canDo('governance.policies.view'), 403);
+
         $policy->load(['attestations.user', 'approvedByUser']);
 
         $attestationStats = [
@@ -81,6 +89,8 @@ class GovernancePolicyController extends Controller
 
     public function edit(GovernancePolicy $policy)
     {
+        abort_unless(request()->user()?->canDo('governance.policies.manage'), 403);
+
         return Inertia::render('Governance/Policies/Edit', [
             'policy' => $policy,
         ]);
@@ -88,6 +98,8 @@ class GovernancePolicyController extends Controller
 
     public function update(Request $request, GovernancePolicy $policy)
     {
+        abort_unless($request->user()?->canDo('governance.policies.manage'), 403);
+
         $validated = $request->validate([
             'title' => 'sometimes|string|max:255',
             'category' => 'sometimes|string',
@@ -105,6 +117,8 @@ class GovernancePolicyController extends Controller
 
     public function approve(Request $request, GovernancePolicy $policy)
     {
+        abort_unless($request->user()?->canDo('governance.policies.manage'), 403);
+
         $policy->update([
             'status' => 'active',
             'approved_by' => auth()->id(),
@@ -116,6 +130,8 @@ class GovernancePolicyController extends Controller
 
     public function attest(Request $request, GovernancePolicy $policy)
     {
+        abort_unless($request->user()?->canDo('governance.policies.view'), 403);
+
         $validated = $request->validate([
             'acknowledged' => 'required|accepted',
             'notes' => 'nullable|string|max:500',
@@ -139,6 +155,8 @@ class GovernancePolicyController extends Controller
 
     public function newVersion(Request $request, GovernancePolicy $policy)
     {
+        abort_unless($request->user()?->canDo('governance.policies.manage'), 403);
+
         $validated = $request->validate([
             'content' => 'required|string',
             'change_summary' => 'required|string|max:500',

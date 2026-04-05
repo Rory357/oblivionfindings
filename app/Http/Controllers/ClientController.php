@@ -2,6 +2,16 @@
 
 namespace App\Http\Controllers;
 
+/**
+ * NOTE: This controller is 1387 lines and should be refactored into:
+ * - ClientOnboardingController (store, create — onboarding/intake methods)
+ * - ClientAssignmentController (assignment-related methods)
+ * - ClientPortalController (portal-related methods)
+ * - ClientMediaController (updatePhoto, destroyPhoto, storeGalleryPhoto, destroyGalleryPhoto)
+ * - ClientLocationController (locationHistory)
+ * See: Phase 14 refactoring plan
+ */
+
 use App\Models\Client;
 use App\Models\ClientDocument;
 use App\Models\ClientPersonalAsset;
@@ -180,6 +190,10 @@ class ClientController extends Controller
                 ],
             ]);
         }
+
+        // Check for expired consents and pass to frontend
+        $expiredConsents = \App\Services\ConsentValidationService::getExpiredConsents($client);
+        $missingMandatory = \App\Services\ConsentValidationService::getMissingMandatoryConsents($client);
 
         $nextShift = Shift::query()
             ->where('client_id', $client->id)
@@ -624,6 +638,12 @@ class ClientController extends Controller
             ],
             'location' => $this->buildLocationData($client),
             'calendar_events' => $this->buildCalendarEvents($client),
+            'expiredConsents' => $expiredConsents->map(fn ($c) => [
+                'id' => $c->id,
+                'type' => $c->consentType?->name,
+                'expired_at' => $c->expires_at?->toIso8601String(),
+            ]),
+            'missingMandatoryConsents' => $missingMandatory->pluck('name')->values(),
         ]);
     }
 

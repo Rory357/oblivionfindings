@@ -40,12 +40,12 @@ export default function CreateCompliance({ auth }: Props) {
         { title: 'Create', href: '/governance/compliance/create' },
       ]}
     >
-      <Head title="Add Compliance Obligation" />
+      <Head title="New Compliance Obligation" />
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-6">
             <Shield className="w-8 h-8 text-blue-500" />
-            <h1 className="text-3xl font-bold text-gray-900">Add Compliance Obligation</h1>
+            <h1 className="text-3xl font-bold text-gray-900">New Compliance Obligation</h1>
           </div>
 
           <Card>

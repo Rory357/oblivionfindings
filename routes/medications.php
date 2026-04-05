@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\MedicationsController;
 use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsReportController;
+use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\ClientMarController;
 use App\Http\Controllers\Compliance\ComplianceDashboardController;
 use Inertia\Inertia;
@@ -74,6 +75,14 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/reports/medications/export-controlled-discrepancies', [MedicationsReportController::class, 'exportDiscrepanciesCsv'])
             ->name('reports.medications.export_discrepancies');
     });
+
+    // Medication correction approval workflow
+    Route::post('/medications/corrections/{correction}/approve', [MedicationAdministrationCorrectionController::class, 'approve'])
+        ->middleware('permission:medications.administer.correct')
+        ->name('medications.corrections.approve');
+    Route::post('/medications/corrections/{correction}/reject', [MedicationAdministrationCorrectionController::class, 'reject'])
+        ->middleware('permission:medications.administer.correct')
+        ->name('medications.corrections.reject');
 
     // Compliance dashboard
     Route::get('/compliance', [ComplianceDashboardController::class, 'index'])

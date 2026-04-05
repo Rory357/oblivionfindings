@@ -13,6 +13,8 @@ class BoardEvaluationController extends Controller
 {
     public function index()
     {
+        abort_unless(request()->user()?->canDo('governance.evaluations.view'), 403);
+
         $evaluations = BoardEvaluation::withCount('responses')
             ->orderByDesc('created_at')
             ->paginate(15);
@@ -24,11 +26,15 @@ class BoardEvaluationController extends Controller
 
     public function create()
     {
+        abort_unless(request()->user()?->canDo('governance.evaluations.manage'), 403);
+
         return Inertia::render('Governance/Evaluations/Create');
     }
 
     public function store(Request $request)
     {
+        abort_unless($request->user()?->canDo('governance.evaluations.manage'), 403);
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'evaluation_type' => 'required|in:board,committee,chair,individual',
@@ -52,6 +58,8 @@ class BoardEvaluationController extends Controller
 
     public function show(BoardEvaluation $evaluation)
     {
+        abort_unless(request()->user()?->canDo('governance.evaluations.view'), 403);
+
         $evaluation->load('responses.boardMember.user');
 
         $boardMembers = BoardMember::with('user')->active()->get();
@@ -76,6 +84,8 @@ class BoardEvaluationController extends Controller
 
     public function launch(BoardEvaluation $evaluation)
     {
+        abort_unless(request()->user()?->canDo('governance.evaluations.manage'), 403);
+
         $evaluation->update([
             'status' => 'active',
             'launched_at' => now(),
@@ -114,6 +124,8 @@ class BoardEvaluationController extends Controller
 
     public function close(BoardEvaluation $evaluation)
     {
+        abort_unless(request()->user()?->canDo('governance.evaluations.manage'), 403);
+
         $evaluation->update([
             'status' => 'closed',
             'closed_at' => now(),
@@ -124,6 +136,8 @@ class BoardEvaluationController extends Controller
 
     public function results(BoardEvaluation $evaluation)
     {
+        abort_unless(request()->user()?->canDo('governance.evaluations.view'), 403);
+
         $evaluation->load('responses.boardMember.user');
 
         return Inertia::render('Governance/Evaluations/Results', [

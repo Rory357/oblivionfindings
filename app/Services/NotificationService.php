@@ -11,6 +11,7 @@ use App\Models\User;
 use App\Notifications\AppEventNotification;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 
 class NotificationService
@@ -344,6 +345,11 @@ class NotificationService
     public function applyPreferences(Collection $recipients, string $eventKey): Collection
     {
         if ($recipients->isEmpty()) return $recipients;
+
+        // Log a warning so we can track how often channel-level preferences are bypassed.
+        // Remove this once per-channel filtering is implemented in notification via() methods.
+        Log::info('Channel-level notification preferences (channel_email/channel_inapp) are not yet enforced for event [' . $eventKey . ']. ' .
+            'Recipients: ' . $recipients->pluck('id')->implode(', '));
 
         $userIds = $recipients->pluck('id')->values();
         $userPrefs = UserNotificationPreference::query()

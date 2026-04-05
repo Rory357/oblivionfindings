@@ -55,7 +55,7 @@ class ClientDocumentController extends Controller
         $this->authorize('update', $client);
 
         $data = $request->validate([
-            'file' => ['required', 'file', 'max:51200'],
+            'file' => ['required', 'file', 'max:20480', 'mimes:pdf,doc,docx,xls,xlsx,csv,jpg,jpeg,png,gif,txt,rtf'],
             'title' => ['nullable', 'string', 'max:200'],
             'category' => ['nullable', 'string', 'max:60'],
             'folder' => ['nullable', 'string', 'max:255'],

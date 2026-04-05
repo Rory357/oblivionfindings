@@ -1,9 +1,23 @@
 import { InertiaLinkProps } from '@inertiajs/react';
 import { LucideIcon } from 'lucide-react';
 
+export interface AuthPermissions {
+    sites?: { viewAny?: boolean; create?: boolean; update?: boolean; archive?: boolean; types?: Record<string, boolean> };
+    staff?: { viewAny?: boolean; create?: boolean; update?: boolean; invite?: boolean };
+    assets?: { viewAny?: boolean; viewAssigned?: boolean; create?: boolean; update?: boolean; delete?: boolean };
+    clients?: { viewAny?: boolean; viewAssigned?: boolean; create?: boolean; update?: boolean };
+    shifts?: { viewAny?: boolean; viewAssigned?: boolean; create?: boolean; update?: boolean; manageAny?: boolean };
+    medications?: { view?: boolean; breakGlass?: boolean; audit?: { view?: boolean }; orders?: { manage?: boolean }; administer?: { record?: boolean; correct?: boolean } };
+    incidents?: { viewAny?: boolean; viewAssigned?: boolean; create?: boolean; update?: boolean; submit?: boolean; approve?: boolean; templatesManage?: boolean };
+    governance?: { view?: boolean; meetings?: { view?: boolean; manage?: boolean }; risks?: { view?: boolean; manage?: boolean; create?: boolean }; budgets?: { view?: boolean; create?: boolean; approve?: boolean }; compliance?: { view?: boolean; manage?: boolean; create?: boolean }; performance?: { view?: boolean; manage?: boolean; create?: boolean }; documents?: { view?: boolean; manage?: boolean } };
+    finance?: { dashboard?: boolean; ledger?: { view?: boolean; manage?: boolean }; ap?: { view?: boolean } };
+    hr?: { recruitment?: { view?: boolean; manage?: boolean }; employees?: { viewAny?: boolean; manage?: boolean } };
+    [key: string]: unknown;
+}
+
 export interface Auth {
     user: User;
-    can?: Record<string, unknown>;
+    can?: AuthPermissions;
     impersonating?: boolean;
     impersonator?: { id: number; name: string } | null;
 }

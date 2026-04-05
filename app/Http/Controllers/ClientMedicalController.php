@@ -75,6 +75,23 @@ class ClientMedicalController extends Controller
     {
         $this->authorize('viewMedications', $client);
 
+        // Audit break-glass medication access
+        $user = $request->user();
+        if ($user && $user->canDo('medications.breakglass')) {
+            $activeBreakGlass = $client->breakGlassAccesses()
+                ->where('user_id', $user->id)
+                ->where('expires_at', '>', now())
+                ->exists();
+
+            if ($activeBreakGlass) {
+                \App\Services\AuditLogger::log('breakglass.medication_access', $client);
+            }
+        }
+
+        // Check for expired consents and pass to frontend
+        $expiredConsents = \App\Services\ConsentValidationService::getExpiredConsents($client);
+        $missingMandatory = \App\Services\ConsentValidationService::getMissingMandatoryConsents($client);
+
         $client->load([
             'medicalProfile',
             'medications.stock',
@@ -100,11 +117,13 @@ class ClientMedicalController extends Controller
         $canControlledWitness = $canEdit || ($user?->canDo('medications.controlled.witness') ?? false);
 
         $witnesses = User::staff()
+            ->where(function ($q) {
+                $q->whereHas('roles.permissions', fn ($rp) => $rp->where('key', 'medications.controlled.witness'))
+                  ->orWhereHas('permissionOverrides', fn ($po) => $po->where('permissions.key', 'medications.controlled.witness')->wherePivot('allowed', true));
+            })
+            ->whereDoesntHave('permissionOverrides', fn ($po) => $po->where('permissions.key', 'medications.controlled.witness')->wherePivot('allowed', false))
             ->orderBy('name')
-            ->get(['id', 'name', 'email', 'role'])
-            ->filter(fn (User $u) => $u->canDo('medications.controlled.witness'))
-            ->values()
-            ->map(fn (User $u) => $u->only(['id', 'name', 'email']));
+            ->get(['id', 'name', 'email']);
 
         $administrations = ClientMedicationAdministration::query()
             ->where('client_id', $client->id)
@@ -248,6 +267,12 @@ class ClientMedicalController extends Controller
                 ->exists(),
             'disability_options' => ClientMedicalProfile::DISABILITY_OPTIONS,
             'allergen_options' => ClientMedicalProfile::ALLERGEN_OPTIONS,
+            'expiredConsents' => $expiredConsents->map(fn ($c) => [
+                'id' => $c->id,
+                'type' => $c->consentType?->name,
+                'expired_at' => $c->expires_at?->toIso8601String(),
+            ]),
+            'missingMandatoryConsents' => $missingMandatory->pluck('name')->values(),
         ]);
     }
 

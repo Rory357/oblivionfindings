@@ -77,7 +77,7 @@ class PortalDocumentController extends Controller
         abort_unless($user->canAccessClientPortal($client), 403);
 
         $request->validate([
-            'file' => 'required|file|max:20480', // 20MB
+            'file' => 'required|file|max:20480|mimes:pdf,doc,docx,xls,xlsx,csv,jpg,jpeg,png,gif,txt,rtf', // 20MB
             'title' => 'required|string|max:200',
             'notes' => 'nullable|string|max:1000',
         ]);

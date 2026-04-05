@@ -16,6 +16,8 @@ class DataBreachController extends Controller
      */
     public function index(Request $request): Response
     {
+        abort_unless($request->user()?->canDo('privacy.reportBreaches'), 403);
+
         $query = DataBreachLog::query()
             ->with(['discoveredBy', 'creator']);
 
@@ -58,8 +60,10 @@ class DataBreachController extends Controller
     /**
      * Show the form for creating a new breach record.
      */
-    public function create(): Response
+    public function create(Request $request): Response
     {
+        abort_unless($request->user()?->canDo('privacy.reportBreaches'), 403);
+
         return Inertia::render('privacy/breaches/create', [
             'staff' => User::staff()->select('id', 'name')->orderBy('name')->get(),
         ]);
@@ -70,6 +74,8 @@ class DataBreachController extends Controller
      */
     public function store(Request $request): RedirectResponse
     {
+        abort_unless($request->user()?->canDo('privacy.reportBreaches'), 403);
+
         $validated = $request->validate([
             'nature_of_breach' => 'required|string',
             'discovered_at' => 'required|date',
@@ -101,8 +107,10 @@ class DataBreachController extends Controller
     /**
      * Display the specified breach.
      */
-    public function show(DataBreachLog $breach): Response
+    public function show(Request $request, DataBreachLog $breach): Response
     {
+        abort_unless($request->user()?->canDo('privacy.reportBreaches'), 403);
+
         $breach->load(['discoveredBy', 'creator']);
 
         return Inertia::render('privacy/breaches/show', [
@@ -115,6 +123,8 @@ class DataBreachController extends Controller
      */
     public function update(Request $request, DataBreachLog $breach): RedirectResponse
     {
+        abort_unless($request->user()?->canDo('privacy.reportBreaches'), 403);
+
         $validated = $request->validate([
             'nature_of_breach' => 'sometimes|string',
             'affected_data_categories' => 'nullable|array',
@@ -136,6 +146,8 @@ class DataBreachController extends Controller
      */
     public function notifyICO(Request $request, DataBreachLog $breach): RedirectResponse
     {
+        abort_unless($request->user()?->canDo('privacy.reportBreaches'), 403);
+
         $request->validate([
             'authority_reference' => 'nullable|string|max:255',
         ]);
@@ -153,6 +165,8 @@ class DataBreachController extends Controller
      */
     public function notifySubjects(Request $request, DataBreachLog $breach): RedirectResponse
     {
+        abort_unless($request->user()?->canDo('privacy.reportBreaches'), 403);
+
         $request->validate([
             'notification_method' => 'required|string|max:255',
         ]);
@@ -170,6 +184,8 @@ class DataBreachController extends Controller
      */
     public function resolve(Request $request, DataBreachLog $breach): RedirectResponse
     {
+        abort_unless($request->user()?->canDo('privacy.reportBreaches'), 403);
+
         $request->validate([
             'resolution_notes' => 'required|string',
         ]);

@@ -22,6 +22,7 @@ class HrApiController extends Controller
     public function employees(Request $request): JsonResponse
     {
         $user = $request->user();
+        abort_unless($user?->canDo('hr.employees.viewAny'), 403);
 
         $employees = HrEmployeeProfile::forTenant($user->tenant_id)
             ->with(['user:id,name,email', 'primarySite:id,name'])
@@ -38,6 +39,7 @@ class HrApiController extends Controller
     public function employee(Request $request, int $id): JsonResponse
     {
         $user = $request->user();
+        abort_unless($user?->canDo('hr.employees.viewAny'), 403);
 
         $employee = HrEmployeeProfile::forTenant($user->tenant_id)
             ->with(['user:id,name,email', 'primarySite:id,name'])
@@ -53,6 +55,7 @@ class HrApiController extends Controller
     public function leaveRequests(Request $request): JsonResponse
     {
         $user = $request->user();
+        abort_unless($user?->canDo('hr.leave.viewAny'), 403);
 
         $requests = HrLeaveRequest::forTenant($user->tenant_id)
             ->with(['user:id,name,email', 'reviewer:id,name'])
@@ -67,6 +70,7 @@ class HrApiController extends Controller
     public function leaveBalances(Request $request, int $userId): JsonResponse
     {
         $user = $request->user();
+        abort_unless($user?->canDo('hr.leave.viewAny'), 403);
 
         $balances = HrLeaveBalance::forTenant($user->tenant_id)
             ->where('user_id', $userId)
@@ -83,6 +87,7 @@ class HrApiController extends Controller
     public function positions(Request $request): JsonResponse
     {
         $user = $request->user();
+        abort_unless($user?->canDo('hr.employees.viewAny'), 403);
 
         $positions = HrPosition::forTenant($user->tenant_id)
             ->when($request->query('active'), fn ($q) => $q->where('is_active', true))
@@ -99,6 +104,7 @@ class HrApiController extends Controller
     public function complianceStatus(Request $request): JsonResponse
     {
         $user = $request->user();
+        abort_unless($user?->canDo('hr.compliance.view'), 403);
 
         $statuses = HrStaffComplianceStatus::forTenant($user->tenant_id)
             ->with(['user:id,name,email'])
@@ -115,6 +121,7 @@ class HrApiController extends Controller
     public function timeEntries(Request $request): JsonResponse
     {
         $user = $request->user();
+        abort_unless($user?->canDo('hr.time.view'), 403);
 
         $entries = HrTimeEntry::forTenant($user->tenant_id)
             ->with(['user:id,name,email'])
@@ -134,6 +141,7 @@ class HrApiController extends Controller
     public function payrollRuns(Request $request): JsonResponse
     {
         $user = $request->user();
+        abort_unless($user?->canDo('hr.payroll.view'), 403);
 
         $runs = HrPayrollRun::forTenant($user->tenant_id)
             ->with(['creator:id,name'])

@@ -32,11 +32,11 @@ class FxRevaluationService
         $baseCurrency = FinCurrency::forOrganization($orgId)->base()->first();
 
         if (! $baseCurrency) {
-            return ['items' => [], 'total_gain_loss' => 0.0];
+            return ['items' => [], 'total_gain_loss' => '0'];
         }
 
         $items = [];
-        $totalGainLoss = 0.0;
+        $totalGainLoss = '0';
 
         // 1. Open foreign-currency bills
         $bills = FinBill::forOrganization($orgId)
@@ -73,7 +73,7 @@ class FxRevaluationService
                     'current_base_value' => $currentBaseValue,
                     'gain_loss' => $gainLoss,
                 ];
-                $totalGainLoss += $gainLoss;
+                $totalGainLoss = bcadd($totalGainLoss, (string) $gainLoss, 2);
             }
         }
 
@@ -115,11 +115,10 @@ class FxRevaluationService
                     'current_base_value' => $currentBaseValue,
                     'gain_loss' => $gainLoss,
                 ];
-                $totalGainLoss += $gainLoss;
+                $totalGainLoss = bcadd($totalGainLoss, (string) $gainLoss, 2);
             }
         }
 
-        $totalGainLoss = round($totalGainLoss, 2);
 
         return [
             'items' => $items,

@@ -9,6 +9,37 @@ use Illuminate\Http\Request;
 
 class MedicationAdministrationCorrectionController extends Controller
 {
+    public function approve(Request $request, ClientMedicationAdministration $correction)
+    {
+        abort_unless($request->user()?->canDo('medications.administer.correct'), 403);
+        abort_unless($correction->is_correction && $correction->correction_status === 'pending', 404);
+
+        $correction->update([
+            'correction_status' => 'approved',
+            'correction_approved_by' => $request->user()->id,
+            'correction_approved_at' => now(),
+        ]);
+
+        return back()->with('success', 'Correction approved.');
+    }
+
+    public function reject(Request $request, ClientMedicationAdministration $correction)
+    {
+        abort_unless($request->user()?->canDo('medications.administer.correct'), 403);
+        abort_unless($correction->is_correction && $correction->correction_status === 'pending', 404);
+
+        $validated = $request->validate(['reason' => 'required|string|max:1000']);
+
+        $correction->update([
+            'correction_status' => 'rejected',
+            'correction_approved_by' => $request->user()->id,
+            'correction_approved_at' => now(),
+            'correction_rejection_reason' => $validated['reason'],
+        ]);
+
+        return back()->with('success', 'Correction rejected.');
+    }
+
     public function store(Request $request, Client $client, ClientMedicationAdministration $administration)
     {
         $this->authorize('viewMedications', $client);
@@ -50,13 +81,15 @@ class MedicationAdministrationCorrectionController extends Controller
         $corr->notes = $data['notes'] ?? null;
         $corr->administered_by = $user->id;
 
+        $corr->correction_status = 'pending';
         $corr->save();
 
-        app(NotificationService::class)->notifyCrud($user, 'created', 'medication correction', $corr, $client, [
-            'title' => 'Medication administration corrected',
+        app(NotificationService::class)->notifyCrud($user, 'created', 'medication correction (pending approval)', $corr, $client, [
+            'title' => 'Medication correction pending approval',
             'url' => url("/clients/{$client->id}/mar"),
+            'notify_roles' => ['manager', 'admin'],
         ]);
 
-        return back()->with('success', 'Correction recorded.');
+        return back()->with('success', 'Correction submitted for approval.');
     }
 }

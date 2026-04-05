@@ -21,36 +21,41 @@ class CheckOnboardingProgressJob implements ShouldQueue
 
     public function handle(OnboardingService $onboardingService, OpsNotificationService $notificationService): void
     {
-        $overdueSteps = $onboardingService->getOverdueSteps($this->organizationId);
-        $staleWorkflows = $onboardingService->getStaleWorkflows($this->organizationId);
+        try {
+            $overdueSteps = $onboardingService->getOverdueSteps($this->organizationId);
+            $staleWorkflows = $onboardingService->getStaleWorkflows($this->organizationId);
 
-        $adminIds = \App\Models\User::where('organization_id', $this->organizationId)
-            ->whereIn('role', ['admin', 'manager', 'coordinator'])
-            ->pluck('id')
-            ->toArray();
+            $adminIds = \App\Models\User::where('organization_id', $this->organizationId)
+                ->whereIn('role', ['admin', 'manager', 'coordinator'])
+                ->pluck('id')
+                ->toArray();
 
-        if ($overdueSteps->isNotEmpty()) {
-            $notificationService->notifyBulk(
-                $adminIds,
-                $this->organizationId,
-                'Overdue Onboarding Steps',
-                sprintf('%d onboarding steps are overdue and need attention.', $overdueSteps->count()),
-                'onboarding.overdue_steps',
-                ['count' => $overdueSteps->count()]
-            );
+            if ($overdueSteps->isNotEmpty()) {
+                $notificationService->notifyBulk(
+                    $adminIds,
+                    $this->organizationId,
+                    'Overdue Onboarding Steps',
+                    sprintf('%d onboarding steps are overdue and need attention.', $overdueSteps->count()),
+                    'onboarding.overdue_steps',
+                    ['count' => $overdueSteps->count()]
+                );
+            }
+
+            if ($staleWorkflows->isNotEmpty()) {
+                $notificationService->notifyBulk(
+                    $adminIds,
+                    $this->organizationId,
+                    'Stale Onboarding Workflows',
+                    sprintf('%d onboarding workflows have not been updated in 14+ days.', $staleWorkflows->count()),
+                    'onboarding.stale_workflows',
+                    ['count' => $staleWorkflows->count()]
+                );
+            }
+
+            Log::info("Checked onboarding for org {$this->organizationId}: {$overdueSteps->count()} overdue, {$staleWorkflows->count()} stale.");
+        } catch (\Throwable $e) {
+            \Log::error('CheckOnboardingProgressJob failed: ' . $e->getMessage(), ['exception' => $e]);
+            throw $e;
         }
-
-        if ($staleWorkflows->isNotEmpty()) {
-            $notificationService->notifyBulk(
-                $adminIds,
-                $this->organizationId,
-                'Stale Onboarding Workflows',
-                sprintf('%d onboarding workflows have not been updated in 14+ days.', $staleWorkflows->count()),
-                'onboarding.stale_workflows',
-                ['count' => $staleWorkflows->count()]
-            );
-        }
-
-        Log::info("Checked onboarding for org {$this->organizationId}: {$overdueSteps->count()} overdue, {$staleWorkflows->count()} stale.");
     }
 }

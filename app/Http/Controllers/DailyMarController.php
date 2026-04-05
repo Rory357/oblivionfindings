@@ -247,8 +247,8 @@ class DailyMarController extends Controller
             }
         }
 
-        // Controlled drugs: require permission + witness when recording a "given" administration.
-        if ($medication->controlled_drug && (($data['status'] ?? 'given') === 'given')) {
+        // Controlled drugs: require permission + witness for ALL actions (given, refused, missed, withheld).
+        if ($medication->controlled_drug) {
             abort_unless(($user?->canDo('clients.update') ?? false) || ($user?->canDo('medications.controlled.record') ?? false), 403);
             if (empty($data['witnessed_by'])) {
                 return back()->withInput()->with('error', 'A witness is required when administering a controlled drug.');

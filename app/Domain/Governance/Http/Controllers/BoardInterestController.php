@@ -12,6 +12,8 @@ class BoardInterestController extends Controller
 {
     public function index()
     {
+        abort_unless(request()->user()?->canDo('governance.interests.view'), 403);
+
         $interests = BoardMemberInterest::with('boardMember.user')
             ->where('is_active', true)
             ->orderBy('board_member_id')
@@ -28,6 +30,16 @@ class BoardInterestController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($request->user()?->canDo('governance.interests.manage'), 403);
+
+        // Ensure the user can only declare interests for their own board member record
+        $userBoardMember = $request->user()->boardMember;
+        abort_unless(
+            $userBoardMember && (int) $request->input('board_member_id') === $userBoardMember->id,
+            403,
+            'You may only declare interests for your own board member record.'
+        );
+
         $validated = $request->validate([
             'board_member_id' => 'required|exists:board_members,id',
             'interest_type' => 'required|in:financial,personal,professional,family,other',
@@ -49,6 +61,8 @@ class BoardInterestController extends Controller
 
     public function update(Request $request, BoardMemberInterest $interest)
     {
+        abort_unless($request->user()?->canDo('governance.interests.manage'), 403);
+
         $validated = $request->validate([
             'description' => 'sometimes|string',
             'is_active' => 'boolean',
@@ -62,6 +76,8 @@ class BoardInterestController extends Controller
 
     public function myInterests()
     {
+        abort_unless(request()->user()?->canDo('governance.interests.view'), 403);
+
         $boardMember = auth()->user()->boardMember;
 
         if (!$boardMember) {

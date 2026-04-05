@@ -11,7 +11,10 @@ class GovernanceDocumentController extends Controller
 {
     public function index(Request $request)
     {
+        abort_unless($request->user()?->canDo('governance.documents.view'), 403);
+
         $documents = GovernanceDocument::query()
+            ->when(!$request->user()?->canDo('governance.documents.manage'), fn($q) => $q->where('is_confidential', false))
             ->when($request->category, fn($q, $cat) => $q->where('category', $cat))
             ->when($request->search, fn($q, $s) => $q->where('title', 'like', "%{$s}%"))
             ->orderByDesc('updated_at')
@@ -33,6 +36,8 @@ class GovernanceDocumentController extends Controller
 
     public function store(Request $request)
     {
+        abort_unless($request->user()?->canDo('governance.documents.manage'), 403);
+
         $validated = $request->validate([
             'title' => 'required|string|max:255',
             'category' => 'required|string',
@@ -61,6 +66,8 @@ class GovernanceDocumentController extends Controller
 
     public function download(GovernanceDocument $document)
     {
+        abort_unless(request()->user()?->canDo('governance.documents.view'), 403);
+
         if ($document->is_confidential) {
             $this->authorize('viewConfidential', $document);
         }
@@ -70,6 +77,8 @@ class GovernanceDocumentController extends Controller
 
     public function destroy(GovernanceDocument $document)
     {
+        abort_unless(request()->user()?->canDo('governance.documents.manage'), 403);
+
         $this->authorize('delete', $document);
 
         $document->delete();

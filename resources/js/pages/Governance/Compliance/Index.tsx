@@ -92,9 +92,11 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
               <Button variant="outline" asChild>
                 <Link href={complianceCalendar.url()}>Calendar View</Link>
               </Button>
-              <Button asChild>
-                <Link href={createCompliance.url()}>Add Obligation</Link>
-              </Button>
+              {(auth.can as any)?.governance?.compliance?.create && (
+                <Button asChild>
+                  <Link href={createCompliance.url()}>New Obligation</Link>
+                </Button>
+              )}
             </div>
           </div>
 

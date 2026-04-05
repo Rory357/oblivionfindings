@@ -203,6 +203,11 @@ Route::middleware('auth')->group(function () {
             fn ($value, $key) => \App\Models\AppSetting::updateOrCreate(['key' => $key], ['value' => $value])
         );
 
+        \App\Services\AuditLogger::log('settings.security.updated', null, [
+            'changes' => $settings,
+            'changed_by' => $request->user()->id,
+        ]);
+
         return back()->with('success', 'Security settings updated.');
     })
         ->middleware('permission:settings.access.manage')

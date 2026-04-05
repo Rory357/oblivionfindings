@@ -41,12 +41,12 @@ export default function CreateRisk({ auth }: Props) {
         { title: 'Create', href: '/governance/risks/create' },
       ]}
     >
-      <Head title="Add Risk" />
+      <Head title="New Risk" />
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3 mb-6">
             <AlertTriangle className="w-8 h-8 text-orange-500" />
-            <h1 className="text-3xl font-bold text-gray-900">Add New Risk</h1>
+            <h1 className="text-3xl font-bold text-gray-900">New Risk</h1>
           </div>
 
           <Card>

@@ -80,6 +80,11 @@ class AccessController extends Controller
             'role' => $primaryRoleName ?? ($target->role ?? 'support_worker'),
         ])->save();
 
+        \App\Services\AuditLogger::log('rbac.roles.updated', $target, [
+            'roles' => $roleIds,
+            'changed_by' => $request->user()->id,
+        ]);
+
         // Overrides (grant/deny wins over role perms)
         $overrides = $data['overrides'] ?? [];
         foreach ($overrides as $permissionId => $mode) {
@@ -92,6 +97,13 @@ class AccessController extends Controller
             // Ensure row exists, then update the pivot value.
             $target->permissionOverrides()->syncWithoutDetaching([$pid]);
             $target->permissionOverrides()->updateExistingPivot($pid, ['allowed' => $allowed]);
+        }
+
+        if (!empty($overrides)) {
+            \App\Services\AuditLogger::log('rbac.permission.override', $target, [
+                'overrides' => $overrides,
+                'changed_by' => $request->user()->id,
+            ]);
         }
 
         return redirect()->back()->with('success', 'Access updated.');
@@ -117,6 +129,11 @@ class AccessController extends Controller
             'approved_at' => $target->approved_at ?? now(),
             'approved_by' => $target->approved_by ?? $user->id,
         ])->save();
+
+        \App\Services\AuditLogger::log('rbac.user.approved', $target, [
+            'approved_by' => $user->id,
+            'roles_assigned' => $data['role_ids'] ?? [],
+        ]);
 
         return redirect()->back()->with('success', 'User approved.');
     }

@@ -160,6 +160,25 @@ class IncidentController extends Controller
             'is_notifiable' => (bool)($data['is_notifiable'] ?? false),
         ]);
 
+        // Auto-escalate abuse/neglect incidents to safeguarding
+        if (preg_match('/abuse|neglect/i', $incident->type)) {
+            \App\Models\SafeguardingConcern::create([
+                'subject_type' => \App\Models\Client::class,
+                'subject_id' => $client->id,
+                'subject_name' => $client->first_name . ' ' . $client->last_name,
+                'concern_type' => 'incident_escalation',
+                'severity' => $incident->severity,
+                'description' => $incident->description,
+                'occurred_at' => $incident->occurred_at,
+                'reported_by_user_id' => $request->user()?->id,
+                'reported_by_name' => $request->user()?->name,
+                'status' => 'open',
+                'requires_external_referral' => true,
+                'related_incident_id' => $incident->id,
+                'created_by' => $request->user()?->id,
+            ]);
+        }
+
         // High severity alert -> managers only (drafts can still be high severity)
         if ($incident->severity === 'high') {
             app(NotificationService::class)->notifyCrud(
@@ -434,6 +453,11 @@ class IncidentController extends Controller
 
         // Guardrail: closing is only valid for reviewed incidents.
         abort_unless($incident->status === 'reviewed', 403);
+
+        // Guardrail: high-severity incidents require a completed investigation before closure.
+        if (in_array($incident->severity, ['high', 'critical'], true) && $incident->investigation_status !== 'completed') {
+            return back()->with('error', 'High-severity incidents require a completed investigation before closure.');
+        }
 
         // Guardrail: incidents cannot be closed while there are any open follow-ups.
         // This applies if follow-ups were explicitly flagged *or* any follow-up records exist.

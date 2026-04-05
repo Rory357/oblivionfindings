@@ -68,45 +68,47 @@ Route::middleware(['auth'])->group(function () {
             ->name('training.courses.destroy');
     });
 
-    // Staff Training Records
-    Route::middleware('permission:training.viewAny')->group(function () {
-        Route::get('/staff/training', [StaffTrainingRecordController::class, 'index'])
-            ->name('staff.training.index');
-        Route::get('/staff/{user}/training', [StaffTrainingRecordController::class, 'userTraining'])
-            ->name('staff.training.user');
-        Route::get('/staff/training/{record}', [StaffTrainingRecordController::class, 'show'])
-            ->name('staff.training.show');
-        Route::get('/training/matrix', [StaffTrainingRecordController::class, 'matrix'])
-            ->name('training.matrix');
-    });
-
-    Route::middleware('permission:training.enrol')->group(function () {
-        Route::post('/staff/{user}/training/enrol', [StaffTrainingRecordController::class, 'enrol'])
-            ->name('staff.training.enrol');
-    });
-
-    Route::middleware('permission:training.record')->group(function () {
-        Route::put('/staff/training/{record}', [StaffTrainingRecordController::class, 'update'])
-            ->name('staff.training.update');
-        Route::post('/staff/training/{record}/complete', [StaffTrainingRecordController::class, 'markComplete'])
-            ->name('staff.training.complete');
-        Route::post('/staff/training/{record}/renew', [StaffTrainingRecordController::class, 'renew'])
-            ->name('staff.training.renew');
-    });
-
-    Route::middleware('permission:training.exempt')->group(function () {
-        Route::post('/staff/training/{record}/exempt', [StaffTrainingRecordController::class, 'exempt'])
-            ->name('staff.training.exempt');
-    });
+    // Staff Training Records — disabled until StaffTrainingRecordController implementation is complete.
+    // Route::middleware('permission:training.viewAny')->group(function () {
+    //     Route::get('/staff/training', [StaffTrainingRecordController::class, 'index'])
+    //         ->name('staff.training.index');
+    //     Route::get('/staff/{user}/training', [StaffTrainingRecordController::class, 'userTraining'])
+    //         ->name('staff.training.user');
+    //     Route::get('/staff/training/{record}', [StaffTrainingRecordController::class, 'show'])
+    //         ->name('staff.training.show');
+    //     Route::get('/training/matrix', [StaffTrainingRecordController::class, 'matrix'])
+    //         ->name('training.matrix');
+    // });
+    //
+    // Route::middleware('permission:training.enrol')->group(function () {
+    //     Route::post('/staff/{user}/training/enrol', [StaffTrainingRecordController::class, 'enrol'])
+    //         ->name('staff.training.enrol');
+    // });
+    //
+    // Route::middleware('permission:training.record')->group(function () {
+    //     Route::put('/staff/training/{record}', [StaffTrainingRecordController::class, 'update'])
+    //         ->name('staff.training.update');
+    //     Route::post('/staff/training/{record}/complete', [StaffTrainingRecordController::class, 'markComplete'])
+    //         ->name('staff.training.complete');
+    //     Route::post('/staff/training/{record}/renew', [StaffTrainingRecordController::class, 'renew'])
+    //         ->name('staff.training.renew');
+    // });
+    //
+    // Route::middleware('permission:training.exempt')->group(function () {
+    //     Route::post('/staff/training/{record}/exempt', [StaffTrainingRecordController::class, 'exempt'])
+    //         ->name('staff.training.exempt');
+    // });
 
     // Competency Framework
+    // Competency Framework routes — StaffCompetencyController is a stub; disabled until implementation is complete.
+    // CompetencyFrameworkController routes are kept active as they are implemented.
     Route::middleware('permission:competency.viewAny')->group(function () {
         Route::get('/competency/frameworks', [CompetencyFrameworkController::class, 'index'])
             ->name('competency.frameworks.index');
         Route::get('/competency/frameworks/{framework}', [CompetencyFrameworkController::class, 'show'])
             ->name('competency.frameworks.show');
-        Route::get('/staff/{user}/competency', [StaffCompetencyController::class, 'userCompetency'])
-            ->name('staff.competency.show');
+        // Route::get('/staff/{user}/competency', [StaffCompetencyController::class, 'userCompetency'])
+        //     ->name('staff.competency.show');
     });
 
     Route::middleware('permission:competency.manage')->group(function () {
@@ -120,12 +122,12 @@ Route::middleware(['auth'])->group(function () {
             ->name('competency.frameworks.update');
     });
 
-    Route::middleware('permission:competency.assess')->group(function () {
-        Route::post('/staff/{user}/competency/assess', [StaffCompetencyController::class, 'assess'])
-            ->name('staff.competency.assess');
-        Route::put('/staff/competency/{assessment}', [StaffCompetencyController::class, 'updateAssessment'])
-            ->name('staff.competency.update');
-    });
+    // Route::middleware('permission:competency.assess')->group(function () {
+    //     Route::post('/staff/{user}/competency/assess', [StaffCompetencyController::class, 'assess'])
+    //         ->name('staff.competency.assess');
+    //     Route::put('/staff/competency/{assessment}', [StaffCompetencyController::class, 'updateAssessment'])
+    //         ->name('staff.competency.update');
+    // });
 
     // Staff Induction
     Route::middleware('permission:training.viewAny')->group(function () {

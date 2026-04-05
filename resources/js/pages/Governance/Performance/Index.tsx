@@ -65,9 +65,11 @@ export default function PerformanceIndex({ auth, reviews, review_cycles }: Props
               <h1 className="text-3xl font-bold text-gray-900">Performance Reviews</h1>
               <p className="text-gray-500 mt-1">CEO and executive performance management</p>
             </div>
-            <Button asChild>
-              <Link href={createPerformance.url()}>New Review</Link>
-            </Button>
+            {(auth.can as any)?.governance?.performance?.create && (
+              <Button asChild>
+                <Link href={createPerformance.url()}>New Review</Link>
+              </Button>
+            )}
           </div>
 
           {/* Summary Cards */}

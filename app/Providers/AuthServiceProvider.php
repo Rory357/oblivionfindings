@@ -38,26 +38,109 @@ use App\Domain\Roadmap\Policies\InitiativeBudgetPolicy as RoadmapInitiativeBudge
 use App\Domain\Roadmap\Policies\InitiativePolicy as RoadmapInitiativePolicy;
 use App\Domain\Roadmap\Policies\InitiativeSuggestionPolicy as RoadmapInitiativeSuggestionPolicy;
 use App\Domain\Roadmap\Policies\QuarterlyRoadmapPlanPolicy as RoadmapQuarterlyRoadmapPlanPolicy;
+use App\Domain\Finance\Models\FinAccount;
+use App\Domain\Finance\Models\FinBankReconciliation;
+use App\Domain\Finance\Models\FinBill;
+use App\Domain\Finance\Models\FinCreditNote;
+use App\Domain\Finance\Models\FinFixedAsset;
+use App\Domain\Finance\Models\FinGstReturn;
+use App\Domain\Finance\Models\FinJournal;
+use App\Domain\Finance\Models\FinPaymentRun;
+use App\Domain\Finance\Models\FinPettyCashFund;
+use App\Domain\Finance\Models\FinPurchaseOrder;
+use App\Domain\Finance\Models\FinVendor;
+use App\Domain\Finance\Policies\FinAccountPolicy;
+use App\Domain\Finance\Policies\FinBankReconciliationPolicy;
+use App\Domain\Finance\Policies\FinBillPolicy;
+use App\Domain\Finance\Policies\FinCreditNotePolicy;
+use App\Domain\Finance\Policies\FinFixedAssetPolicy;
+use App\Domain\Finance\Policies\FinGstReturnPolicy;
+use App\Domain\Finance\Policies\FinJournalPolicy;
+use App\Domain\Finance\Policies\FinPaymentRunPolicy;
+use App\Domain\Finance\Policies\FinPettyCashPolicy;
+use App\Domain\Finance\Policies\FinPurchaseOrderPolicy;
+use App\Domain\Finance\Policies\FinVendorPolicy;
+use App\Models\Asset;
+use App\Models\BillingEntry;
+use App\Models\CarePlan;
+use App\Models\Client;
+use App\Models\ClientAssessment;
+use App\Models\ClientCondition;
+use App\Models\ClientConsent;
+use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientIncident;
+use App\Models\ClientMedication;
+use App\Models\ClientNote;
+use App\Models\ClientRisk;
+use App\Models\DataBreachLog;
+use App\Models\DataSubjectRequest;
 use App\Models\IncidentFollowup;
 use App\Models\IncidentTemplate;
+use App\Models\LegalHold;
+use App\Models\SafeguardingConcern;
+use App\Models\Site;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteDamage;
+use App\Policies\AssetPolicy;
+use App\Policies\BillingEntryPolicy;
+use App\Policies\CarePlanPolicy;
+use App\Policies\ClientAssessmentPolicy;
+use App\Policies\ClientConditionPolicy;
+use App\Policies\ClientConsentPolicy;
+use App\Policies\ClientControlledDrugEntryPolicy;
 use App\Policies\ClientIncidentPolicy;
+use App\Policies\ClientMedicationPolicy;
+use App\Policies\ClientNotePolicy;
+use App\Policies\ClientPolicy;
+use App\Policies\ClientRiskPolicy;
+use App\Policies\DataBreachLogPolicy;
+use App\Policies\DataSubjectRequestPolicy;
 use App\Policies\IncidentFollowupPolicy;
 use App\Policies\IncidentTemplatePolicy;
+use App\Policies\LegalHoldPolicy;
+use App\Policies\SafeguardingConcernPolicy;
 use App\Policies\SiteChecklistTemplatePolicy;
 use App\Policies\SiteDamagePolicy;
+use App\Policies\SitePolicy;
 use Illuminate\Foundation\Support\Providers\AuthServiceProvider as ServiceProvider;
 
 class AuthServiceProvider extends ServiceProvider
 {
     protected $policies = [
+        // Core
+        Asset::class => AssetPolicy::class,
+        Client::class => ClientPolicy::class,
+        Site::class => SitePolicy::class,
+        SafeguardingConcern::class => SafeguardingConcernPolicy::class,
         ClientIncident::class => ClientIncidentPolicy::class,
         IncidentTemplate::class => IncidentTemplatePolicy::class,
         IncidentFollowup::class => IncidentFollowupPolicy::class,
         SiteChecklistTemplate::class => SiteChecklistTemplatePolicy::class,
         SiteDamage::class => SiteDamagePolicy::class,
+        ClientMedication::class => ClientMedicationPolicy::class,
+        ClientNote::class => ClientNotePolicy::class,
+        CarePlan::class => CarePlanPolicy::class,
+        ClientAssessment::class => ClientAssessmentPolicy::class,
+        ClientCondition::class => ClientConditionPolicy::class,
+        ClientConsent::class => ClientConsentPolicy::class,
+        ClientRisk::class => ClientRiskPolicy::class,
+        ClientControlledDrugEntry::class => ClientControlledDrugEntryPolicy::class,
+        BillingEntry::class => BillingEntryPolicy::class,
+        DataBreachLog::class => DataBreachLogPolicy::class,
+        DataSubjectRequest::class => DataSubjectRequestPolicy::class,
+        LegalHold::class => LegalHoldPolicy::class,
+        // Finance
+        FinAccount::class => FinAccountPolicy::class,
+        FinBankReconciliation::class => FinBankReconciliationPolicy::class,
+        FinBill::class => FinBillPolicy::class,
+        FinCreditNote::class => FinCreditNotePolicy::class,
+        FinFixedAsset::class => FinFixedAssetPolicy::class,
+        FinGstReturn::class => FinGstReturnPolicy::class,
+        FinJournal::class => FinJournalPolicy::class,
+        FinPaymentRun::class => FinPaymentRunPolicy::class,
+        FinPettyCashFund::class => FinPettyCashPolicy::class,
+        FinPurchaseOrder::class => FinPurchaseOrderPolicy::class,
+        FinVendor::class => FinVendorPolicy::class,
         RoadmapInitiative::class => RoadmapInitiativePolicy::class,
         QuarterlyRoadmapPlan::class => RoadmapQuarterlyRoadmapPlanPolicy::class,
         RoadmapDecisionRequest::class => RoadmapDecisionRequestPolicy::class,

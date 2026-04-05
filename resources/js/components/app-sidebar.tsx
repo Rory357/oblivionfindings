@@ -294,12 +294,10 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     if (can?.calendar?.viewAny) items.push({ title: 'Calendars', href: '/calendar', icon: CalendarDays });
     if (can?.checklists?.view) items.push({ title: 'Checklists', href: '/checklists', icon: ClipboardCheck });
     if (can?.checklists?.view) items.push({ title: 'Inspections & Maintenance', href: '/sites/inspections', icon: ClipboardList });
-    if (can?.hazards?.view) items.push({ title: 'Hazards', href: '/hazards', icon: ShieldAlert });
     if (can?.reports?.sitesView) items.push({ title: 'Reports', href: '/sites/reports', icon: BarChart3 });
     if (can?.vendors?.view) items.push({ title: 'Vendors', href: '/vendors', icon: Package });
     if (can?.siteHardware?.view) items.push({ title: 'Site Hardware', href: '/site-hardware', icon: Settings });
     if (can?.unifi?.manage) items.push({ title: 'UniFi', href: '/unifi', icon: Settings });
-    if (can?.assets?.geofences?.manage || can?.fleet?.viewAny) items.push({ title: 'Geofences', href: '/fleet-assets/geofences', icon: MapPin });
 
     const groups: SubPanelGroup[] = [{ label: 'Sites & Locations', items }];
 
@@ -375,7 +373,6 @@ function buildOperationsSubPanelGroups({ can, role, labels }: { can?: any; role?
     if (can?.custom_forms?.viewAny) tools.push({ title: 'Custom Forms', href: '/operations/forms', icon: ClipboardCheck });
     if (can?.care_note_templates?.viewAny) tools.push({ title: 'Note Templates', href: '/operations/note-templates', icon: FileText });
     if (can?.evv?.viewAny) tools.push({ title: 'EVV', href: '/operations/evv', icon: MapPin });
-    if (can?.evv?.viewAny) tools.push({ title: 'Geofences', href: '/operations/geofences', icon: MapPin });
     if (can?.clients?.update) tools.push({ title: 'Family Portal', href: '/operations/family-portal', icon: Users });
     if (can?.rostering?.viewAny || can?.shifts?.viewAny) tools.push({ title: 'Calendar Sync', href: '/operations/calendar-sync', icon: CalendarDays });
     if (can?.rostering?.viewAny) tools.push({ title: 'Qualifications', href: '/operations/qualifications', icon: ShieldCheck });

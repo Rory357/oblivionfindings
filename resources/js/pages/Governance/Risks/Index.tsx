@@ -82,9 +82,11 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
               <Button variant="outline" asChild>
                 <Link href={risksHeatmap.url()}>Risk Heatmap</Link>
               </Button>
-              <Button asChild>
-                <Link href={createRisk.url()}>Add Risk</Link>
-              </Button>
+              {(auth.can as any)?.governance?.risks?.create && (
+                <Button asChild>
+                  <Link href={createRisk.url()}>New Risk</Link>
+                </Button>
+              )}
             </div>
           </div>
 
