@@ -829,6 +829,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::middleware('permission:clients.update')->group(function () {
         Route::get('/family-portal', [FamilyPortalController::class, 'index'])->name('operations.family_portal.index');
         Route::get('/family-portal/{client}', [FamilyPortalController::class, 'show'])->name('operations.family_portal.show');
+        Route::get('/family-portal/{client}/edit', [FamilyPortalController::class, 'edit'])->name('operations.family_portal.edit');
         Route::put('/family-portal/{client}', [FamilyPortalController::class, 'update'])->name('operations.family_portal.update');
     });
 

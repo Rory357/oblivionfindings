@@ -1,7 +1,7 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HorizontalBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -159,7 +159,7 @@ export default function CostAllocation({ by_site: rawSite, by_resident: rawResid
         >
             <Head title="Cost Allocation" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Cost Allocation"
                     description="Analyse fleet costs allocated by house/site and by resident."
                     backHref="/fleet-assets/reports"

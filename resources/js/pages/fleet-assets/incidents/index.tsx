@@ -1,6 +1,6 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { FLEET_COLORS, ProgressRing } from '@/components/fleet-charts';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -125,7 +125,7 @@ export default function IncidentIndex({ incidents: rawIncidents, vehicles, filte
         >
             <Head title="Incident Reports" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Incident Reports"
                     actions={
                         <div className="flex gap-2">

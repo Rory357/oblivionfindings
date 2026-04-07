@@ -182,6 +182,11 @@ class Client extends Model
         return $this->hasMany(\App\Models\ClientDocument::class);
     }
 
+    public function familyPortalSetting()
+    {
+        return $this->hasOne(\App\Models\FamilyPortalSetting::class);
+    }
+
     public function supportPlan()
     {
         return $this->hasOne(\App\Models\ClientSupportPlan::class);

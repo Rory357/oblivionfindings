@@ -21,6 +21,25 @@ class FamilyPortalController extends Controller
             ->paginate(20)
             ->withQueryString();
 
+        $clients->through(function (Client $client) {
+            $setting = $client->familyPortalSetting;
+
+            return [
+                'id' => $client->id,
+                'first_name' => $client->first_name,
+                'last_name' => $client->last_name,
+                'portal_enabled' => $setting !== null,
+                'notifications' => [
+                    'shift_updates' => $setting?->show_shift_schedule ?? false,
+                    'care_notes' => $setting?->show_care_notes ?? false,
+                    'incident_alerts' => $setting?->show_incidents ?? false,
+                    'billing_updates' => false,
+                    'messages' => false,
+                ],
+                'family_contacts_count' => 0,
+            ];
+        });
+
         return inertia('operations/family-portal/Index', [
             'clients' => $clients,
         ]);
@@ -29,7 +48,7 @@ class FamilyPortalController extends Controller
     public function show(Request $request, $client)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('family_portal.view'), 403);
+        abort_unless($auth && $auth->canDo('family_portal.viewAny'), 403);
 
         $client = Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -41,10 +60,25 @@ class FamilyPortalController extends Controller
         ]);
     }
 
+    public function edit(Request $request, $client)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('family_portal.manage'), 403);
+
+        $client = Client::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->with(['familyPortalSetting'])
+            ->findOrFail($client);
+
+        return inertia('operations/family-portal/Edit', [
+            'client' => $client,
+        ]);
+    }
+
     public function update(Request $request, $client)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('family_portal.edit'), 403);
+        abort_unless($auth && $auth->canDo('family_portal.manage'), 403);
 
         Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))

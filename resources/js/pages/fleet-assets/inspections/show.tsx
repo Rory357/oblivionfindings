@@ -1,4 +1,4 @@
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -130,7 +130,7 @@ export default function InspectionShow({ inspection }: Props) {
         >
             <Head title={`Inspection #${insp.id ?? ''}`} />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title={`Inspection #${insp.id ?? ''}`}
                     backHref="/fleet-assets/inspections"
                     backLabel="Back to Inspections"

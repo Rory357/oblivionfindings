@@ -1,5 +1,5 @@
 import { ProgressRing, FLEET_COLORS } from '@/components/fleet-charts';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -72,7 +72,7 @@ export default function DailyCheck({ vehicles: rawVehicles, summary: rawSummary 
         >
             <Head title="Daily Vehicle Checks" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Daily Vehicle Checks"
                     description="Complete a quick visual check for each vehicle at your site."
                 />

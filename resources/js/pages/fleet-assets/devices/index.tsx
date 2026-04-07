@@ -1,7 +1,7 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { FLEET_COLORS, ProgressRing } from '@/components/fleet-charts';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -131,7 +131,7 @@ export default function DevicesIndex({ devices, stats }: Props) {
         >
             <Head title="Tracking Devices" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Tracking Devices"
                     description="Manage GPS trackers and IoT devices paired to assets."
                     actions={<div className="flex gap-2"><Button variant="outline" size="sm" asChild><a href="/fleet-assets/devices?export=csv"><Download className="mr-2 h-4 w-4" />Export CSV</a></Button>

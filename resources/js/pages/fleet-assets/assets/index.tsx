@@ -1,7 +1,7 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { FLEET_COLORS } from '@/components/fleet-charts';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -124,7 +124,7 @@ export default function AssetsIndex({ assets, filters, sites, categories }: Prop
         >
             <Head title="Assets" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Assets"
                     description="Manage all organisational assets including vehicles, equipment, and property."
                     actions={

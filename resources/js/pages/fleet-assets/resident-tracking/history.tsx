@@ -1,5 +1,5 @@
 import LeafletMap from '@/components/leaflet-map';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -99,7 +99,7 @@ export default function ResidentTrackingHistory({ client, tracker, locations, fi
         >
             <Head title={`Location History - ${client?.name ?? ''}`} />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Location History"
                     subtitle={client?.name ?? ''}
                     backHref="/fleet-assets/resident-tracking"

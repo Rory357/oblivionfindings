@@ -1,4 +1,4 @@
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -109,7 +109,7 @@ export default function WorkOrderShow({ work_order }: Props) {
         >
             <Head title={`Work Order: ${wo.title ?? ''}`} />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title={wo.title ?? 'Work Order'}
                     backHref="/fleet-assets/maintenance/work-orders"
                     backLabel="Back to Work Orders"

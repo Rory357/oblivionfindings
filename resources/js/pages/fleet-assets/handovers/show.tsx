@@ -1,4 +1,4 @@
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -118,7 +118,7 @@ export default function HandoverShow({ handover: h, current_user_id }: Props) {
         >
             <Head title={`Handover #${h.id}`} />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title={`Shift Handover #${h.id}`}
                     backHref="/fleet-assets/handovers"
                     backLabel="Back to Handovers"

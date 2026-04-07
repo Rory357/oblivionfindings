@@ -1,6 +1,6 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -449,11 +449,18 @@ export default function FleetAssetsDashboard({
         >
             <Head title="Fleet & Assets" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Fleet & Assets"
                     description="Real-time fleet tracking, asset management, and operational insights."
+                    icon={<Car className="h-7 w-7" />}
+                    stats={[
+                        { label: 'Vehicles', value: stats.total_vehicles },
+                        { label: 'Online', value: stats.online_count },
+                        { label: 'Alerts', value: stats.active_alerts },
+                        { label: 'Trips Today', value: stats.trips_today },
+                    ]}
                     actions={
-                        <Button variant="ghost" size="icon" asChild>
+                        <Button variant="ghost" size="icon" className="text-white/70 hover:bg-white/10 hover:text-white" asChild>
                             <Link href="/fleet-assets/settings/notifications">
                                 <Settings className="h-4 w-4" />
                             </Link>

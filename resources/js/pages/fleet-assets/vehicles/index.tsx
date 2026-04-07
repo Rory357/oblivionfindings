@@ -2,7 +2,7 @@ import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
 import { SparklineChart, FLEET_COLORS } from '@/components/fleet-charts';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -157,7 +157,7 @@ export default function VehiclesIndex({ vehicles: rawVehicles, sites }: Props) {
         >
             <Head title="Vehicles" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title={
                         <div className="flex items-center gap-2">
                             <span>Vehicles</span>

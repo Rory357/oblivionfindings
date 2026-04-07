@@ -1,7 +1,7 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HorizontalBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -60,7 +60,7 @@ export default function ReportByHouse({
         >
             <Head title="Usage by House" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Vehicle Usage by House"
                     description="Compare vehicle usage, costs, and transport activity across houses."
                     backHref="/fleet-assets/reports"

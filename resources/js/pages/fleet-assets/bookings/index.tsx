@@ -1,7 +1,7 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { FLEET_COLORS } from '@/components/fleet-charts';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -201,7 +201,7 @@ export default function BookingsIndex({
         <AppLayout breadcrumbs={[{ title: 'Fleet & Assets', href: '/fleet-assets' }, { title: 'Bookings', href: '/fleet-assets/bookings' }]}>
             <Head title="Vehicle Bookings" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Vehicle Bookings"
                     description="Manage vehicle booking requests and availability."
                     actions={

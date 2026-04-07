@@ -343,7 +343,7 @@ class RosteringController extends Controller
             ->values()
             ->all();
 
-        $stats['coverage_gaps'] = $coverageAlerts->count();
+        $stats['coverage_gaps'] = count($coverageAlerts);
         $recurringCoverageAlignment = $canManageAny
             ? $this->shiftCoverageService->buildRecurringAlignment($weekStart, $weekEnd, $selectedSiteId)
             : ['rule_drift' => [], 'orphan_series' => []];

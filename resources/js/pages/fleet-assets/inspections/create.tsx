@@ -1,4 +1,4 @@
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -172,7 +172,7 @@ export default function InspectionCreate({ vehicles, preselected_asset_id, prese
         >
             <Head title="New Vehicle Inspection" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="New Vehicle Inspection"
                     backHref="/fleet-assets/inspections"
                     backLabel="Back to Inspections"

@@ -1,6 +1,6 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HalfMoonGauge, HorizontalBarChart, MiniBarChart, SparklineChart, FLEET_COLORS } from '@/components/fleet-charts';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -20,6 +20,7 @@ import {
     Clock,
     DollarSign,
     Download,
+    FileBarChart,
     Fuel,
     Route,
     Shield,
@@ -195,13 +196,14 @@ export default function FleetReports({
         >
             <Head title="Fleet Reports" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Fleet & Asset Reports"
                     description="Analytics and reporting for fleet operations."
+                    icon={<FileBarChart className="h-7 w-7" />}
                     actions={
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
                             <Select value={period} onValueChange={handlePeriodChange}>
-                                <SelectTrigger className="w-32">
+                                <SelectTrigger className="w-32 border-white/20 bg-white/10 text-white backdrop-blur-sm">
                                     <SelectValue />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -211,11 +213,11 @@ export default function FleetReports({
                                     <SelectItem value="1y">Last year</SelectItem>
                                 </SelectContent>
                             </Select>
-                            <Button variant="outline" size="sm" onClick={() => handleExport('trips')}>
+                            <Button variant="ghost" size="sm" className="border border-white/20 text-white hover:bg-white/10" onClick={() => handleExport('trips')}>
                                 <Download className="mr-2 h-4 w-4" />
                                 Trips CSV
                             </Button>
-                            <Button variant="outline" size="sm" onClick={() => handleExport('fuel')}>
+                            <Button variant="ghost" size="sm" className="border border-white/20 text-white hover:bg-white/10" onClick={() => handleExport('fuel')}>
                                 <Download className="mr-2 h-4 w-4" />
                                 Fuel CSV
                             </Button>

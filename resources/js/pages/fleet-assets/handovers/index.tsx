@@ -1,7 +1,7 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { FLEET_COLORS, ProgressRing } from '@/components/fleet-charts';
 import { Card, CardContent } from '@/components/ui/card';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -123,7 +123,7 @@ export default function HandoverIndex({ handovers: rawHandovers, vehicles, filte
         >
             <Head title="Shift Handovers" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Shift Handovers"
                     actions={
                         <Button asChild>

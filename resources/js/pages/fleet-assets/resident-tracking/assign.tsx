@@ -1,4 +1,4 @@
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -88,7 +88,7 @@ export default function ResidentTrackingAssign({ clients, available_trackers, as
         >
             <Head title="Assign Tracker" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Assign Tracker Device"
                     subtitle="Link a personal tracker to a resident"
                     backHref="/fleet-assets/resident-tracking"

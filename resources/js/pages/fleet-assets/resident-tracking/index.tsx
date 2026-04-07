@@ -2,7 +2,7 @@ import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { HalfMoonGauge, FLEET_COLORS } from '@/components/fleet-charts';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import LeafletMap, { type MapMarker, type MapGeofence } from '@/components/leaflet-map';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -267,7 +267,7 @@ export default function ResidentTrackingIndex({
         >
             <Head title="Resident Tracking" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Resident Tracking"
                     subtitle="Safety command center - monitor tracked residents in real-time"
                     actions={

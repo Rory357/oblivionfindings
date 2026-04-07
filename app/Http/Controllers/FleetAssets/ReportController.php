@@ -105,13 +105,12 @@ class ReportController extends Controller
             ->where(function ($q) {
                 $q->where('wof_expires_at', '<=', now()->addDays(90))
                   ->orWhere('registration_expires_at', '<=', now()->addDays(90))
-                  ->orWhere('cof_expires_at', '<=', now()->addDays(90))
-                  ->orWhere('insurance_expires_at', '<=', now()->addDays(90));
+                  ->orWhere('cof_expires_at', '<=', now()->addDays(90));
             })
-            ->get(['id', 'name', 'asset_tag', 'wof_expires_at', 'registration_expires_at', 'cof_expires_at', 'insurance_expires_at'])
+            ->get(['id', 'name', 'asset_tag', 'wof_expires_at', 'registration_expires_at', 'cof_expires_at'])
             ->flatMap(function ($vehicle) {
                 $items = [];
-                foreach (['wof_expires_at', 'registration_expires_at', 'cof_expires_at', 'insurance_expires_at'] as $field) {
+                foreach (['wof_expires_at', 'registration_expires_at', 'cof_expires_at'] as $field) {
                     if ($vehicle->$field && $vehicle->$field->lte(now()->addDays(90))) {
                         $days = now()->diffInDays($vehicle->$field, false);
                         $items[] = [

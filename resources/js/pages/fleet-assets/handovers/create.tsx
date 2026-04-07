@@ -1,4 +1,4 @@
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -138,7 +138,7 @@ export default function HandoverCreate({ vehicles, users, current_user_id }: Pro
         >
             <Head title="New Shift Handover" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="New Shift Handover"
                     backHref="/fleet-assets/handovers"
                     backLabel="Back to Handovers"

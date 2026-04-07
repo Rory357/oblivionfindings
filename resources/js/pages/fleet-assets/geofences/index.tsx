@@ -1,5 +1,5 @@
 import LeafletMap, { MapGeofence } from '@/components/leaflet-map';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import {
     AlertDialog,
@@ -180,7 +180,7 @@ export default function GeofencesIndex({ geofences, sites, filters }: Props) {
         >
             <Head title="Geofences" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Geofences"
                     description={`${(geofences ?? []).length} geofence${(geofences ?? []).length !== 1 ? 's' : ''} configured. ${activeCount} active, ${inactiveCount} inactive.`}
                     actions={

@@ -1,4 +1,4 @@
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -317,7 +317,7 @@ export default function TransportCreate({
         >
             <Head title="Log Transport" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Log Resident Transport"
                     description="Record a resident transport trip."
                     backHref="/fleet-assets/transports"

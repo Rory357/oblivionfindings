@@ -1,7 +1,7 @@
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -114,7 +114,7 @@ export default function DeviceConsentManagement({ devices, stats }: Props) {
         >
             <Head title="Device Consent Management" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Device Consent Management"
                     description="Manage location tracking consent for GPS trackers. Telemetry location data is blocked when consent is not active."
                     backHref="/fleet-assets/devices"

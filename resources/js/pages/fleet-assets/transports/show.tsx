@@ -1,5 +1,5 @@
 import LeafletMap, { type MapMarker } from '@/components/leaflet-map';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -177,7 +177,7 @@ export default function TransportShow({
         >
             <Head title={`Transport #${t.id ?? ''}`} />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title={`Transport #${t.id ?? ''}`}
                     backHref="/fleet-assets/transports"
                     backLabel="Back to Transport Logs"

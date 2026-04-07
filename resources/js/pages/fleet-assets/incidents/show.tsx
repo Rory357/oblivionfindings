@@ -1,4 +1,4 @@
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -112,7 +112,7 @@ export default function IncidentShow({ incident: inc }: Props) {
         >
             <Head title={`Incident #${inc.id}`} />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title={`Incident #${inc.id}`}
                     backHref="/fleet-assets/incidents"
                     backLabel="Back to Incidents"

@@ -1,7 +1,7 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HalfMoonGauge, HorizontalBarChart, MiniBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -175,7 +175,7 @@ export default function SchedulesIndex({
             >
                 <Head title="Service Schedules" />
                 <PageShell>
-                    <PageHeader
+                    <FleetHero
                         title="Service Schedules"
                         description="Manage recurring service and maintenance schedules for assets."
                         actions={
@@ -219,7 +219,7 @@ export default function SchedulesIndex({
         >
             <Head title="Service Schedules" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Service Schedules"
                     description="Manage recurring service and maintenance schedules for assets."
                     actions={

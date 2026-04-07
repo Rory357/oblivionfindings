@@ -1,4 +1,4 @@
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -84,7 +84,7 @@ export default function ChecklistsIndex({ templates, recent_runs }: Props) {
         >
             <Head title="Checklists" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Checklists"
                     description="Inspection and maintenance checklist templates and runs."
                     actions={

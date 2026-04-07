@@ -1,6 +1,6 @@
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import { FleetStatCard } from '@/components/fleet-stat-card';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -121,7 +121,7 @@ export default function MedicationTransitIndex({ logs, filters, clients, stats }
         >
             <Head title="Medication Transit" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Medication-in-Transit"
                     description="Track medications packed for resident transport. Controlled drug audit trail for NZ compliance."
                     backHref="/fleet-assets/transports"

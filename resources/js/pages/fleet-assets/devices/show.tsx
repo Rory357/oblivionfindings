@@ -1,5 +1,5 @@
 import LeafletMap, { MapMarker } from '@/components/leaflet-map';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -94,7 +94,7 @@ export default function DeviceShow({ tracker }: Props) {
         >
             <Head title={`Device: ${device.device_uid ?? ''}`} />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title={`${device.vendor} - ${device.device_uid}`}
                     backHref="/fleet-assets/devices"
                     backLabel="Back to Devices"

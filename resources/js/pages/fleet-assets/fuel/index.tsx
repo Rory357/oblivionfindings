@@ -1,6 +1,6 @@
 import { FleetStatCard } from '@/components/fleet-stat-card';
 import { HorizontalBarChart, FLEET_COLORS } from '@/components/fleet-charts';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -185,7 +185,7 @@ export default function FuelIndex({
         >
             <Head title="Fuel Management" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Fuel Management"
                     description="Track fuel consumption, costs, and vehicle efficiency."
                     actions={

@@ -2,7 +2,7 @@ import { FleetStatCard } from '@/components/fleet-stat-card';
 import { MiniBarChart, HorizontalBarChart, SparklineChart, FLEET_COLORS } from '@/components/fleet-charts';
 import { FleetEmptyState } from '@/components/fleet-empty-state';
 import LeafletMap from '@/components/leaflet-map';
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -219,7 +219,7 @@ export default function TripsIndex({
         >
             <Head title="Trip History" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Trip History"
                     description="View and analyse all vehicle trips across your fleet."
                     actions={

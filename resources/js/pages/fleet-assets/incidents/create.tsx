@@ -1,4 +1,4 @@
-import PageHeader from '@/components/page-header';
+import FleetHero from '@/components/fleet-hero';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -153,7 +153,7 @@ export default function IncidentCreate({ vehicles, users, preselected_asset_id }
         >
             <Head title="Report Incident" />
             <PageShell>
-                <PageHeader
+                <FleetHero
                     title="Report Incident"
                     backHref="/fleet-assets/incidents"
                     backLabel="Back to Incidents"
