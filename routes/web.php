@@ -136,7 +136,7 @@ require __DIR__.'/respite.php';
 
 // Compliance module routes
 require __DIR__.'/safeguarding.php';
-require __DIR__.'/consents.php';
+// require __DIR__.'/consents.php'; // TODO: Controllers not yet implemented
 require __DIR__.'/training.php';
 require __DIR__.'/privacy.php';
 

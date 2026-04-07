@@ -207,8 +207,8 @@ class DashboardController extends Controller
         $allSiteVehicleIds = $allSiteVehicles->flatMap->pluck('id')->all();
 
         $alertCountsBySite = ControlRoomAlert::query()
-            ->whereIn('asset_id', $allSiteVehicleIds)
-            ->whereNotIn('status', ['closed', 'resolved'])
+            ->whereIn('control_room_alerts.asset_id', $allSiteVehicleIds)
+            ->whereNotIn('control_room_alerts.status', ['closed', 'resolved'])
             ->join('assets', 'assets.id', '=', 'control_room_alerts.asset_id')
             ->selectRaw('assets.site_id, COUNT(*) as cnt')
             ->groupBy('assets.site_id')
@@ -216,8 +216,8 @@ class DashboardController extends Controller
 
         $fuelCostsBySite = $hasFuelTable
             ? FleetFuelLog::query()
-                ->whereIn('asset_id', $allSiteVehicleIds)
-                ->whereMonth('created_at', now()->month)
+                ->whereIn('fleet_fuel_logs.asset_id', $allSiteVehicleIds)
+                ->whereMonth('fleet_fuel_logs.created_at', now()->month)
                 ->join('assets', 'assets.id', '=', 'fleet_fuel_logs.asset_id')
                 ->selectRaw('assets.site_id, SUM(fleet_fuel_logs.total_cost) as total')
                 ->groupBy('assets.site_id')
