@@ -2,6 +2,7 @@
 
 namespace App\Services\ControlRoom;
 
+use App\Models\ClientMedicationAdministration;
 use App\Models\ControlRoom\AlertSla;
 use App\Models\ControlRoom\AlertQueue;
 use App\Models\ControlRoom\Device;
@@ -16,15 +17,22 @@ use App\Models\ControlRoom\SignalType;
 use App\Models\ControlRoom\SlaDefinition;
 use App\Models\ControlRoom\TriageQueue;
 use App\Models\ControlRoomAlert;
+use App\Models\ShiftSignal;
 use App\Services\AuditLogger;
 use App\Services\ControlRoom\ControlRoomNotificationService;
+use App\Services\ShiftSignalService;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 class SignalProcessingService
 {
-    public function __construct(protected ControlRoomNotificationService $notifications)
+    public function __construct(
+        protected ControlRoomNotificationService $notifications,
+        protected ?ShiftSignalService $shiftSignals = null,
+    )
     {
+        $this->shiftSignals ??= app(ShiftSignalService::class);
     }
 
     /**
@@ -156,15 +164,7 @@ class SignalProcessingService
             ?? 'medium';
 
         // Determine alert type name
-        $derivedRuleAlertType = null;
-        if ($rule && is_string($rule->name) && str_ends_with(strtolower($rule->name), ' rule')) {
-            $derivedRuleAlertType = preg_replace('/\s+rule$/i', '', $rule->name);
-        }
-
-        $alertType = $rule?->alert_type
-            ?? $derivedRuleAlertType
-            ?? $signalType?->name
-            ?? str_replace('_', ' ', ucwords($signal->signal_type_code, '_'));
+        $alertType = $this->resolveAlertType($signal, $rule);
 
         // Find appropriate queue
         $queue = null;
@@ -276,14 +276,29 @@ class SignalProcessingService
     protected function findCorrelatedAlert(Signal $signal, SignalRule $rule): ?ControlRoomAlert
     {
         $windowMinutes = $rule->dedup_window_minutes ?? 30;
+        $normalizedData = $signal->normalized_data ?? [];
 
         $query = ControlRoomAlert::query()
             ->unresolved()
-            ->where('alert_type', $signal->signalType?->name ?? str_replace('_', ' ', ucwords($signal->signal_type_code, '_')))
             ->where('triggered_at', '>=', now()->subMinutes($windowMinutes));
 
-        // Match on same device/asset/site
-        if ($signal->device_id) {
+        $query->whereIn('alert_type', $this->correlationAlertTypes($signal, $rule));
+
+        if (! empty($normalizedData['shift_id'])) {
+            $query->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.shift_id')) = ?",
+                [(string) $normalizedData['shift_id']]
+            );
+        } elseif (! empty($normalizedData['coverage_window_key'])) {
+            $query->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.coverage_window_key')) = ?",
+                [(string) $normalizedData['coverage_window_key']]
+            );
+
+            if ($signal->site_id) {
+                $query->where('site_id', $signal->site_id);
+            }
+        } elseif ($signal->device_id) {
             $query->where('device_id', $signal->device_id);
         } elseif ($signal->asset_id) {
             $query->where('asset_id', $signal->asset_id);
@@ -307,12 +322,54 @@ class SignalProcessingService
             'severity_hint' => $signal->severity_hint,
         ];
 
-        $alert->update([
-            'context' => array_merge($context, [
-                'correlated_signals' => $correlatedSignals,
-                'last_signal_at' => $signal->occurred_at->toISOString(),
-            ]),
+        $newAlertType = $this->resolveAlertType($signal);
+        $isTransition = $this->isShiftStateTransition($alert->alert_type, $newAlertType);
+        $updatedContext = array_merge($context, [
+            'signal_id' => $signal->id,
+            'signal_type_code' => $signal->signal_type_code,
+            'signal_payload' => $signal->payload,
+            'normalized_data' => $signal->normalized_data,
+            'correlated_signals' => $correlatedSignals,
+            'last_signal_at' => $signal->occurred_at->toISOString(),
         ]);
+
+        if ($isTransition) {
+            $transitions = $updatedContext['state_transitions'] ?? [];
+            $transitions[] = [
+                'from_alert_type' => $alert->alert_type,
+                'to_alert_type' => $newAlertType,
+                'from_signal_type_code' => $context['signal_type_code'] ?? null,
+                'to_signal_type_code' => $signal->signal_type_code,
+                'transitioned_at' => now()->toISOString(),
+                'reason' => 'Shift start anomaly moved from no-show risk to confirmed late start.',
+            ];
+            $updatedContext['state_transitions'] = $transitions;
+        }
+
+        $attributes = [
+            'context' => $updatedContext,
+        ];
+
+        if ($isTransition) {
+            $attributes['alert_type'] = $newAlertType;
+            $attributes['severity'] = $signal->severity_hint ?? $alert->severity;
+        } else {
+            $highestSeverity = $this->higherSeverity($alert->severity, $signal->severity_hint);
+            if ($highestSeverity !== $alert->severity) {
+                $attributes['severity'] = $highestSeverity;
+            }
+        }
+
+        $alert->update($attributes);
+
+        if ($isTransition) {
+            AuditLogger::log('controlRoom.alert.transition', $alert, [
+                'source' => 'shift_signal_pipeline',
+                'signal_id' => $signal->id,
+                'from_alert_type' => $alert->getOriginal('alert_type'),
+                'to_alert_type' => $newAlertType,
+            ]);
+        }
     }
 
     /**
@@ -347,26 +404,398 @@ class SignalProcessingService
     }
 
     /**
-     * Ingest a signal from a fleet signal.
+     * Ingest a signal from a fleet signal, enriching with operational context.
      */
     public function ingestFromFleetSignal(\App\Models\FleetSignal $fleetSignal): Signal
     {
+        // Eager-load relationships for context enrichment
+        $fleetSignal->loadMissing([
+            'asset:id,name,asset_tag,registration_number,home_site_id',
+            'asset.homeSite:id,name',
+            'trip:id,asset_id,driver_session_id,started_at,ended_at,distance_km,start_address,end_address',
+            'trip.driverSession:id,user_id',
+            'trip.driverSession.user:id,name',
+            'driverSession:id,user_id',
+            'driverSession.user:id,name',
+            'geofence:id,name,asset_id',
+        ]);
+
+        // Build fleet context for the alert
+        $fleetContext = $this->buildFleetContext($fleetSignal);
+
+        // Map fleet source to control room signal source
+        $fleetSource = \App\Models\ControlRoom\SignalSource::where('slug', 'queclink_fleet')->first();
+
+        $signalTypeCode = 'fleet_' . str_replace('.', '_', $fleetSignal->signal_type);
+
         $data = [
-            'signal_source_id' => null, // Will need to map fleet to signal source
-            'signal_type_code' => 'fleet_' . $fleetSignal->signal_type,
+            'signal_source_id' => $fleetSource?->id,
+            'signal_type_code' => $signalTypeCode,
             'asset_id' => $fleetSignal->asset_id,
+            'site_id' => $fleetSignal->asset?->home_site_id,
             'external_ref' => 'fleet_signal_' . $fleetSignal->id,
             'severity_hint' => $fleetSignal->severity_hint ?? 'medium',
             'occurred_at' => $fleetSignal->occurred_at,
-            'payload' => $fleetSignal->payload,
+            'payload' => array_merge($fleetSignal->payload ?? [], [
+                'fleet_context' => $fleetContext,
+            ]),
             'normalized_data' => [
                 'fleet_signal_id' => $fleetSignal->id,
                 'trip_id' => $fleetSignal->trip_id,
                 'driver_session_id' => $fleetSignal->driver_session_id,
+                'fleet_context' => $fleetContext,
             ],
         ];
 
         return $this->ingest($data);
+    }
+
+    /**
+     * Ingest a signal from a shift signal, enriching with staffing and care context.
+     */
+    public function ingestFromShiftSignal(ShiftSignal $shiftSignal): Signal
+    {
+        $shiftSignal->loadMissing([
+            'site:id,name',
+            'client:id,first_name,last_name,site_id',
+            'staff:id,name',
+            'shift:id,client_id,site_id,service_context_id,user_id,starts_at,ends_at,actual_starts_at,actual_ends_at,status,shift_type,location',
+            'shift.client:id,first_name,last_name,site_id',
+            'shift.site:id,name',
+            'shift.staff:id,name',
+            'shift.serviceContext:id,name,type',
+            'shift.attendanceSessions:id,shift_id,user_id,clock_in_at,clock_out_at,status',
+            'shift.medicationAdministrations:id,shift_id,client_medication_id,scheduled_for,status,administered_at,notes',
+            'shift.medicationAdministrations.medication:id,name',
+            'shift.incidents:id,shift_id,client_id,type,severity,status,occurred_at,title',
+            'shift.residentTransports:id,shift_id,resident_id,booking_id,status,pickup_location,dropoff_location',
+            'shift.residentTransports.resident:id,first_name,last_name',
+            'shift.residentTransports.booking:id,status,purpose,starts_at,ends_at',
+        ]);
+
+        $shiftContext = $this->buildShiftContext($shiftSignal);
+        $source = SignalSource::query()->where('slug', 'shift_operations')->first();
+
+        $data = [
+            'signal_source_id' => $source?->id,
+            'signal_type_code' => $shiftSignal->signal_type,
+            'site_id' => $shiftSignal->site_id ?: $shiftSignal->shift?->site_id ?: $shiftSignal->shift?->client?->site_id,
+            'client_id' => $shiftSignal->client_id ?: $shiftSignal->shift?->client_id,
+            'external_ref' => 'shift_signal_'.$shiftSignal->id,
+            'severity_hint' => $shiftSignal->severity_hint ?? 'medium',
+            'occurred_at' => $shiftSignal->occurred_at,
+            'payload' => array_merge($shiftSignal->payload ?? [], [
+                'shift_context' => $shiftContext,
+            ]),
+            'normalized_data' => [
+                'shift_signal_id' => $shiftSignal->id,
+                'shift_id' => $shiftSignal->shift_id,
+                'coverage_window_key' => $shiftSignal->payload['coverage_window_key']
+                    ?? $shiftSignal->payload['window_key']
+                    ?? null,
+                'staff_user_id' => $shiftSignal->user_id ?: $shiftSignal->shift?->user_id,
+                'site_id' => $shiftSignal->site_id ?: $shiftSignal->shift?->site_id ?: $shiftSignal->shift?->client?->site_id,
+            ],
+        ];
+
+        return $this->ingest($data);
+    }
+
+    public function resolveShiftAlertsByShift(
+        int $shiftId,
+        array $signalTypes,
+        string $reason,
+        string $resolutionSource,
+        array $metadata = [],
+    ): int {
+        $alerts = ControlRoomAlert::query()
+            ->unresolved()
+            ->where('source', 'shift_operations')
+            ->whereIn('alert_type', collect($signalTypes)->map(
+                fn (string $signalType) => $this->shiftSignals->alertTypeForSignalType($signalType)
+            )->all())
+            ->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.shift_id')) = ?",
+                [(string) $shiftId]
+            )
+            ->get();
+
+        foreach ($alerts as $alert) {
+            $this->resolveAlert($alert, $reason, $resolutionSource, $metadata);
+        }
+
+        return $alerts->count();
+    }
+
+    public function resolveShiftCoverageAlert(
+        string $coverageWindowKey,
+        string $reason,
+        string $resolutionSource,
+        array $metadata = [],
+    ): int {
+        $alerts = ControlRoomAlert::query()
+            ->unresolved()
+            ->where('source', 'shift_operations')
+            ->where('alert_type', $this->shiftSignals->alertTypeForSignalType(ShiftSignalService::TYPE_UNCOVERED))
+            ->whereRaw(
+                "JSON_UNQUOTE(JSON_EXTRACT(context, '$.normalized_data.coverage_window_key')) = ?",
+                [$coverageWindowKey]
+            )
+            ->get();
+
+        foreach ($alerts as $alert) {
+            $this->resolveAlert($alert, $reason, $resolutionSource, $metadata);
+        }
+
+        return $alerts->count();
+    }
+
+    /**
+     * Build enriched fleet context for control room alerts.
+     */
+    protected function buildFleetContext(\App\Models\FleetSignal $signal): array
+    {
+        $context = [];
+
+        // Vehicle info (non-PII operational identifiers)
+        if ($signal->asset) {
+            $context['vehicle'] = [
+                'id' => $signal->asset->id,
+                'name' => $signal->asset->name,
+                'asset_tag' => $signal->asset->asset_tag,
+                'registration' => $signal->asset->registration_number,
+                'home_site' => $signal->asset->homeSite?->name,
+            ];
+        }
+
+        // Driver reference (ID only — name available via drill-down)
+        $driver = $signal->driverSession?->user ?? $signal->trip?->driverSession?->user;
+        if ($driver) {
+            $context['driver'] = [
+                'id' => $driver->id,
+            ];
+        }
+
+        // Geofence info (non-PII)
+        if ($signal->geofence) {
+            $context['geofence'] = [
+                'id' => $signal->geofence->id,
+                'name' => $signal->geofence->name,
+            ];
+        }
+
+        // Trip info (IDs and metrics only — addresses removed)
+        if ($signal->trip) {
+            $context['trip'] = [
+                'id' => $signal->trip->id,
+                'started_at' => optional($signal->trip->started_at)->toISOString(),
+                'ended_at' => optional($signal->trip->ended_at)->toISOString(),
+                'distance_km' => $signal->trip->distance_km,
+            ];
+        }
+
+        // Linked booking and outing (reduced to IDs, status, and non-PII labels)
+        if ($signal->asset_id) {
+            $activeBooking = \App\Models\FleetVehicleBooking::query()
+                ->where('asset_id', $signal->asset_id)
+                ->where('status', 'checked_out')
+                ->first();
+
+            if ($activeBooking) {
+                $context['booking'] = [
+                    'id' => $activeBooking->id,
+                    'purpose' => $activeBooking->purpose,
+                    'booked_by_user_id' => $activeBooking->user_id,
+                ];
+
+                $outing = \App\Models\FleetOuting::query()
+                    ->where('booking_id', $activeBooking->id)
+                    ->where('status', 'active')
+                    ->withCount('residents')
+                    ->first();
+
+                if ($outing) {
+                    $context['outing'] = [
+                        'id' => $outing->id,
+                        'title' => $outing->title,
+                    ];
+                    $context['affected_resident_count'] = $outing->residents_count;
+                }
+            }
+
+            // Active transport (count + IDs only — names removed)
+            $activeTransport = \App\Models\FleetResidentTransport::query()
+                ->where('asset_id', $signal->asset_id)
+                ->where('status', 'in_progress')
+                ->first();
+
+            if ($activeTransport && ! isset($context['affected_resident_count'])) {
+                $context['affected_resident_count'] = $activeTransport->resident_id ? 1 : 0;
+            }
+        }
+
+        // Vehicle state (last known position — already consent-gated)
+        if ($signal->asset_id) {
+            $state = \App\Models\FleetVehicleStateSnapshot::query()
+                ->where('asset_id', $signal->asset_id)
+                ->first();
+
+            if ($state && $state->latitude && !$state->consent_blocked) {
+                $context['location'] = [
+                    'lat' => (float) $state->latitude,
+                    'lng' => (float) $state->longitude,
+                    'speed_kph' => $state->speed_kph,
+                    'last_seen_at' => optional($state->last_seen_at)->toISOString(),
+                ];
+            }
+        }
+
+        return $context;
+    }
+
+    /**
+     * Build enriched shift context for control room alerts.
+     */
+    protected function buildShiftContext(ShiftSignal $signal): array
+    {
+        $context = [];
+        $shift = $signal->shift;
+        $occurredAt = $signal->occurred_at ?? now();
+
+        if ($shift) {
+            $attendanceSessions = $shift->attendanceSessions ?? collect();
+            $clockIn = $attendanceSessions
+                ->whereNotNull('clock_in_at')
+                ->sortBy('clock_in_at')
+                ->first();
+            $clockOut = $attendanceSessions
+                ->whereNotNull('clock_out_at')
+                ->sortByDesc('clock_out_at')
+                ->first();
+
+            $context['shift'] = [
+                'id' => $shift->id,
+                'status' => $shift->status,
+                'shift_type' => $shift->shift_type,
+                'location' => $shift->location,
+                'planned_start' => $shift->starts_at?->toISOString(),
+                'planned_end' => $shift->ends_at?->toISOString(),
+                'actual_start' => ($shift->actual_starts_at ?? $clockIn?->clock_in_at)?->toISOString(),
+                'actual_end' => ($shift->actual_ends_at ?? $clockOut?->clock_out_at)?->toISOString(),
+            ];
+
+            // Staff reference (ID only — name available via drill-down)
+            if ($shift->staff) {
+                $context['staff'] = [
+                    'id' => $shift->staff->id,
+                ];
+            }
+
+            // Client reference (ID only — name available via drill-down)
+            if ($shift->client) {
+                $context['client'] = [
+                    'id' => $shift->client->id,
+                ];
+            }
+
+            // Site info (non-PII operational label)
+            if ($shift->site ?? $shift->client?->site) {
+                $site = $shift->site ?? $shift->client?->site;
+                $context['site'] = [
+                    'id' => $site?->id,
+                    'name' => $site?->name,
+                ];
+            }
+
+            // Service context (non-PII operational label)
+            if ($shift->serviceContext) {
+                $context['service_context'] = [
+                    'id' => $shift->serviceContext->id,
+                    'name' => $shift->serviceContext->name,
+                    'type' => $shift->serviceContext->type,
+                ];
+            }
+
+            $context['attendance'] = [
+                'open_session_count' => $attendanceSessions->where('status', 'open')->count(),
+                'latest_clock_in_at' => $clockIn?->clock_in_at?->toISOString(),
+                'latest_clock_out_at' => $clockOut?->clock_out_at?->toISOString(),
+            ];
+
+            // Medications: count and flag only — no medication names or schedule detail
+            $medicationsDueSoon = $shift->medicationAdministrations
+                ->filter(function (ClientMedicationAdministration $administration) use ($occurredAt) {
+                    if (! $administration->scheduled_for || $administration->administered_at) {
+                        return false;
+                    }
+
+                    if ($administration->status !== 'pending') {
+                        return false;
+                    }
+
+                    return $administration->scheduled_for->between(
+                        Carbon::parse($occurredAt)->copy()->subMinutes(30),
+                        Carbon::parse($occurredAt)->copy()->addHour(),
+                        true
+                    );
+                });
+
+            $context['medications_due_soon'] = [
+                'count' => $medicationsDueSoon->count(),
+                'has_due' => $medicationsDueSoon->isNotEmpty(),
+            ];
+
+            // Incidents: count and severity summary only — no titles or narrative
+            $activeIncidents = $shift->incidents
+                ->filter(fn ($incident) => ! in_array($incident->status, ['closed'], true));
+
+            $context['active_incidents'] = [
+                'count' => $activeIncidents->count(),
+                'has_active' => $activeIncidents->isNotEmpty(),
+                'highest_severity' => $activeIncidents->sortByDesc('severity')->first()?->severity,
+            ];
+
+            // Transport: count and status summary — no resident names or location detail
+            $activeTransports = $shift->residentTransports
+                ->filter(fn ($transport) => ! in_array($transport->status, ['completed', 'cancelled', 'returned'], true));
+
+            $context['transport'] = [
+                'count' => $activeTransports->count(),
+                'has_active' => $activeTransports->isNotEmpty(),
+            ];
+        }
+
+        if (! empty($signal->payload['coverage_status']) && is_array($signal->payload['coverage_status'])) {
+            $coverageStatus = $signal->payload['coverage_status'];
+            $context['coverage_window'] = [
+                'site_id' => $coverageStatus['site_id'] ?? $signal->site_id,
+                'site_name' => $coverageStatus['site_name'] ?? null,
+                'rule_id' => $coverageStatus['rule_id'] ?? null,
+                'rule_name' => $coverageStatus['rule_name'] ?? null,
+                'coverage_type' => $coverageStatus['coverage_type'] ?? null,
+                'service_context_id' => $coverageStatus['service_context_id'] ?? null,
+                'service_context_name' => $coverageStatus['service_context_name'] ?? null,
+                'window_label' => $coverageStatus['window_label'] ?? null,
+                'starts_at' => $coverageStatus['starts_at'] ?? null,
+                'ends_at' => $coverageStatus['ends_at'] ?? null,
+                'required_staff' => $coverageStatus['required_staff'] ?? null,
+                'assigned_staff' => $coverageStatus['assigned_staff'] ?? null,
+                'planned_staff' => $coverageStatus['planned_staff'] ?? null,
+                'missing_staff' => $coverageStatus['missing_staff'] ?? null,
+                'deficit' => $coverageStatus['deficit'] ?? $coverageStatus['unfilled_after_open_shifts'] ?? null,
+                'unfilled_after_open_shifts' => $coverageStatus['unfilled_after_open_shifts'] ?? null,
+                'role_shortages' => $coverageStatus['role_shortages'] ?? [],
+                'recommended_fill_action' => $coverageStatus['recommended_fill_action'] ?? null,
+                'open_shift_ids' => $coverageStatus['open_shift_ids'] ?? [],
+                'coverage_window_key' => $coverageStatus['coverage_window_key'] ?? $signal->payload['coverage_window_key'] ?? null,
+            ];
+        }
+
+        if (! empty($signal->payload['reason'])) {
+            $context['reason'] = $signal->payload['reason'];
+        }
+
+        return $context;
     }
 
     /**
@@ -385,5 +814,98 @@ class SignalProcessingService
             'occurred_at' => now(),
             'payload' => $payload,
         ]);
+    }
+
+    protected function resolveAlertType(Signal $signal, ?SignalRule $rule = null): string
+    {
+        $derivedRuleAlertType = null;
+        if ($rule && is_string($rule->name) && str_ends_with(strtolower($rule->name), ' rule')) {
+            $derivedRuleAlertType = preg_replace('/\s+rule$/i', '', $rule->name);
+        }
+
+        return $rule?->alert_type
+            ?? $derivedRuleAlertType
+            ?? $signal->signalType?->name
+            ?? str_replace('_', ' ', ucwords($signal->signal_type_code, '_'));
+    }
+
+    protected function higherSeverity(?string $current, ?string $candidate): string
+    {
+        $rank = [
+            'info' => 0,
+            'low' => 1,
+            'medium' => 2,
+            'high' => 3,
+            'critical' => 4,
+        ];
+
+        $currentSeverity = $current ?? 'medium';
+        $candidateSeverity = $candidate ?? $currentSeverity;
+
+        return ($rank[$candidateSeverity] ?? 0) > ($rank[$currentSeverity] ?? 0)
+            ? $candidateSeverity
+            : $currentSeverity;
+    }
+
+    protected function resolveAlert(
+        ControlRoomAlert $alert,
+        string $reason,
+        string $resolutionSource,
+        array $metadata = [],
+    ): void {
+        if (in_array($alert->status, ['resolved', 'closed'], true)) {
+            return;
+        }
+
+        $resolvedAt = now();
+        $context = $alert->context ?? [];
+        $resolution = array_merge([
+            'resolved_at' => $resolvedAt->toISOString(),
+            'reason' => $reason,
+            'source' => $resolutionSource,
+        ], $metadata);
+        $history = $context['resolution_history'] ?? [];
+        $history[] = $resolution;
+
+        $alert->update([
+            'status' => 'resolved',
+            'resolved_at' => $resolvedAt,
+            'resolved_by_user_id' => null,
+            'notes' => $reason,
+            'context' => array_merge($context, [
+                'resolution' => $resolution,
+                'resolution_history' => $history,
+            ]),
+        ]);
+
+        $alert->sla?->recordResolution();
+
+        AuditLogger::log('controlRoom.alert.resolve', $alert, [
+            'source' => 'shift_signal_pipeline',
+            'resolution_source' => $resolutionSource,
+        ]);
+    }
+
+    protected function correlationAlertTypes(Signal $signal, ?SignalRule $rule = null): array
+    {
+        if ($this->isShiftStartSignal((string) $signal->signal_type_code)) {
+            return [
+                $this->shiftSignals->alertTypeForSignalType(ShiftSignalService::TYPE_NO_SHOW),
+                $this->shiftSignals->alertTypeForSignalType(ShiftSignalService::TYPE_LATE_START),
+            ];
+        }
+
+        return [$this->resolveAlertType($signal, $rule)];
+    }
+
+    protected function isShiftStartSignal(string $signalTypeCode): bool
+    {
+        return in_array($signalTypeCode, ShiftSignalService::START_ANOMALY_TYPES, true);
+    }
+
+    protected function isShiftStateTransition(string $fromAlertType, string $toAlertType): bool
+    {
+        return $fromAlertType === $this->shiftSignals->alertTypeForSignalType(ShiftSignalService::TYPE_NO_SHOW)
+            && $toAlertType === $this->shiftSignals->alertTypeForSignalType(ShiftSignalService::TYPE_LATE_START);
     }
 }

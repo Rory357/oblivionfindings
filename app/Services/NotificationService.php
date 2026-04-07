@@ -94,7 +94,8 @@ class NotificationService
         $context = $extra['context'] ?? $this->buildContext($entity, $client, $extra);
 
         $payload = array_merge([
-            'kind' => 'crud',
+            'kind' => $extra['kind'] ?? 'crud',
+            'subtype' => $extra['subtype'] ?? null,
             'action' => $action,
             'entity' => $entityLabel,
             'entity_id' => $entity?->getKey(),

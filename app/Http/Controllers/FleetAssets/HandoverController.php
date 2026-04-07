@@ -7,18 +7,25 @@ use App\Models\Asset;
 use App\Models\FleetShiftHandover;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
 use Inertia\Inertia;
 
 class HandoverController extends Controller
 {
+    protected const BYPASS_PERMISSIONS = ['fleet.manage'];
+
     public function index(Request $request)
     {
+        $auth = $request->user();
+        $siteAccess = app(UserSiteAccessService::class);
+
         if (!Schema::hasTable('fleet_shift_handovers')) {
-            $vehicles = Asset::query()
-                ->where('category', 'vehicle')
-                ->orderBy('name')
+            $vehicleQuery = Asset::query()->where('category', 'vehicle')->orderBy('name');
+            $this->applyAssetSiteScope($vehicleQuery, $auth, $siteAccess);
+
+            $vehicles = $vehicleQuery
                 ->get(['id', 'name'])
                 ->map(fn ($a) => ['id' => $a->id, 'name' => $a->name])
                 ->values();
@@ -32,10 +39,12 @@ class HandoverController extends Controller
 
         $query = FleetShiftHandover::query()
             ->with([
-                'asset:id,name,registration_number',
+                'asset:id,name,registration_number,site_id,home_site_id',
                 'outgoingUser:id,name',
                 'incomingUser:id,name',
             ]);
+
+        $siteAccess->applyFleetHandoverScope($query, $auth, self::BYPASS_PERMISSIONS);
 
         if ($request->filled('vehicle_id')) {
             $query->where('asset_id', $request->input('vehicle_id'));
@@ -53,11 +62,13 @@ class HandoverController extends Controller
             $query->whereDate('handed_over_at', '<=', $request->input('date_to'));
         }
 
-        $handovers = $query
+        $paginator = $query
             ->latest('handed_over_at')
-            ->limit(100)
-            ->get()
-            ->map(fn ($h) => [
+            ->paginate(25)
+            ->withQueryString();
+
+        $handovers = [
+            'data' => $paginator->getCollection()->map(fn ($h) => [
                 'id' => $h->id,
                 'asset' => $h->asset ? [
                     'id' => $h->asset->id,
@@ -73,12 +84,19 @@ class HandoverController extends Controller
                 'status' => $h->status,
                 'handed_over_at' => optional($h->handed_over_at)->toISOString(),
                 'accepted_at' => optional($h->accepted_at)->toISOString(),
-            ])
-            ->values();
+            ])->values(),
+            'links' => $paginator->linkCollection()->toArray(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total(),
+            ],
+        ];
 
-        $vehicles = Asset::query()
-            ->where('category', 'vehicle')
-            ->orderBy('name')
+        $vehicleQuery = Asset::query()->where('category', 'vehicle')->orderBy('name');
+        $this->applyAssetSiteScope($vehicleQuery, $auth, $siteAccess);
+
+        $vehicles = $vehicleQuery
             ->get(['id', 'name'])
             ->map(fn ($a) => ['id' => $a->id, 'name' => $a->name])
             ->values();
@@ -92,9 +110,13 @@ class HandoverController extends Controller
 
     public function create(Request $request)
     {
-        $vehicles = Asset::query()
-            ->where('category', 'vehicle')
-            ->orderBy('name')
+        $auth = $request->user();
+        $siteAccess = app(UserSiteAccessService::class);
+
+        $vehicleQuery = Asset::query()->where('category', 'vehicle')->orderBy('name');
+        $this->applyAssetSiteScope($vehicleQuery, $auth, $siteAccess);
+
+        $vehicles = $vehicleQuery
             ->get(['id', 'name', 'registration_number'])
             ->map(fn ($a) => [
                 'id' => $a->id,
@@ -103,8 +125,10 @@ class HandoverController extends Controller
             ])
             ->values();
 
-        $users = User::query()
-            ->orderBy('name')
+        $userQuery = User::query()->orderBy('name');
+        $siteAccess->applyStaffScope($userQuery, $auth, self::BYPASS_PERMISSIONS);
+
+        $users = $userQuery
             ->get(['id', 'name'])
             ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
             ->values();
@@ -112,12 +136,14 @@ class HandoverController extends Controller
         return Inertia::render('fleet-assets/handovers/create', [
             'vehicles' => $vehicles,
             'users' => $users,
-            'current_user_id' => $request->user()->id,
+            'current_user_id' => $auth->id,
         ]);
     }
 
     public function store(Request $request)
     {
+        $auth = $request->user();
+
         $data = $request->validate([
             'asset_id' => ['required', 'integer', 'exists:assets,id'],
             'incoming_user_id' => ['nullable', 'integer', 'exists:users,id'],
@@ -135,9 +161,17 @@ class HandoverController extends Controller
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
 
+        $asset = Asset::findOrFail($data['asset_id']);
+        app(UserSiteAccessService::class)->assertCanAccessSiteId(
+            $auth,
+            $asset->site_id ? (int) $asset->site_id : ($asset->home_site_id ? (int) $asset->home_site_id : null),
+            self::BYPASS_PERMISSIONS,
+            'You are not authorized to create handovers for vehicles at this site.',
+        );
+
         $handover = FleetShiftHandover::create([
             'asset_id' => $data['asset_id'],
-            'outgoing_user_id' => $request->user()->id,
+            'outgoing_user_id' => $auth->id,
             'incoming_user_id' => $data['incoming_user_id'] ?? null,
             'odometer_km' => $data['odometer_km'] ?? null,
             'fuel_level' => $data['fuel_level'] ?? null,
@@ -155,7 +189,7 @@ class HandoverController extends Controller
 
         AuditLogger::log('fleet.handover.create', $handover, [
             'asset_id' => $data['asset_id'],
-            'outgoing_user_id' => $request->user()->id,
+            'outgoing_user_id' => $auth->id,
             'incoming_user_id' => $data['incoming_user_id'] ?? null,
         ]);
 
@@ -166,6 +200,13 @@ class HandoverController extends Controller
 
     public function show(FleetShiftHandover $handover)
     {
+        app(UserSiteAccessService::class)->assertCanAccessFleetHandover(
+            request()->user(),
+            $handover,
+            self::BYPASS_PERMISSIONS,
+            'You are not authorized to view handovers for vehicles at this site.',
+        );
+
         $handover->load([
             'asset:id,name,registration_number',
             'outgoingUser:id,name',
@@ -209,9 +250,22 @@ class HandoverController extends Controller
 
     public function accept(Request $request, FleetShiftHandover $handover)
     {
+        app(UserSiteAccessService::class)->assertCanAccessFleetHandover(
+            $request->user(),
+            $handover,
+            self::BYPASS_PERMISSIONS,
+            'You are not authorized to accept handovers for vehicles at this site.',
+        );
+
         if ($handover->status !== 'pending_acceptance') {
             return back()->with('error', 'This handover has already been processed.');
         }
+
+        abort_unless(
+            $handover->incoming_user_id === $request->user()->id,
+            403,
+            'Only the incoming user can accept this handover.'
+        );
 
         $handover->update([
             'status' => 'accepted',
@@ -227,6 +281,13 @@ class HandoverController extends Controller
 
     public function dispute(Request $request, FleetShiftHandover $handover)
     {
+        app(UserSiteAccessService::class)->assertCanAccessFleetHandover(
+            $request->user(),
+            $handover,
+            self::BYPASS_PERMISSIONS,
+            'You are not authorized to dispute handovers for vehicles at this site.',
+        );
+
         if ($handover->status !== 'pending_acceptance') {
             return back()->with('error', 'This handover has already been processed.');
         }
@@ -246,5 +307,26 @@ class HandoverController extends Controller
         ]);
 
         return back()->with('success', 'Handover disputed. Management has been notified.');
+    }
+
+    protected function applyAssetSiteScope(
+        \Illuminate\Database\Eloquent\Builder $query,
+        User $user,
+        UserSiteAccessService $siteAccess,
+    ): void {
+        if ($siteAccess->canBypass($user, self::BYPASS_PERMISSIONS)) {
+            return;
+        }
+
+        $siteIds = $siteAccess->accessibleSiteIds($user, self::BYPASS_PERMISSIONS);
+        if ($siteIds === []) {
+            $query->whereRaw('1 = 0');
+            return;
+        }
+
+        $query->where(function ($nested) use ($siteIds) {
+            $nested->whereIn('site_id', $siteIds)
+                ->orWhereIn('home_site_id', $siteIds);
+        });
     }
 }

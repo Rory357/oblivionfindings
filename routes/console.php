@@ -23,6 +23,7 @@ use App\Jobs\ProcessControlRoomSignals;
 use App\Jobs\PruneAssetTelemetry;
 use App\Jobs\PruneFleetTelemetry;
 use App\Jobs\SendEventReminderJob;
+use App\Jobs\ShiftAutoAlertJob;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -82,6 +83,12 @@ app(Schedule::class)
 // Control Room SLA breach checks
 app(Schedule::class)
     ->job(new CheckControlRoomSlaBreaches)
+    ->timezone('Pacific/Auckland')
+    ->everyFiveMinutes();
+
+// Shift anomaly detection and control-room signal emission
+app(Schedule::class)
+    ->job(new ShiftAutoAlertJob)
     ->timezone('Pacific/Auckland')
     ->everyFiveMinutes();
 
@@ -212,6 +219,18 @@ app(Schedule::class)
     ->job(new SendRoadmapDigestJob)
     ->timezone('Pacific/Auckland')
     ->weeklyOn(1, '07:30');
+
+// Orphan detection: completed shifts without timesheets, attendance gaps, broken linkage
+app(Schedule::class)
+    ->command('shifts:detect-orphans')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('06:00');
+
+// Stale alert auto-resolution: clears unactioned operational alerts past TTL
+app(Schedule::class)
+    ->command('control-room:auto-resolve-stale-alerts')
+    ->timezone('Pacific/Auckland')
+    ->hourly();
 
 // Privacy & Compliance Scheduled Jobs
 

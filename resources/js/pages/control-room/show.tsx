@@ -37,6 +37,7 @@ import {
     Shield,
     ShieldAlert,
     SkipForward,
+    Truck,
     Upload,
     User,
     UserCheck,
@@ -56,6 +57,17 @@ interface FleetSignal {
     severity_hint: string;
     occurred_at: string | null;
     payload: Record<string, any> | null;
+}
+
+interface FleetContext {
+    vehicle?: { id: number; name: string; asset_tag?: string; registration?: string; home_site?: string };
+    driver?: { id: number };
+    geofence?: { id: number; name: string };
+    trip?: { id: number; started_at?: string; ended_at?: string; distance_km?: number };
+    booking?: { id: number; purpose?: string; booked_by_user_id?: number };
+    outing?: { id: number; title: string };
+    affected_resident_count?: number;
+    location?: { lat: number; lng: number; speed_kph?: number; last_seen_at?: string };
 }
 
 interface UserRef {
@@ -140,6 +152,7 @@ interface Alert {
     asset: { id: number; name: string; asset_tag: string } | null;
     fleet_signal_id: number | null;
     fleet_signal: FleetSignal | null;
+    fleet_context: FleetContext | null;
     assigned_to_user_id: number | null;
     assigned_to: { id: number; name: string; email: string } | null;
     acknowledged_by: UserRef | null;
@@ -748,61 +761,117 @@ export default function ControlRoomAlertShow({
                                     </Card>
                                 )}
 
-                                {/* Fleet Signal */}
-                                {alert.fleet_signal && (
-                                    <Card>
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-base flex items-center gap-2">
-                                                <AlertTriangle className="h-4 w-4" />
-                                                Fleet Signal
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="text-sm space-y-1">
-                                            <div>
-                                                <span className="text-muted-foreground">Type:</span>{' '}
-                                                <span className="font-medium capitalize">
-                                                    {alert.fleet_signal.signal_type.replace(
-                                                        /_/g,
-                                                        ' ',
-                                                    )}
-                                                </span>
-                                            </div>
-                                            <div>
-                                                <span className="text-muted-foreground">
-                                                    Severity Hint:
-                                                </span>{' '}
-                                                <Badge
-                                                    className={`capitalize text-xs ${
-                                                        SEVERITY_BADGE[
-                                                            alert.fleet_signal.severity_hint
-                                                        ] ?? ''
-                                                    }`}
-                                                >
-                                                    {alert.fleet_signal.severity_hint}
-                                                </Badge>
-                                            </div>
-                                            {alert.fleet_signal.occurred_at && (
-                                                <div>
-                                                    <span className="text-muted-foreground">
-                                                        Occurred:
-                                                    </span>{' '}
-                                                    {fmtDate(alert.fleet_signal.occurred_at)}
+                                {/* Fleet Context */}
+                                {alert.fleet_signal && (() => {
+                                    const fc = alert.fleet_context;
+                                    const sig = alert.fleet_signal;
+                                    return (
+                                        <Card className="border-l-4 border-l-purple-500">
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-base flex items-center gap-2">
+                                                    <Truck className="h-4 w-4 text-purple-600" />
+                                                    Fleet Context
+                                                    <Badge className={`capitalize text-xs ml-auto ${SEVERITY_BADGE[sig.severity_hint] ?? ''}`}>
+                                                        {sig.severity_hint}
+                                                    </Badge>
+                                                </CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="text-sm space-y-3">
+                                                {/* Signal type + time */}
+                                                <div className="flex items-center justify-between">
+                                                    <span className="font-medium capitalize">{sig.signal_type.replace(/[._]/g, ' ')}</span>
+                                                    {sig.occurred_at && <span className="text-xs text-muted-foreground">{fmtDate(sig.occurred_at)}</span>}
                                                 </div>
-                                            )}
-                                            {alert.fleet_signal.payload &&
-                                                Object.keys(alert.fleet_signal.payload).length >
-                                                    0 && (
-                                                    <div className="mt-2 rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
-                                                        {JSON.stringify(
-                                                            alert.fleet_signal.payload,
-                                                            null,
-                                                            2,
+
+                                                {/* Vehicle */}
+                                                {fc?.vehicle && (
+                                                    <div className="rounded-md bg-muted/50 p-3 space-y-1">
+                                                        <div className="flex items-center gap-2 text-xs font-semibold uppercase text-muted-foreground"><Truck className="h-3 w-3" /> Vehicle</div>
+                                                        <div className="flex items-center justify-between">
+                                                            <Link href={`/fleet-assets/vehicles/${fc.vehicle.id}`} className="font-medium text-primary hover:underline">{fc.vehicle.name}</Link>
+                                                            {fc.vehicle.registration && <span className="text-xs text-muted-foreground">{fc.vehicle.registration}</span>}
+                                                        </div>
+                                                        {fc.vehicle.home_site && <div className="text-xs text-muted-foreground">Home: {fc.vehicle.home_site}</div>}
+                                                    </div>
+                                                )}
+
+                                                {/* Driver */}
+                                                {fc?.driver && (
+                                                    <div className="flex items-center gap-2">
+                                                        <User className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                        <span className="text-xs text-muted-foreground">Driver:</span>
+                                                        <span className="font-medium">Staff #{fc.driver.id}</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Geofence */}
+                                                {fc?.geofence && (
+                                                    <div className="flex items-center gap-2">
+                                                        <Shield className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                        <span className="text-xs text-muted-foreground">Geofence:</span>
+                                                        <span className="font-medium">{fc.geofence.name}</span>
+                                                    </div>
+                                                )}
+
+                                                {/* Affected Residents */}
+                                                {fc?.affected_resident_count != null && fc.affected_resident_count > 0 && (
+                                                    <div className="rounded-md bg-amber-50 dark:bg-amber-950/20 p-3">
+                                                        <div className="flex items-center gap-2 text-xs font-semibold uppercase text-amber-700 dark:text-amber-400"><Users className="h-3 w-3" /> Affected Residents ({fc.affected_resident_count})</div>
+                                                    </div>
+                                                )}
+
+                                                {/* Booking + Outing */}
+                                                {(fc?.booking || fc?.outing) && (
+                                                    <div className="space-y-1.5">
+                                                        {fc?.booking && (
+                                                            <div className="flex items-center gap-2 text-xs">
+                                                                <Package className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                                <span className="text-muted-foreground">Booking:</span>
+                                                                <Link href={`/fleet-assets/bookings/${fc.booking.id}`} className="text-primary hover:underline">{fc.booking.purpose ?? `#${fc.booking.id}`}</Link>
+                                                            </div>
+                                                        )}
+                                                        {fc?.outing && (
+                                                            <div className="flex items-center gap-2 text-xs">
+                                                                <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                                <span className="text-muted-foreground">Outing:</span>
+                                                                <Link href={`/fleet-assets/outings/${fc.outing.id}`} className="text-primary hover:underline">{fc.outing.title}</Link>
+                                                            </div>
                                                         )}
                                                     </div>
                                                 )}
-                                        </CardContent>
-                                    </Card>
-                                )}
+
+                                                {/* Trip */}
+                                                {fc?.trip && (
+                                                    <div className="flex items-center gap-2 text-xs">
+                                                        <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                        <span className="text-muted-foreground">Trip:</span>
+                                                        {fc.trip.distance_km != null && <span>{Number(fc.trip.distance_km).toFixed(1)} km</span>}
+                                                        {fc.trip.start_address && <span className="text-muted-foreground">from {fc.trip.start_address}</span>}
+                                                        {fc.trip.end_address && <span className="text-muted-foreground">to {fc.trip.end_address}</span>}
+                                                    </div>
+                                                )}
+
+                                                {/* Location */}
+                                                {fc?.location && (
+                                                    <div className="flex items-center gap-2 text-xs">
+                                                        <MapPin className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                                        <span className="text-muted-foreground">Last known:</span>
+                                                        <span>{fc.location.lat.toFixed(5)}, {fc.location.lng.toFixed(5)}</span>
+                                                        {fc.location.speed_kph != null && <span className="text-muted-foreground">{fc.location.speed_kph} km/h</span>}
+                                                        {fc.location.last_seen_at && <span className="text-muted-foreground">{timeAgo(fc.location.last_seen_at)}</span>}
+                                                    </div>
+                                                )}
+
+                                                {/* Fallback: raw payload if no enriched context */}
+                                                {!fc && sig.payload && Object.keys(sig.payload).length > 0 && (
+                                                    <div className="rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
+                                                        {JSON.stringify(sig.payload, null, 2)}
+                                                    </div>
+                                                )}
+                                            </CardContent>
+                                        </Card>
+                                    );
+                                })()}
 
                                 {/* Notes / Activity */}
                                 <Card>

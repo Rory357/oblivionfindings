@@ -9,6 +9,8 @@ use Inertia\Inertia;
 
 class LeaveReportController extends Controller
 {
+    use Concerns\ResolvesHrTenant;
+
     public function __construct(
         private LeaveReportService $reportService,
     ) {}
@@ -21,7 +23,8 @@ class LeaveReportController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.viewAny'), 403);
 
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        abort_unless($tenantId, 403, 'Unable to determine tenant context for leave reports.');
         $year = (int) $request->query('year', now()->year);
 
         $absenteeism = $this->reportService->getAbsenteeismReport($tenantId, $year);

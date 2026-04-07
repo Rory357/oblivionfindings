@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Shift;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 
 class ShiftReportsController extends Controller
@@ -15,11 +16,15 @@ class ShiftReportsController extends Controller
         $from = $request->query('from') ? now()->parse($request->query('from'))->startOfDay() : now()->subDays(7)->startOfDay();
         $to = $request->query('to') ? now()->parse($request->query('to'))->endOfDay() : now()->endOfDay();
 
-        $shifts = Shift::query()
-            ->with(['client:id,first_name,last_name', 'staff:id,name'])
+        $query = Shift::query()
+            ->with(['client:id,first_name,last_name,site_id', 'staff:id,name'])
             ->whereBetween('starts_at', [$from, $to])
             ->orderByDesc('starts_at')
-            ->limit(300)
+            ->limit(300);
+
+        app(UserSiteAccessService::class)->applyShiftScope($query, $user, ['shifts.manageAny']);
+
+        $shifts = $query
             ->get()
             ->map(function (Shift $s) {
                 $noteCount = \App\Models\ClientNote::query()
